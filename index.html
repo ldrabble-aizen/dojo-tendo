@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dojo Tendo</title>
+    <link rel="stylesheet" href="styles.css?v=4" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <canvas id="game" width="960" height="540" aria-label="Dojo Tendo"></canvas>
+      <div class="topbar">
+        <div class="fighter-label left">Pchan</div>
+        <div class="topbar-actions">
+          <button id="restart" type="button">Reiniciar</button>
+          <button id="mode" type="button" aria-pressed="true">CPU</button>
+          <button id="difficulty" type="button">Normal</button>
+          <button id="sound" type="button" aria-pressed="true">Sonido</button>
+          <button id="help" type="button">?</button>
+        </div>
+        <div class="fighter-label right">Akane</div>
+      </div>
+      <div id="overlay" class="overlay">
+        <h1>Dojo Tendo</h1>
+        <p id="overlay-copy" class="overlay-copy">
+          Mejor de 3 rounds. Akane juega con flechas, K golpe, L patada, O especial y P agarre.
+          Pchan arranca como CPU.
+        </p>
+        <button id="start" type="button">LUCHAR</button>
+      </div>
+    </main>
+    <script src="game.js"></script>
+  </body>
+</html>

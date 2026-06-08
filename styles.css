@@ -1,0 +1,248 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #101012;
+  color: #f8f5ef;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(16, 16, 18, 0.1), rgba(16, 16, 18, 0.85)),
+    #101012;
+}
+
+button {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 6px;
+  color: #111216;
+  background: #ffd44d;
+  font: 800 14px/1 system-ui, sans-serif;
+  letter-spacing: 0;
+  min-height: 38px;
+  padding: 0 16px;
+  cursor: pointer;
+  box-shadow: 0 8px 0 #9b651b;
+}
+
+button:active {
+  transform: translateY(4px);
+  box-shadow: 0 4px 0 #9b651b;
+}
+
+.game-shell {
+  position: relative;
+  width: min(100vw - 40px, 1180px);
+  aspect-ratio: 16 / 9;
+  min-height: 320px;
+  max-height: calc(100vh - 40px);
+  background: #111216;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.45);
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: auto;
+}
+
+.topbar {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  right: 14px;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  pointer-events: none;
+  gap: 12px;
+}
+
+.fighter-label {
+  display: none;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: clamp(12px, 1.5vw, 15px);
+  font-weight: 800;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+}
+
+.fighter-label.right {
+  text-align: right;
+}
+
+#restart {
+  pointer-events: auto;
+  min-width: 92px;
+  min-height: 34px;
+  padding-inline: 12px;
+  font-size: 12px;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+#mode {
+  min-width: 52px;
+  min-height: 34px;
+  padding-inline: 10px;
+  font-size: 12px;
+}
+
+#mode[aria-pressed="false"] {
+  background: #d8e7f3;
+  box-shadow: 0 8px 0 #557083;
+}
+
+#difficulty,
+#sound,
+#help {
+  min-width: 52px;
+  min-height: 34px;
+  padding-inline: 10px;
+  font-size: 12px;
+}
+
+#sound[aria-pressed="false"] {
+  background: #d8e7f3;
+  box-shadow: 0 8px 0 #557083;
+}
+
+#help {
+  min-width: 36px;
+  padding-inline: 0;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 24px;
+  background: rgba(5, 6, 9, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay h1 {
+  margin: 0;
+  color: #fff7d6;
+  font-size: clamp(36px, 8vw, 96px);
+  line-height: 0.92;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow:
+    0 5px 0 #7f1d1d,
+    0 16px 38px rgba(0, 0, 0, 0.82);
+}
+
+.overlay-copy {
+  width: min(680px, calc(100% - 36px));
+  margin: 0;
+  color: rgba(255, 247, 214, 0.94);
+  font-size: clamp(13px, 1.8vw, 16px);
+  font-weight: 750;
+  line-height: 1.45;
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+}
+
+#start {
+  min-width: 156px;
+  min-height: 48px;
+  font-size: 18px;
+}
+
+@media (max-width: 720px) {
+  body {
+    padding: 10px;
+  }
+
+  .game-shell {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    min-height: 220px;
+  }
+
+  .topbar {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    grid-template-columns: 1fr;
+  }
+
+  .fighter-label {
+    display: none;
+  }
+
+  .topbar-actions {
+    justify-content: center;
+  }
+
+  #restart {
+    min-width: 76px;
+    min-height: 30px;
+    font-size: 11px;
+  }
+
+  #mode {
+    min-width: 46px;
+    min-height: 30px;
+    font-size: 11px;
+  }
+
+  #difficulty,
+  #sound {
+    min-width: 54px;
+    min-height: 30px;
+    font-size: 10px;
+  }
+
+  #help {
+    min-width: 30px;
+    min-height: 30px;
+    font-size: 11px;
+  }
+
+  .topbar-actions {
+    gap: 5px;
+  }
+
+  .overlay {
+    gap: 14px;
+  }
+
+  .overlay-copy {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+}
