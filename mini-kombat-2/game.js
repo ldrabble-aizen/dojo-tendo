@@ -1422,10 +1422,13 @@ function drawFighter(f) {
   const baseY = f.y + bob;
   const stride = walking ? Math.sin(t * 14) : 0;
   const pose = getPose(f, stride);
+  const attackStretch = f.attack ? attackProgress(f.attack) * 0.035 : 0;
+  const breathing = f.grounded && f.hurt <= 0 ? Math.sin(t * 2.7 + f.x * 0.02) * 0.012 : 0;
+  const hurtSquash = f.hurt > 0 ? Math.sin(f.hurt * 0.7) * 0.012 : 0;
 
   ctx.save();
   ctx.translate(baseX, baseY);
-  ctx.scale(f.dir, 1);
+  ctx.scale(f.dir * (1 + attackStretch + hurtSquash), 1 + breathing - attackStretch * 0.28);
 
   const shadow = ctx.createRadialGradient(0, 12, 6, 0, 12, 72);
   shadow.addColorStop(0, "rgba(0,0,0,0.32)");
@@ -1456,6 +1459,7 @@ function drawFighter(f) {
   drawHead(f, crouch, walking ? stride : 0);
 
   if (f.blocking) drawGuard(f.trim, crouch);
+  if (f.hurt > 0) drawHurtRim(f, crouch);
   ctx.restore();
 
   const box = attackBox(f);
@@ -1478,6 +1482,23 @@ function drawEnergyAura(color, crouch) {
   ctx.globalAlpha = 0.09 + pulse * 0.08;
   ctx.beginPath();
   ctx.ellipse(0, -93 + crouch, 66, 92, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawHurtRim(f, crouch) {
+  const alpha = clamp(f.hurt / 18, 0, 1);
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = `rgba(255, 239, 179, ${0.34 * alpha})`;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.ellipse(0, -103 + crouch, 56, 92, -0.05, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(255, 78, 64, ${0.22 * alpha})`;
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.ellipse(0, -93 + crouch, 48, 82, 0.08, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }

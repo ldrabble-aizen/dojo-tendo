@@ -33,6 +33,7 @@ También puede abrirse directamente desde `index.html` en un navegador.
 - Uniformes con sombreado por volumen, pliegues, insignia y cinturon mejorado.
 - Manos y pies redibujados con mas detalle para que los golpes lean mejor.
 - Proporcion de cabezas ajustada para que el cuerpo y la pose tengan mas presencia.
+- Respiracion, estiramiento de ataques y destello de impacto sobre los luchadores.
 
 ## Controles
 
