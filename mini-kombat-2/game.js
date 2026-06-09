@@ -87,6 +87,7 @@ const fighterProfiles = {
     face: faces.p1,
     skin: "#f1bd98",
     build: "balanced",
+    mark: "P",
   },
   p2: {
     id: "p2",
@@ -96,6 +97,7 @@ const fighterProfiles = {
     face: faces.p2,
     skin: "#f4c3a3",
     build: "athletic",
+    mark: "A",
   },
   p3: {
     id: "p3",
@@ -105,6 +107,7 @@ const fighterProfiles = {
     face: faces.p3,
     skin: "#d6a07e",
     build: "heavy",
+    mark: "M",
   },
   p4: {
     id: "p4",
@@ -114,6 +117,7 @@ const fighterProfiles = {
     face: faces.p4,
     skin: "#edb894",
     build: "lean",
+    mark: "N",
   },
 };
 
@@ -137,7 +141,7 @@ function buildFighters() {
   ];
 }
 
-function makeFighter({ id, name, x, dir, color, trim, face, controls, skin, build }) {
+function makeFighter({ id, name, x, dir, color, trim, face, controls, skin, build, mark }) {
   return {
     id,
     name,
@@ -153,6 +157,7 @@ function makeFighter({ id, name, x, dir, color, trim, face, controls, skin, buil
     face,
     skin,
     build,
+    mark,
     controls,
     health: 100,
     energy: 52,
@@ -1362,9 +1367,9 @@ function bodySpec(f) {
       limb: 0.95,
       hand: 0.92,
       foot: 0.94,
-      headW: 108,
-      headH: 112,
-      headY: 5,
+      headW: 88,
+      headH: 94,
+      headY: 12,
       stance: 0.95,
     },
     balanced: {
@@ -1374,9 +1379,9 @@ function bodySpec(f) {
       limb: 1,
       hand: 1,
       foot: 1,
-      headW: 112,
-      headH: 116,
-      headY: 3,
+      headW: 92,
+      headH: 98,
+      headY: 10,
       stance: 1,
     },
     heavy: {
@@ -1386,9 +1391,9 @@ function bodySpec(f) {
       limb: 1.12,
       hand: 1.12,
       foot: 1.12,
-      headW: 120,
-      headH: 122,
-      headY: 0,
+      headW: 98,
+      headH: 102,
+      headY: 8,
       stance: 1.12,
     },
     lean: {
@@ -1398,9 +1403,9 @@ function bodySpec(f) {
       limb: 0.9,
       hand: 0.9,
       foot: 0.9,
-      headW: 108,
-      headH: 112,
-      headY: 4,
+      headW: 88,
+      headH: 94,
+      headY: 12,
       stance: 0.9,
     },
   };
@@ -1632,6 +1637,7 @@ function drawTorso(f, crouch) {
   const spec = bodySpec(f);
   const giLight = lighten(f.color, 28);
   const giDark = darken(f.color, 34);
+  const giDeep = darken(f.color, 48);
   const shoulder = spec.shoulder;
   const waist = spec.waist;
   const hip = spec.hip;
@@ -1719,6 +1725,35 @@ function drawTorso(f, crouch) {
   ctx.fillStyle = "rgba(0,0,0,0.18)";
   ctx.fillRect(-2, -61 + crouch, 8, 11);
 
+  ctx.fillStyle = giDeep;
+  ctx.beginPath();
+  ctx.roundRect(-11, -66 + crouch, 22, 19, 5);
+  ctx.fill();
+  ctx.fillStyle = f.trim;
+  ctx.beginPath();
+  ctx.moveTo(-7, -62 + crouch);
+  ctx.lineTo(0, -55 + crouch);
+  ctx.lineTo(7, -62 + crouch);
+  ctx.lineTo(7, -51 + crouch);
+  ctx.lineTo(0, -47 + crouch);
+  ctx.lineTo(-7, -51 + crouch);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.beginPath();
+  ctx.roundRect(waist - 18, -103 + crouch, 20, 24, 5);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(50, 28, 19, 0.3)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 247, 214, 0.82)";
+  ctx.font = "900 12px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(f.mark ?? f.name[0], waist - 8, -91 + crouch);
+  ctx.textBaseline = "alphabetic";
+
   ctx.strokeStyle = "rgba(255,255,255,0.18)";
   ctx.lineWidth = 2;
   for (const x of [-shoulder + 16, shoulder - 16]) {
@@ -1727,6 +1762,8 @@ function drawTorso(f, crouch) {
     ctx.quadraticCurveTo(x * 0.55, -82 + crouch, x * 0.78, -42 + crouch);
     ctx.stroke();
   }
+
+  drawGiFolds(f, shoulder, waist, crouch);
 }
 
 function drawHead(f, crouch, stride) {
@@ -1736,10 +1773,17 @@ function drawHead(f, crouch, stride) {
   const x = -headW / 2;
   const y = -224 + crouch + Math.abs(stride) * 2 + spec.headY;
 
-  ctx.fillStyle = f.skin ?? "#f2b891";
+  const skin = f.skin ?? "#f2b891";
+  const neckGrad = ctx.createLinearGradient(0, -125 + crouch, 0, -82 + crouch);
+  neckGrad.addColorStop(0, lighten(skin, 16));
+  neckGrad.addColorStop(1, darken(skin, 18));
+  ctx.fillStyle = neckGrad;
   ctx.beginPath();
   ctx.roundRect(-14, -122 + crouch, 28, 40, 10);
   ctx.fill();
+  ctx.strokeStyle = "rgba(43, 24, 18, 0.35)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
 
   ctx.save();
   ctx.rotate(stride * 0.018 + (f.hurt > 0 ? Math.sin(f.hurt) * 0.03 : 0));
@@ -1760,6 +1804,15 @@ function drawHead(f, crouch, stride) {
     ctx.drawImage(f.face, x - 2, y - 2, headW, headH);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
+
+    const rim = ctx.createLinearGradient(x, y, x + headW, y + headH);
+    rim.addColorStop(0, "rgba(255,255,255,0.18)");
+    rim.addColorStop(0.48, "rgba(255,255,255,0)");
+    rim.addColorStop(1, "rgba(0,0,0,0.2)");
+    ctx.fillStyle = rim;
+    ctx.beginPath();
+    ctx.roundRect(x + 7, y + 6, headW - 14, headH - 12, 20);
+    ctx.fill();
   } else {
     ctx.fillStyle = "#e5c0a9";
     ctx.fillRect(x, y, headW, headH);
@@ -1781,15 +1834,28 @@ function drawLeg(f, leg, front) {
   ctx.save();
   ctx.translate(leg.foot.x, leg.foot.y);
   ctx.rotate((leg.foot.x - leg.knee.x) * 0.012);
-  ctx.fillStyle = f.trim;
+  const footGrad = ctx.createLinearGradient(-15, -9, 27 * spec.foot, 7);
+  footGrad.addColorStop(0, darken(f.trim, 26));
+  footGrad.addColorStop(0.38, f.trim);
+  footGrad.addColorStop(1, lighten(f.trim, 16));
+  ctx.fillStyle = footGrad;
   ctx.beginPath();
-  ctx.roundRect(-14, -8, 39 * spec.foot, 14, 7);
+  ctx.roundRect(-16, -9, 43 * spec.foot, 16, 7);
   ctx.fill();
   ctx.strokeStyle = "rgba(35, 21, 17, 0.48)";
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.fillStyle = "rgba(255,255,255,0.22)";
-  ctx.fillRect(2, -6, 13, 4);
+  ctx.fillRect(1, -7, 15 * spec.foot, 4);
+  ctx.strokeStyle = "rgba(35, 21, 17, 0.34)";
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i += 1) {
+    const x = 13 + i * 5 * spec.foot;
+    ctx.beginPath();
+    ctx.moveTo(x, -6);
+    ctx.lineTo(x + 2, 4);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -1799,7 +1865,12 @@ function drawArm(f, arm, front) {
   drawLimbSegment(arm.shoulder, arm.elbow, sleeve, 21 * spec.limb, 13 * spec.limb);
   drawLimbSegment(arm.elbow, arm.hand, sleeve, 17 * spec.limb, 10 * spec.limb);
 
-  ctx.fillStyle = f.skin ?? "#f5c7a9";
+  const skin = f.skin ?? "#f5c7a9";
+  const handGrad = ctx.createRadialGradient(arm.hand.x - 4, arm.hand.y - 4, 3, arm.hand.x, arm.hand.y, 15 * spec.hand);
+  handGrad.addColorStop(0, lighten(skin, 18));
+  handGrad.addColorStop(0.62, skin);
+  handGrad.addColorStop(1, darken(skin, 22));
+  ctx.fillStyle = handGrad;
   ctx.beginPath();
   ctx.ellipse(arm.hand.x, arm.hand.y, (front ? 12 : 11) * spec.hand, 9 * spec.hand, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -1811,6 +1882,13 @@ function drawArm(f, arm, front) {
   ctx.beginPath();
   ctx.arc(arm.elbow.x, arm.elbow.y, 5.5, 0, Math.PI * 2);
   ctx.fill();
+
+  ctx.strokeStyle = "rgba(61, 34, 24, 0.28)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(arm.hand.x - 5 * spec.hand, arm.hand.y + 2);
+  ctx.quadraticCurveTo(arm.hand.x, arm.hand.y + 6, arm.hand.x + 6 * spec.hand, arm.hand.y + 1);
+  ctx.stroke();
 
   if (front && f.attack?.type === "special") {
     const progress = attackProgress(f.attack);
@@ -1827,7 +1905,11 @@ function drawLimbSegment(a, b, color, widthA, widthB) {
   const nx = Math.cos(angle + Math.PI / 2);
   const ny = Math.sin(angle + Math.PI / 2);
 
-  ctx.fillStyle = color;
+  const grad = ctx.createLinearGradient(a.x + nx * widthA * 0.45, a.y + ny * widthA * 0.45, a.x - nx * widthA * 0.45, a.y - ny * widthA * 0.45);
+  grad.addColorStop(0, lighten(color, 18));
+  grad.addColorStop(0.5, color);
+  grad.addColorStop(1, darken(color, 28));
+  ctx.fillStyle = grad;
   ctx.beginPath();
   ctx.moveTo(a.x + nx * widthA * 0.5, a.y + ny * widthA * 0.5);
   ctx.lineTo(a.x - nx * widthA * 0.5, a.y - ny * widthA * 0.5);
@@ -1846,6 +1928,31 @@ function drawLimbSegment(a, b, color, widthA, widthB) {
   ctx.moveTo(a.x, a.y);
   ctx.lineTo(b.x, b.y);
   ctx.stroke();
+}
+
+function drawGiFolds(f, shoulder, waist, crouch) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(29, 18, 14, 0.22)";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * (shoulder - 12), -112 + crouch);
+    ctx.quadraticCurveTo(side * (waist + 2), -82 + crouch, side * (waist - 5), -44 + crouch);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(side * (shoulder - 23), -98 + crouch);
+    ctx.quadraticCurveTo(side * 12, -76 + crouch, side * 17, -39 + crouch);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = "rgba(255,255,255,0.13)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-shoulder + 16, -121 + crouch);
+  ctx.quadraticCurveTo(-18, -132 + crouch, shoulder - 16, -121 + crouch);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawGuard(color, crouch) {
@@ -1973,20 +2080,30 @@ function circleRectOverlap(circle, rect) {
   return dx * dx + dy * dy <= circle.r * circle.r;
 }
 
-function darken(hex) {
-  const n = Number.parseInt(hex.slice(1), 16);
-  const r = Math.max(0, ((n >> 16) & 255) - 42);
-  const g = Math.max(0, ((n >> 8) & 255) - 42);
-  const b = Math.max(0, (n & 255) - 42);
+function darken(hex, amount = 42) {
+  const [baseR, baseG, baseB] = colorParts(hex);
+  const r = Math.max(0, baseR - amount);
+  const g = Math.max(0, baseG - amount);
+  const b = Math.max(0, baseB - amount);
   return `rgb(${r}, ${g}, ${b})`;
 }
 
 function lighten(hex, amount = 28) {
-  const n = Number.parseInt(hex.slice(1), 16);
-  const r = Math.min(255, ((n >> 16) & 255) + amount);
-  const g = Math.min(255, ((n >> 8) & 255) + amount);
-  const b = Math.min(255, (n & 255) + amount);
+  const [baseR, baseG, baseB] = colorParts(hex);
+  const r = Math.min(255, baseR + amount);
+  const g = Math.min(255, baseG + amount);
+  const b = Math.min(255, baseB + amount);
   return `rgb(${r}, ${g}, ${b})`;
+}
+
+function colorParts(color) {
+  if (color.startsWith("#")) {
+    const n = Number.parseInt(color.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  const parts = color.match(/\d+/g);
+  if (parts && parts.length >= 3) return parts.slice(0, 3).map(Number);
+  return [128, 128, 128];
 }
 
 function clamp(value, min, max) {

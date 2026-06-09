@@ -30,6 +30,9 @@ También puede abrirse directamente desde `index.html` en un navegador.
 - Menu inicial con estetica arcade oscura: metal, fuego, dorado y rojo.
 - Cabezas integradas sin aro circular durante la pelea.
 - Cuerpos y extremidades con proporciones por personaje, contornos y mas volumen arcade.
+- Uniformes con sombreado por volumen, pliegues, insignia y cinturon mejorado.
+- Manos y pies redibujados con mas detalle para que los golpes lean mejor.
+- Proporcion de cabezas ajustada para que el cuerpo y la pose tengan mas presencia.
 
 ## Controles
 
