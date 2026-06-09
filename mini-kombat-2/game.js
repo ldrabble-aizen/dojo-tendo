@@ -2547,28 +2547,35 @@ function drawParticles() {
 
 function drawKOBanner() {
   if (!winner) return;
-  const alpha = overlay.classList.contains("hidden") ? 0.82 : 0.35;
-  const banner = ctx.createLinearGradient(0, 174, W, 282);
-  banner.addColorStop(0, `rgba(48, 14, 13, ${alpha})`);
-  banner.addColorStop(0.48, `rgba(117, 32, 24, ${alpha})`);
-  banner.addColorStop(1, `rgba(48, 14, 13, ${alpha})`);
+  if (overlay.dataset.screen === "winner" && !overlay.classList.contains("hidden")) return;
+  const alpha = overlay.classList.contains("hidden") ? 0.72 : 0.28;
+  const x = W / 2 - 132;
+  const y = 108;
+  const banner = ctx.createLinearGradient(x, y, x + 264, y + 68);
+  banner.addColorStop(0, `rgba(30, 8, 7, ${alpha})`);
+  banner.addColorStop(0.48, `rgba(126, 33, 21, ${alpha})`);
+  banner.addColorStop(1, `rgba(30, 8, 7, ${alpha})`);
   ctx.fillStyle = banner;
-  ctx.fillRect(0, 170, W, 118);
-  ctx.strokeStyle = "rgba(255, 241, 189, 0.58)";
-  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(0, 170);
-  ctx.lineTo(W, 170);
-  ctx.moveTo(0, 288);
-  ctx.lineTo(W, 288);
+  ctx.roundRect(x, y, 264, 68, 8);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(255, 226, 132, ${0.5 + alpha * 0.24})`;
+  ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.fillStyle = "#fff1bd";
-  ctx.font = "900 78px system-ui, sans-serif";
+
+  ctx.fillStyle = `rgba(255, 241, 189, ${0.86 + alpha * 0.1})`;
+  ctx.font = "900 34px system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.lineWidth = 8;
-  ctx.strokeStyle = "rgba(43, 20, 16, 0.9)";
-  ctx.strokeText("K.O.", W / 2, 257);
-  ctx.fillText("K.O.", W / 2, 257);
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = `rgba(43, 20, 16, ${0.74 + alpha * 0.12})`;
+  ctx.strokeText("K.O.", W / 2, y + 29);
+  ctx.fillText("K.O.", W / 2, y + 29);
+
+  ctx.font = "800 11px system-ui, sans-serif";
+  ctx.fillStyle = `rgba(255, 226, 132, ${0.74 + alpha * 0.1})`;
+  ctx.fillText(`${winner.toUpperCase()} GANA`, W / 2, y + 52);
+  ctx.textBaseline = "alphabetic";
 }
 
 function showWinner() {

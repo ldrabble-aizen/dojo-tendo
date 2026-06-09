@@ -33,6 +33,7 @@ También puede abrirse directamente desde `index.html` en un navegador.
 - Pantalla VS previa al combate y a cada siguiente round.
 - Modo torneo con escalera de rivales CPU del Dojo Tendo.
 - Poses de victoria/derrota y feedback sonoro ampliado para menu, seleccion, VS, victoria y derrota.
+- Cartel de resultado compacto para que las poses de victoria y derrota queden visibles.
 - Cabezas integradas sin aro circular durante la pelea.
 - Cuerpos y extremidades con proporciones por personaje, contornos y mas volumen arcade.
 - Uniformes con sombreado por volumen, pliegues, insignia y cinturon mejorado.
