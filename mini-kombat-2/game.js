@@ -2579,6 +2579,8 @@ function drawKOBanner() {
 }
 
 function showWinner() {
+  flash = 0;
+  shake = 0;
   overlayMode = "winner";
   overlay.dataset.screen = "winner";
   overlay.dataset.mode = tournamentActive ? "tournament" : "match";
