@@ -34,6 +34,12 @@ También puede abrirse directamente desde `index.html` en un navegador.
 - Manos y pies redibujados con mas detalle para que los golpes lean mejor.
 - Proporcion de cabezas ajustada para que el cuerpo y la pose tengan mas presencia.
 - Respiracion, estiramiento de ataques y destello de impacto sobre los luchadores.
+- Cuellos mas cortos y solapas superiores para integrar mejor cabeza y torso.
+- Siluetas mas humanas con piernas largas, hombros firmes y poses mas atleticas.
+- Vestuario diferenciado por personaje: patrones, mangas, calzado, franjas y emblemas.
+- Sombras dinamicas pegadas al tatami segun salto, velocidad y ataque.
+- Impactos con shockwave, chispas y destello corporal.
+- Efectos de golpe con doble trazo, color por personaje y lineas de velocidad reforzadas.
 
 ## Controles
 
