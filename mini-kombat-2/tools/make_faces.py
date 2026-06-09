@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "assets" / "akypchan.png"
 SENSEI_SRC = ROOT / "assets" / "fighter-3-original.png"
 PINO_SRC = ROOT / "assets" / "fighter-4-original.png"
+NEW_FIGHTERS_SRC = ROOT / "assets" / "fighter-5-6-original.png"
 
 
 def is_checker_pixel(pixel):
@@ -130,9 +131,40 @@ def make_pino_face():
     canvas.save(ROOT / "assets" / "fighter-4-face.png")
 
 
+def make_simiolin_face():
+    image = Image.open(NEW_FIGHTERS_SRC).convert("RGBA")
+    face = remove_bright_checker_background(image.crop((0, 460, 930, 1655)))
+    face = ImageEnhance.Brightness(face).enhance(1.04)
+    face = ImageEnhance.Contrast(face).enhance(1.06)
+    face.thumbnail((520, 520), Image.Resampling.LANCZOS)
+
+    canvas = Image.new("RGBA", (520, 520), (0, 0, 0, 0))
+    x = (520 - face.width) // 2
+    y = (520 - face.height) // 2
+    canvas.alpha_composite(face, (x, y))
+    canvas.save(ROOT / "assets" / "fighter-5-face.png")
+
+
+def make_lili_face():
+    image = Image.open(NEW_FIGHTERS_SRC).convert("RGBA")
+    face = remove_bright_checker_background(image.crop((900, 520, 1775, 1665)))
+    face = ImageEnhance.Brightness(face).enhance(1.03)
+    face = ImageEnhance.Contrast(face).enhance(1.05)
+    face.thumbnail((520, 520), Image.Resampling.LANCZOS)
+
+    canvas = Image.new("RGBA", (520, 520), (0, 0, 0, 0))
+    x = (520 - face.width) // 2
+    y = (520 - face.height) // 2
+    canvas.alpha_composite(face, (x, y))
+    canvas.save(ROOT / "assets" / "fighter-6-face.png")
+
+
 make_face("fighter-1-face.png", (65, 90, 1118, 1658), 520)
 make_face("fighter-2-face.png", (1330, 112, 2195, 1720), 520, brightness=1.04)
 if SENSEI_SRC.exists():
     make_sensei_face()
 if PINO_SRC.exists():
     make_pino_face()
+if NEW_FIGHTERS_SRC.exists():
+    make_simiolin_face()
+    make_lili_face()

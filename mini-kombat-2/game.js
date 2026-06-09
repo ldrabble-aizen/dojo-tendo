@@ -24,6 +24,8 @@ const faces = {
   p2: loadImage("assets/fighter-2-face.png"),
   p3: loadImage("assets/fighter-3-face.png"),
   p4: loadImage("assets/fighter-4-face.png"),
+  p5: loadImage("assets/fighter-5-face.png"),
+  p6: loadImage("assets/fighter-6-face.png"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -132,7 +134,7 @@ const difficultyLevels = [
   { name: "Dificil", think: 10, block: 0.78, attack: 0.72, special: 0.6 },
 ];
 
-const fighterIds = ["p1", "p2", "p3", "p4"];
+const fighterIds = ["p1", "p2", "p3", "p4", "p5", "p6"];
 const leftControls = {
   left: "a",
   right: "d",
@@ -228,6 +230,44 @@ const fighterProfiles = {
       shoe: "#7fcd61",
       accent: "#d7c9ff",
       pattern: "stripe",
+    },
+  },
+  p5: {
+    id: "p5",
+    name: "Simiolin",
+    color: "#d9682d",
+    trim: "#47d5ff",
+    face: faces.p5,
+    skin: "#e5aa8d",
+    build: "lean",
+    mark: "S",
+    outfit: {
+      jacket: "#d9682d",
+      pants: "#93401f",
+      sleeve: "#47d5ff",
+      belt: "#47d5ff",
+      shoe: "#f0b44a",
+      accent: "#ffe2b0",
+      pattern: "stripe",
+    },
+  },
+  p6: {
+    id: "p6",
+    name: "Lili",
+    color: "#263f9f",
+    trim: "#ff8ac8",
+    face: faces.p6,
+    skin: "#efbd95",
+    build: "athletic",
+    mark: "L",
+    outfit: {
+      jacket: "#263f9f",
+      pants: "#192868",
+      sleeve: "#ff8ac8",
+      belt: "#ff8ac8",
+      shoe: "#f07fb7",
+      accent: "#dbe6ff",
+      pattern: "wrap",
     },
   },
 };

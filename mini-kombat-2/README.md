@@ -9,6 +9,8 @@ Personajes actuales:
 - Akane
 - Maguila
 - Pino
+- Simiolin
+- Lili
 
 ## Abrir
 
