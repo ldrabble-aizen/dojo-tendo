@@ -238,16 +238,17 @@ function loadImage(src, fallback) {
 }
 
 function buildFighters() {
-  cpuFighterId = selectedLeftId;
+  cpuFighterId = "left";
   return [
-    makeFighter({ ...fighterProfiles[selectedLeftId], x: 214, dir: 1, controls: leftControls }),
-    makeFighter({ ...fighterProfiles[selectedRightId], x: 746, dir: -1, controls: rightControls }),
+    makeFighter({ ...fighterProfiles[selectedLeftId], id: "left", profileId: selectedLeftId, x: 214, dir: 1, controls: leftControls }),
+    makeFighter({ ...fighterProfiles[selectedRightId], id: "right", profileId: selectedRightId, x: 746, dir: -1, controls: rightControls }),
   ];
 }
 
-function makeFighter({ id, name, x, dir, color, trim, face, controls, skin, build, mark, outfit }) {
+function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls, skin, build, mark, outfit }) {
   return {
     id,
+    profileId,
     name,
     x,
     y: FLOOR,
@@ -443,7 +444,7 @@ function resetRound() {
 function showHomeOverlay() {
   overlayMode = "home";
   overlay.dataset.screen = "home";
-  overlay.querySelector("h1").textContent = "Mini Kombat 2";
+  overlay.querySelector("h1").textContent = "Mini Kombat II";
   overlayCopy.textContent =
     `Elegí tus luchadores. Izquierda usa A/D, W, S, F, G, R y T${cpuEnabled ? " o CPU" : ""}. Derecha usa flechas, K, L, O y P.`;
   startButton.textContent = "LUCHAR";
@@ -2421,7 +2422,7 @@ function showWinner() {
   overlay.dataset.screen = "winner";
   overlay.querySelector("h1").textContent = matchOver ? `${winner} gana` : `${winner} gana round ${roundNumber}`;
   overlayCopy.textContent = matchOver
-    ? `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Revancha en Mini Kombat 2.`
+    ? `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Revancha en Mini Kombat II.`
     : `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Siguiente round.`;
   startButton.textContent = matchOver ? "REVANCHA" : "SIGUIENTE ROUND";
   fighterSelect.classList.add("hidden");
@@ -2523,8 +2524,6 @@ function setDifficulty(nextIndex) {
 }
 
 function setSelectedFighter(side, nextId) {
-  if (side === "left" && nextId === selectedRightId) return;
-  if (side === "right" && nextId === selectedLeftId) return;
   if (side === "left") selectedLeftId = nextId;
   else selectedRightId = nextId;
   fighters = buildFighters();
@@ -2534,17 +2533,17 @@ function setSelectedFighter(side, nextId) {
 
 function renderFighterSelect() {
   fighterSelect.innerHTML = "";
-  fighterSelect.append(makeSelectColumn("left", "Izquierda", selectedLeftId, selectedRightId));
+  fighterSelect.append(makeSelectColumn("left", "Izquierda", selectedLeftId));
 
   const versus = document.createElement("div");
   versus.className = "fighter-select-versus";
   versus.textContent = "VS";
   fighterSelect.append(versus);
 
-  fighterSelect.append(makeSelectColumn("right", "Derecha", selectedRightId, selectedLeftId));
+  fighterSelect.append(makeSelectColumn("right", "Derecha", selectedRightId));
 }
 
-function makeSelectColumn(side, title, selectedId, lockedId) {
+function makeSelectColumn(side, title, selectedId) {
   const column = document.createElement("section");
   column.className = "fighter-select-column";
   column.dataset.side = side;
@@ -2595,7 +2594,6 @@ function makeSelectColumn(side, title, selectedId, lockedId) {
     button.dataset.side = side;
     button.dataset.fighter = id;
     button.setAttribute("aria-pressed", String(id === selectedId));
-    button.disabled = id === lockedId;
     button.addEventListener("click", () => setSelectedFighter(side, id));
 
     const image = document.createElement("img");

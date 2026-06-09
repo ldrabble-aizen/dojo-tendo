@@ -1,4 +1,4 @@
-# Mini Kombat 2
+# Mini Kombat II
 
 Demo simple de pelea 2D con personajes de cabezas recortadas desde fotos.
 El juego sigue siendo una web estatica: HTML, CSS, JavaScript y assets locales.
@@ -29,6 +29,7 @@ También puede abrirse directamente desde `index.html` en un navegador.
 - Efectos de luz, polvo, golpes, aura y proyectiles se generan en canvas.
 - Menu inicial con estetica arcade oscura: metal, fuego, dorado y rojo.
 - Selector principal tipo versus con retratos destacados, stats y roster compacto.
+- Se permite elegir el mismo personaje en ambos lados para peleas espejo.
 - Cabezas integradas sin aro circular durante la pelea.
 - Cuerpos y extremidades con proporciones por personaje, contornos y mas volumen arcade.
 - Uniformes con sombreado por volumen, pliegues, insignia y cinturon mejorado.
