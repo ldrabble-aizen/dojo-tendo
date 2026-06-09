@@ -4,6 +4,8 @@ const overlay = document.querySelector("#overlay");
 const startButton = document.querySelector("#start");
 const restartButton = document.querySelector("#restart");
 const modeButton = document.querySelector("#mode");
+const tournamentButton = document.querySelector("#tournament");
+const tournamentMenuButton = document.querySelector("#tournament-menu");
 const fighterButton = document.querySelector("#fighter");
 const difficultyButton = document.querySelector("#difficulty");
 const soundButton = document.querySelector("#sound");
@@ -50,6 +52,14 @@ let particles = [];
 let floatingTexts = [];
 let audioCtx = null;
 let overlayMode = "home";
+let tournamentMode = false;
+let tournamentActive = false;
+let tournamentOpponents = [];
+let tournamentIndex = 0;
+let tournamentPlayerId = selectedRightId;
+let pendingFightStart = "match";
+let roundWinnerId = "";
+let matchWinnerId = "";
 let lastFrameTime = 0;
 let updateAccumulator = 0;
 
@@ -319,22 +329,34 @@ function playSound(type) {
   const noise = audioCtx.createBufferSource();
   const filter = audioCtx.createBiquadFilter();
   const duration = {
+    menu: 0.08,
+    select: 0.11,
+    vs: 0.42,
+    round: 0.2,
     punch: 0.08,
     kick: 0.1,
     hit: 0.16,
     block: 0.09,
     jump: 0.08,
     special: 0.34,
+    victory: 0.66,
+    lose: 0.52,
     ko: 0.72,
   }[type] ?? 0.1;
 
   const freqs = {
+    menu: [520, 720],
+    select: [360, 620],
+    vs: [110, 220],
+    round: [392, 588],
     punch: [170, 80],
     kick: [120, 64],
     hit: [90, 42],
     block: [360, 220],
     jump: [260, 410],
     special: [520, 160],
+    victory: [330, 660],
+    lose: [180, 90],
     ko: [78, 30],
   }[type] ?? [200, 100];
 
@@ -344,11 +366,11 @@ function playSound(type) {
 
   osc.frequency.setValueAtTime(freqs[0], now);
   osc.frequency.exponentialRampToValueAtTime(freqs[1], now + duration);
-  osc.type = type === "special" ? "sawtooth" : "triangle";
-  gain.gain.setValueAtTime(type === "ko" ? 0.18 : 0.1, now);
+  osc.type = type === "special" || type === "vs" ? "sawtooth" : type === "victory" ? "square" : "triangle";
+  gain.gain.setValueAtTime(type === "ko" || type === "victory" || type === "vs" ? 0.18 : 0.1, now);
   gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
   filter.type = "lowpass";
-  filter.frequency.setValueAtTime(type === "block" ? 900 : 520, now);
+  filter.frequency.setValueAtTime(type === "block" || type === "select" || type === "menu" ? 900 : type === "victory" ? 1200 : 520, now);
 
   noise.buffer = buffer;
   noise.connect(filter);
@@ -387,6 +409,8 @@ function resetGame() {
   fighters[1].wins = 0;
   roundNumber = 1;
   matchOver = false;
+  roundWinnerId = "";
+  matchWinnerId = "";
   resetRound();
 }
 
@@ -431,6 +455,8 @@ function resetRound() {
   floatingTexts = [];
   projectiles.length = 0;
   winner = "";
+  roundWinnerId = "";
+  if (!matchOver) matchWinnerId = "";
   flash = 0;
   shake = 0;
   koFreeze = 0;
@@ -444,13 +470,75 @@ function resetRound() {
 function showHomeOverlay() {
   overlayMode = "home";
   overlay.dataset.screen = "home";
+  overlay.dataset.mode = tournamentMode ? "tournament" : "match";
   overlay.querySelector("h1").textContent = "Mini Kombat II";
   overlayCopy.textContent =
-    `Elegí tus luchadores. Izquierda usa A/D, W, S, F, G, R y T${cpuEnabled ? " o CPU" : ""}. Derecha usa flechas, K, L, O y P.`;
-  startButton.textContent = "LUCHAR";
+    tournamentMode
+      ? "Modo torneo: elegí tu luchador a la derecha y el primer rival a la izquierda. Ganá la escalera completa del Dojo Tendo."
+      : `Elegí tus luchadores. Izquierda usa A/D, W, S, F, G, R y T${cpuEnabled ? " o CPU" : ""}. Derecha usa flechas, K, L, O y P.`;
+  startButton.textContent = tournamentMode ? "INICIAR TORNEO" : "LUCHAR";
   renderFighterSelect();
   fighterSelect.classList.remove("hidden");
   overlay.classList.remove("hidden");
+}
+
+function showVersusOverlay(startKind = "match") {
+  pendingFightStart = startKind;
+  overlayMode = "versus";
+  overlay.dataset.screen = "versus";
+  overlay.dataset.mode = tournamentActive ? "tournament" : "match";
+  const roundLabel = startKind === "round" ? `ROUND ${toRoman(roundNumber)}` : tournamentActive ? `RIVAL ${tournamentIndex + 1}/${tournamentOpponents.length}` : `ROUND ${toRoman(roundNumber)}`;
+  overlay.querySelector("h1").textContent = `${fighters[0].name} VS ${fighters[1].name}`;
+  overlayCopy.textContent = tournamentActive
+    ? `Torneo Dojo Tendo. ${roundLabel}. ${fighters[1].name} busca avanzar en la escalera.`
+    : `${roundLabel}. Preparados para pelear.`;
+  renderVersusPanel(roundLabel);
+  startButton.textContent = "COMENZAR";
+  fighterSelect.classList.remove("hidden");
+  overlay.classList.remove("hidden");
+  playSound("vs");
+}
+
+function beginVersusFight() {
+  if (pendingFightStart === "match") {
+    fighters[0].wins = 0;
+    fighters[1].wins = 0;
+    roundNumber = 1;
+    matchOver = false;
+    matchWinnerId = "";
+  }
+  resetRound();
+  playSound("round");
+}
+
+function startTournament() {
+  ensureAudio();
+  setCpuMode(true);
+  tournamentMode = true;
+  tournamentActive = true;
+  tournamentPlayerId = selectedRightId;
+  tournamentOpponents = [selectedLeftId, ...fighterIds.filter((id) => id !== selectedLeftId)];
+  tournamentIndex = 0;
+  selectedRightId = tournamentPlayerId;
+  selectedLeftId = tournamentOpponents[tournamentIndex];
+  fighters = buildFighters();
+  updateFighterLabels();
+  showVersusOverlay("match");
+}
+
+function advanceTournament() {
+  const playerWon = matchWinnerId === "right";
+  if (playerWon && tournamentIndex < tournamentOpponents.length - 1) {
+    tournamentIndex += 1;
+    selectedLeftId = tournamentOpponents[tournamentIndex];
+    selectedRightId = tournamentPlayerId;
+    fighters = buildFighters();
+    updateFighterLabels();
+    showVersusOverlay("match");
+    return;
+  }
+  tournamentActive = false;
+  showHomeOverlay();
 }
 
 function showPauseOverlay() {
@@ -641,14 +729,16 @@ function update() {
   if (!winner && (a.health <= 0 || b.health <= 0)) {
     const winnerFighter = a.health > b.health ? a : b;
     winner = winnerFighter.name;
+    roundWinnerId = winnerFighter.id;
     winnerFighter.wins += 1;
     matchOver = winnerFighter.wins >= 2;
+    if (matchOver) matchWinnerId = winnerFighter.id;
     running = false;
     koFreeze = 18;
     shake = 16;
     flash = 16;
     addText(winnerFighter.x, winnerFighter.y - 190, matchOver ? "MATCH" : "ROUND", "#fff1bd");
-    playSound("ko");
+    playSound(matchOver ? tournamentActive && winnerFighter.id !== "right" ? "lose" : "victory" : "ko");
     setTimeout(showWinner, 760);
   }
 
@@ -1609,6 +1699,7 @@ function drawFighter(f) {
   if (f.blocking) drawGuard(f.trim, crouch);
   if (f.hitFlash > 0) drawHitFlash(f, crouch);
   if (f.hurt > 0) drawHurtRim(f, crouch);
+  if (winner) drawResultPoseEffect(f, crouch);
   ctx.restore();
 
   const box = attackBox(f);
@@ -1673,6 +1764,43 @@ function drawHitFlash(f, crouch) {
   ctx.moveTo(22, -134 + crouch);
   ctx.lineTo(-26, -66 + crouch);
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawResultPoseEffect(f, crouch) {
+  ctx.save();
+  if (f.id === roundWinnerId) {
+    ctx.globalCompositeOperation = "screen";
+    for (let i = 0; i < 5; i += 1) {
+      const angle = roundFrame * 0.035 + i * 1.26;
+      const x = Math.cos(angle) * 44;
+      const y = -148 + crouch + Math.sin(angle * 1.4) * 18;
+      ctx.fillStyle = colorWithAlpha(f.trim, 0.45);
+      ctx.beginPath();
+      ctx.moveTo(x, y - 8);
+      ctx.lineTo(x + 4, y - 2);
+      ctx.lineTo(x + 10, y);
+      ctx.lineTo(x + 4, y + 3);
+      ctx.lineTo(x, y + 10);
+      ctx.lineTo(x - 4, y + 3);
+      ctx.lineTo(x - 10, y);
+      ctx.lineTo(x - 4, y - 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else {
+    ctx.strokeStyle = "rgba(255, 241, 189, 0.58)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, -170 + crouch, 21, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255, 241, 189, 0.62)";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.arc(-18 + i * 18, -171 + crouch + Math.sin(roundFrame * 0.12 + i) * 4, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   ctx.restore();
 }
 
@@ -1845,6 +1973,32 @@ function getPose(f, stride) {
     base.frontLeg.foot.y -= 18;
     base.backLeg.knee.y -= 10;
     base.backLeg.foot.y -= 8;
+  }
+
+  if (winner) {
+    if (f.id === roundWinnerId) {
+      base.torsoTilt = -0.08;
+      base.frontArm = {
+        shoulder: { x: shoulderX, y: shoulderY },
+        elbow: { x: 42 * spec.stance, y: -155 + crouch },
+        hand: { x: 54 * spec.stance, y: -184 + crouch },
+      };
+      base.backArm = {
+        shoulder: { x: -shoulderX, y: shoulderY + 4 },
+        elbow: { x: -42 * spec.stance, y: -151 + crouch },
+        hand: { x: -54 * spec.stance, y: -178 + crouch },
+      };
+      base.frontLeg.foot.x += 8 * spec.stance;
+      base.backLeg.foot.x -= 8 * spec.stance;
+    } else {
+      base.torsoTilt = 0.2;
+      base.frontArm.hand = { x: 48 * spec.stance, y: -42 + crouch };
+      base.backArm.hand = { x: -40 * spec.stance, y: -38 + crouch };
+      base.frontLeg.knee.y += 10;
+      base.backLeg.knee.y += 12;
+      base.frontLeg.foot.x += 12 * spec.stance;
+      base.backLeg.foot.x -= 14 * spec.stance;
+    }
   }
 
   return base;
@@ -2420,11 +2574,24 @@ function drawKOBanner() {
 function showWinner() {
   overlayMode = "winner";
   overlay.dataset.screen = "winner";
-  overlay.querySelector("h1").textContent = matchOver ? `${winner} gana` : `${winner} gana round ${roundNumber}`;
-  overlayCopy.textContent = matchOver
-    ? `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Revancha en Mini Kombat II.`
-    : `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Siguiente round.`;
-  startButton.textContent = matchOver ? "REVANCHA" : "SIGUIENTE ROUND";
+  overlay.dataset.mode = tournamentActive ? "tournament" : "match";
+  if (matchOver && tournamentActive) {
+    const playerWon = matchWinnerId === "right";
+    const hasNext = playerWon && tournamentIndex < tournamentOpponents.length - 1;
+    overlay.querySelector("h1").textContent = playerWon && !hasNext ? `${winner} campeón` : playerWon ? `${winner} avanza` : "Torneo perdido";
+    overlayCopy.textContent = playerWon
+      ? hasNext
+        ? `Rival ${tournamentIndex + 1}/${tournamentOpponents.length} superado. Próximo combate en el Dojo Tendo.`
+        : `Ganaste la escalera completa del Dojo Tendo. ${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}.`
+      : `${winner} ganó el match. Volvé al selector para reintentar el torneo.`;
+    startButton.textContent = hasNext ? "SIGUIENTE RIVAL" : "VOLVER";
+  } else {
+    overlay.querySelector("h1").textContent = matchOver ? `${winner} gana` : `${winner} gana round ${roundNumber}`;
+    overlayCopy.textContent = matchOver
+      ? `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Revancha en Mini Kombat II.`
+      : `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Siguiente round.`;
+    startButton.textContent = matchOver ? "REVANCHA" : "SIGUIENTE ROUND";
+  }
   fighterSelect.classList.add("hidden");
   overlay.classList.remove("hidden");
 }
@@ -2518,21 +2685,34 @@ function setCpuMode(enabled) {
   if (!fighterSelect.classList.contains("hidden")) renderFighterSelect();
 }
 
+function setTournamentMode(enabled) {
+  tournamentMode = enabled;
+  if (tournamentMode) setCpuMode(true);
+  tournamentButton.textContent = tournamentMode ? "Torneo ON" : "Torneo";
+  tournamentButton.setAttribute("aria-pressed", String(tournamentMode));
+  tournamentMenuButton.textContent = tournamentMode ? "TORNEO ON" : "TORNEO OFF";
+  tournamentMenuButton.setAttribute("aria-pressed", String(tournamentMode));
+  if (!running || overlayMode === "home") showHomeOverlay();
+}
+
 function setDifficulty(nextIndex) {
   cpuDifficulty = nextIndex;
   difficultyButton.textContent = difficultyLevels[cpuDifficulty].name;
 }
 
 function setSelectedFighter(side, nextId) {
+  ensureAudio();
   if (side === "left") selectedLeftId = nextId;
   else selectedRightId = nextId;
   fighters = buildFighters();
   updateFighterLabels();
   renderFighterSelect();
+  playSound("select");
 }
 
 function renderFighterSelect() {
   fighterSelect.innerHTML = "";
+  fighterSelect.classList.remove("versus-panel");
   fighterSelect.append(makeSelectColumn("left", "Izquierda", selectedLeftId));
 
   const versus = document.createElement("div");
@@ -2541,6 +2721,45 @@ function renderFighterSelect() {
   fighterSelect.append(versus);
 
   fighterSelect.append(makeSelectColumn("right", "Derecha", selectedRightId));
+}
+
+function renderVersusPanel(roundLabel) {
+  fighterSelect.innerHTML = "";
+  fighterSelect.classList.add("versus-panel");
+  fighterSelect.append(makeVersusCard(fighters[0], "Rival"));
+
+  const center = document.createElement("div");
+  center.className = "versus-panel-center";
+  const label = document.createElement("span");
+  label.textContent = roundLabel;
+  center.append(label);
+  const mark = document.createElement("strong");
+  mark.textContent = "VS";
+  center.append(mark);
+  fighterSelect.append(center);
+
+  fighterSelect.append(makeVersusCard(fighters[1], "Jugador"));
+}
+
+function makeVersusCard(fighter, role) {
+  const card = document.createElement("section");
+  card.className = "versus-card";
+  card.style.setProperty("--fighter-color", fighter.color);
+  card.style.setProperty("--fighter-trim", fighter.trim);
+
+  const image = document.createElement("img");
+  image.src = fighter.face.src;
+  image.alt = fighter.name;
+  card.append(image);
+
+  const name = document.createElement("strong");
+  name.textContent = fighter.name;
+  card.append(name);
+
+  const caption = document.createElement("span");
+  caption.textContent = role;
+  card.append(caption);
+  return card;
 }
 
 function makeSelectColumn(side, title, selectedId) {
@@ -2634,6 +2853,10 @@ function makeMenuStats(profile) {
   return list;
 }
 
+function toRoman(value) {
+  return ["0", "I", "II", "III", "IV", "V"][value] ?? String(value);
+}
+
 function updateFighterLabels() {
   fighterButton.textContent = "Personajes";
   document.querySelector(".fighter-label.left").textContent = cpuEnabled
@@ -2652,7 +2875,16 @@ function advanceOverlay() {
   ensureAudio();
   if (overlayMode === "home") {
     paused = false;
-    resetGame();
+    playSound("menu");
+    if (tournamentMode) startTournament();
+    else {
+      tournamentActive = false;
+      showVersusOverlay("match");
+    }
+    return;
+  }
+  if (overlayMode === "versus") {
+    beginVersusFight();
     return;
   }
   if (paused) {
@@ -2661,7 +2893,11 @@ function advanceOverlay() {
   }
   if (winner && !matchOver) {
     roundNumber += 1;
-    resetRound();
+    showVersusOverlay("round");
+    return;
+  }
+  if (matchOver && tournamentActive) {
+    advanceTournament();
     return;
   }
   if (overlayMode === "help") {
@@ -2709,17 +2945,43 @@ window.addEventListener("keyup", (event) => {
 
 startButton.addEventListener("click", advanceOverlay);
 restartButton.addEventListener("click", resetGame);
-modeButton.addEventListener("click", () => setCpuMode(!cpuEnabled));
+modeButton.addEventListener("click", () => {
+  ensureAudio();
+  if (tournamentMode) setTournamentMode(false);
+  setCpuMode(!cpuEnabled);
+  playSound("menu");
+});
+tournamentButton.addEventListener("click", () => {
+  ensureAudio();
+  setTournamentMode(!tournamentMode);
+  playSound("menu");
+});
+tournamentMenuButton.addEventListener("click", () => {
+  ensureAudio();
+  setTournamentMode(!tournamentMode);
+  playSound("menu");
+});
 fighterButton.addEventListener("click", () => {
+  ensureAudio();
   if (running && !winner) paused = true;
+  playSound("menu");
   showHomeOverlay();
 });
-difficultyButton.addEventListener("click", () => setDifficulty((cpuDifficulty + 1) % difficultyLevels.length));
+difficultyButton.addEventListener("click", () => {
+  ensureAudio();
+  setDifficulty((cpuDifficulty + 1) % difficultyLevels.length);
+  playSound("menu");
+});
 soundButton.addEventListener("click", () => {
   ensureAudio();
   setSound(!soundEnabled);
+  playSound("menu");
 });
-helpButton.addEventListener("click", showHelpOverlay);
+helpButton.addEventListener("click", () => {
+  ensureAudio();
+  playSound("menu");
+  showHelpOverlay();
+});
 updateFighterLabels();
 
 function handleActionKey(key) {
@@ -2735,6 +2997,7 @@ function handleActionKey(key) {
 }
 
 setCpuMode(cpuEnabled);
+setTournamentMode(tournamentMode);
 setDifficulty(cpuDifficulty);
 setSound(soundEnabled);
 showHomeOverlay();

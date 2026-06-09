@@ -140,6 +140,7 @@ canvas {
 
 #difficulty,
 #fighter,
+#tournament,
 #sound,
 #help {
   min-width: 52px;
@@ -152,6 +153,12 @@ canvas {
   min-width: 106px;
   background: #9be7ff;
   box-shadow: 0 8px 0 #2b6f86;
+}
+
+#tournament[aria-pressed="true"] {
+  color: #fff7d6;
+  background: #c83b22;
+  box-shadow: 0 8px 0 #64140f, 0 0 18px rgba(238, 59, 28, 0.32);
 }
 
 #sound[aria-pressed="false"] {
@@ -489,6 +496,43 @@ canvas {
     inset 0 1px 0 rgba(255,255,255,0.5);
 }
 
+.overlay-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+#tournament-menu {
+  min-width: 128px;
+  min-height: 50px;
+  color: #ffe9a6;
+  background:
+    linear-gradient(180deg, rgba(46, 49, 56, 0.98), rgba(16, 13, 13, 0.98));
+  border-color: rgba(255, 228, 131, 0.52);
+  font: 900 14px/1 system-ui, sans-serif;
+  box-shadow:
+    0 8px 0 #130908,
+    inset 0 1px 0 rgba(255,255,255,0.14);
+}
+
+#tournament-menu[aria-pressed="true"] {
+  color: #fff7d6;
+  background:
+    linear-gradient(180deg, #f0c84d 0%, #c83b22 48%, #46100c 100%);
+  border-color: #ffe483;
+  box-shadow:
+    0 8px 0 #1d0706,
+    0 0 24px rgba(238, 59, 28, 0.42),
+    inset 0 1px 0 rgba(255,255,255,0.44);
+}
+
+.overlay:not([data-screen="home"]) #tournament-menu {
+  display: none;
+}
+
 .overlay[data-screen="home"] {
   gap: 8px;
 }
@@ -712,6 +756,96 @@ canvas {
   transform: translateY(-2px);
 }
 
+.overlay[data-screen="versus"] {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 215, 94, 0.22), transparent 28%),
+    linear-gradient(90deg, rgba(47, 10, 9, 0.86), rgba(4, 5, 7, 0.78) 48%, rgba(8, 39, 42, 0.78)),
+    url("assets/dojo-premium-bg.webp") center / cover;
+}
+
+.overlay[data-screen="versus"] h1 {
+  max-width: min(960px, 92vw);
+  font-family: Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+  font-size: clamp(40px, 7vw, 82px);
+}
+
+.versus-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 110px minmax(220px, 1fr);
+  align-items: center;
+  width: min(930px, calc(100% - 40px));
+  gap: 16px;
+}
+
+.versus-card {
+  display: grid;
+  justify-items: center;
+  min-height: 230px;
+  padding: 20px 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--fighter-trim) 58%, #fff1bd);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 16%, color-mix(in srgb, var(--fighter-trim) 24%, transparent), transparent 38%),
+    linear-gradient(180deg, color-mix(in srgb, var(--fighter-color) 36%, rgba(12, 12, 14, 0.94)), rgba(8, 8, 10, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.14),
+    0 22px 38px rgba(0,0,0,0.44);
+}
+
+.versus-card img {
+  width: 132px;
+  height: 132px;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 12px rgba(0,0,0,0.68));
+}
+
+.versus-card strong {
+  margin-top: 12px;
+  color: #fff7d6;
+  font: 900 clamp(26px, 4vw, 46px)/0.9 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 #250806, 0 0 18px color-mix(in srgb, var(--fighter-trim) 48%, transparent);
+}
+
+.versus-card span {
+  margin-top: 8px;
+  color: #ffe9a6;
+  font: 900 12px/1 system-ui, sans-serif;
+  text-transform: uppercase;
+}
+
+.versus-panel-center {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  color: #fff1bd;
+  text-align: center;
+}
+
+.versus-panel-center span {
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 228, 131, 0.4);
+  border-radius: 6px;
+  background: rgba(0,0,0,0.36);
+  font: 900 12px/1 system-ui, sans-serif;
+}
+
+.versus-panel-center strong {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border: 1px solid rgba(255, 228, 131, 0.72);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(255, 239, 164, 0.32), transparent 42%),
+    linear-gradient(180deg, rgba(139, 27, 18, 0.98), rgba(22, 7, 6, 0.98));
+  box-shadow: 0 0 34px rgba(255, 193, 62, 0.34);
+  font: 900 38px/1 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+  text-shadow: 0 3px 0 #260706;
+}
+
 @media (max-width: 720px) {
   body {
     padding: 10px;
@@ -751,6 +885,7 @@ canvas {
   }
 
   #fighter,
+  #tournament,
   #difficulty,
   #sound {
     min-width: 54px;
@@ -901,6 +1036,45 @@ canvas {
     min-width: 144px;
     min-height: 42px;
     font-size: 15px;
+  }
+
+  .versus-panel {
+    grid-template-columns: 1fr;
+    width: min(520px, calc(100% - 24px));
+    gap: 9px;
+  }
+
+  .versus-card {
+    grid-template-columns: 66px minmax(0, 1fr);
+    justify-items: start;
+    align-items: center;
+    min-height: 86px;
+    padding: 9px;
+  }
+
+  .versus-card img {
+    width: 62px;
+    height: 62px;
+  }
+
+  .versus-card strong {
+    margin-top: 0;
+    font-size: clamp(22px, 8vw, 30px);
+  }
+
+  .versus-card span {
+    margin-top: 4px;
+  }
+
+  .versus-panel-center {
+    gap: 5px;
+  }
+
+  .versus-panel-center strong {
+    width: 56px;
+    height: 38px;
+    border-radius: 8px;
+    font-size: 22px;
   }
 
   .overlay-copy {

@@ -30,6 +30,9 @@ También puede abrirse directamente desde `index.html` en un navegador.
 - Menu inicial con estetica arcade oscura: metal, fuego, dorado y rojo.
 - Selector principal tipo versus con retratos destacados, stats y roster compacto.
 - Se permite elegir el mismo personaje en ambos lados para peleas espejo.
+- Pantalla VS previa al combate y a cada siguiente round.
+- Modo torneo con escalera de rivales CPU del Dojo Tendo.
+- Poses de victoria/derrota y feedback sonoro ampliado para menu, seleccion, VS, victoria y derrota.
 - Cabezas integradas sin aro circular durante la pelea.
 - Cuerpos y extremidades con proporciones por personaje, contornos y mas volumen arcade.
 - Uniformes con sombreado por volumen, pliegues, insignia y cinturon mejorado.

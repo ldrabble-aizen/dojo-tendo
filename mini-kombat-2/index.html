@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mini Kombat II</title>
-    <link rel="stylesheet" href="styles.css?v=14" />
+    <link rel="stylesheet" href="styles.css?v=16" />
   </head>
   <body>
     <main class="game-shell">
@@ -14,6 +14,7 @@
         <div class="topbar-actions">
           <button id="restart" type="button">Reiniciar</button>
           <button id="mode" type="button" aria-pressed="true">CPU</button>
+          <button id="tournament" type="button" aria-pressed="false">Torneo</button>
           <button id="fighter" type="button">Personajes</button>
           <button id="difficulty" type="button">Normal</button>
           <button id="sound" type="button" aria-pressed="true">Sonido</button>
@@ -28,9 +29,12 @@
           Elegi los personajes y preparate para pelear.
         </p>
         <div id="fighter-select" class="fighter-select" aria-label="Seleccion de personajes"></div>
-        <button id="start" type="button">LUCHAR</button>
+        <div class="overlay-actions">
+          <button id="tournament-menu" type="button" aria-pressed="false">TORNEO OFF</button>
+          <button id="start" type="button">LUCHAR</button>
+        </div>
       </div>
     </main>
-    <script src="game.js?v=14"></script>
+    <script src="game.js?v=16"></script>
   </body>
 </html>
