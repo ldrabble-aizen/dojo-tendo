@@ -1,5 +1,5 @@
 const canvas = document.querySelector("#game");
-const ctx = canvas.getContext("2d");
+let ctx = canvas.getContext("2d");
 const overlay = document.querySelector("#overlay");
 const startButton = document.querySelector("#start");
 const restartButton = document.querySelector("#restart");
@@ -50,6 +50,71 @@ let particles = [];
 let floatingTexts = [];
 let audioCtx = null;
 let overlayMode = "home";
+let lastFrameTime = 0;
+let updateAccumulator = 0;
+
+const STEP_MS = 1000 / 60;
+const MAX_UPDATE_STEPS = 3;
+const stageCache = document.createElement("canvas");
+stageCache.width = W;
+stageCache.height = H;
+let stageCacheReady = false;
+let stageCacheMode = "";
+const colorPartsCache = new Map();
+const lightenCache = new Map();
+const darkenCache = new Map();
+const alphaColorCache = new Map();
+
+const BODY_SPECS = {
+  athletic: {
+    shoulder: 41,
+    waist: 27,
+    hip: 34,
+    limb: 0.98,
+    hand: 0.92,
+    foot: 0.94,
+    headW: 88,
+    headH: 94,
+    headY: 18,
+    stance: 0.95,
+  },
+  balanced: {
+    shoulder: 44,
+    waist: 30,
+    hip: 37,
+    limb: 1.03,
+    hand: 1,
+    foot: 1,
+    headW: 92,
+    headH: 98,
+    headY: 16,
+    stance: 1,
+  },
+  heavy: {
+    shoulder: 50,
+    waist: 36,
+    hip: 43,
+    limb: 1.14,
+    hand: 1.12,
+    foot: 1.12,
+    headW: 98,
+    headH: 102,
+    headY: 14,
+    stance: 1.12,
+  },
+  lean: {
+    shoulder: 39,
+    waist: 26,
+    hip: 32,
+    limb: 0.94,
+    hand: 0.9,
+    foot: 0.9,
+    headW: 88,
+    headH: 94,
+    headY: 18,
+    stance: 0.9,
+  },
+};
 
 const difficultyLevels = [
   { name: "Facil", think: 28, block: 0.35, attack: 0.38, special: 0.2 },
@@ -161,6 +226,9 @@ let fighters = buildFighters();
 
 function loadImage(src, fallback) {
   const image = new Image();
+  image.onload = () => {
+    stageCacheReady = false;
+  };
   if (fallback) image.onerror = () => {
     image.onerror = null;
     image.src = fallback;
@@ -194,7 +262,7 @@ function makeFighter({ id, name, x, dir, color, trim, face, controls, skin, buil
     skin,
     build,
     mark,
-    outfit,
+    outfit: normalizeOutfit(color, trim, outfit),
     controls,
     health: 100,
     energy: 52,
@@ -219,6 +287,18 @@ function makeFighter({ id, name, x, dir, color, trim, face, controls, skin, buil
       grab: false,
       think: 0,
     },
+  };
+}
+
+function normalizeOutfit(color, trim, outfit = {}) {
+  return {
+    jacket: outfit.jacket ?? color,
+    pants: outfit.pants ?? darken(color, 16),
+    sleeve: outfit.sleeve ?? trim,
+    belt: outfit.belt ?? trim,
+    shoe: outfit.shoe ?? trim,
+    accent: outfit.accent ?? lighten(trim, 18),
+    pattern: outfit.pattern ?? "classic",
   };
 }
 
@@ -321,6 +401,7 @@ function resetRound() {
     attack: null,
     cooldown: 0,
     hurt: 0,
+    hitFlash: 0,
     blocking: false,
     grounded: true,
     specialCooldown: 0,
@@ -338,6 +419,7 @@ function resetRound() {
     attack: null,
     cooldown: 0,
     hurt: 0,
+    hitFlash: 0,
     blocking: false,
     grounded: true,
     specialCooldown: 0,
@@ -872,7 +954,6 @@ function draw() {
     ctx.fillRect(0, 0, W, H);
   }
 
-  requestAnimationFrame(loop);
 }
 
 function drawFloatingTexts() {
@@ -926,30 +1007,61 @@ function drawCountdown() {
 }
 
 function drawStage() {
-  if (stageArt.complete && stageArt.naturalWidth > 0) {
-    drawCoverImage(stageArt, 0, 0, W, H);
-    drawPremiumStageOverlays();
-    return;
+  const premiumReady = stageArt.complete && stageArt.naturalWidth > 0;
+  const mode = premiumReady ? "premium" : "fallback";
+  if (!stageCacheReady || stageCacheMode !== mode) buildStageCache(premiumReady);
+  ctx.drawImage(stageCache, 0, 0);
+
+  if (premiumReady) {
+    drawDynamicStageOverlays();
+  } else {
+    drawFloorContactLight();
   }
+}
 
-  const wall = ctx.createLinearGradient(0, 0, 0, FLOOR);
-  wall.addColorStop(0, "#f7e8c9");
-  wall.addColorStop(0.46, "#e2bd82");
-  wall.addColorStop(1, "#8d542f");
-  ctx.fillStyle = wall;
-  ctx.fillRect(0, 0, W, FLOOR);
+function buildStageCache(premiumReady) {
+  const cacheCtx = stageCache.getContext("2d");
+  cacheCtx.clearRect(0, 0, W, H);
+  withContext(cacheCtx, () => {
+    if (premiumReady) {
+      drawCoverImage(stageArt, 0, 0, W, H);
+      drawWallPortraits();
+      drawDojoSign();
+      drawVignette();
+      return;
+    }
 
-  drawCeiling();
-  drawGardenView();
-  drawBackWallDetails();
-  drawShojiPanels();
-  drawWallPortraits();
-  drawDojoSign();
-  drawLanterns();
-  drawWeaponRack();
-  drawTatamiFloor();
-  drawForegroundPosts();
-  drawVignette();
+    const wall = ctx.createLinearGradient(0, 0, 0, FLOOR);
+    wall.addColorStop(0, "#f7e8c9");
+    wall.addColorStop(0.46, "#e2bd82");
+    wall.addColorStop(1, "#8d542f");
+    ctx.fillStyle = wall;
+    ctx.fillRect(0, 0, W, FLOOR);
+
+    drawCeiling();
+    drawGardenView();
+    drawBackWallDetails();
+    drawShojiPanels();
+    drawWallPortraits();
+    drawDojoSign();
+    drawLanterns();
+    drawWeaponRack();
+    drawTatamiFloor();
+    drawForegroundPosts();
+    drawVignette();
+  });
+  stageCacheReady = true;
+  stageCacheMode = premiumReady ? "premium" : "fallback";
+}
+
+function withContext(nextCtx, drawFn) {
+  const previous = ctx;
+  ctx = nextCtx;
+  try {
+    drawFn();
+  } finally {
+    ctx = previous;
+  }
 }
 
 function drawCoverImage(image, x, y, width, height) {
@@ -961,13 +1073,10 @@ function drawCoverImage(image, x, y, width, height) {
   ctx.drawImage(image, sourceX, sourceY, sourceW, sourceH, x, y, width, height);
 }
 
-function drawPremiumStageOverlays() {
+function drawDynamicStageOverlays() {
   drawAmbientLight();
-  drawWallPortraits();
-  drawDojoSign();
   drawFloorContactLight();
   drawStageAtmosphere();
-  drawVignette();
 }
 
 function drawAmbientLight() {
@@ -1040,8 +1149,8 @@ function drawStageAtmosphere() {
   const t = roundFrame * 0.012;
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  for (let i = 0; i < 18; i += 1) {
-    const x = (i * 67 + (roundFrame * (0.15 + (i % 3) * 0.04))) % W;
+  for (let i = 0; i < 10; i += 1) {
+    const x = (i * 103 + (roundFrame * (0.12 + (i % 3) * 0.035))) % W;
     const y = 96 + ((i * 53 + Math.sin(t + i) * 18) % 250);
     const alpha = 0.045 + (i % 4) * 0.01;
     ctx.fillStyle = `rgba(255, 235, 178, ${alpha})`;
@@ -1452,69 +1561,11 @@ function drawWins(x, y, f, reverse) {
 }
 
 function bodySpec(f) {
-  const specs = {
-    athletic: {
-      shoulder: 41,
-      waist: 27,
-      hip: 34,
-      limb: 0.98,
-      hand: 0.92,
-      foot: 0.94,
-      headW: 88,
-      headH: 94,
-      headY: 18,
-      stance: 0.95,
-    },
-    balanced: {
-      shoulder: 44,
-      waist: 30,
-      hip: 37,
-      limb: 1.03,
-      hand: 1,
-      foot: 1,
-      headW: 92,
-      headH: 98,
-      headY: 16,
-      stance: 1,
-    },
-    heavy: {
-      shoulder: 50,
-      waist: 36,
-      hip: 43,
-      limb: 1.14,
-      hand: 1.12,
-      foot: 1.12,
-      headW: 98,
-      headH: 102,
-      headY: 14,
-      stance: 1.12,
-    },
-    lean: {
-      shoulder: 39,
-      waist: 26,
-      hip: 32,
-      limb: 0.94,
-      hand: 0.9,
-      foot: 0.9,
-      headW: 88,
-      headH: 94,
-      headY: 18,
-      stance: 0.9,
-    },
-  };
-  return specs[f.build] ?? specs.balanced;
+  return BODY_SPECS[f.build] ?? BODY_SPECS.balanced;
 }
 
 function outfitSpec(f) {
-  return {
-    jacket: f.outfit?.jacket ?? f.color,
-    pants: f.outfit?.pants ?? darken(f.color, 16),
-    sleeve: f.outfit?.sleeve ?? f.trim,
-    belt: f.outfit?.belt ?? f.trim,
-    shoe: f.outfit?.shoe ?? f.trim,
-    accent: f.outfit?.accent ?? lighten(f.trim, 18),
-    pattern: f.outfit?.pattern ?? "classic",
-  };
+  return f.outfit;
 }
 
 function drawFighter(f) {
@@ -1538,8 +1589,8 @@ function drawFighter(f) {
   if (f.energy >= 45 && f.hurt <= 0) drawEnergyAura(f.trim, crouch);
 
   ctx.shadowColor = "rgba(10, 8, 7, 0.42)";
-  ctx.shadowBlur = 5;
-  ctx.shadowOffsetY = 2;
+  ctx.shadowBlur = 2;
+  ctx.shadowOffsetY = 1;
   drawLeg(f, pose.backLeg, false);
   drawLeg(f, pose.frontLeg, true);
 
@@ -2377,9 +2428,22 @@ function showWinner() {
   overlay.classList.remove("hidden");
 }
 
-function loop() {
-  update();
+function loop(timestamp = 0) {
+  if (!lastFrameTime) lastFrameTime = timestamp;
+  const elapsed = Math.min(100, timestamp - lastFrameTime);
+  lastFrameTime = timestamp;
+  updateAccumulator += elapsed;
+
+  let steps = 0;
+  while (updateAccumulator >= STEP_MS && steps < MAX_UPDATE_STEPS) {
+    update();
+    updateAccumulator -= STEP_MS;
+    steps += 1;
+  }
+  if (steps === MAX_UPDATE_STEPS) updateAccumulator = 0;
+
   draw();
+  requestAnimationFrame(loop);
 }
 
 function rectsOverlap(a, b) {
@@ -2395,34 +2459,50 @@ function circleRectOverlap(circle, rect) {
 }
 
 function darken(hex, amount = 42) {
+  const key = `${hex}|${amount}`;
+  if (darkenCache.has(key)) return darkenCache.get(key);
   const [baseR, baseG, baseB] = colorParts(hex);
   const r = Math.max(0, baseR - amount);
   const g = Math.max(0, baseG - amount);
   const b = Math.max(0, baseB - amount);
-  return `rgb(${r}, ${g}, ${b})`;
+  const value = `rgb(${r}, ${g}, ${b})`;
+  darkenCache.set(key, value);
+  return value;
 }
 
 function lighten(hex, amount = 28) {
+  const key = `${hex}|${amount}`;
+  if (lightenCache.has(key)) return lightenCache.get(key);
   const [baseR, baseG, baseB] = colorParts(hex);
   const r = Math.min(255, baseR + amount);
   const g = Math.min(255, baseG + amount);
   const b = Math.min(255, baseB + amount);
-  return `rgb(${r}, ${g}, ${b})`;
+  const value = `rgb(${r}, ${g}, ${b})`;
+  lightenCache.set(key, value);
+  return value;
 }
 
 function colorWithAlpha(color, alpha) {
+  const key = `${color}|${alpha}`;
+  if (alphaColorCache.has(key)) return alphaColorCache.get(key);
   const [r, g, b] = colorParts(color);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const value = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  alphaColorCache.set(key, value);
+  return value;
 }
 
 function colorParts(color) {
+  if (colorPartsCache.has(color)) return colorPartsCache.get(color);
+  let value = [128, 128, 128];
   if (color.startsWith("#")) {
     const n = Number.parseInt(color.slice(1), 16);
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    value = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  } else {
+    const parts = color.match(/\d+/g);
+    if (parts && parts.length >= 3) value = parts.slice(0, 3).map(Number);
   }
-  const parts = color.match(/\d+/g);
-  if (parts && parts.length >= 3) return parts.slice(0, 3).map(Number);
-  return [128, 128, 128];
+  colorPartsCache.set(color, value);
+  return value;
 }
 
 function clamp(value, min, max) {
@@ -2596,4 +2676,4 @@ setCpuMode(cpuEnabled);
 setDifficulty(cpuDifficulty);
 setSound(soundEnabled);
 showHomeOverlay();
-loop();
+requestAnimationFrame(loop);

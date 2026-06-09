@@ -40,6 +40,7 @@ También puede abrirse directamente desde `index.html` en un navegador.
 - Sombras dinamicas pegadas al tatami segun salto, velocidad y ataque.
 - Impactos con shockwave, chispas y destello corporal.
 - Efectos de golpe con doble trazo, color por personaje y lineas de velocidad reforzadas.
+- Motor optimizado con pasos fijos, cache del escenario y colores precalculados para mejorar fluidez.
 
 ## Controles
 
