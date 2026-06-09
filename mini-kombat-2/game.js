@@ -2535,16 +2535,55 @@ function setSelectedFighter(side, nextId) {
 function renderFighterSelect() {
   fighterSelect.innerHTML = "";
   fighterSelect.append(makeSelectColumn("left", "Izquierda", selectedLeftId, selectedRightId));
+
+  const versus = document.createElement("div");
+  versus.className = "fighter-select-versus";
+  versus.textContent = "VS";
+  fighterSelect.append(versus);
+
   fighterSelect.append(makeSelectColumn("right", "Derecha", selectedRightId, selectedLeftId));
 }
 
 function makeSelectColumn(side, title, selectedId, lockedId) {
   const column = document.createElement("section");
   column.className = "fighter-select-column";
+  column.dataset.side = side;
+  column.style.setProperty("--fighter-color", fighterProfiles[selectedId].color);
+  column.style.setProperty("--fighter-trim", fighterProfiles[selectedId].trim);
+  column.style.setProperty("--fighter-accent", fighterProfiles[selectedId].outfit.accent);
 
   const heading = document.createElement("h2");
   heading.textContent = side === "left" && cpuEnabled ? `${title} / CPU` : title;
   column.append(heading);
+
+  const selectedProfile = fighterProfiles[selectedId];
+  const showcase = document.createElement("div");
+  showcase.className = "fighter-showcase";
+
+  const portraitWrap = document.createElement("div");
+  portraitWrap.className = "fighter-showcase-portrait";
+  const portrait = document.createElement("img");
+  portrait.src = selectedProfile.face.src;
+  portrait.alt = selectedProfile.name;
+  portraitWrap.append(portrait);
+
+  const badge = document.createElement("div");
+  badge.className = "fighter-showcase-mark";
+  badge.textContent = selectedProfile.mark;
+  portraitWrap.append(badge);
+  showcase.append(portraitWrap);
+
+  const info = document.createElement("div");
+  info.className = "fighter-showcase-info";
+  const name = document.createElement("strong");
+  name.textContent = selectedProfile.name;
+  info.append(name);
+  const role = document.createElement("span");
+  role.textContent = side === "left" && cpuEnabled ? "CPU" : side === "left" ? "Jugador 1" : "Jugador 2";
+  info.append(role);
+  info.append(makeMenuStats(selectedProfile));
+  showcase.append(info);
+  column.append(showcase);
 
   const grid = document.createElement("div");
   grid.className = "fighter-choice-grid";
@@ -2553,6 +2592,8 @@ function makeSelectColumn(side, title, selectedId, lockedId) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "fighter-choice";
+    button.dataset.side = side;
+    button.dataset.fighter = id;
     button.setAttribute("aria-pressed", String(id === selectedId));
     button.disabled = id === lockedId;
     button.addEventListener("click", () => setSelectedFighter(side, id));
@@ -2570,6 +2611,29 @@ function makeSelectColumn(side, title, selectedId, lockedId) {
   }
   column.append(grid);
   return column;
+}
+
+function makeMenuStats(profile) {
+  const stats = {
+    athletic: [78, 88, 74],
+    balanced: [80, 76, 82],
+    heavy: [92, 62, 88],
+    lean: [68, 92, 72],
+  }[profile.build] ?? [75, 75, 75];
+  const labels = ["FUE", "VEL", "ENE"];
+  const list = document.createElement("div");
+  list.className = "fighter-showcase-stats";
+  for (let i = 0; i < stats.length; i += 1) {
+    const row = document.createElement("div");
+    row.className = "fighter-showcase-stat";
+    const label = document.createElement("span");
+    label.textContent = labels[i];
+    const meter = document.createElement("i");
+    meter.style.setProperty("--stat", `${stats[i]}%`);
+    row.append(label, meter);
+    list.append(row);
+  }
+  return list;
 }
 
 function updateFighterLabels() {

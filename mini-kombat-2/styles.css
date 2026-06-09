@@ -190,6 +190,7 @@ canvas {
 .overlay[data-screen="home"] {
   grid-template-rows: auto auto auto auto;
   gap: 14px;
+  overflow: hidden;
   background:
     radial-gradient(circle at 50% 44%, rgba(255, 216, 97, 0.14), transparent 23%),
     radial-gradient(circle at 20% 92%, rgba(196, 31, 18, 0.44), transparent 27%),
@@ -246,7 +247,7 @@ canvas {
   padding: 4px 16px 2px;
   color: transparent;
   font-family: Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
-  font-size: clamp(48px, 9vw, 112px);
+  font-size: clamp(46px, 8.2vw, 96px);
   line-height: 0.86;
   background:
     linear-gradient(180deg, #fff4b8 0%, #f2bc43 34%, #9e321e 62%, #4c100e 100%);
@@ -475,7 +476,7 @@ canvas {
 
 .overlay[data-screen="home"] #start {
   min-width: 188px;
-  min-height: 54px;
+  min-height: 50px;
   color: #fff7d6;
   background:
     linear-gradient(180deg, #f2c94c 0%, #b7301b 42%, #3b0b09 100%);
@@ -486,6 +487,229 @@ canvas {
     0 9px 0 #1d0706,
     0 0 28px rgba(238, 59, 28, 0.52),
     inset 0 1px 0 rgba(255,255,255,0.5);
+}
+
+.overlay[data-screen="home"] {
+  gap: 8px;
+}
+
+.overlay[data-screen="home"] .overlay-copy {
+  width: min(920px, calc(100% - 36px));
+}
+
+.overlay[data-screen="home"] .fighter-select {
+  grid-template-columns: minmax(280px, 1fr) 74px minmax(280px, 1fr);
+  align-items: stretch;
+  width: min(1040px, calc(100% - 24px));
+  gap: 12px;
+}
+
+.fighter-select-versus {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  color: #fff1bd;
+  border: 1px solid rgba(255, 228, 131, 0.72);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(255, 239, 164, 0.28), transparent 40%),
+    linear-gradient(180deg, rgba(109, 24, 17, 0.96), rgba(20, 7, 6, 0.98));
+  box-shadow:
+    0 0 0 6px rgba(0, 0, 0, 0.34),
+    0 0 28px rgba(255, 193, 62, 0.28),
+    inset 0 2px 0 rgba(255,255,255,0.2);
+  font: 900 30px/1 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+  text-shadow: 0 3px 0 #260706, 0 0 14px rgba(255, 216, 97, 0.5);
+}
+
+.overlay[data-screen="home"] .fighter-select-column {
+  position: relative;
+  overflow: hidden;
+  grid-template-rows: auto minmax(128px, auto) auto;
+  min-height: 260px;
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--fighter-trim) 58%, #2a100b);
+  background:
+    radial-gradient(circle at 50% -8%, color-mix(in srgb, var(--fighter-trim) 24%, transparent), transparent 38%),
+    linear-gradient(180deg, rgba(40, 22, 18, 0.9), rgba(8, 8, 10, 0.95));
+}
+
+.overlay[data-screen="home"] .fighter-select-column::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, transparent 0 42%, color-mix(in srgb, var(--fighter-color) 20%, transparent) 42% 58%, transparent 58%),
+    repeating-linear-gradient(0deg, rgba(255, 241, 189, 0.035) 0 1px, transparent 1px 18px);
+  opacity: 0.78;
+}
+
+.fighter-select-column[data-side="left"] {
+  transform-origin: right center;
+}
+
+.fighter-select-column[data-side="right"] {
+  transform-origin: left center;
+}
+
+.overlay[data-screen="home"] .fighter-select-column h2,
+.fighter-showcase,
+.fighter-choice-grid {
+  position: relative;
+  z-index: 1;
+}
+
+.fighter-showcase {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 124px;
+  padding: 9px;
+  border: 1px solid rgba(255, 241, 189, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.12)),
+    radial-gradient(circle at 20% 24%, color-mix(in srgb, var(--fighter-trim) 22%, transparent), transparent 44%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    inset 0 -18px 32px rgba(0,0,0,0.18);
+}
+
+.fighter-showcase-portrait {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  border: 1px solid rgba(255, 228, 131, 0.56);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(255, 241, 189, 0.26), transparent 45%),
+    linear-gradient(180deg, color-mix(in srgb, var(--fighter-color) 32%, #111216), #111216);
+  box-shadow:
+    0 10px 18px rgba(0,0,0,0.42),
+    inset 0 1px 0 rgba(255,255,255,0.16);
+}
+
+.fighter-showcase-portrait img {
+  width: 86px;
+  height: 86px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.62));
+}
+
+.fighter-showcase-mark {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  color: #1c1208;
+  border: 1px solid rgba(255,255,255,0.54);
+  border-radius: 50%;
+  background: var(--fighter-trim);
+  font: 900 13px/1 system-ui, sans-serif;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.42);
+}
+
+.fighter-showcase-info {
+  min-width: 0;
+}
+
+.fighter-showcase-info strong {
+  display: block;
+  overflow: hidden;
+  color: #fff7d6;
+  font: 900 clamp(22px, 3vw, 34px)/0.96 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  text-shadow:
+    0 3px 0 #250806,
+    0 0 16px color-mix(in srgb, var(--fighter-trim) 44%, transparent);
+  white-space: nowrap;
+}
+
+.fighter-showcase-info > span {
+  display: inline-grid;
+  margin-top: 6px;
+  padding: 5px 9px;
+  color: #ffe9a6;
+  border: 1px solid rgba(255, 228, 131, 0.36);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+  font: 900 11px/1 system-ui, sans-serif;
+  text-transform: uppercase;
+}
+
+.fighter-showcase-stats {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.fighter-showcase-stat {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.fighter-showcase-stat span {
+  color: rgba(255, 247, 214, 0.82);
+  font: 900 10px/1 system-ui, sans-serif;
+}
+
+.fighter-showcase-stat i {
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 999px;
+  background: rgba(0,0,0,0.36);
+}
+
+.fighter-showcase-stat i::before {
+  content: "";
+  display: block;
+  width: var(--stat);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--fighter-color), var(--fighter-trim));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--fighter-trim) 45%, transparent);
+}
+
+.overlay[data-screen="home"] .fighter-choice-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.overlay[data-screen="home"] .fighter-choice {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  gap: 5px;
+  min-height: 76px;
+  padding: 7px 5px;
+  border-radius: 7px;
+}
+
+.overlay[data-screen="home"] .fighter-choice img {
+  width: 45px;
+  height: 45px;
+}
+
+.overlay[data-screen="home"] .fighter-choice span {
+  max-width: 100%;
+  font-size: 10px;
+  text-align: center;
+}
+
+.overlay[data-screen="home"] .fighter-choice[aria-pressed="true"] {
+  transform: translateY(-2px);
 }
 
 @media (max-width: 720px) {
@@ -555,6 +779,10 @@ canvas {
     padding: 10px;
   }
 
+  .overlay[data-screen="home"] {
+    overflow-y: auto;
+  }
+
   .overlay h1 {
     font-size: clamp(28px, 6vw, 48px);
   }
@@ -568,10 +796,75 @@ canvas {
     font-size: 10px;
   }
 
+  .overlay[data-screen="home"] .fighter-select,
   .fighter-select {
     grid-template-columns: 1fr;
     gap: 10px;
     width: min(520px, calc(100% - 24px));
+  }
+
+  .fighter-select-versus {
+    width: 46px;
+    height: 32px;
+    justify-self: center;
+    border-radius: 6px;
+    font-size: 18px;
+  }
+
+  .overlay[data-screen="home"] .fighter-select-column {
+    min-height: 0;
+    padding: 9px;
+  }
+
+  .fighter-showcase {
+    grid-template-columns: 66px minmax(0, 1fr);
+    min-height: 82px;
+    gap: 8px;
+    padding: 7px;
+  }
+
+  .fighter-showcase-portrait {
+    width: 66px;
+    height: 66px;
+  }
+
+  .fighter-showcase-portrait img {
+    width: 54px;
+    height: 54px;
+  }
+
+  .fighter-showcase-mark {
+    width: 19px;
+    height: 19px;
+    font-size: 10px;
+  }
+
+  .fighter-showcase-info strong {
+    font-size: clamp(18px, 6vw, 25px);
+  }
+
+  .fighter-showcase-info > span {
+    margin-top: 4px;
+    padding: 4px 7px;
+    font-size: 9px;
+  }
+
+  .fighter-showcase-stats {
+    gap: 3px;
+    margin-top: 7px;
+  }
+
+  .fighter-showcase-stat {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .fighter-showcase-stat span {
+    font-size: 8px;
+  }
+
+  .fighter-showcase-stat i {
+    height: 5px;
   }
 
   .fighter-choice-grid {
@@ -591,11 +884,13 @@ canvas {
     min-height: 62px;
   }
 
+  .overlay[data-screen="home"] .fighter-choice img,
   .fighter-choice img {
     width: 30px;
     height: 30px;
   }
 
+  .overlay[data-screen="home"] .fighter-choice span,
   .fighter-choice span {
     max-width: 100%;
     font-size: 9px;

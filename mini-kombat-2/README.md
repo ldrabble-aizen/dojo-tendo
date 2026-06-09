@@ -28,6 +28,7 @@ También puede abrirse directamente desde `index.html` en un navegador.
 - Cuadros decorativos de Akane Tendo y Ryoga Hibiki en la pared del dojo.
 - Efectos de luz, polvo, golpes, aura y proyectiles se generan en canvas.
 - Menu inicial con estetica arcade oscura: metal, fuego, dorado y rojo.
+- Selector principal tipo versus con retratos destacados, stats y roster compacto.
 - Cabezas integradas sin aro circular durante la pelea.
 - Cuerpos y extremidades con proporciones por personaje, contornos y mas volumen arcade.
 - Uniformes con sombreado por volumen, pliegues, insignia y cinturon mejorado.
