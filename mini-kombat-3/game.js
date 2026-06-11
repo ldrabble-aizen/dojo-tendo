@@ -746,7 +746,7 @@ function scheduleWinnerOverlay() {
   winnerOverlayTimer = setTimeout(() => {
     winnerOverlayTimer = null;
     showWinner();
-  }, 760);
+  }, 2600);
 }
 
 function homeOverlayCopy() {
@@ -2334,37 +2334,39 @@ function rasterBodyFrameIndex(f, frameName, walking) {
   return frames[Math.floor(roundFrame / 34) % frames.length] ?? frames[0];
 }
 
-function rasterHeadPose(frameName, frameIndex) {
+function rasterHeadPose(f, frameName, frameIndex) {
   const pose = {
     x: 0,
-    y: -38,
+    y: -42,
     scale: 0.74,
   };
 
   if (frameName === "walk") {
-    pose.y = -42;
+    pose.y = -43;
   } else if (frameName === "punch") {
-    pose.y = frameIndex === 5 ? -41 : -39;
+    pose.y = frameIndex === 5 ? -44 : -43;
   } else if (frameName === "kick") {
-    pose.y = frameIndex === 8 ? -40 : -39;
+    pose.y = frameIndex === 8 ? -43 : -42;
   } else if (frameName === "block") {
-    pose.y = -36;
+    pose.y = -40;
     pose.scale = 0.72;
   } else if (frameName === "hurt") {
-    pose.x = 2;
-    pose.y = -32;
+    pose.x = 1;
+    pose.y = -42;
     pose.scale = 0.72;
   } else if (frameName === "special" || frameName === "victory") {
-    pose.y = -42;
+    pose.y = -44;
   } else if (frameName === "sweep") {
-    pose.x = 5;
-    pose.y = -24;
+    pose.x = 4;
+    pose.y = -31;
     pose.scale = 0.7;
   } else if (frameName === "defeat") {
     pose.x = 8;
-    pose.y = -6;
+    pose.y = -12;
     pose.scale = 0.68;
   }
+
+  if (f.profileId === "p1") pose.y -= 3;
 
   return pose;
 }
@@ -2376,12 +2378,11 @@ function drawRasterBodySprite(f, crouch, stride, walking) {
   const frameName = rasterBodyFrameFor(f, walking);
   const frameIndex = rasterBodyFrameIndex(f, frameName, walking);
   const frameX = frameIndex * BODY_SPRITE_FRAME_W;
-  const headPose = rasterHeadPose(frameName, frameIndex);
+  const headPose = rasterHeadPose(f, frameName, frameIndex);
   const headCrouch =
     crouch +
     headPose.y +
-    (frameName === "hurt" ? 7 : 0) +
-    (frameName === "block" ? 4 : 0);
+    (frameName === "block" ? 2 : 0);
 
   ctx.save();
   ctx.shadowColor = "rgba(10, 8, 7, 0.46)";
@@ -2402,7 +2403,12 @@ function drawRasterBodySprite(f, crouch, stride, walking) {
 
   ctx.save();
   ctx.translate(headPose.x, 0);
-  drawHead(f, headCrouch, 0, headPose.scale, { drawNeck: false, drawShadowImage: false });
+  drawHead(f, headCrouch, 0, headPose.scale, {
+    drawNeck: false,
+    drawShadowImage: false,
+    drawFaceGlow: false,
+    lockRotation: true,
+  });
   ctx.restore();
   drawFighterStageLighting(f, crouch);
   return true;
@@ -3380,7 +3386,8 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
   }
 
   ctx.save();
-  ctx.rotate(stride * 0.018 + (f.hurt > 0 ? Math.sin(f.hurt) * 0.03 : 0));
+  const headAngle = options.lockRotation ? 0 : stride * 0.018 + (f.hurt > 0 ? Math.sin(f.hurt) * 0.03 : 0);
+  ctx.rotate(headAngle);
   ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
   ctx.beginPath();
   ctx.ellipse(0, -146 + crouch + spec.headY, 38, 14, 0, 0, Math.PI * 2);
@@ -3420,11 +3427,13 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     ctx.clip();
     ctx.drawImage(f.face, x, y, headW, headH);
 
-    ctx.globalCompositeOperation = "screen";
-    ctx.globalAlpha = 0.16;
-    ctx.drawImage(f.face, x - 2, y - 2, headW, headH);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = "source-over";
+    if (options.drawFaceGlow !== false) {
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.16;
+      ctx.drawImage(f.face, x - 2, y - 2, headW, headH);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+    }
 
     const faceShade = ctx.createLinearGradient(clipX, clipY, clipX + clipW, clipY + clipH);
     faceShade.addColorStop(0, "rgba(255,255,255,0.12)");
@@ -3471,9 +3480,9 @@ function drawPchanHeadBandana(x, y, headW, headH) {
   const mark = "#151515";
   const bandLeft = x + headW * 0.26;
   const bandRight = x + headW * 0.76;
-  const bandTop = y + headH * 0.02;
+  const bandTop = y - headH * 0.025;
   const knotX = x + headW * 0.72;
-  const knotY = y + headH * 0.1;
+  const knotY = y + headH * 0.055;
 
   ctx.fillStyle = "rgba(0,0,0,0.26)";
   ctx.beginPath();
@@ -4043,35 +4052,35 @@ function drawParticles() {
 }
 
 function drawKOBanner() {
-  if (!winner) return;
+  if (!winner || matchOver) return;
   if (overlay.dataset.screen === "winner" && !overlay.classList.contains("hidden")) return;
-  const alpha = overlay.classList.contains("hidden") ? 0.54 : 0.18;
-  const x = W / 2 - 100;
-  const y = 76;
-  const banner = ctx.createLinearGradient(x, y, x + 200, y + 48);
+  const alpha = overlay.classList.contains("hidden") ? 0.26 : 0.12;
+  const x = W / 2 - 60;
+  const y = 82;
+  const banner = ctx.createLinearGradient(x, y, x + 120, y + 34);
   banner.addColorStop(0, `rgba(30, 8, 7, ${alpha})`);
   banner.addColorStop(0.48, `rgba(126, 33, 21, ${alpha})`);
   banner.addColorStop(1, `rgba(30, 8, 7, ${alpha})`);
   ctx.fillStyle = banner;
   ctx.beginPath();
-  ctx.roundRect(x, y, 200, 48, 8);
+  ctx.roundRect(x, y, 120, 34, 8);
   ctx.fill();
-  ctx.strokeStyle = `rgba(255, 226, 132, ${0.42 + alpha * 0.18})`;
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = `rgba(255, 226, 132, ${0.28 + alpha * 0.14})`;
+  ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  ctx.fillStyle = `rgba(255, 241, 189, ${0.8 + alpha * 0.12})`;
-  ctx.font = "850 24px system-ui, sans-serif";
+  ctx.fillStyle = `rgba(255, 241, 189, ${0.72 + alpha * 0.12})`;
+  ctx.font = "850 18px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = `rgba(43, 20, 16, ${0.66 + alpha * 0.12})`;
-  ctx.strokeText("K.O.", W / 2, y + 21);
-  ctx.fillText("K.O.", W / 2, y + 21);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = `rgba(43, 20, 16, ${0.5 + alpha * 0.12})`;
+  ctx.strokeText("K.O.", W / 2, y + 14);
+  ctx.fillText("K.O.", W / 2, y + 14);
 
-  ctx.font = "800 10px system-ui, sans-serif";
-  ctx.fillStyle = `rgba(255, 226, 132, ${0.68 + alpha * 0.1})`;
-  ctx.fillText(`${winner.toUpperCase()} GANA`, W / 2, y + 37);
+  ctx.font = "800 8px system-ui, sans-serif";
+  ctx.fillStyle = `rgba(255, 226, 132, ${0.54 + alpha * 0.1})`;
+  ctx.fillText(`${winner.toUpperCase()} GANA`, W / 2, y + 27);
   ctx.textBaseline = "alphabetic";
 }
 
