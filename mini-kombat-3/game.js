@@ -1908,7 +1908,7 @@ function drawFighter(f) {
   const baseY = f.y + bob;
   const stride = walking ? Math.sin(t * 14) : 0;
   const pose = getPose(f, stride);
-  const attackStretch = f.attack ? attackProgress(f.attack) * 0.035 : 0;
+  const attackStretch = f.attack ? attackProgress(f.attack) * 0.012 : 0;
   const breathing = f.grounded && f.hurt <= 0 ? Math.sin(t * 2.7 + f.x * 0.02) * 0.012 : 0;
   const hurtSquash = f.hurt > 0 ? Math.sin(f.hurt * 0.7) * 0.012 : 0;
 
@@ -2193,88 +2193,88 @@ function getPose(f, stride) {
     (attackType === "grab" ? 0.08 * progress : 0) +
     (attackType === "special" ? -0.08 * progress : 0);
 
-  const hipY = -56 + crouch;
-  const shoulderY = -118 + crouch;
-  const hipX = 20 * spec.stance;
-  const shoulderX = 30 * spec.stance;
+  const hipY = -62 + crouch;
+  const shoulderY = -124 + crouch;
+  const hipX = 18 * spec.stance;
+  const shoulderX = 31 * spec.stance;
   const base = {
     torsoTilt,
     frontArm: {
       shoulder: { x: shoulderX, y: shoulderY },
-      elbow: { x: 58 * spec.stance, y: -83 + crouch },
-      hand: { x: 80 * spec.stance, y: -61 + crouch },
+      elbow: { x: 50 * spec.stance, y: -93 + crouch },
+      hand: { x: 62 * spec.stance, y: -72 + crouch },
     },
     backArm: {
       shoulder: { x: -shoulderX, y: shoulderY + 4 },
-      elbow: { x: -52 * spec.stance, y: -82 + crouch },
-      hand: { x: -38 * spec.stance, y: -60 + crouch },
+      elbow: { x: -47 * spec.stance, y: -94 + crouch },
+      hand: { x: -34 * spec.stance, y: -72 + crouch },
     },
     frontLeg: {
       hip: { x: hipX, y: hipY },
-      knee: { x: (27 + stride * 12) * spec.stance, y: -30 + crouch },
+      knee: { x: (25 + stride * 10) * spec.stance, y: -35 + crouch },
       foot: { x: (34 + stride * 19) * spec.stance, y: -2 },
     },
     backLeg: {
       hip: { x: -hipX, y: hipY },
-      knee: { x: (-27 - stride * 10) * spec.stance, y: -30 + crouch },
-      foot: { x: (-36 - stride * 16) * spec.stance, y: -2 },
+      knee: { x: (-25 - stride * 9) * spec.stance, y: -35 + crouch },
+      foot: { x: (-34 - stride * 15) * spec.stance, y: -2 },
     },
   };
 
   if (f.blocking) {
     base.frontArm = {
       shoulder: { x: 26, y: shoulderY },
-      elbow: { x: 42, y: -121 + crouch },
-      hand: { x: 46, y: -96 + crouch },
+      elbow: { x: 39, y: -124 + crouch },
+      hand: { x: 42, y: -99 + crouch },
     };
     base.backArm = {
       shoulder: { x: -24, y: shoulderY + 6 },
-      elbow: { x: 16, y: -119 + crouch },
-      hand: { x: 18, y: -94 + crouch },
+      elbow: { x: 14, y: -122 + crouch },
+      hand: { x: 16, y: -97 + crouch },
     };
     base.frontLeg.knee.x += 8;
     base.backLeg.foot.x -= 8;
   }
 
   if (attackType === "punch" || attackType === "airPunch") {
-    base.frontArm.elbow = { x: 50 + progress * 42 + activePulse * 16, y: -99 + crouch - progress * 8 };
-    base.frontArm.hand = { x: 72 + progress * 86 + activePulse * 18, y: -94 + crouch - progress * 12 };
-    base.backArm.elbow = { x: -46 - windup * 12, y: -102 + crouch - windup * 8 };
-    base.backArm.hand = { x: -10 - windup * 18, y: -87 + crouch - windup * 10 };
-    base.frontLeg.foot.x += 12 * progress;
-    base.backLeg.foot.x -= 16 * progress;
+    base.frontArm.elbow = { x: 56 + progress * 22 + activePulse * 8, y: -103 + crouch - progress * 5 };
+    base.frontArm.hand = { x: 70 + progress * 48 + activePulse * 8, y: -99 + crouch - progress * 7 };
+    base.backArm.elbow = { x: -45 - windup * 7, y: -107 + crouch - windup * 5 };
+    base.backArm.hand = { x: -19 - windup * 9, y: -91 + crouch - windup * 6 };
+    base.frontLeg.foot.x += 7 * progress;
+    base.backLeg.foot.x -= 9 * progress;
   } else if (attackType === "kick" || attackType === "airKick") {
-    base.frontLeg.knee = { x: 45 + progress * 46, y: -46 - progress * 24 + crouch };
-    base.frontLeg.foot = { x: 62 + progress * 104 + activePulse * 12, y: -28 - progress * 34 };
-    base.backLeg.knee = { x: -30 - progress * 8, y: -25 + crouch };
-    base.backLeg.foot = { x: -44 - progress * 18, y: -1 };
-    base.frontArm.elbow = { x: 37 - progress * 10, y: -79 + crouch + progress * 8 };
-    base.frontArm.hand = { x: 47 - progress * 14, y: -52 + crouch + progress * 4 };
-    base.backArm.elbow = { x: -44 - progress * 12, y: -104 + crouch - progress * 10 };
-    base.backArm.hand = { x: -24 - progress * 22, y: -83 + crouch - progress * 12 };
+    base.frontLeg.knee = { x: 42 + progress * 31, y: -45 - progress * 17 + crouch };
+    base.frontLeg.foot = { x: 59 + progress * 66 + activePulse * 6, y: -24 - progress * 30 };
+    base.backLeg.knee = { x: -29 - progress * 5, y: -31 + crouch };
+    base.backLeg.foot = { x: -42 - progress * 9, y: -1 };
+    base.frontArm.elbow = { x: 36 - progress * 6, y: -86 + crouch + progress * 5 };
+    base.frontArm.hand = { x: 47 - progress * 7, y: -63 + crouch + progress * 2 };
+    base.backArm.elbow = { x: -42 - progress * 7, y: -108 + crouch - progress * 6 };
+    base.backArm.hand = { x: -24 - progress * 12, y: -90 + crouch - progress * 7 };
   } else if (attackType === "sweep") {
-    base.frontLeg.knee = { x: 38 + progress * 34, y: -22 + crouch + progress * 8 };
-    base.frontLeg.foot = { x: 72 + progress * 86, y: -1 };
-    base.backLeg.knee = { x: -34, y: -16 + crouch + progress * 12 };
+    base.frontLeg.knee = { x: 36 + progress * 28, y: -25 + crouch + progress * 7 };
+    base.frontLeg.foot = { x: 70 + progress * 56, y: -1 };
+    base.backLeg.knee = { x: -32, y: -23 + crouch + progress * 8 };
     base.backLeg.foot = { x: -58, y: 0 };
-    base.frontArm.elbow = { x: 34, y: -76 + crouch + progress * 16 };
-    base.frontArm.hand = { x: 46, y: -47 + crouch + progress * 18 };
-    base.backArm.elbow = { x: -34, y: -82 + crouch + progress * 14 };
-    base.backArm.hand = { x: -48, y: -53 + crouch + progress * 18 };
+    base.frontArm.elbow = { x: 31, y: -84 + crouch + progress * 11 };
+    base.frontArm.hand = { x: 42, y: -61 + crouch + progress * 12 };
+    base.backArm.elbow = { x: -32, y: -89 + crouch + progress * 10 };
+    base.backArm.hand = { x: -45, y: -66 + crouch + progress * 12 };
   } else if (attackType === "grab") {
-    base.frontArm.elbow = { x: 56 + progress * 30, y: -92 + crouch - progress * 4 };
-    base.frontArm.hand = { x: 82 + progress * 48, y: -87 + crouch - progress * 2 };
-    base.backArm.elbow = { x: 30 + progress * 34, y: -112 + crouch - progress * 2 };
-    base.backArm.hand = { x: 66 + progress * 48, y: -109 + crouch + progress * 4 };
-    base.frontLeg.foot.x += 22 * progress;
-    base.backLeg.foot.x -= 10 * progress;
-  } else if (attackType === "special") {
-    base.frontArm.elbow = { x: 48 + progress * 14, y: -120 + crouch - progress * 8 };
-    base.frontArm.hand = { x: 76 + progress * 34, y: -105 + crouch - progress * 6 };
-    base.backArm.elbow = { x: 18 + progress * 14, y: -122 + crouch - progress * 10 };
-    base.backArm.hand = { x: 56 + progress * 32, y: -106 + crouch - progress * 5 };
-    base.frontLeg.foot.x += 8 * progress;
+    base.frontArm.elbow = { x: 55 + progress * 23, y: -96 + crouch - progress * 3 };
+    base.frontArm.hand = { x: 78 + progress * 35, y: -92 + crouch - progress * 1 };
+    base.backArm.elbow = { x: 27 + progress * 27, y: -114 + crouch - progress * 2 };
+    base.backArm.hand = { x: 59 + progress * 37, y: -111 + crouch + progress * 3 };
+    base.frontLeg.foot.x += 12 * progress;
     base.backLeg.foot.x -= 8 * progress;
+  } else if (attackType === "special") {
+    base.frontArm.elbow = { x: 48 + progress * 10, y: -121 + crouch - progress * 6 };
+    base.frontArm.hand = { x: 74 + progress * 24, y: -106 + crouch - progress * 4 };
+    base.backArm.elbow = { x: 18 + progress * 10, y: -123 + crouch - progress * 7 };
+    base.backArm.hand = { x: 54 + progress * 22, y: -107 + crouch - progress * 4 };
+    base.frontLeg.foot.x += 6 * progress;
+    base.backLeg.foot.x -= 6 * progress;
   }
 
   if (airborne) {
@@ -2310,7 +2310,51 @@ function getPose(f, stride) {
     }
   }
 
-  return base;
+  return humanizePose(base, spec);
+}
+
+function humanizePose(pose, spec) {
+  const scale = spec.limb ?? 1;
+  pose.frontArm = solveTwoBoneLimb(pose.frontArm, "shoulder", "elbow", "hand", 32 * scale, 34 * scale, 1);
+  pose.backArm = solveTwoBoneLimb(pose.backArm, "shoulder", "elbow", "hand", 31 * scale, 33 * scale, -1);
+  pose.frontLeg = solveTwoBoneLimb(pose.frontLeg, "hip", "knee", "foot", 34 * scale, 38 * scale, 1);
+  pose.backLeg = solveTwoBoneLimb(pose.backLeg, "hip", "knee", "foot", 34 * scale, 38 * scale, -1);
+  return pose;
+}
+
+function solveTwoBoneLimb(limb, rootKey, jointKey, endKey, upperLen, lowerLen, bendHint) {
+  const root = limb[rootKey];
+  const targetEnd = limb[endKey];
+  const currentJoint = limb[jointKey];
+  const dx = targetEnd.x - root.x;
+  const dy = targetEnd.y - root.y;
+  const rawDistance = Math.max(0.001, Math.hypot(dx, dy));
+  const maxReach = upperLen + lowerLen - 0.5;
+  const minReach = Math.max(2, Math.abs(upperLen - lowerLen) + 0.5);
+  const distance = clamp(rawDistance, minReach, maxReach);
+  const ux = dx / rawDistance;
+  const uy = dy / rawDistance;
+  const end = {
+    x: root.x + ux * distance,
+    y: root.y + uy * distance,
+  };
+
+  const along = clamp((upperLen * upperLen - lowerLen * lowerLen + distance * distance) / (2 * distance), 0, upperLen);
+  const height = Math.sqrt(Math.max(0, upperLen * upperLen - along * along));
+  const px = -uy;
+  const py = ux;
+  const sideFromCurrent = Math.sign((currentJoint.x - root.x) * px + (currentJoint.y - root.y) * py);
+  const side = sideFromCurrent || bendHint || 1;
+  const joint = {
+    x: root.x + ux * along + px * height * side,
+    y: root.y + uy * along + py * height * side,
+  };
+
+  return {
+    ...limb,
+    [jointKey]: joint,
+    [endKey]: end,
+  };
 }
 
 function drawTorso(f, crouch) {
@@ -2542,14 +2586,14 @@ function drawHead(f, crouch, stride) {
   const y = -224 + crouch + Math.abs(stride) * 2 + spec.headY;
 
   const skin = f.skin ?? "#f2b891";
-  const neckTop = -119 + crouch;
-  const neckBottom = -91 + crouch;
+  const neckTop = -118 + crouch;
+  const neckBottom = -99 + crouch;
   const neckGrad = ctx.createLinearGradient(0, neckTop, 0, neckBottom);
   neckGrad.addColorStop(0, lighten(skin, 16));
   neckGrad.addColorStop(1, darken(skin, 18));
   ctx.fillStyle = neckGrad;
   ctx.beginPath();
-  ctx.roundRect(-17, neckTop, 34, neckBottom - neckTop, 11);
+  ctx.roundRect(-14, neckTop, 28, neckBottom - neckTop, 9);
   ctx.fill();
   ctx.strokeStyle = "rgba(43, 24, 18, 0.35)";
   ctx.lineWidth = 2;
@@ -2723,45 +2767,60 @@ function drawLimbSegment(a, b, color, widthA, widthB) {
   const angle = Math.atan2(b.y - a.y, b.x - a.x);
   const nx = Math.cos(angle + Math.PI / 2);
   const ny = Math.sin(angle + Math.PI / 2);
+  const length = Math.hypot(b.y - a.y, b.x - a.x);
+  const width = (widthA + widthB) * 0.52;
 
-  const grad = ctx.createLinearGradient(a.x + nx * widthA * 0.45, a.y + ny * widthA * 0.45, a.x - nx * widthA * 0.45, a.y - ny * widthA * 0.45);
-  grad.addColorStop(0, lighten(color, 18));
-  grad.addColorStop(0.5, color);
-  grad.addColorStop(1, darken(color, 28));
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.moveTo(a.x + nx * widthA * 0.5, a.y + ny * widthA * 0.5);
-  ctx.lineTo(a.x - nx * widthA * 0.5, a.y - ny * widthA * 0.5);
-  ctx.lineTo(b.x - nx * widthB * 0.5, b.y - ny * widthB * 0.5);
-  ctx.lineTo(b.x + nx * widthB * 0.5, b.y + ny * widthB * 0.5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "rgba(35, 21, 17, 0.52)";
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  ctx.strokeStyle = "rgba(255,255,255,0.22)";
-  ctx.lineWidth = Math.max(1.2, widthB * 0.12);
+  ctx.save();
   ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(a.x + nx * widthA * 0.22, a.y + ny * widthA * 0.22);
-  ctx.lineTo(b.x + nx * widthB * 0.18, b.y + ny * widthB * 0.18);
-  ctx.stroke();
+  ctx.lineJoin = "round";
 
-  ctx.strokeStyle = "rgba(0,0,0,0.16)";
-  ctx.lineWidth = Math.max(1.5, widthB * 0.16);
-  ctx.beginPath();
-  ctx.moveTo(a.x - nx * widthA * 0.28, a.y - ny * widthA * 0.28);
-  ctx.lineTo(b.x - nx * widthB * 0.24, b.y - ny * widthB * 0.24);
-  ctx.stroke();
-
-  ctx.strokeStyle = "rgba(55, 30, 22, 0.28)";
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(35, 21, 17, 0.56)";
+  ctx.lineWidth = width + 5;
   ctx.beginPath();
   ctx.moveTo(a.x, a.y);
   ctx.lineTo(b.x, b.y);
   ctx.stroke();
+
+  const grad = ctx.createLinearGradient(a.x + nx * width * 0.55, a.y + ny * width * 0.55, a.x - nx * width * 0.55, a.y - ny * width * 0.55);
+  grad.addColorStop(0, lighten(color, 18));
+  grad.addColorStop(0.5, color);
+  grad.addColorStop(1, darken(color, 28));
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.lineWidth = Math.max(1.2, width * 0.13);
+  ctx.beginPath();
+  ctx.moveTo(a.x + nx * width * 0.24, a.y + ny * width * 0.24);
+  ctx.lineTo(b.x + nx * width * 0.19, b.y + ny * width * 0.19);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(0,0,0,0.16)";
+  ctx.lineWidth = Math.max(1.5, width * 0.16);
+  ctx.beginPath();
+  ctx.moveTo(a.x - nx * width * 0.28, a.y - ny * width * 0.28);
+  ctx.lineTo(b.x - nx * width * 0.24, b.y - ny * width * 0.24);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(55, 30, 22, 0.28)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(a.x + nx * width * 0.02, a.y + ny * width * 0.02);
+  ctx.lineTo(b.x + nx * width * 0.02, b.y + ny * width * 0.02);
+  ctx.stroke();
+
+  if (length > 22) {
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, Math.max(3.5, width * 0.22), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
 function drawGiFolds(f, shoulder, waist, crouch) {
