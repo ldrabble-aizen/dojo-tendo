@@ -1403,7 +1403,7 @@ function draw() {
   drawKOBanner();
 
   if (flash > 0) {
-    ctx.fillStyle = `rgba(255, 245, 205, ${flash / 26})`;
+    ctx.fillStyle = `rgba(255, 245, 205, ${Math.min(0.24, flash / 64)})`;
     ctx.fillRect(0, 0, W, H);
   }
 
@@ -1429,16 +1429,13 @@ function drawCountdown() {
   const pulse = 1 + Math.sin(countdownFrames * 0.18) * (label === "FIGHT" ? 0.065 : 0.04);
 
   ctx.save();
-  ctx.fillStyle = "rgba(8, 9, 12, 0.46)";
-  ctx.fillRect(0, 0, W, H);
-
   const band = ctx.createLinearGradient(0, 185, W, 339);
-  band.addColorStop(0, "rgba(0,0,0,0.18)");
-  band.addColorStop(0.5, "rgba(73,18,13,0.46)");
-  band.addColorStop(1, "rgba(0,0,0,0.18)");
+  band.addColorStop(0, "rgba(0,0,0,0.025)");
+  band.addColorStop(0.5, "rgba(73,18,13,0.07)");
+  band.addColorStop(1, "rgba(0,0,0,0.025)");
   ctx.fillStyle = band;
   ctx.fillRect(0, 185, W, 154);
-  ctx.strokeStyle = "rgba(255, 241, 189, 0.42)";
+  ctx.strokeStyle = "rgba(255, 241, 189, 0.16)";
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(0, 185);
