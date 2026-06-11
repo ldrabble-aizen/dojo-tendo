@@ -134,6 +134,7 @@ canvas {
     0 8px 0 rgba(63, 22, 14, 0.78),
     0 0 22px rgba(255, 198, 64, 0.18),
     inset 0 2px 0 rgba(255,255,255,0.16);
+  transition: filter 120ms ease, box-shadow 120ms ease;
 }
 
 .mobile-stick-base::before,
@@ -166,6 +167,23 @@ canvas {
     0 8px 16px rgba(0,0,0,0.42),
     inset 0 1px 0 rgba(255,255,255,0.42);
   transform: translate(-50%, -50%);
+  transition: filter 120ms ease, box-shadow 120ms ease;
+}
+
+.mobile-stick.is-active .mobile-stick-base {
+  filter: brightness(1.12);
+  box-shadow:
+    0 8px 0 rgba(63, 22, 14, 0.78),
+    0 0 28px rgba(255, 198, 64, 0.28),
+    inset 0 2px 0 rgba(255,255,255,0.2);
+}
+
+.mobile-stick.is-active .mobile-stick-knob {
+  filter: brightness(1.18);
+  box-shadow:
+    0 6px 14px rgba(0,0,0,0.38),
+    0 0 16px rgba(255, 212, 77, 0.28),
+    inset 0 1px 0 rgba(255,255,255,0.46);
 }
 
 .mobile-stick span {
@@ -184,6 +202,7 @@ canvas {
 }
 
 .mobile-controls button {
+  position: relative;
   display: grid;
   place-items: center;
   width: 54px;
@@ -205,6 +224,22 @@ canvas {
   line-height: 1;
   text-shadow: 0 2px 0 rgba(0,0,0,0.72);
   touch-action: none;
+  transition: filter 90ms ease, transform 90ms ease, box-shadow 90ms ease;
+}
+
+.mobile-controls button::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border: 2px solid rgba(255, 226, 132, 0.5);
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.7);
+  pointer-events: none;
+}
+
+.mobile-controls button.is-tapped::after {
+  animation: touch-pulse 260ms ease-out;
 }
 
 .mobile-controls button.is-pressed {
@@ -214,6 +249,17 @@ canvas {
     0 2px 0 rgba(63, 22, 14, 0.92),
     0 0 20px rgba(255, 212, 77, 0.36),
     inset 0 1px 0 rgba(255,255,255,0.28);
+}
+
+@keyframes touch-pulse {
+  0% {
+    opacity: 0.75;
+    transform: scale(0.68);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.24);
+  }
 }
 
 .online-status {
@@ -1022,41 +1068,41 @@ canvas {
 
 .overlay[data-screen="winner"] {
   align-content: start;
-  gap: 6px;
+  gap: 5px;
   overflow: hidden;
-  padding: clamp(104px, 15vh, 128px) 16px 16px;
+  padding: clamp(58px, 10vh, 82px) 16px 16px;
   background: transparent;
   backdrop-filter: none;
 }
 
 .overlay[data-screen="winner"] h1 {
-  width: min(460px, calc(100% - 32px));
-  padding: 8px 16px 9px;
+  width: min(360px, calc(100% - 32px));
+  padding: 6px 13px 7px;
   color: #fff2c2;
-  border: 1px solid rgba(255, 226, 132, 0.62);
-  border-radius: 8px;
+  border: 1px solid rgba(255, 226, 132, 0.48);
+  border-radius: 7px;
   background:
-    linear-gradient(180deg, rgba(42, 14, 12, 0.86), rgba(13, 10, 10, 0.88)),
-    radial-gradient(circle at 50% 0%, rgba(255, 226, 132, 0.2), transparent 62%);
+    linear-gradient(180deg, rgba(42, 14, 12, 0.7), rgba(13, 10, 10, 0.72)),
+    radial-gradient(circle at 50% 0%, rgba(255, 226, 132, 0.14), transparent 62%);
   box-shadow:
-    0 12px 24px rgba(0,0,0,0.28),
-    inset 0 1px 0 rgba(255,255,255,0.14);
-  font: 850 clamp(18px, 2.7vw, 30px)/1.05 system-ui, sans-serif;
+    0 8px 18px rgba(0,0,0,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+  font: 850 clamp(16px, 2.2vw, 24px)/1.05 system-ui, sans-serif;
   text-transform: none;
   text-shadow:
     0 1px 0 rgba(41, 9, 7, 0.86),
-    0 0 10px rgba(255, 209, 92, 0.2);
+    0 0 8px rgba(255, 209, 92, 0.16);
 }
 
 .overlay[data-screen="winner"] .overlay-copy {
-  width: min(420px, calc(100% - 32px));
-  padding: 7px 12px;
-  color: rgba(255, 247, 214, 0.9);
-  border: 1px solid rgba(255, 226, 132, 0.28);
-  border-radius: 8px;
-  background: rgba(8, 8, 10, 0.34);
-  font-size: clamp(11px, 1.35vw, 13px);
-  line-height: 1.3;
+  width: min(330px, calc(100% - 32px));
+  padding: 5px 10px;
+  color: rgba(255, 247, 214, 0.82);
+  border: 1px solid rgba(255, 226, 132, 0.2);
+  border-radius: 7px;
+  background: rgba(8, 8, 10, 0.18);
+  font-size: clamp(10px, 1.2vw, 12px);
+  line-height: 1.25;
 }
 
 .overlay[data-screen="winner"] .overlay-actions {
@@ -1064,12 +1110,12 @@ canvas {
 }
 
 .overlay[data-screen="winner"] #start {
-  min-width: 154px;
-  min-height: 38px;
-  font-size: 13px;
+  min-width: 132px;
+  min-height: 32px;
+  font-size: 11px;
   box-shadow:
-    0 6px 0 #9b651b,
-    0 0 16px rgba(255, 212, 77, 0.2);
+    0 5px 0 #9b651b,
+    0 0 12px rgba(255, 212, 77, 0.16);
 }
 
 @media (max-width: 720px) {

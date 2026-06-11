@@ -94,6 +94,10 @@ const colorPartsCache = new Map();
 const lightenCache = new Map();
 const darkenCache = new Map();
 const alphaColorCache = new Map();
+const mobileFightQuery = window.matchMedia("(pointer: coarse), (max-width: 920px)");
+let cameraZoom = 1;
+let cameraPan = 0;
+let cameraLift = 8;
 
 const BODY_SPECS = {
   athletic: {
@@ -517,6 +521,9 @@ function resetRound() {
   if (!matchOver) matchWinnerId = "";
   flash = 0;
   shake = 0;
+  cameraZoom = 1;
+  cameraPan = 0;
+  cameraLift = 8;
   koFreeze = 0;
   roundFrame = 0;
   countdownFrames = 180;
@@ -933,6 +940,8 @@ function landHit(attacker, target, damage, projectile = false) {
   const unblockable = attacker?.attack?.type === "grab";
   const counter = attacker?.counterWindow > 0;
   const blocked = !unblockable && target.blocking && attacker && target.dir !== attacker.dir;
+  const attackType = attacker?.attack?.type ?? "";
+  const heavyImpact = projectile || attackType === "kick" || attackType === "airKick" || attackType === "sweep" || attackType === "grab";
   const finalDamage = blocked ? Math.ceil(damage * 0.28) : damage + (counter ? 4 : 0);
 
   target.health = clamp(target.health - finalDamage, 0, 100);
@@ -943,8 +952,8 @@ function landHit(attacker, target, damage, projectile = false) {
   if (attacker) attacker.energy = clamp(attacker.energy + (blocked ? 3 : 8), 0, 100);
   if (blocked) target.counterWindow = 34;
   if (counter && attacker) attacker.counterWindow = 0;
-  flash = blocked ? 3 : 6;
-  shake = blocked ? Math.max(shake, 3) : Math.max(shake, projectile ? 8 : 6);
+  flash = blocked ? 2 : heavyImpact ? 7 : 5;
+  shake = blocked ? Math.max(shake, 3) : Math.max(shake, projectile ? 8 : heavyImpact ? 7 : 5);
   playSound(blocked ? "block" : "hit");
   addText(
     target.x,
@@ -952,25 +961,30 @@ function landHit(attacker, target, damage, projectile = false) {
     blocked ? "BLOCK" : counter ? "COUNTER" : unblockable ? "GRAB" : projectile ? "SPECIAL" : "HIT",
     blocked ? "#bdeaff" : counter ? "#fff1bd" : "#ffd44d",
   );
+  const impactX = target.x - target.dir * 26;
+  const impactY = target.y - (projectile ? 116 : blocked ? 108 : heavyImpact ? 88 : 96);
   burst(
     target.x - target.dir * 22,
-    target.y - 102,
+    target.y - (heavyImpact ? 92 : 102),
     blocked ? "#bdeaff" : projectile ? "#fff0a6" : "#ffd44d",
-    blocked ? 10 : projectile ? 22 : 18,
+    blocked ? 8 : projectile ? 20 : heavyImpact ? 16 : 14,
   );
   impactBurst(
-    target.x - target.dir * 26,
-    target.y - (projectile ? 116 : blocked ? 108 : 96),
+    impactX,
+    impactY,
     blocked ? "#bdeaff" : projectile ? "#fff0a6" : counter ? "#fff1bd" : "#ffd44d",
     blocked,
+    heavyImpact,
   );
   impactShockwave(
-    target.x - target.dir * 28,
-    target.y - (projectile ? 116 : 100),
+    impactX - target.dir * 2,
+    target.y - (projectile ? 116 : heavyImpact ? 90 : 100),
     blocked ? "#bdeaff" : projectile ? "#fff0a6" : counter ? "#fff1bd" : "#ffd44d",
     blocked,
+    heavyImpact,
   );
-  floorDust(target.x, target.y + 3, blocked ? 5 : 9);
+  impactGlints(impactX, impactY, blocked ? "#bdeaff" : counter ? "#fff1bd" : projectile ? "#fff0a6" : "#ffd44d", blocked, heavyImpact);
+  floorDust(target.x, target.y + 3, blocked ? 4 : heavyImpact ? 10 : 7);
 }
 
 function burst(x, y, color, count) {
@@ -987,48 +1001,64 @@ function burst(x, y, color, count) {
   }
 }
 
-function impactBurst(x, y, color, blocked) {
-  const count = blocked ? 4 : 7;
+function impactBurst(x, y, color, blocked, heavyImpact = false) {
+  const count = blocked ? 4 : heavyImpact ? 9 : 7;
   for (let i = 0; i < count; i += 1) {
     particles.push({
       x,
       y,
       angle: -0.7 + i * (1.4 / Math.max(1, count - 1)),
-      length: blocked ? 18 + Math.random() * 14 : 26 + Math.random() * 26,
-      life: blocked ? 13 + Math.random() * 8 : 16 + Math.random() * 12,
-      size: blocked ? 3 : 4,
+      length: blocked ? 18 + Math.random() * 14 : heavyImpact ? 34 + Math.random() * 30 : 26 + Math.random() * 24,
+      life: blocked ? 13 + Math.random() * 8 : heavyImpact ? 18 + Math.random() * 12 : 15 + Math.random() * 10,
+      size: blocked ? 3 : heavyImpact ? 4.6 : 3.8,
       color,
       kind: "slash",
     });
   }
 }
 
-function impactShockwave(x, y, color, blocked) {
+function impactShockwave(x, y, color, blocked, heavyImpact = false) {
   particles.push({
     x,
     y,
     vx: 0,
     vy: 0,
-    life: blocked ? 14 : 20,
-    maxLife: blocked ? 14 : 20,
-    size: blocked ? 14 : 22,
-    growth: blocked ? 1.5 : 2.25,
+    life: blocked ? 14 : heavyImpact ? 22 : 18,
+    maxLife: blocked ? 14 : heavyImpact ? 22 : 18,
+    size: blocked ? 14 : heavyImpact ? 25 : 20,
+    growth: blocked ? 1.5 : heavyImpact ? 2.45 : 2.05,
     color,
     kind: "ring",
   });
 
-  const count = blocked ? 4 : 7;
+  const count = blocked ? 4 : heavyImpact ? 9 : 6;
   for (let i = 0; i < count; i += 1) {
     const angle = -0.75 + i * (1.5 / Math.max(1, count - 1));
     particles.push({
       x,
       y,
-      vx: Math.cos(angle) * (1.1 + Math.random() * 2.2),
-      vy: Math.sin(angle) * (1 + Math.random() * 1.9),
+      vx: Math.cos(angle) * (1.1 + Math.random() * (heavyImpact ? 2.8 : 2.1)),
+      vy: Math.sin(angle) * (1 + Math.random() * (heavyImpact ? 2.2 : 1.7)),
       life: 12 + Math.random() * 8,
-      size: blocked ? 2.5 : 3.5,
+      size: blocked ? 2.5 : heavyImpact ? 4 : 3.3,
       color,
       kind: "spark",
+    });
+  }
+}
+
+function impactGlints(x, y, color, blocked, heavyImpact) {
+  const count = blocked ? 2 : heavyImpact ? 5 : 3;
+  for (let i = 0; i < count; i += 1) {
+    particles.push({
+      x: x + (Math.random() - 0.5) * 18,
+      y: y + (Math.random() - 0.5) * 18,
+      vx: (Math.random() - 0.5) * 1.8,
+      vy: -0.6 - Math.random() * 1.6,
+      life: 12 + Math.random() * 8,
+      size: blocked ? 5 : heavyImpact ? 8 : 6.5,
+      color,
+      kind: "glint",
     });
   }
 }
@@ -1070,21 +1100,34 @@ function updateFloatingTexts() {
   });
 }
 
+function isMobileFightView() {
+  return mobileFightQuery.matches || window.innerWidth <= 920 || window.innerHeight <= 520;
+}
+
 function applyCamera() {
   const [a, b] = fighters;
   const distance = Math.abs(a.x - b.x);
   const center = (a.x + b.x) / 2;
-  const zoom = 1 + (1 - clamp(distance / 620, 0, 1)) * 0.075;
-  const pan = clamp((W / 2 - center) * 0.09, -34, 34);
-  ctx.translate(W / 2 + pan, H / 2 + 8);
-  ctx.scale(zoom, zoom);
+  const mobileView = isMobileFightView();
+  const close = 1 - clamp(distance / (mobileView ? 540 : 620), 0, 1);
+  const targetZoom = 1 + close * (mobileView ? 0.032 : 0.075);
+  const targetPan = clamp((W / 2 - center) * (mobileView ? 0.052 : 0.09), mobileView ? -20 : -34, mobileView ? 20 : 34);
+  const targetLift = mobileView ? 13 : 8;
+  const ease = mobileView ? 0.2 : 0.13;
+
+  cameraZoom += (targetZoom - cameraZoom) * ease;
+  cameraPan += (targetPan - cameraPan) * ease;
+  cameraLift += (targetLift - cameraLift) * ease;
+
+  ctx.translate(W / 2 + cameraPan, H / 2 + cameraLift);
+  ctx.scale(cameraZoom, cameraZoom);
   ctx.translate(-W / 2, -H / 2);
 }
 
 function draw() {
   ctx.save();
   if (shake > 0) {
-    const amount = shake * 0.22;
+    const amount = shake * (isMobileFightView() ? 0.14 : 0.22);
     ctx.translate((Math.random() - 0.5) * amount, (Math.random() - 0.5) * amount);
   }
 
@@ -1947,12 +1990,21 @@ function getPose(f, stride) {
   const crouch = f.crouch * 18;
   const progress = attackProgress(f.attack);
   const attackType = f.attack?.type;
+  const activePulse = f.attack
+    ? Math.sin(clamp((f.attack.frame - f.attack.activeStart + 2) / Math.max(1, f.attack.activeEnd - f.attack.activeStart + 4), 0, 1) * Math.PI)
+    : 0;
+  const windup = f.attack
+    ? Math.sin(clamp(f.attack.frame / Math.max(1, f.attack.activeStart), 0, 1) * Math.PI)
+    : 0;
   const airborne = !f.grounded;
   const torsoTilt =
     (f.hurt > 0 ? -0.07 : 0) +
     (airborne ? -0.05 : 0) +
-    (attackType === "punch" || attackType === "airPunch" ? 0.05 * progress : 0) +
-    (attackType === "kick" || attackType === "airKick" ? -0.04 * progress : 0);
+    (attackType === "punch" || attackType === "airPunch" ? 0.08 * progress - 0.03 * windup : 0) +
+    (attackType === "kick" || attackType === "airKick" ? -0.09 * progress : 0) +
+    (attackType === "sweep" ? 0.16 * progress : 0) +
+    (attackType === "grab" ? 0.08 * progress : 0) +
+    (attackType === "special" ? -0.08 * progress : 0);
 
   const hipY = -56 + crouch;
   const shoulderY = -118 + crouch;
@@ -1998,35 +2050,44 @@ function getPose(f, stride) {
   }
 
   if (attackType === "punch" || attackType === "airPunch") {
-    base.frontArm.elbow = { x: 58 + progress * 24, y: -96 + crouch - progress * 4 };
-    base.frontArm.hand = { x: 78 + progress * 68, y: -92 + crouch - progress * 8 };
-    base.backArm.elbow = { x: -44, y: -98 + crouch };
-    base.backArm.hand = { x: -8, y: -84 + crouch };
+    base.frontArm.elbow = { x: 50 + progress * 42 + activePulse * 16, y: -99 + crouch - progress * 8 };
+    base.frontArm.hand = { x: 72 + progress * 86 + activePulse * 18, y: -94 + crouch - progress * 12 };
+    base.backArm.elbow = { x: -46 - windup * 12, y: -102 + crouch - windup * 8 };
+    base.backArm.hand = { x: -10 - windup * 18, y: -87 + crouch - windup * 10 };
+    base.frontLeg.foot.x += 12 * progress;
+    base.backLeg.foot.x -= 16 * progress;
   } else if (attackType === "kick" || attackType === "airKick") {
-    base.frontLeg.knee = { x: 52 + progress * 36, y: -44 - progress * 18 + crouch };
-    base.frontLeg.foot = { x: 70 + progress * 86, y: -30 - progress * 26 };
-    base.frontArm.elbow = { x: 46, y: -76 + crouch };
-    base.frontArm.hand = { x: 54, y: -48 + crouch };
-    base.backArm.elbow = { x: -42, y: -100 + crouch };
-    base.backArm.hand = { x: -22, y: -80 + crouch };
+    base.frontLeg.knee = { x: 45 + progress * 46, y: -46 - progress * 24 + crouch };
+    base.frontLeg.foot = { x: 62 + progress * 104 + activePulse * 12, y: -28 - progress * 34 };
+    base.backLeg.knee = { x: -30 - progress * 8, y: -25 + crouch };
+    base.backLeg.foot = { x: -44 - progress * 18, y: -1 };
+    base.frontArm.elbow = { x: 37 - progress * 10, y: -79 + crouch + progress * 8 };
+    base.frontArm.hand = { x: 47 - progress * 14, y: -52 + crouch + progress * 4 };
+    base.backArm.elbow = { x: -44 - progress * 12, y: -104 + crouch - progress * 10 };
+    base.backArm.hand = { x: -24 - progress * 22, y: -83 + crouch - progress * 12 };
   } else if (attackType === "sweep") {
-    base.frontLeg.knee = { x: 42 + progress * 25, y: -24 + crouch };
-    base.frontLeg.foot = { x: 78 + progress * 66, y: -2 };
-    base.backLeg.knee = { x: -32, y: -18 + crouch };
+    base.frontLeg.knee = { x: 38 + progress * 34, y: -22 + crouch + progress * 8 };
+    base.frontLeg.foot = { x: 72 + progress * 86, y: -1 };
+    base.backLeg.knee = { x: -34, y: -16 + crouch + progress * 12 };
     base.backLeg.foot = { x: -58, y: 0 };
-    base.frontArm.hand.y += 9;
-    base.backArm.hand.y += 7;
+    base.frontArm.elbow = { x: 34, y: -76 + crouch + progress * 16 };
+    base.frontArm.hand = { x: 46, y: -47 + crouch + progress * 18 };
+    base.backArm.elbow = { x: -34, y: -82 + crouch + progress * 14 };
+    base.backArm.hand = { x: -48, y: -53 + crouch + progress * 18 };
   } else if (attackType === "grab") {
-    base.frontArm.elbow = { x: 60 + progress * 18, y: -90 + crouch };
-    base.frontArm.hand = { x: 88 + progress * 34, y: -88 + crouch };
-    base.backArm.elbow = { x: 38 + progress * 18, y: -104 + crouch };
-    base.backArm.hand = { x: 78 + progress * 30, y: -106 + crouch };
-    base.frontLeg.foot.x += 18 * progress;
+    base.frontArm.elbow = { x: 56 + progress * 30, y: -92 + crouch - progress * 4 };
+    base.frontArm.hand = { x: 82 + progress * 48, y: -87 + crouch - progress * 2 };
+    base.backArm.elbow = { x: 30 + progress * 34, y: -112 + crouch - progress * 2 };
+    base.backArm.hand = { x: 66 + progress * 48, y: -109 + crouch + progress * 4 };
+    base.frontLeg.foot.x += 22 * progress;
+    base.backLeg.foot.x -= 10 * progress;
   } else if (attackType === "special") {
-    base.frontArm.elbow = { x: 54, y: -112 + crouch };
-    base.frontArm.hand = { x: 82 + progress * 20, y: -98 + crouch };
-    base.backArm.elbow = { x: 24, y: -114 + crouch };
-    base.backArm.hand = { x: 62 + progress * 20, y: -98 + crouch };
+    base.frontArm.elbow = { x: 48 + progress * 14, y: -120 + crouch - progress * 8 };
+    base.frontArm.hand = { x: 76 + progress * 34, y: -105 + crouch - progress * 6 };
+    base.backArm.elbow = { x: 18 + progress * 14, y: -122 + crouch - progress * 10 };
+    base.backArm.hand = { x: 56 + progress * 32, y: -106 + crouch - progress * 5 };
+    base.frontLeg.foot.x += 8 * progress;
+    base.backLeg.foot.x -= 8 * progress;
   }
 
   if (airborne) {
@@ -2591,6 +2652,21 @@ function drawParticles() {
       ctx.roundRect(-p.size * 1.7, -p.size * 0.45, p.size * 3.4, p.size * 0.9, p.size * 0.45);
       ctx.fill();
       ctx.restore();
+    } else if (p.kind === "glint") {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(roundFrame * 0.08 + p.size);
+      ctx.globalCompositeOperation = "screen";
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = Math.max(1.2, p.size * 0.22);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-p.size, 0);
+      ctx.lineTo(p.size, 0);
+      ctx.moveTo(0, -p.size);
+      ctx.lineTo(0, p.size);
+      ctx.stroke();
+      ctx.restore();
     } else if (p.kind === "dust") {
       ctx.fillStyle = p.color;
       ctx.beginPath();
@@ -2609,33 +2685,33 @@ function drawParticles() {
 function drawKOBanner() {
   if (!winner) return;
   if (overlay.dataset.screen === "winner" && !overlay.classList.contains("hidden")) return;
-  const alpha = overlay.classList.contains("hidden") ? 0.72 : 0.28;
-  const x = W / 2 - 132;
-  const y = 108;
-  const banner = ctx.createLinearGradient(x, y, x + 264, y + 68);
+  const alpha = overlay.classList.contains("hidden") ? 0.54 : 0.18;
+  const x = W / 2 - 100;
+  const y = 76;
+  const banner = ctx.createLinearGradient(x, y, x + 200, y + 48);
   banner.addColorStop(0, `rgba(30, 8, 7, ${alpha})`);
   banner.addColorStop(0.48, `rgba(126, 33, 21, ${alpha})`);
   banner.addColorStop(1, `rgba(30, 8, 7, ${alpha})`);
   ctx.fillStyle = banner;
   ctx.beginPath();
-  ctx.roundRect(x, y, 264, 68, 8);
+  ctx.roundRect(x, y, 200, 48, 8);
   ctx.fill();
-  ctx.strokeStyle = `rgba(255, 226, 132, ${0.5 + alpha * 0.24})`;
+  ctx.strokeStyle = `rgba(255, 226, 132, ${0.42 + alpha * 0.18})`;
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  ctx.fillStyle = `rgba(255, 241, 189, ${0.86 + alpha * 0.1})`;
-  ctx.font = "900 34px system-ui, sans-serif";
+  ctx.fillStyle = `rgba(255, 241, 189, ${0.8 + alpha * 0.12})`;
+  ctx.font = "850 24px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = `rgba(43, 20, 16, ${0.74 + alpha * 0.12})`;
-  ctx.strokeText("K.O.", W / 2, y + 29);
-  ctx.fillText("K.O.", W / 2, y + 29);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = `rgba(43, 20, 16, ${0.66 + alpha * 0.12})`;
+  ctx.strokeText("K.O.", W / 2, y + 21);
+  ctx.fillText("K.O.", W / 2, y + 21);
 
-  ctx.font = "800 11px system-ui, sans-serif";
-  ctx.fillStyle = `rgba(255, 226, 132, ${0.74 + alpha * 0.1})`;
-  ctx.fillText(`${winner.toUpperCase()} GANA`, W / 2, y + 52);
+  ctx.font = "800 10px system-ui, sans-serif";
+  ctx.fillStyle = `rgba(255, 226, 132, ${0.68 + alpha * 0.1})`;
+  ctx.fillText(`${winner.toUpperCase()} GANA`, W / 2, y + 37);
   ctx.textBaseline = "alphabetic";
 }
 
@@ -2658,8 +2734,8 @@ function showWinner() {
   } else {
     overlay.querySelector("h1").textContent = matchOver ? `${winner} gana` : `${winner} gana round ${roundNumber}`;
     overlayCopy.textContent = matchOver
-      ? `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Revancha en Mini Kombat III.`
-      : `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Siguiente round.`;
+      ? `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Revancha disponible.`
+      : `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Prepará el siguiente round.`;
     startButton.textContent = matchOver ? "REVANCHA" : "SIGUIENTE ROUND";
   }
   fighterSelect.classList.add("hidden");
@@ -3104,6 +3180,11 @@ function setTouchControl(button, pressed) {
   const action = button.dataset.touch;
   if (!action || !(action in touchInput)) return;
   button.classList.toggle("is-pressed", pressed);
+  if (pressed) {
+    button.classList.remove("is-tapped");
+    void button.offsetWidth;
+    button.classList.add("is-tapped");
+  }
   touchInput[action] = pressed;
   if (!pressed || !running || koFreeze > 0 || countdownFrames > 0) return;
   const player = fighters.find((f) => f.id === "right");
@@ -3144,6 +3225,7 @@ if (mobileStick) {
     event.preventDefault();
     ensureAudio();
     stickPointerId = event.pointerId;
+    mobileStick.classList.add("is-active");
     mobileStick.setPointerCapture(event.pointerId);
     updateStickFromEvent(event);
   });
@@ -3156,12 +3238,14 @@ if (mobileStick) {
     if (event.pointerId !== stickPointerId) return;
     event.preventDefault();
     stickPointerId = null;
+    mobileStick.classList.remove("is-active");
     setStickState();
   };
   mobileStick.addEventListener("pointerup", releaseStick);
   mobileStick.addEventListener("pointercancel", releaseStick);
   mobileStick.addEventListener("lostpointercapture", () => {
     stickPointerId = null;
+    mobileStick.classList.remove("is-active");
     setStickState();
   });
 }
@@ -3179,6 +3263,7 @@ document.querySelectorAll("[data-touch]").forEach((button) => {
   });
   button.addEventListener("pointercancel", () => setTouchControl(button, false));
   button.addEventListener("lostpointercapture", () => setTouchControl(button, false));
+  button.addEventListener("animationend", () => button.classList.remove("is-tapped"));
 });
 
 function preventZoomGesture(event) {
