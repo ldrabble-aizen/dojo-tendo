@@ -118,107 +118,179 @@ const SPECIAL_STYLES = {
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
+    chest: 42,
     waist: 27,
     hip: 34,
     limb: 0.98,
+    upperArmWidth: 0.96,
+    forearmWidth: 0.9,
+    thighWidth: 0.98,
+    calfWidth: 0.92,
     hand: 0.92,
     foot: 0.94,
     headW: 88,
     headH: 94,
     headY: 18,
+    neckW: 24,
+    neckH: 19,
+    shoulderSlope: 8,
+    facePad: 4,
     stance: 0.95,
   },
   slimFemale: {
-    shoulder: 35,
+    shoulder: 33,
+    chest: 34,
     waist: 23,
     hip: 34,
     limb: 0.9,
     armScale: 0.88,
     legScale: 0.94,
+    upperArmWidth: 0.72,
+    forearmWidth: 0.68,
+    thighWidth: 0.78,
+    calfWidth: 0.7,
     hand: 0.82,
     foot: 0.86,
     headW: 84,
     headH: 92,
     headY: 20,
+    neckW: 20,
+    neckH: 18,
+    shoulderSlope: 10,
+    facePad: 5,
     stance: 0.82,
   },
   softFemale: {
     shoulder: 39,
+    chest: 38,
     waist: 28,
     hip: 39,
     limb: 0.98,
     armScale: 0.95,
     legScale: 1,
+    upperArmWidth: 0.88,
+    forearmWidth: 0.82,
+    thighWidth: 0.96,
+    calfWidth: 0.86,
     hand: 0.9,
     foot: 0.94,
     headW: 88,
     headH: 96,
     headY: 18,
+    neckW: 23,
+    neckH: 19,
+    shoulderSlope: 9,
+    facePad: 5,
     stance: 0.94,
   },
   balanced: {
     shoulder: 44,
+    chest: 43,
     waist: 30,
     hip: 37,
     limb: 1.03,
+    upperArmWidth: 1,
+    forearmWidth: 0.94,
+    thighWidth: 1,
+    calfWidth: 0.96,
     hand: 1,
     foot: 1,
     headW: 92,
     headH: 98,
     headY: 16,
+    neckW: 26,
+    neckH: 20,
+    shoulderSlope: 8,
+    facePad: 4,
     stance: 1,
   },
   heavy: {
     shoulder: 50,
+    chest: 50,
     waist: 36,
     hip: 43,
     limb: 1.14,
+    upperArmWidth: 1.12,
+    forearmWidth: 1.04,
+    thighWidth: 1.1,
+    calfWidth: 1.04,
     hand: 1.12,
     foot: 1.12,
     headW: 98,
     headH: 102,
     headY: 14,
+    neckW: 30,
+    neckH: 21,
+    shoulderSlope: 7,
+    facePad: 4,
     stance: 1.12,
   },
   racingHeavy: {
     shoulder: 55,
+    chest: 56,
     waist: 42,
     hip: 47,
     limb: 1.1,
     armScale: 1.04,
     legScale: 0.98,
+    upperArmWidth: 1.18,
+    forearmWidth: 1.08,
+    thighWidth: 1.16,
+    calfWidth: 1.04,
     hand: 1.13,
     foot: 1.1,
     headW: 98,
     headH: 102,
     headY: 14,
+    neckW: 32,
+    neckH: 22,
+    shoulderSlope: 6,
+    facePad: 3,
     stance: 1.18,
     belly: 1.22,
   },
   lean: {
     shoulder: 39,
+    chest: 38,
     waist: 26,
     hip: 32,
     limb: 0.94,
+    upperArmWidth: 0.86,
+    forearmWidth: 0.8,
+    thighWidth: 0.86,
+    calfWidth: 0.8,
     hand: 0.9,
     foot: 0.9,
     headW: 88,
     headH: 94,
     headY: 18,
+    neckW: 22,
+    neckH: 19,
+    shoulderSlope: 9,
+    facePad: 5,
     stance: 0.9,
   },
   tallLean: {
     shoulder: 36,
+    chest: 35,
     waist: 24,
     hip: 30,
     limb: 1.04,
     armScale: 1.08,
     legScale: 1.16,
+    upperArmWidth: 0.78,
+    forearmWidth: 0.72,
+    thighWidth: 0.78,
+    calfWidth: 0.7,
     hand: 0.88,
     foot: 0.94,
     headW: 82,
     headH: 92,
     headY: 22,
+    neckW: 21,
+    neckH: 21,
+    shoulderSlope: 11,
+    facePad: 5,
     stance: 0.82,
   },
 };
@@ -2623,10 +2695,13 @@ function drawTorso(f, crouch) {
   const giDark = darken(outfit.jacket, 34);
   const giDeep = darken(outfit.jacket, 48);
   const shoulder = spec.shoulder;
+  const chest = spec.chest ?? shoulder;
   const waist = spec.waist;
   const hip = spec.hip;
   const lowerWaist = waist * (spec.belly ?? 1);
   const lowerHip = hip * (spec.belly ? 1.08 : 1);
+  const shoulderSlope = spec.shoulderSlope ?? 8;
+  const waistY = -77 + crouch;
   const top = -137 + crouch;
   const bottom = -32 + crouch;
 
@@ -2637,20 +2712,21 @@ function drawTorso(f, crouch) {
 
   ctx.fillStyle = "rgba(38, 22, 17, 0.76)";
   ctx.beginPath();
-  ctx.moveTo(-shoulder - 4, top + 11);
-  ctx.quadraticCurveTo(0, top - 14, shoulder + 4, top + 11);
-  ctx.lineTo(lowerWaist + 5, bottom + 3);
-  ctx.lineTo(-lowerWaist - 5, bottom + 3);
+  ctx.moveTo(-shoulder - 5, top + shoulderSlope + 3);
+  ctx.quadraticCurveTo(-chest - 12, waistY, -lowerWaist - 6, bottom + 3);
+  ctx.lineTo(lowerWaist + 6, bottom + 3);
+  ctx.quadraticCurveTo(chest + 12, waistY, shoulder + 5, top + shoulderSlope + 3);
+  ctx.quadraticCurveTo(0, top - 13, -shoulder - 5, top + shoulderSlope + 3);
   ctx.closePath();
   ctx.fill();
 
   ctx.fillStyle = giDark;
   ctx.beginPath();
-  ctx.moveTo(-shoulder, top + 9);
-  ctx.quadraticCurveTo(-shoulder - 9, -78 + crouch, -lowerWaist, bottom);
+  ctx.moveTo(-shoulder, top + shoulderSlope);
+  ctx.bezierCurveTo(-chest - 11, -116 + crouch, -lowerWaist - 8, -68 + crouch, -lowerWaist, bottom);
   ctx.lineTo(lowerWaist, bottom);
-  ctx.quadraticCurveTo(shoulder + 9, -78 + crouch, shoulder, top + 9);
-  ctx.quadraticCurveTo(0, top - 11, -shoulder, top + 9);
+  ctx.bezierCurveTo(lowerWaist + 8, -68 + crouch, chest + 11, -116 + crouch, shoulder, top + shoulderSlope);
+  ctx.quadraticCurveTo(0, top - 11, -shoulder, top + shoulderSlope);
   ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = "rgba(38, 22, 17, 0.68)";
@@ -2659,11 +2735,11 @@ function drawTorso(f, crouch) {
 
   ctx.fillStyle = outfit.jacket;
   ctx.beginPath();
-  ctx.moveTo(-shoulder + 2, top + 11);
-  ctx.quadraticCurveTo(-shoulder - 5, -74 + crouch, -lowerWaist, bottom);
+  ctx.moveTo(-shoulder + 2, top + shoulderSlope + 2);
+  ctx.bezierCurveTo(-chest - 6, -110 + crouch, -lowerWaist - 4, -67 + crouch, -lowerWaist, bottom);
   ctx.lineTo(lowerWaist, bottom);
-  ctx.quadraticCurveTo(shoulder + 5, -74 + crouch, shoulder - 2, top + 11);
-  ctx.quadraticCurveTo(0, top - 7, -shoulder + 2, top + 11);
+  ctx.bezierCurveTo(lowerWaist + 4, -67 + crouch, chest + 6, -110 + crouch, shoulder - 2, top + shoulderSlope + 2);
+  ctx.quadraticCurveTo(0, top - 7, -shoulder + 2, top + shoulderSlope + 2);
   ctx.fill();
   ctx.strokeStyle = "rgba(38, 22, 17, 0.42)";
   ctx.lineWidth = 2;
@@ -2671,11 +2747,11 @@ function drawTorso(f, crouch) {
 
   ctx.fillStyle = giLight;
   ctx.beginPath();
-  ctx.moveTo(-shoulder + 14, top + 12);
+  ctx.moveTo(-shoulder + 14, top + shoulderSlope + 4);
   ctx.lineTo(6, -82 + crouch);
   ctx.lineTo(-10, -35 + crouch);
   ctx.lineTo(-waist - 2, -35 + crouch);
-  ctx.quadraticCurveTo(-shoulder + 3, -78 + crouch, -shoulder + 14, top + 12);
+  ctx.quadraticCurveTo(-chest + 2, -78 + crouch, -shoulder + 14, top + shoulderSlope + 4);
   ctx.fill();
 
   ctx.fillStyle = "rgba(255,255,255,0.16)";
@@ -2688,8 +2764,14 @@ function drawTorso(f, crouch) {
 
   ctx.fillStyle = "rgba(255,255,255,0.09)";
   ctx.beginPath();
-  ctx.ellipse(-shoulder + 12, top + 23, 15, 26, -0.4, 0, Math.PI * 2);
-  ctx.ellipse(shoulder - 12, top + 23, 15, 26, 0.4, 0, Math.PI * 2);
+  ctx.ellipse(-shoulder + 12, top + shoulderSlope + 14, 16, 23, -0.5, 0, Math.PI * 2);
+  ctx.ellipse(shoulder - 12, top + shoulderSlope + 14, 16, 23, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = colorWithAlpha(outfit.sleeve, 0.34);
+  ctx.beginPath();
+  ctx.ellipse(-shoulder + 7, top + shoulderSlope + 13, 17, 15, -0.45, 0, Math.PI * 2);
+  ctx.ellipse(shoulder - 7, top + shoulderSlope + 13, 17, 15, 0.45, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = "rgba(58, 31, 20, 0.35)";
@@ -2702,17 +2784,17 @@ function drawTorso(f, crouch) {
 
   ctx.fillStyle = giDeep;
   ctx.beginPath();
-  ctx.moveTo(-21, -119 + crouch);
+  ctx.moveTo(-20, -119 + crouch);
   ctx.lineTo(-5, -101 + crouch);
   ctx.lineTo(-17, -87 + crouch);
-  ctx.lineTo(-35, -113 + crouch);
+  ctx.lineTo(-34, -113 + crouch);
   ctx.closePath();
   ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(21, -119 + crouch);
+  ctx.moveTo(20, -119 + crouch);
   ctx.lineTo(5, -101 + crouch);
   ctx.lineTo(17, -87 + crouch);
-  ctx.lineTo(35, -113 + crouch);
+  ctx.lineTo(34, -113 + crouch);
   ctx.closePath();
   ctx.fill();
 
@@ -2875,18 +2957,25 @@ function drawHead(f, crouch, stride) {
   const y = -224 + crouch + Math.abs(stride) * 2 + spec.headY;
 
   const skin = f.skin ?? "#f2b891";
+  const neckW = spec.neckW ?? 26;
+  const neckH = spec.neckH ?? 20;
   const neckTop = -118 + crouch;
-  const neckBottom = -99 + crouch;
+  const neckBottom = neckTop + neckH;
   const neckGrad = ctx.createLinearGradient(0, neckTop, 0, neckBottom);
   neckGrad.addColorStop(0, lighten(skin, 16));
   neckGrad.addColorStop(1, darken(skin, 18));
   ctx.fillStyle = neckGrad;
   ctx.beginPath();
-  ctx.roundRect(-14, neckTop, 28, neckBottom - neckTop, 9);
+  ctx.roundRect(-neckW / 2, neckTop, neckW, neckH, 9);
   ctx.fill();
   ctx.strokeStyle = "rgba(43, 24, 18, 0.35)";
   ctx.lineWidth = 2;
   ctx.stroke();
+
+  ctx.fillStyle = "rgba(39, 20, 15, 0.28)";
+  ctx.beginPath();
+  ctx.ellipse(0, neckTop - 2, neckW * 0.6, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.save();
   ctx.rotate(stride * 0.018 + (f.hurt > 0 ? Math.sin(f.hurt) * 0.03 : 0));
@@ -2901,18 +2990,45 @@ function drawHead(f, crouch, stride) {
   ctx.fill();
 
   if (f.face.complete) {
-    ctx.shadowColor = "rgba(0, 0, 0, 0.56)";
-    ctx.shadowBlur = 14;
+    const facePad = spec.facePad ?? 4;
+    const clipX = x + facePad;
+    const clipY = y + facePad;
+    const clipW = headW - facePad * 2;
+    const clipH = headH - facePad * 1.55;
+    const clipRadius = Math.min(24, Math.max(16, headW * 0.23));
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.48)";
+    ctx.shadowBlur = 12;
     ctx.shadowOffsetY = 7;
+    ctx.globalAlpha = 0.82;
     ctx.drawImage(f.face, x, y, headW, headH);
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
+    ctx.restore();
+
+    ctx.fillStyle = "rgba(18, 12, 10, 0.12)";
+    ctx.beginPath();
+    ctx.roundRect(clipX - 2, clipY - 2, clipW + 4, clipH + 4, clipRadius + 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(clipX, clipY, clipW, clipH, clipRadius);
+    ctx.clip();
+    ctx.drawImage(f.face, x, y, headW, headH);
 
     ctx.globalCompositeOperation = "screen";
-    ctx.globalAlpha = 0.18;
+    ctx.globalAlpha = 0.16;
     ctx.drawImage(f.face, x - 2, y - 2, headW, headH);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
+
+    const faceShade = ctx.createLinearGradient(clipX, clipY, clipX + clipW, clipY + clipH);
+    faceShade.addColorStop(0, "rgba(255,255,255,0.12)");
+    faceShade.addColorStop(0.5, "rgba(255,255,255,0)");
+    faceShade.addColorStop(1, "rgba(0,0,0,0.18)");
+    ctx.fillStyle = faceShade;
+    ctx.fillRect(clipX, clipY, clipW, clipH);
+    ctx.restore();
 
     const rim = ctx.createLinearGradient(x, y, x + headW, y + headH);
     rim.addColorStop(0, "rgba(255,255,255,0.18)");
@@ -2920,18 +3036,18 @@ function drawHead(f, crouch, stride) {
     rim.addColorStop(1, "rgba(0,0,0,0.2)");
     ctx.fillStyle = rim;
     ctx.beginPath();
-    ctx.roundRect(x + 7, y + 6, headW - 14, headH - 12, 20);
+    ctx.roundRect(clipX, clipY, clipW, clipH, clipRadius);
     ctx.fill();
 
     ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = "rgba(36, 21, 16, 0.18)";
+    ctx.fillStyle = "rgba(36, 21, 16, 0.28)";
     ctx.beginPath();
-    ctx.ellipse(0, y + headH - 10, headW * 0.3, 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, y + headH - 12, headW * 0.28, 8, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = colorWithAlpha(f.trim, 0.32);
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, y + headH * 0.52, headW * 0.42, -0.72, 0.72);
+    ctx.arc(0, y + headH * 0.53, headW * 0.4, -0.72, 0.72);
     ctx.stroke();
 
     if (f.headwear === "pchanBandana") drawPchanHeadBandana(x, y, headW, headH);
@@ -3017,12 +3133,14 @@ function drawLeg(f, leg, front) {
   const spec = bodySpec(f);
   const outfit = outfitSpec(f);
   const pant = front ? outfit.pants : darken(outfit.pants, 28);
-  drawLimbSegment(leg.hip, leg.knee, pant, 23 * spec.limb, 16 * spec.limb);
-  drawLimbSegment(leg.knee, leg.foot, pant, 19 * spec.limb, 11 * spec.limb);
+  const thighWidth = (spec.thighWidth ?? spec.limb ?? 1);
+  const calfWidth = (spec.calfWidth ?? spec.limb ?? 1);
+  drawLimbSegment(leg.hip, leg.knee, pant, 24 * thighWidth, 16 * thighWidth);
+  drawLimbSegment(leg.knee, leg.foot, pant, 19 * calfWidth, 10 * calfWidth);
 
   ctx.fillStyle = front ? outfit.accent : "rgba(255,255,255,0.14)";
   ctx.beginPath();
-  ctx.ellipse(leg.knee.x, leg.knee.y, 8 * spec.limb, 6 * spec.limb, 0, 0, Math.PI * 2);
+  ctx.ellipse(leg.knee.x, leg.knee.y, 8 * calfWidth, 6 * calfWidth, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "rgba(35, 21, 17, 0.34)";
   ctx.lineWidth = 1.5;
@@ -3069,8 +3187,10 @@ function drawArm(f, arm, front) {
   const spec = bodySpec(f);
   const outfit = outfitSpec(f);
   const sleeve = front ? outfit.sleeve : darken(outfit.jacket, 34);
-  drawLimbSegment(arm.shoulder, arm.elbow, sleeve, 20 * spec.limb, 13 * spec.limb);
-  drawLimbSegment(arm.elbow, arm.hand, sleeve, 16 * spec.limb, 9 * spec.limb);
+  const upperArmWidth = (spec.upperArmWidth ?? spec.limb ?? 1);
+  const forearmWidth = (spec.forearmWidth ?? spec.limb ?? 1);
+  drawLimbSegment(arm.shoulder, arm.elbow, sleeve, 20 * upperArmWidth, 13 * upperArmWidth);
+  drawLimbSegment(arm.elbow, arm.hand, sleeve, 16 * forearmWidth, 9 * forearmWidth);
 
   if (front) {
     ctx.strokeStyle = outfit.accent;
@@ -3096,7 +3216,7 @@ function drawArm(f, arm, front) {
 
   ctx.fillStyle = "rgba(255,255,255,0.2)";
   ctx.beginPath();
-  ctx.arc(arm.elbow.x, arm.elbow.y, 5.5, 0, Math.PI * 2);
+  ctx.arc(arm.elbow.x, arm.elbow.y, 5.5 * forearmWidth, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = "rgba(61, 34, 24, 0.28)";
@@ -3130,55 +3250,96 @@ function drawLimbSegment(a, b, color, widthA, widthB) {
   const nx = Math.cos(angle + Math.PI / 2);
   const ny = Math.sin(angle + Math.PI / 2);
   const length = Math.hypot(b.y - a.y, b.x - a.x);
-  const width = (widthA + widthB) * 0.52;
+  const startW = widthA;
+  const endW = widthB;
+  const width = (startW + endW) * 0.5;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const c1x = a.x + dx * 0.32;
+  const c1y = a.y + dy * 0.32;
+  const c2x = a.x + dx * 0.7;
+  const c2y = a.y + dy * 0.7;
 
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
   ctx.strokeStyle = "rgba(35, 21, 17, 0.56)";
-  ctx.lineWidth = width + 5;
+  ctx.lineWidth = Math.max(startW, endW) + 5;
   ctx.beginPath();
   ctx.moveTo(a.x, a.y);
   ctx.lineTo(b.x, b.y);
   ctx.stroke();
 
-  const grad = ctx.createLinearGradient(a.x + nx * width * 0.55, a.y + ny * width * 0.55, a.x - nx * width * 0.55, a.y - ny * width * 0.55);
+  const grad = ctx.createLinearGradient(a.x + nx * width * 0.6, a.y + ny * width * 0.6, a.x - nx * width * 0.6, a.y - ny * width * 0.6);
   grad.addColorStop(0, lighten(color, 18));
   grad.addColorStop(0.5, color);
   grad.addColorStop(1, darken(color, 28));
-  ctx.strokeStyle = grad;
-  ctx.lineWidth = width;
+  ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
-  ctx.lineTo(b.x, b.y);
+  ctx.moveTo(a.x + nx * startW * 0.5, a.y + ny * startW * 0.5);
+  ctx.bezierCurveTo(
+    c1x + nx * startW * 0.44,
+    c1y + ny * startW * 0.44,
+    c2x + nx * endW * 0.44,
+    c2y + ny * endW * 0.44,
+    b.x + nx * endW * 0.5,
+    b.y + ny * endW * 0.5
+  );
+  ctx.lineTo(b.x - nx * endW * 0.5, b.y - ny * endW * 0.5);
+  ctx.bezierCurveTo(
+    c2x - nx * endW * 0.44,
+    c2y - ny * endW * 0.44,
+    c1x - nx * startW * 0.44,
+    c1y - ny * startW * 0.44,
+    a.x - nx * startW * 0.5,
+    a.y - ny * startW * 0.5
+  );
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(35, 21, 17, 0.5)";
+  ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
   ctx.lineWidth = Math.max(1.2, width * 0.13);
   ctx.beginPath();
-  ctx.moveTo(a.x + nx * width * 0.24, a.y + ny * width * 0.24);
-  ctx.lineTo(b.x + nx * width * 0.19, b.y + ny * width * 0.19);
+  ctx.moveTo(a.x + nx * startW * 0.22, a.y + ny * startW * 0.22);
+  ctx.bezierCurveTo(
+    c1x + nx * startW * 0.19,
+    c1y + ny * startW * 0.19,
+    c2x + nx * endW * 0.18,
+    c2y + ny * endW * 0.18,
+    b.x + nx * endW * 0.16,
+    b.y + ny * endW * 0.16
+  );
   ctx.stroke();
 
   ctx.strokeStyle = "rgba(0,0,0,0.16)";
   ctx.lineWidth = Math.max(1.5, width * 0.16);
   ctx.beginPath();
-  ctx.moveTo(a.x - nx * width * 0.28, a.y - ny * width * 0.28);
-  ctx.lineTo(b.x - nx * width * 0.24, b.y - ny * width * 0.24);
+  ctx.moveTo(a.x - nx * startW * 0.26, a.y - ny * startW * 0.26);
+  ctx.bezierCurveTo(
+    c1x - nx * startW * 0.22,
+    c1y - ny * startW * 0.22,
+    c2x - nx * endW * 0.2,
+    c2y - ny * endW * 0.2,
+    b.x - nx * endW * 0.18,
+    b.y - ny * endW * 0.18
+  );
   ctx.stroke();
 
   ctx.strokeStyle = "rgba(55, 30, 22, 0.28)";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = Math.max(1.4, width * 0.12);
   ctx.beginPath();
-  ctx.moveTo(a.x + nx * width * 0.02, a.y + ny * width * 0.02);
-  ctx.lineTo(b.x + nx * width * 0.02, b.y + ny * width * 0.02);
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
   ctx.stroke();
 
   if (length > 22) {
     ctx.fillStyle = "rgba(255,255,255,0.12)";
     ctx.beginPath();
-    ctx.arc(a.x, a.y, Math.max(3.5, width * 0.22), 0, Math.PI * 2);
+    ctx.arc(a.x, a.y, Math.max(3.5, startW * 0.2), 0, Math.PI * 2);
     ctx.fill();
   }
 
