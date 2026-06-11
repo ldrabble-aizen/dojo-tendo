@@ -103,7 +103,7 @@ let cameraLift = 8;
 const SPECIAL_STYLES = {
   p1: { shape: "wave", core: "#fff1bd", rim: "#5bd7ff", trail: "#47b5ff" },
   p2: { shape: "petal", core: "#fff4d6", rim: "#5ff0c7", trail: "#ff5f6f" },
-  p3: { shape: "burst", core: "#fff5be", rim: "#ffcc3d", trail: "#8a5cff" },
+  p3: { shape: "burst", core: "#ffffff", rim: "#65c7f2", trail: "#162b52" },
   p4: { shape: "spark", core: "#f5f1ff", rim: "#d7c9ff", trail: "#96e06c" },
   p5: { shape: "bolt", core: "#fff0c9", rim: "#47d5ff", trail: "#d9682d" },
   p6: { shape: "star", core: "#f5f9ff", rim: "#ff8ac8", trail: "#263f9f" },
@@ -121,6 +121,34 @@ const BODY_SPECS = {
     headH: 94,
     headY: 18,
     stance: 0.95,
+  },
+  slimFemale: {
+    shoulder: 35,
+    waist: 23,
+    hip: 34,
+    limb: 0.9,
+    armScale: 0.88,
+    legScale: 0.94,
+    hand: 0.82,
+    foot: 0.86,
+    headW: 84,
+    headH: 92,
+    headY: 20,
+    stance: 0.82,
+  },
+  softFemale: {
+    shoulder: 39,
+    waist: 28,
+    hip: 39,
+    limb: 0.98,
+    armScale: 0.95,
+    legScale: 1,
+    hand: 0.9,
+    foot: 0.94,
+    headW: 88,
+    headH: 96,
+    headY: 18,
+    stance: 0.94,
   },
   balanced: {
     shoulder: 44,
@@ -146,6 +174,21 @@ const BODY_SPECS = {
     headY: 14,
     stance: 1.12,
   },
+  racingHeavy: {
+    shoulder: 55,
+    waist: 42,
+    hip: 47,
+    limb: 1.1,
+    armScale: 1.04,
+    legScale: 0.98,
+    hand: 1.13,
+    foot: 1.1,
+    headW: 98,
+    headH: 102,
+    headY: 14,
+    stance: 1.18,
+    belly: 1.22,
+  },
   lean: {
     shoulder: 39,
     waist: 26,
@@ -157,6 +200,20 @@ const BODY_SPECS = {
     headH: 94,
     headY: 18,
     stance: 0.9,
+  },
+  tallLean: {
+    shoulder: 36,
+    waist: 24,
+    hip: 30,
+    limb: 1.04,
+    armScale: 1.08,
+    legScale: 1.16,
+    hand: 0.88,
+    foot: 0.94,
+    headW: 82,
+    headH: 92,
+    headY: 22,
+    stance: 0.82,
   },
 };
 
@@ -197,6 +254,7 @@ const fighterProfiles = {
     skin: "#f1bd98",
     build: "balanced",
     mark: "P",
+    headwear: "pchanBandana",
     outfit: {
       jacket: "#2677bf",
       pants: "#174d93",
@@ -214,7 +272,7 @@ const fighterProfiles = {
     trim: "#5ee0b4",
     face: faces.p2,
     skin: "#f4c3a3",
-    build: "athletic",
+    build: "slimFemale",
     mark: "A",
     outfit: {
       jacket: "#cc3a3f",
@@ -229,20 +287,22 @@ const fighterProfiles = {
   p3: {
     id: "p3",
     name: "Maguila",
-    color: "#318f79",
-    trim: "#f0d36b",
+    color: "#65c7f2",
+    trim: "#ffffff",
     face: faces.p3,
     skin: "#d6a07e",
-    build: "heavy",
+    build: "racingHeavy",
     mark: "M",
     outfit: {
-      jacket: "#318f79",
-      pants: "#226454",
-      sleeve: "#f0d36b",
-      belt: "#f0d36b",
-      shoe: "#d2ae46",
-      accent: "#8ef0d7",
-      pattern: "power",
+      jacket: "#65c7f2",
+      pants: "#162b52",
+      sleeve: "#ffffff",
+      belt: "#162b52",
+      shoe: "#101725",
+      accent: "#ffffff",
+      stripe: "#ffffff",
+      trimLine: "#162b52",
+      pattern: "racing",
     },
   },
   p4: {
@@ -266,13 +326,13 @@ const fighterProfiles = {
   },
   p5: {
     id: "p5",
-    name: "Simiolin",
+    name: "Lucas",
     color: "#d9682d",
     trim: "#47d5ff",
     face: faces.p5,
     skin: "#e5aa8d",
-    build: "lean",
-    mark: "S",
+    build: "tallLean",
+    mark: "L",
     outfit: {
       jacket: "#d9682d",
       pants: "#93401f",
@@ -290,7 +350,7 @@ const fighterProfiles = {
     trim: "#ff8ac8",
     face: faces.p6,
     skin: "#efbd95",
-    build: "athletic",
+    build: "softFemale",
     mark: "L",
     outfit: {
       jacket: "#263f9f",
@@ -327,7 +387,7 @@ function buildFighters() {
   ];
 }
 
-function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls, skin, build, mark, outfit }) {
+function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls, skin, build, mark, headwear, outfit }) {
   return {
     id,
     profileId,
@@ -345,6 +405,7 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     skin,
     build,
     mark,
+    headwear,
     outfit: normalizeOutfit(color, trim, outfit),
     specialStyle: SPECIAL_STYLES[profileId] ?? SPECIAL_STYLES.p1,
     controls,
@@ -357,6 +418,7 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     attack: null,
     cooldown: 0,
     hurt: 0,
+    pigMorph: 0,
     specialCooldown: 0,
     counterWindow: 0,
     hitFlash: 0,
@@ -383,6 +445,8 @@ function normalizeOutfit(color, trim, outfit = {}) {
     belt: outfit.belt ?? trim,
     shoe: outfit.shoe ?? trim,
     accent: outfit.accent ?? lighten(trim, 18),
+    stripe: outfit.stripe ?? lighten(trim, 18),
+    trimLine: outfit.trimLine ?? darken(color, 24),
     pattern: outfit.pattern ?? "classic",
   };
 }
@@ -501,6 +565,7 @@ function resetRound() {
     attack: null,
     cooldown: 0,
     hurt: 0,
+    pigMorph: 0,
     hitFlash: 0,
     blocking: false,
     grounded: true,
@@ -520,6 +585,7 @@ function resetRound() {
     attack: null,
     cooldown: 0,
     hurt: 0,
+    pigMorph: 0,
     hitFlash: 0,
     blocking: false,
     grounded: true,
@@ -547,6 +613,12 @@ function resetRound() {
   overlay.classList.add("hidden");
 }
 
+function homeOverlayCopy() {
+  return tournamentMode
+    ? "Modo torneo: elegí tu luchador a la derecha y el primer rival a la izquierda. En telefono gira la pantalla y usa los botones tactiles."
+    : `Elegí tus luchadores. En telefono gira la pantalla y usa los botones tactiles. Izquierda usa A/D, W, S, F, G, R y T${cpuEnabled ? " o CPU" : ""}. Derecha usa flechas, K, L, O y P.`;
+}
+
 function showHomeOverlay() {
   overlayMode = "home";
   overlay.dataset.screen = "home";
@@ -554,10 +626,7 @@ function showHomeOverlay() {
   onlineButton.setAttribute("aria-pressed", "false");
   onlineMenuButton.setAttribute("aria-pressed", "false");
   overlay.querySelector("h1").textContent = "Mini Kombat III";
-  overlayCopy.textContent =
-    tournamentMode
-      ? "Modo torneo: elegí tu luchador a la derecha y el primer rival a la izquierda. En telefono gira la pantalla y usa los botones tactiles."
-      : `Elegí tus luchadores. En telefono gira la pantalla y usa los botones tactiles. Izquierda usa A/D, W, S, F, G, R y T${cpuEnabled ? " o CPU" : ""}. Derecha usa flechas, K, L, O y P.`;
+  overlayCopy.textContent = homeOverlayCopy();
   startButton.textContent = tournamentMode ? "INICIAR TORNEO" : "LUCHAR";
   renderFighterSelect();
   fighterSelect.classList.remove("hidden");
@@ -751,6 +820,11 @@ function startSpecial(f) {
     height: 0,
     hit: true,
   };
+  if (f.profileId === "p1") {
+    f.pigMorph = 72;
+    coldWaterSplash(f.x, f.y - 118, f.dir);
+    addText(f.x, f.y - 166, "P-CHAN", "#ffe66a");
+  }
   playSound("special");
 }
 
@@ -850,6 +924,7 @@ function updateFighter(f, opponent) {
   f.crouch += ((wantBlock ? 1 : 0) - f.crouch) * 0.18;
   if (f.counterWindow > 0) f.counterWindow -= 1;
   if (f.hitFlash > 0) f.hitFlash -= 1;
+  if (f.pigMorph > 0) f.pigMorph -= 1;
 
   if (f.hurt > 0) {
     f.hurt -= 1;
@@ -1089,6 +1164,23 @@ function impactGlints(x, y, color, blocked, heavyImpact) {
       kind: "glint",
     });
   }
+}
+
+function coldWaterSplash(x, y, dir) {
+  for (let i = 0; i < 18; i += 1) {
+    const angle = -Math.PI * 0.78 + (i / 17) * Math.PI * 0.62;
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * (2.1 + Math.random() * 2.4) * dir,
+      vy: Math.sin(angle) * (2.3 + Math.random() * 2.1),
+      life: 18 + Math.random() * 14,
+      size: 3 + Math.random() * 4,
+      color: "rgba(143, 226, 255, 0.86)",
+      kind: "droplet",
+    });
+  }
+  impactShockwave(x, y + 8, "#8fe2ff", false, true);
 }
 
 function floorDust(x, y, count) {
@@ -1916,6 +2008,20 @@ function drawFighter(f) {
   ctx.translate(baseX, baseY);
   ctx.scale(f.dir * (1 + attackStretch + hurtSquash), 1 + breathing - attackStretch * 0.28);
 
+  const pigForm = f.profileId === "p1" && f.pigMorph > 10 && f.pigMorph < 66;
+  if (pigForm) {
+    drawPchanPigForm(f, crouch);
+    if (f.hitFlash > 0) drawHitFlash(f, crouch);
+    if (winner) drawResultPoseEffect(f, crouch);
+    ctx.restore();
+    const box = attackBox(f);
+    if (box && f.attack.frame >= f.attack.activeStart - 2 && f.attack.frame <= f.attack.activeEnd + 2) {
+      drawSpeedLines(f, box);
+      drawAttackArc(f, box);
+    }
+    return;
+  }
+
   drawFighterRimLight(f, crouch);
   if (f.attack) drawAttackBodyGlow(f, crouch);
   if (f.energy >= 45 && f.hurt <= 0) drawEnergyAura(f.trim, crouch);
@@ -2005,6 +2111,146 @@ function drawAttackBodyGlow(f, crouch) {
   }
   ctx.globalAlpha = 1;
   ctx.restore();
+}
+
+function drawPchanPigForm(f, crouch) {
+  const pulse = Math.sin(roundFrame * 0.24) * 1.5;
+  ctx.save();
+  ctx.translate(0, pulse);
+  ctx.globalCompositeOperation = "source-over";
+
+  ctx.fillStyle = "rgba(0,0,0,0.24)";
+  ctx.beginPath();
+  ctx.ellipse(0, -5, 54, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#363636";
+  ctx.strokeStyle = "#101010";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(-4, -47 + crouch, 46, 39, -0.03, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.ellipse(31, -60 + crouch, 31, 28, -0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#2c2c2c";
+  for (const ear of [
+    [18, -89, -0.35],
+    [41, -88, 0.32],
+  ]) {
+    ctx.save();
+    ctx.translate(ear[0], ear[1] + crouch);
+    ctx.rotate(ear[2]);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(11, -34);
+    ctx.lineTo(21, 1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.fillStyle = "#fff";
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.ellipse(27, -65 + crouch, 14, 18, 0.1, 0, Math.PI * 2);
+  ctx.ellipse(48, -62 + crouch, 11, 15, -0.08, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#050505";
+  ctx.beginPath();
+  ctx.arc(32, -62 + crouch, 2.5, 0, Math.PI * 2);
+  ctx.arc(52, -59 + crouch, 2.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#f5c5a8";
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(61, -49 + crouch, 12, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = "#7a513f";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(57, -50 + crouch);
+  ctx.lineTo(57, -43 + crouch);
+  ctx.moveTo(64, -50 + crouch);
+  ctx.lineTo(64, -43 + crouch);
+  ctx.stroke();
+
+  drawPigBandana(crouch);
+
+  ctx.fillStyle = "#f5c5a8";
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 2;
+  for (const hoof of [
+    [-25, -10],
+    [-3, -9],
+    [20, -10],
+    [40, -12],
+  ]) {
+    ctx.beginPath();
+    ctx.roundRect(hoof[0], hoof[1] + crouch, 14, 14, 5);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = "rgba(143, 226, 255, 0.42)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, -50 + crouch, 64, roundFrame * 0.04, roundFrame * 0.04 + Math.PI * 1.3);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function drawPigBandana(crouch) {
+  const yellow = "#f7dc63";
+  ctx.fillStyle = yellow;
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-37, -52 + crouch);
+  ctx.quadraticCurveTo(0, -31 + crouch, 40, -43 + crouch);
+  ctx.lineTo(38, -29 + crouch);
+  ctx.quadraticCurveTo(-3, -19 + crouch, -43, -43 + crouch);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(-23, -38 + crouch);
+  ctx.quadraticCurveTo(-47, -34 + crouch, -60, -20 + crouch);
+  ctx.quadraticCurveTo(-38, -19 + crouch, -20, -30 + crouch);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#111";
+  for (const spot of [
+    [-25, -41, 5, 13, -0.55],
+    [0, -32, 5, 13, 0.2],
+    [23, -36, 5, 13, 0.5],
+    [-43, -26, 5, 11, 0.8],
+  ]) {
+    ctx.save();
+    ctx.translate(spot[0], spot[1] + crouch);
+    ctx.rotate(spot[4]);
+    ctx.beginPath();
+    ctx.roundRect(-spot[2] / 2, -spot[3] / 2, spot[2], spot[3], 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawHurtRim(f, crouch) {
@@ -2314,11 +2560,12 @@ function getPose(f, stride) {
 }
 
 function humanizePose(pose, spec) {
-  const scale = spec.limb ?? 1;
-  pose.frontArm = solveTwoBoneLimb(pose.frontArm, "shoulder", "elbow", "hand", 32 * scale, 34 * scale, 1);
-  pose.backArm = solveTwoBoneLimb(pose.backArm, "shoulder", "elbow", "hand", 31 * scale, 33 * scale, -1);
-  pose.frontLeg = solveTwoBoneLimb(pose.frontLeg, "hip", "knee", "foot", 34 * scale, 38 * scale, 1);
-  pose.backLeg = solveTwoBoneLimb(pose.backLeg, "hip", "knee", "foot", 34 * scale, 38 * scale, -1);
+  const armScale = (spec.limb ?? 1) * (spec.armScale ?? 1);
+  const legScale = (spec.limb ?? 1) * (spec.legScale ?? 1);
+  pose.frontArm = solveTwoBoneLimb(pose.frontArm, "shoulder", "elbow", "hand", 32 * armScale, 34 * armScale, 1);
+  pose.backArm = solveTwoBoneLimb(pose.backArm, "shoulder", "elbow", "hand", 31 * armScale, 33 * armScale, -1);
+  pose.frontLeg = solveTwoBoneLimb(pose.frontLeg, "hip", "knee", "foot", 34 * legScale, 38 * legScale, 1);
+  pose.backLeg = solveTwoBoneLimb(pose.backLeg, "hip", "knee", "foot", 34 * legScale, 38 * legScale, -1);
   return pose;
 }
 
@@ -2366,6 +2613,8 @@ function drawTorso(f, crouch) {
   const shoulder = spec.shoulder;
   const waist = spec.waist;
   const hip = spec.hip;
+  const lowerWaist = waist * (spec.belly ?? 1);
+  const lowerHip = hip * (spec.belly ? 1.08 : 1);
   const top = -137 + crouch;
   const bottom = -32 + crouch;
 
@@ -2378,16 +2627,16 @@ function drawTorso(f, crouch) {
   ctx.beginPath();
   ctx.moveTo(-shoulder - 4, top + 11);
   ctx.quadraticCurveTo(0, top - 14, shoulder + 4, top + 11);
-  ctx.lineTo(waist + 5, bottom + 3);
-  ctx.lineTo(-waist - 5, bottom + 3);
+  ctx.lineTo(lowerWaist + 5, bottom + 3);
+  ctx.lineTo(-lowerWaist - 5, bottom + 3);
   ctx.closePath();
   ctx.fill();
 
   ctx.fillStyle = giDark;
   ctx.beginPath();
   ctx.moveTo(-shoulder, top + 9);
-  ctx.quadraticCurveTo(-shoulder - 9, -78 + crouch, -waist, bottom);
-  ctx.lineTo(waist, bottom);
+  ctx.quadraticCurveTo(-shoulder - 9, -78 + crouch, -lowerWaist, bottom);
+  ctx.lineTo(lowerWaist, bottom);
   ctx.quadraticCurveTo(shoulder + 9, -78 + crouch, shoulder, top + 9);
   ctx.quadraticCurveTo(0, top - 11, -shoulder, top + 9);
   ctx.closePath();
@@ -2399,8 +2648,8 @@ function drawTorso(f, crouch) {
   ctx.fillStyle = outfit.jacket;
   ctx.beginPath();
   ctx.moveTo(-shoulder + 2, top + 11);
-  ctx.quadraticCurveTo(-shoulder - 5, -74 + crouch, -waist, bottom);
-  ctx.lineTo(waist, bottom);
+  ctx.quadraticCurveTo(-shoulder - 5, -74 + crouch, -lowerWaist, bottom);
+  ctx.lineTo(lowerWaist, bottom);
   ctx.quadraticCurveTo(shoulder + 5, -74 + crouch, shoulder - 2, top + 11);
   ctx.quadraticCurveTo(0, top - 7, -shoulder + 2, top + 11);
   ctx.fill();
@@ -2459,7 +2708,7 @@ function drawTorso(f, crouch) {
 
   ctx.fillStyle = outfit.belt;
   ctx.beginPath();
-  ctx.roundRect(-hip - 7, -63 + crouch, (hip + 7) * 2, 13, 4);
+  ctx.roundRect(-lowerHip - 7, -63 + crouch, (lowerHip + 7) * 2, 13, 4);
   ctx.fill();
   ctx.strokeStyle = "rgba(43, 26, 20, 0.42)";
   ctx.lineWidth = 2;
@@ -2554,6 +2803,34 @@ function drawOutfitPattern(f, outfit, shoulder, waist, hip, top, bottom, crouch)
       ctx.roundRect(x, top + 22, 18, 12, 5);
       ctx.fill();
     }
+  } else if (outfit.pattern === "racing") {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-shoulder + 8, top + 12);
+    ctx.quadraticCurveTo(-shoulder - 2, -78 + crouch, -waist - 13, bottom);
+    ctx.lineTo(waist + 13, bottom);
+    ctx.quadraticCurveTo(shoulder + 2, -78 + crouch, shoulder - 8, top + 12);
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = "#ffffff";
+    for (let x = -42; x <= 42; x += 28) {
+      ctx.fillRect(x - 7, top + 10, 14, bottom - top - 2);
+    }
+    ctx.fillStyle = "rgba(22, 43, 82, 0.22)";
+    ctx.fillRect(-6, top + 12, 12, bottom - top);
+    ctx.restore();
+
+    ctx.strokeStyle = outfit.trimLine ?? "#162b52";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-shoulder + 12, top + 15);
+    ctx.quadraticCurveTo(0, -122 + crouch, shoulder - 12, top + 15);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(22, 43, 82, 0.72)";
+    ctx.font = "900 11px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("RACING", 0, -91 + crouch);
   } else if (outfit.pattern === "stripe") {
     ctx.strokeStyle = outfit.sleeve;
     ctx.lineWidth = 7;
@@ -2644,10 +2921,85 @@ function drawHead(f, crouch, stride) {
     ctx.beginPath();
     ctx.arc(0, y + headH * 0.52, headW * 0.42, -0.72, 0.72);
     ctx.stroke();
+
+    if (f.headwear === "pchanBandana") drawPchanHeadBandana(x, y, headW, headH);
   } else {
     ctx.fillStyle = "#e5c0a9";
     ctx.fillRect(x, y, headW, headH);
   }
+  ctx.restore();
+}
+
+function drawPchanHeadBandana(x, y, headW, headH) {
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  const yellow = "#f7dc63";
+  const shadow = "#b77d19";
+  const mark = "#151515";
+  const bandLeft = x + headW * 0.46;
+  const bandRight = x + headW * 0.86;
+  const bandTop = y + headH * 0.18;
+  const knotX = x + headW * 0.84;
+  const knotY = y + headH * 0.28;
+
+  ctx.fillStyle = "rgba(0,0,0,0.26)";
+  ctx.beginPath();
+  ctx.moveTo(knotX + 4, knotY + 4);
+  ctx.quadraticCurveTo(knotX + 20, knotY + 3, knotX + 29, knotY + 14);
+  ctx.quadraticCurveTo(knotX + 15, knotY + 19, knotX + 4, knotY + 12);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = yellow;
+  ctx.strokeStyle = shadow;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(bandLeft, bandTop + 10);
+  ctx.quadraticCurveTo(x + headW * 0.64, bandTop + 2, bandRight, bandTop + 7);
+  ctx.lineTo(bandRight - 3, bandTop + 20);
+  ctx.quadraticCurveTo(x + headW * 0.63, bandTop + 15, bandLeft - 3, bandTop + 22);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.ellipse(knotX, knotY, 6.5, 8.5, -0.35, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(knotX + 5, knotY - 2);
+  ctx.quadraticCurveTo(knotX + 24, knotY - 6, knotX + 35, knotY + 5);
+  ctx.quadraticCurveTo(knotX + 25, knotY + 13, knotX + 7, knotY + 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(knotX + 2, knotY + 6);
+  ctx.quadraticCurveTo(knotX + 18, knotY + 16, knotX + 24, knotY + 31);
+  ctx.quadraticCurveTo(knotX + 10, knotY + 28, knotX - 3, knotY + 12);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = mark;
+  for (const spot of [
+    [bandLeft + headW * 0.1, bandTop + 9, 4, 8, -0.42],
+    [bandLeft + headW * 0.27, bandTop + 11, 3.6, 8, 0.25],
+    [knotX + 16, knotY + 3, 3.8, 8, 0.72],
+    [knotX + 12, knotY + 19, 3.5, 7.5, -0.2],
+  ]) {
+    ctx.save();
+    ctx.translate(spot[0], spot[1]);
+    ctx.rotate(spot[4]);
+    ctx.beginPath();
+    ctx.roundRect(-spot[2] / 2, -spot[3] / 2, spot[2], spot[3], 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 
@@ -3016,6 +3368,16 @@ function drawParticles() {
       ctx.lineTo(0, p.size);
       ctx.stroke();
       ctx.restore();
+    } else if (p.kind === "droplet") {
+      ctx.save();
+      ctx.fillStyle = p.color;
+      ctx.strokeStyle = "rgba(235, 252, 255, 0.72)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, p.size * 0.72, p.size * 1.18, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
     } else if (p.kind === "dust") {
       ctx.fillStyle = p.color;
       ctx.beginPath();
@@ -3177,6 +3539,7 @@ function setCpuMode(enabled) {
   modeButton.textContent = cpuEnabled ? "CPU" : "2P";
   modeButton.setAttribute("aria-pressed", String(cpuEnabled));
   updateFighterLabels();
+  if (overlayMode === "home") overlayCopy.textContent = homeOverlayCopy();
   if (!fighterSelect.classList.contains("hidden")) renderFighterSelect();
 }
 
