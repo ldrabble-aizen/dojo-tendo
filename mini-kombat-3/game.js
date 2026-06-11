@@ -2304,22 +2304,20 @@ function rasterHeadPose(frameName, frameIndex) {
   const pose = {
     x: 0,
     y: -38,
-    rotate: 0,
     scale: 0.74,
   };
 
   if (frameName === "walk") {
-    pose.x = frameIndex % 2 === 0 ? -2 : 2;
+    pose.x = frameIndex % 2 === 0 ? -1 : 1;
   } else if (frameName === "punch") {
-    pose.x = frameIndex === 5 ? 4 : 1;
-    pose.y = frameIndex === 5 ? -40 : -38;
+    pose.y = frameIndex === 5 ? -39 : -38;
   } else if (frameName === "kick") {
-    pose.x = frameIndex === 8 ? -5 : -2;
+    pose.y = frameIndex === 8 ? -37 : -38;
   } else if (frameName === "block") {
-    pose.y = -35;
+    pose.y = -36;
     pose.scale = 0.72;
   } else if (frameName === "hurt") {
-    pose.x = 5;
+    pose.x = 2;
     pose.y = -32;
     pose.scale = 0.72;
   } else if (frameName === "special" || frameName === "victory") {
@@ -2370,7 +2368,7 @@ function drawRasterBodySprite(f, crouch, stride, walking) {
 
   ctx.save();
   ctx.translate(headPose.x, 0);
-  drawHead(f, headCrouch, stride, headPose.scale);
+  drawHead(f, headCrouch, 0, headPose.scale, { drawNeck: false });
   ctx.restore();
   drawFighterStageLighting(f, crouch);
   return true;
@@ -3316,7 +3314,7 @@ function drawSpriteTorsoVolume(f, outfit, shoulder, chest, waist, hip, top, bott
   ctx.restore();
 }
 
-function drawHead(f, crouch, stride, headScaleMultiplier = 1) {
+function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
   const spec = bodySpec(f);
   const headScale = (spec.headScale ?? 0.94) * headScaleMultiplier;
   const headW = spec.headW * headScale;
@@ -3324,26 +3322,28 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1) {
   const x = -headW / 2;
   const y = -224 + crouch + Math.abs(stride) * 2 + spec.headY;
 
-  const skin = f.skin ?? "#f2b891";
-  const neckW = spec.neckW ?? 26;
-  const neckH = spec.neckH ?? 20;
-  const neckTop = -118 + crouch;
-  const neckBottom = neckTop + neckH;
-  const neckGrad = ctx.createLinearGradient(0, neckTop, 0, neckBottom);
-  neckGrad.addColorStop(0, lighten(skin, 16));
-  neckGrad.addColorStop(1, darken(skin, 18));
-  ctx.fillStyle = neckGrad;
-  ctx.beginPath();
-  ctx.roundRect(-neckW / 2, neckTop, neckW, neckH, 9);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(43, 24, 18, 0.35)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  if (options.drawNeck !== false) {
+    const skin = f.skin ?? "#f2b891";
+    const neckW = spec.neckW ?? 26;
+    const neckH = spec.neckH ?? 20;
+    const neckTop = -118 + crouch;
+    const neckBottom = neckTop + neckH;
+    const neckGrad = ctx.createLinearGradient(0, neckTop, 0, neckBottom);
+    neckGrad.addColorStop(0, lighten(skin, 16));
+    neckGrad.addColorStop(1, darken(skin, 18));
+    ctx.fillStyle = neckGrad;
+    ctx.beginPath();
+    ctx.roundRect(-neckW / 2, neckTop, neckW, neckH, 9);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(43, 24, 18, 0.35)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-  ctx.fillStyle = "rgba(39, 20, 15, 0.28)";
-  ctx.beginPath();
-  ctx.ellipse(0, neckTop - 2, neckW * 0.6, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
+    ctx.fillStyle = "rgba(39, 20, 15, 0.28)";
+    ctx.beginPath();
+    ctx.ellipse(0, neckTop - 2, neckW * 0.6, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.save();
   ctx.rotate(stride * 0.018 + (f.hurt > 0 ? Math.sin(f.hurt) * 0.03 : 0));
@@ -3435,9 +3435,9 @@ function drawPchanHeadBandana(x, y, headW, headH) {
   const mark = "#151515";
   const bandLeft = x + headW * 0.26;
   const bandRight = x + headW * 0.76;
-  const bandTop = y + headH * 0.07;
+  const bandTop = y + headH * 0.02;
   const knotX = x + headW * 0.72;
-  const knotY = y + headH * 0.15;
+  const knotY = y + headH * 0.1;
 
   ctx.fillStyle = "rgba(0,0,0,0.26)";
   ctx.beginPath();
@@ -3451,8 +3451,8 @@ function drawPchanHeadBandana(x, y, headW, headH) {
   ctx.beginPath();
   ctx.moveTo(bandLeft, bandTop + 8);
   ctx.quadraticCurveTo(x + headW * 0.5, bandTop + 1, bandRight, bandTop + 7);
-  ctx.lineTo(bandRight - 2, bandTop + 17);
-  ctx.quadraticCurveTo(x + headW * 0.5, bandTop + 12, bandLeft - 2, bandTop + 18);
+  ctx.lineTo(bandRight - 2, bandTop + 15);
+  ctx.quadraticCurveTo(x + headW * 0.5, bandTop + 10, bandLeft - 2, bandTop + 16);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
