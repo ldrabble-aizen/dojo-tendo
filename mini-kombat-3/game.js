@@ -2303,41 +2303,34 @@ function rasterBodyFrameIndex(f, frameName, walking) {
 function rasterHeadPose(frameName, frameIndex) {
   const pose = {
     x: 0,
-    y: -36,
+    y: -38,
     rotate: 0,
     scale: 0.74,
   };
 
   if (frameName === "walk") {
     pose.x = frameIndex % 2 === 0 ? -2 : 2;
-    pose.rotate = frameIndex % 2 === 0 ? -0.018 : 0.018;
   } else if (frameName === "punch") {
     pose.x = frameIndex === 5 ? 4 : 1;
-    pose.y = frameIndex === 5 ? -2 : 0;
-    pose.rotate = frameIndex === 5 ? 0.035 : 0.012;
+    pose.y = frameIndex === 5 ? -40 : -38;
   } else if (frameName === "kick") {
     pose.x = frameIndex === 8 ? -5 : -2;
-    pose.rotate = frameIndex === 8 ? -0.065 : -0.025;
   } else if (frameName === "block") {
-    pose.y = -30;
+    pose.y = -35;
     pose.scale = 0.72;
   } else if (frameName === "hurt") {
     pose.x = 5;
-    pose.y = -25;
-    pose.rotate = 0.09;
+    pose.y = -32;
     pose.scale = 0.72;
   } else if (frameName === "special" || frameName === "victory") {
-    pose.y = -40;
-    pose.rotate = -0.04;
+    pose.y = -42;
   } else if (frameName === "sweep") {
     pose.x = 5;
-    pose.y = -4;
-    pose.rotate = 0.16;
+    pose.y = -24;
     pose.scale = 0.7;
   } else if (frameName === "defeat") {
     pose.x = 8;
-    pose.y = 18;
-    pose.rotate = 0.28;
+    pose.y = -6;
     pose.scale = 0.68;
   }
 
@@ -2377,7 +2370,6 @@ function drawRasterBodySprite(f, crouch, stride, walking) {
 
   ctx.save();
   ctx.translate(headPose.x, 0);
-  ctx.rotate(headPose.rotate);
   drawHead(f, headCrouch, stride, headPose.scale);
   ctx.restore();
   drawFighterStageLighting(f, crouch);
@@ -3443,9 +3435,9 @@ function drawPchanHeadBandana(x, y, headW, headH) {
   const mark = "#151515";
   const bandLeft = x + headW * 0.26;
   const bandRight = x + headW * 0.76;
-  const bandTop = y + headH * 0.14;
+  const bandTop = y + headH * 0.07;
   const knotX = x + headW * 0.72;
-  const knotY = y + headH * 0.22;
+  const knotY = y + headH * 0.15;
 
   ctx.fillStyle = "rgba(0,0,0,0.26)";
   ctx.beginPath();
@@ -3459,8 +3451,8 @@ function drawPchanHeadBandana(x, y, headW, headH) {
   ctx.beginPath();
   ctx.moveTo(bandLeft, bandTop + 8);
   ctx.quadraticCurveTo(x + headW * 0.5, bandTop + 1, bandRight, bandTop + 7);
-  ctx.lineTo(bandRight - 2, bandTop + 19);
-  ctx.quadraticCurveTo(x + headW * 0.5, bandTop + 14, bandLeft - 2, bandTop + 20);
+  ctx.lineTo(bandRight - 2, bandTop + 17);
+  ctx.quadraticCurveTo(x + headW * 0.5, bandTop + 12, bandLeft - 2, bandTop + 18);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
