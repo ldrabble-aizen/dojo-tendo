@@ -178,23 +178,23 @@ canvas {
 }
 
 .mobile-actions {
-  grid-template-columns: repeat(2, minmax(86px, 1fr));
+  grid-template-columns: repeat(2, minmax(74px, 1fr));
 }
 
 .mobile-controls button {
   min-width: 0;
-  min-height: 48px;
-  padding: 0 10px;
-  border-color: rgba(255, 241, 189, 0.62);
-  color: #fff8d9;
+  min-height: 42px;
+  padding: 0 8px;
+  border-color: rgba(255, 241, 189, 0.5);
+  color: rgba(255, 248, 217, 0.94);
   background:
-    linear-gradient(180deg, rgba(111, 25, 17, 0.82), rgba(24, 10, 9, 0.84)),
-    radial-gradient(circle at 50% 0%, rgba(255, 217, 95, 0.28), transparent 60%);
+    linear-gradient(180deg, rgba(111, 25, 17, 0.68), rgba(24, 10, 9, 0.72)),
+    radial-gradient(circle at 50% 0%, rgba(255, 217, 95, 0.2), transparent 60%);
   box-shadow:
-    0 5px 0 rgba(63, 22, 14, 0.9),
-    0 0 18px rgba(255, 198, 64, 0.22),
-    inset 0 1px 0 rgba(255,255,255,0.22);
-  font-size: 12px;
+    0 4px 0 rgba(63, 22, 14, 0.76),
+    0 0 14px rgba(255, 198, 64, 0.14),
+    inset 0 1px 0 rgba(255,255,255,0.16);
+  font-size: 11px;
   text-shadow: 0 2px 0 rgba(0,0,0,0.72);
   touch-action: none;
 }
@@ -1488,7 +1488,7 @@ canvas {
 
   .mobile-controls {
     inset: auto 14px 10px;
-    grid-template-columns: 130px minmax(210px, 290px);
+    grid-template-columns: 130px minmax(168px, 220px);
   }
 
   .mobile-stick {
