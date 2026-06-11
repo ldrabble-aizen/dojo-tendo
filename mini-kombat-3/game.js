@@ -2939,9 +2939,9 @@ function drawPchanHeadBandana(x, y, headW, headH) {
   const mark = "#151515";
   const bandLeft = x + headW * 0.26;
   const bandRight = x + headW * 0.76;
-  const bandTop = y + headH * 0.2;
+  const bandTop = y + headH * 0.14;
   const knotX = x + headW * 0.72;
-  const knotY = y + headH * 0.28;
+  const knotY = y + headH * 0.22;
 
   ctx.fillStyle = "rgba(0,0,0,0.26)";
   ctx.beginPath();
