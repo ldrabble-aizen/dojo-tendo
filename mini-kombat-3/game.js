@@ -51,6 +51,10 @@ const faces = {
   p5: loadImage("assets/fighter-5-face.png"),
   p6: loadImage("assets/fighter-6-face.png"),
 };
+const bodySpriteSheets = {
+  p1: loadImage("assets/sprite-pchan-body.svg"),
+  p2: loadImage("assets/sprite-akane-body.svg"),
+};
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
   akane: loadImage("assets/wall-portrait-akane-tendo.webp", "assets/wall-portrait-akane-tendo.png"),
@@ -113,6 +117,23 @@ const SPECIAL_STYLES = {
   p4: { shape: "spark", core: "#f5f1ff", rim: "#d7c9ff", trail: "#96e06c" },
   p5: { shape: "bolt", core: "#fff0c9", rim: "#47d5ff", trail: "#d9682d" },
   p6: { shape: "star", core: "#f5f9ff", rim: "#ff8ac8", trail: "#263f9f" },
+};
+
+const BODY_SPRITE_FRAME_W = 180;
+const BODY_SPRITE_FRAME_H = 260;
+const BODY_SPRITE_ANCHOR_X = 90;
+const BODY_SPRITE_ANCHOR_Y = 244;
+const BODY_SPRITE_FRAMES = {
+  idle: 0,
+  walk: 1,
+  punch: 2,
+  kick: 3,
+  block: 4,
+  hurt: 5,
+  victory: 6,
+  special: 6,
+  sweep: 7,
+  defeat: 8,
 };
 
 const BODY_SPECS = {
@@ -2111,6 +2132,21 @@ function drawFighter(f) {
   if (f.energy >= 45 && f.hurt <= 0) drawEnergyAura(f.trim, crouch);
   drawSpriteUnderlay(f, pose, crouch);
 
+  if (drawRasterBodySprite(f, crouch, walking ? stride : 0, walking)) {
+    if (f.blocking) drawGuard(f.trim, crouch);
+    if (f.hitFlash > 0) drawHitFlash(f, crouch);
+    if (f.hurt > 0) drawHurtRim(f, crouch);
+    if (winner) drawResultPoseEffect(f, crouch);
+    ctx.restore();
+
+    const box = attackBox(f);
+    if (box && f.attack.frame >= f.attack.activeStart - 2 && f.attack.frame <= f.attack.activeEnd + 2) {
+      drawSpeedLines(f, box);
+      drawAttackArc(f, box);
+    }
+    return;
+  }
+
   ctx.shadowColor = "rgba(10, 8, 7, 0.42)";
   ctx.shadowBlur = 2;
   ctx.shadowOffsetY = 1;
@@ -2227,6 +2263,57 @@ function drawSpriteUnderlay(f, pose, crouch) {
     ctx.fill();
   }
   ctx.restore();
+}
+
+function rasterBodyFrameFor(f, walking) {
+  if (winner) return f.id === roundWinnerId ? "victory" : "defeat";
+  if (f.hurt > 0) return "hurt";
+  if (f.blocking) return "block";
+
+  const type = f.attack?.type;
+  if (type === "punch" || type === "airPunch" || type === "grab") return "punch";
+  if (type === "kick" || type === "airKick") return "kick";
+  if (type === "sweep") return "sweep";
+  if (type === "special") return "special";
+  if (!f.grounded) return "kick";
+  if (walking) return "walk";
+  return "idle";
+}
+
+function drawRasterBodySprite(f, crouch, stride, walking) {
+  const sheet = bodySpriteSheets[f.profileId];
+  if (!sheet?.complete || !sheet.naturalWidth) return false;
+
+  const frameName = rasterBodyFrameFor(f, walking);
+  const frameIndex = BODY_SPRITE_FRAMES[frameName] ?? BODY_SPRITE_FRAMES.idle;
+  const frameX = frameIndex * BODY_SPRITE_FRAME_W;
+  const headCrouch =
+    crouch +
+    (frameName === "defeat" ? 34 : 0) +
+    (frameName === "sweep" ? 18 : 0) +
+    (frameName === "hurt" ? 7 : 0) +
+    (frameName === "block" ? 4 : 0);
+
+  ctx.save();
+  ctx.shadowColor = "rgba(10, 8, 7, 0.46)";
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 2;
+  ctx.drawImage(
+    sheet,
+    frameX,
+    0,
+    BODY_SPRITE_FRAME_W,
+    BODY_SPRITE_FRAME_H,
+    -BODY_SPRITE_ANCHOR_X,
+    -BODY_SPRITE_ANCHOR_Y + crouch * 0.18,
+    BODY_SPRITE_FRAME_W,
+    BODY_SPRITE_FRAME_H
+  );
+  ctx.restore();
+
+  drawHead(f, headCrouch, stride, 0.86);
+  drawFighterStageLighting(f, crouch);
+  return true;
 }
 
 function drawAttackBodyGlow(f, crouch) {
@@ -3169,9 +3256,9 @@ function drawSpriteTorsoVolume(f, outfit, shoulder, chest, waist, hip, top, bott
   ctx.restore();
 }
 
-function drawHead(f, crouch, stride) {
+function drawHead(f, crouch, stride, headScaleMultiplier = 1) {
   const spec = bodySpec(f);
-  const headScale = spec.headScale ?? 0.94;
+  const headScale = (spec.headScale ?? 0.94) * headScaleMultiplier;
   const headW = spec.headW * headScale;
   const headH = spec.headH * headScale;
   const x = -headW / 2;

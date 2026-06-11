@@ -1,0 +1,216 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="260" viewBox="0 0 1620 260">
+  <title>Akane body sprite sheet</title>
+  <defs>
+    <linearGradient id="p2Jacket" x1="0" y1="78" x2="0" y2="168" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f15f66" offset="0"/>
+      <stop stop-color="#cc3a3f" offset="0.58"/>
+      <stop stop-color="#8e1f2b" offset="1"/>
+    </linearGradient>
+    <linearGradient id="p2Pants" x1="0" y1="148" x2="0" y2="238" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#bd3139" offset="0"/>
+      <stop stop-color="#9f2731" offset="0.55"/>
+      <stop stop-color="#671826" offset="1"/>
+    </linearGradient>
+    <linearGradient id="p2Trim" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#a3ffe3" offset="0"/>
+      <stop stop-color="#5ee0b4" offset="0.58"/>
+      <stop stop-color="#269a81" offset="1"/>
+    </linearGradient>
+    <linearGradient id="p2Skin" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffe0c7" offset="0"/>
+      <stop stop-color="#f4c3a3" offset="0.62"/>
+      <stop stop-color="#c98e72" offset="1"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .edge { fill: none; stroke: #21130f; stroke-linecap: round; stroke-linejoin: round; opacity: .66; }
+    .fold { fill: none; stroke: #ffe7df; stroke-linecap: round; opacity: .32; }
+    .darkFold { fill: none; stroke: #4b1119; stroke-linecap: round; opacity: .3; }
+    .skinEdge { stroke: #4c2a1e; stroke-width: 2; }
+    .shoeEdge { stroke: #24473d; stroke-width: 2; }
+  </style>
+
+  <g transform="translate(0 0)">
+    <ellipse cx="90" cy="239" rx="47" ry="10" fill="#000" opacity=".17"/>
+    <path class="edge" stroke-width="25" d="M71 157 C66 184 63 208 55 235"/>
+    <path class="edge" stroke-width="25" d="M109 157 C114 185 118 209 127 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M71 157 C66 184 63 208 55 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M109 157 C114 185 118 209 127 235"/>
+    <path class="edge" stroke-width="23" d="M61 104 C49 129 50 146 60 164"/>
+    <path class="edge" stroke-width="23" d="M119 104 C132 129 131 146 120 164"/>
+    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M61 104 C49 129 50 146 60 164"/>
+    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 104 C132 129 131 146 120 164"/>
+    <path d="M55 102 C64 86 78 79 90 79 C102 79 116 86 125 102 C121 124 119 145 116 162 C109 170 71 170 64 162 C61 145 59 124 55 102 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
+    <path d="M60 102 L92 155 L121 102" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M77 90 C82 108 84 128 83 158" class="fold" stroke-width="2.5"/>
+    <path d="M103 91 C98 112 97 133 98 158" class="darkFold" stroke-width="2.5"/>
+    <rect x="62" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
+    <path d="M79 75 C86 70 96 70 102 75 L100 97 L81 97 Z" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="60" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="120" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <path d="M40 235 C49 230 66 230 74 235 C70 243 47 245 39 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+    <path d="M112 235 C122 230 139 230 147 236 C143 244 119 245 111 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+  </g>
+
+  <g transform="translate(180 0)">
+    <ellipse cx="90" cy="239" rx="56" ry="10" fill="#000" opacity=".17"/>
+    <path class="edge" stroke-width="25" d="M70 157 C62 181 54 205 38 235"/>
+    <path class="edge" stroke-width="25" d="M108 157 C119 181 130 205 145 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M70 157 C62 181 54 205 38 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M108 157 C119 181 130 205 145 235"/>
+    <path class="edge" stroke-width="23" d="M61 104 C70 128 74 145 68 164"/>
+    <path class="edge" stroke-width="23" d="M119 104 C107 128 105 145 114 164"/>
+    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M61 104 C70 128 74 145 68 164"/>
+    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 104 C107 128 105 145 114 164"/>
+    <path d="M55 102 C64 86 78 79 90 79 C102 79 116 86 125 102 C121 124 119 145 116 162 C109 170 71 170 64 162 C61 145 59 124 55 102 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
+    <path d="M60 102 L92 155 L121 102" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M75 90 C80 110 81 131 80 158" class="fold" stroke-width="2.5"/>
+    <rect x="62" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
+    <path d="M79 75 C86 70 96 70 102 75 L100 97 L81 97 Z" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="68" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="114" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <path d="M20 235 C33 229 51 230 60 236 C55 244 28 246 19 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+    <path d="M129 235 C141 229 159 230 168 236 C164 244 137 246 128 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+  </g>
+
+  <g transform="translate(360 0)">
+    <ellipse cx="93" cy="239" rx="61" ry="10" fill="#000" opacity=".17"/>
+    <path class="edge" stroke-width="25" d="M72 157 C67 184 64 209 56 235"/>
+    <path class="edge" stroke-width="25" d="M110 157 C116 184 123 208 136 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M72 157 C67 184 64 209 56 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M110 157 C116 184 123 208 136 235"/>
+    <path class="edge" stroke-width="23" d="M61 105 C51 128 49 146 58 164"/>
+    <path class="edge" stroke-width="23" d="M119 104 C137 103 157 101 172 98"/>
+    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M61 105 C51 128 49 146 58 164"/>
+    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 104 C137 103 157 101 172 98"/>
+    <path d="M56 102 C66 85 80 79 93 80 C106 81 118 87 127 103 C123 125 121 145 118 162 C111 170 73 170 65 162 C62 145 60 124 56 102 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
+    <path d="M61 102 L94 155 L122 103" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
+    <rect x="64" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
+    <path d="M82 76 C89 71 99 71 105 76 L102 98 L83 98 Z" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="58" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="174" cy="98" r="11" fill="url(#p2Skin)" class="skinEdge"/>
+    <path d="M41 235 C50 230 67 230 75 235 C71 243 48 245 40 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+    <path d="M121 235 C133 230 151 230 159 236 C155 244 129 246 120 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+  </g>
+
+  <g transform="translate(540 0)">
+    <ellipse cx="94" cy="239" rx="65" ry="10" fill="#000" opacity=".17"/>
+    <path class="edge" stroke-width="25" d="M72 158 C65 184 59 209 48 235"/>
+    <path class="edge" stroke-width="25" d="M109 157 C129 178 150 190 170 205"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M72 158 C65 184 59 209 48 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M109 157 C129 178 150 190 170 205"/>
+    <path class="edge" stroke-width="23" d="M61 105 C51 130 51 146 60 164"/>
+    <path class="edge" stroke-width="23" d="M119 105 C110 129 108 145 115 164"/>
+    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M61 105 C51 130 51 146 60 164"/>
+    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 105 C110 129 108 145 115 164"/>
+    <path d="M56 103 C66 86 80 79 93 80 C106 81 119 88 128 104 C123 126 121 145 118 162 C111 170 73 170 65 162 C62 145 60 125 56 103 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
+    <path d="M61 103 L94 155 L123 104" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
+    <rect x="64" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
+    <path d="M82 76 C89 71 99 71 105 76 L102 98 L83 98 Z" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="60" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="115" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <path d="M32 235 C44 230 62 230 71 236 C67 244 40 246 31 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+    <path d="M154 204 C166 198 184 199 192 206 C186 214 161 216 153 210 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+  </g>
+
+  <g transform="translate(720 0)">
+    <ellipse cx="90" cy="239" rx="47" ry="10" fill="#000" opacity=".17"/>
+    <path class="edge" stroke-width="25" d="M71 157 C66 184 63 208 55 235"/>
+    <path class="edge" stroke-width="25" d="M109 157 C114 185 118 209 127 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M71 157 C66 184 63 208 55 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M109 157 C114 185 118 209 127 235"/>
+    <path class="edge" stroke-width="23" d="M63 106 C75 112 80 126 82 146"/>
+    <path class="edge" stroke-width="23" d="M117 106 C104 112 99 126 97 147"/>
+    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M63 106 C75 112 80 126 82 146"/>
+    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M117 106 C104 112 99 126 97 147"/>
+    <path d="M55 102 C64 86 78 79 90 79 C102 79 116 86 125 102 C121 124 119 145 116 162 C109 170 71 170 64 162 C61 145 59 124 55 102 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
+    <path d="M60 102 L92 155 L121 102" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
+    <rect x="62" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
+    <path d="M79 75 C86 70 96 70 102 75 L100 97 L81 97 Z" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="82" cy="146" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="97" cy="147" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <path d="M40 235 C49 230 66 230 74 235 C70 243 47 245 39 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+    <path d="M112 235 C122 230 139 230 147 236 C143 244 119 245 111 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+  </g>
+
+  <g transform="translate(900 0)">
+    <ellipse cx="88" cy="239" rx="51" ry="10" fill="#000" opacity=".17"/>
+    <path class="edge" stroke-width="25" d="M68 158 C62 184 63 209 56 235"/>
+    <path class="edge" stroke-width="25" d="M106 158 C113 186 120 209 132 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M68 158 C62 184 63 209 56 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M106 158 C113 186 120 209 132 235"/>
+    <path class="edge" stroke-width="23" d="M60 106 C45 124 45 143 59 164"/>
+    <path class="edge" stroke-width="23" d="M118 105 C135 119 137 140 121 164"/>
+    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M60 106 C45 124 45 143 59 164"/>
+    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M118 105 C135 119 137 140 121 164"/>
+    <path d="M51 104 C61 85 78 80 91 82 C104 84 119 92 128 106 C124 128 121 147 117 163 C110 171 70 170 62 162 C58 145 55 126 51 104 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
+    <path d="M61 104 L89 156 L121 106" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
+    <rect x="61" y="154" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
+    <path d="M79 77 C87 72 98 72 105 79 L101 100 L82 99 Z" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="59" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="121" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <path d="M41 235 C50 230 67 230 75 235 C71 243 48 245 40 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+    <path d="M116 235 C126 230 143 230 151 236 C147 244 123 245 115 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+  </g>
+
+  <g transform="translate(1080 0)">
+    <ellipse cx="91" cy="239" rx="51" ry="10" fill="#000" opacity=".17"/>
+    <path class="edge" stroke-width="25" d="M71 157 C66 184 63 208 55 235"/>
+    <path class="edge" stroke-width="25" d="M109 157 C114 184 118 208 127 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M71 157 C66 184 63 208 55 235"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M109 157 C114 184 118 208 127 235"/>
+    <path class="edge" stroke-width="23" d="M62 104 C67 89 74 77 82 62"/>
+    <path class="edge" stroke-width="23" d="M119 104 C114 89 107 77 98 62"/>
+    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M62 104 C67 89 74 77 82 62"/>
+    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 104 C114 89 107 77 98 62"/>
+    <path d="M55 102 C64 86 78 79 91 79 C103 79 117 86 126 102 C122 124 120 145 117 162 C110 170 72 170 65 162 C62 145 59 124 55 102 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
+    <path d="M60 102 L92 155 L122 102" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
+    <rect x="63" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
+    <path d="M80 75 C87 70 97 70 103 75 L101 97 L82 97 Z" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="82" cy="62" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="98" cy="62" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <path d="M40 235 C49 230 66 230 74 235 C70 243 47 245 39 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+    <path d="M112 235 C122 230 139 230 147 236 C143 244 119 245 111 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+  </g>
+
+  <g transform="translate(1260 0)">
+    <ellipse cx="89" cy="242" rx="55" ry="10" fill="#000" opacity=".16"/>
+    <path class="edge" stroke-width="25" d="M69 176 C64 196 60 216 51 238"/>
+    <path class="edge" stroke-width="25" d="M108 176 C119 196 130 216 145 238"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M69 176 C64 196 60 216 51 238"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M108 176 C119 196 130 216 145 238"/>
+    <path class="edge" stroke-width="23" d="M61 122 C51 147 54 166 68 183"/>
+    <path class="edge" stroke-width="23" d="M119 122 C132 146 133 166 120 184"/>
+    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M61 122 C51 147 54 166 68 183"/>
+    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 122 C132 146 133 166 120 184"/>
+    <path d="M55 119 C65 103 79 97 91 97 C103 97 117 103 126 119 C122 141 120 162 117 177 C110 185 72 185 65 177 C62 162 59 141 55 119 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
+    <path d="M60 119 L91 174 L122 119" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
+    <rect x="63" y="169" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
+    <path d="M80 93 C87 88 97 88 103 93 L101 115 L82 115 Z" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="68" cy="183" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="120" cy="184" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <path d="M35 238 C47 232 65 232 73 238 C69 246 42 248 34 243 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+    <path d="M129 238 C141 232 159 232 167 239 C164 247 137 248 128 243 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+  </g>
+
+  <g transform="translate(1440 0)">
+    <ellipse cx="92" cy="244" rx="62" ry="9" fill="#000" opacity=".16"/>
+    <path class="edge" stroke-width="23" d="M72 190 C58 203 45 219 31 237"/>
+    <path class="edge" stroke-width="23" d="M108 188 C127 198 143 214 160 233"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="17" d="M72 190 C58 203 45 219 31 237"/>
+    <path class="line" stroke="url(#p2Pants)" stroke-width="17" d="M108 188 C127 198 143 214 160 233"/>
+    <path class="edge" stroke-width="22" d="M62 150 C51 166 50 184 61 199"/>
+    <path class="edge" stroke-width="22" d="M119 150 C132 166 133 184 121 200"/>
+    <path class="line" stroke="url(#p2Trim)" stroke-width="15" d="M62 150 C51 166 50 184 61 199"/>
+    <path class="line" stroke="#cc3a3f" stroke-width="15" d="M119 150 C132 166 133 184 121 200"/>
+    <path d="M55 146 C66 130 81 127 94 131 C107 134 120 143 128 158 C124 176 122 192 118 202 C108 209 73 207 64 198 C61 185 58 166 55 146 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
+    <path d="M61 146 L91 199 L122 158" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
+    <rect x="64" y="194" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
+    <path d="M83 127 C91 122 101 124 107 132 L102 150 L84 148 Z" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="61" cy="199" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <circle cx="121" cy="200" r="10" fill="url(#p2Skin)" class="skinEdge"/>
+    <path d="M18 237 C30 231 49 231 57 237 C53 245 27 247 18 242 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+    <path d="M145 233 C157 227 175 229 183 235 C179 243 153 245 144 239 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+  </g>
+</svg>
