@@ -2109,6 +2109,7 @@ function drawFighter(f) {
   drawFighterRimLight(f, crouch);
   if (f.attack) drawAttackBodyGlow(f, crouch);
   if (f.energy >= 45 && f.hurt <= 0) drawEnergyAura(f.trim, crouch);
+  drawSpriteUnderlay(f, pose, crouch);
 
   ctx.shadowColor = "rgba(10, 8, 7, 0.42)";
   ctx.shadowBlur = 2;
@@ -2200,6 +2201,31 @@ function drawFighterStageLighting(f, crouch) {
   ctx.beginPath();
   ctx.ellipse(14, -82 + crouch, 58, 98, 0.05, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+function drawSpriteUnderlay(f, pose, crouch) {
+  const spec = bodySpec(f);
+  const shoulder = spec.shoulder + 12;
+  const hip = spec.hip + 12;
+  const alpha = f.hurt > 0 ? 0.34 : 0.22;
+
+  ctx.save();
+  ctx.fillStyle = `rgba(20, 11, 9, ${alpha})`;
+  ctx.beginPath();
+  ctx.ellipse(0, -88 + crouch, shoulder, 82, -0.04, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(10, 7, 6, 0.18)";
+  ctx.beginPath();
+  ctx.ellipse(0, -31 + crouch, hip, 17, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  for (const leg of [pose.backLeg, pose.frontLeg]) {
+    ctx.beginPath();
+    ctx.ellipse(leg.foot.x, leg.foot.y + 4, 24 * spec.foot, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -2831,6 +2857,7 @@ function drawTorso(f, crouch) {
 
   drawOutfitPattern(f, outfit, shoulder, waist, hip, top, bottom, crouch);
   drawOutfitMaterial(f, outfit, shoulder, waist, hip, top, bottom, crouch);
+  drawSpriteTorsoVolume(f, outfit, shoulder, chest, waist, hip, top, bottom, crouch);
 
   ctx.fillStyle = outfit.belt;
   ctx.beginPath();
@@ -3054,6 +3081,94 @@ function drawOutfitMaterial(f, outfit, shoulder, waist, hip, top, bottom, crouch
   ctx.restore();
 }
 
+function drawSpriteTorsoVolume(f, outfit, shoulder, chest, waist, hip, top, bottom, crouch) {
+  const spec = bodySpec(f);
+  const lowerWaist = waist * (spec.belly ?? 1);
+  const lowerHip = hip * (spec.belly ? 1.08 : 1);
+  const shoulderSlope = spec.shoulderSlope ?? 8;
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(-shoulder + 6, top + shoulderSlope + 3);
+  ctx.bezierCurveTo(-chest - 6, -110 + crouch, -lowerWaist - 4, -67 + crouch, -lowerHip + 1, bottom);
+  ctx.lineTo(lowerHip - 1, bottom);
+  ctx.bezierCurveTo(lowerWaist + 4, -67 + crouch, chest + 6, -110 + crouch, shoulder - 6, top + shoulderSlope + 3);
+  ctx.quadraticCurveTo(0, top - 6, -shoulder + 6, top + shoulderSlope + 3);
+  ctx.closePath();
+  ctx.clip();
+
+  const bodySheen = ctx.createLinearGradient(-shoulder, top, shoulder, bottom);
+  bodySheen.addColorStop(0, "rgba(255,255,255,0.16)");
+  bodySheen.addColorStop(0.42, "rgba(255,255,255,0.03)");
+  bodySheen.addColorStop(1, "rgba(0,0,0,0.12)");
+  ctx.fillStyle = bodySheen;
+  ctx.beginPath();
+  ctx.ellipse(-shoulder * 0.22, -94 + crouch, shoulder * 0.5, 54, -0.28, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(20, 12, 10, 0.36)";
+  ctx.lineWidth = 3;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * (shoulder - 8), top + shoulderSlope + 10);
+    ctx.bezierCurveTo(side * (chest + 4), -103 + crouch, side * (lowerWaist + 3), -66 + crouch, side * (lowerHip - 2), bottom - 2);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-shoulder * 0.48, -116 + crouch);
+  ctx.bezierCurveTo(-shoulder * 0.2, -104 + crouch, -waist * 0.25, -84 + crouch, -waist * 0.2, -48 + crouch);
+  ctx.stroke();
+
+  if (f.build === "slimFemale" || f.build === "softFemale") {
+    ctx.strokeStyle = colorWithAlpha(outfit.accent, f.build === "slimFemale" ? 0.36 : 0.3);
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-waist - 5, -69 + crouch);
+    ctx.bezierCurveTo(-waist * 0.4, -61 + crouch, waist * 0.4, -61 + crouch, waist + 5, -69 + crouch);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.beginPath();
+    ctx.ellipse(0, -49 + crouch, hip * 0.72, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (f.build === "racingHeavy") {
+    ctx.strokeStyle = "rgba(22, 43, 82, 0.38)";
+    ctx.lineWidth = 2.6;
+    for (let y = -99 + crouch; y <= -59 + crouch; y += 15) {
+      ctx.beginPath();
+      ctx.moveTo(-waist - 14, y);
+      ctx.bezierCurveTo(-waist * 0.2, y + 8, waist * 0.2, y + 8, waist + 14, y);
+      ctx.stroke();
+    }
+  } else if (f.build === "tallLean") {
+    ctx.strokeStyle = colorWithAlpha(outfit.accent, 0.24);
+    ctx.lineWidth = 1.8;
+    for (const x of [-10, 10]) {
+      ctx.beginPath();
+      ctx.moveTo(x, -118 + crouch);
+      ctx.bezierCurveTo(x * 0.65, -96 + crouch, x * 0.62, -72 + crouch, x * 0.8, -41 + crouch);
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-shoulder + 16, top + shoulderSlope + 7);
+  ctx.quadraticCurveTo(0, top - 10, shoulder - 16, top + shoulderSlope + 7);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawHead(f, crouch, stride) {
   const spec = bodySpec(f);
   const headScale = spec.headScale ?? 0.94;
@@ -3235,14 +3350,67 @@ function drawPchanHeadBandana(x, y, headW, headH) {
   ctx.restore();
 }
 
+function drawSpriteJointCover(point, color, rx, ry, angle, alpha = 1) {
+  ctx.save();
+  ctx.translate(point.x, point.y);
+  ctx.rotate(angle);
+  ctx.globalAlpha *= alpha;
+  const coverGrad = ctx.createLinearGradient(-rx, -ry, rx, ry);
+  coverGrad.addColorStop(0, lighten(color, 22));
+  coverGrad.addColorStop(0.55, color);
+  coverGrad.addColorStop(1, darken(color, 26));
+  ctx.fillStyle = coverGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(35, 21, 17, 0.42)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.16)";
+  ctx.beginPath();
+  ctx.ellipse(-rx * 0.22, -ry * 0.24, rx * 0.42, ry * 0.22, -0.25, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSpriteCuff(a, b, color, width, offset = 0.78) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const angle = Math.atan2(dy, dx);
+  const x = a.x + dx * offset;
+  const y = a.y + dy * offset;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  const cuffGrad = ctx.createLinearGradient(-width * 0.45, -6, width * 0.45, 6);
+  cuffGrad.addColorStop(0, darken(color, 24));
+  cuffGrad.addColorStop(0.55, lighten(color, 10));
+  cuffGrad.addColorStop(1, darken(color, 16));
+  ctx.fillStyle = cuffGrad;
+  ctx.beginPath();
+  ctx.roundRect(-width * 0.5, -5, width, 10, 4);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(35, 21, 17, 0.36)";
+  ctx.lineWidth = 1.3;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawLeg(f, leg, front) {
   const spec = bodySpec(f);
   const outfit = outfitSpec(f);
   const pant = front ? outfit.pants : darken(outfit.pants, 28);
   const thighWidth = (spec.thighWidth ?? spec.limb ?? 1);
   const calfWidth = (spec.calfWidth ?? spec.limb ?? 1);
+  const hipAngle = Math.atan2(leg.knee.y - leg.hip.y, leg.knee.x - leg.hip.x);
+  const kneeAngle = Math.atan2(leg.foot.y - leg.knee.y, leg.foot.x - leg.knee.x);
+
   drawLimbSegment(leg.hip, leg.knee, pant, 24 * thighWidth, 16 * thighWidth);
   drawLimbSegment(leg.knee, leg.foot, pant, 19 * calfWidth, 10 * calfWidth);
+  drawSpriteJointCover(leg.hip, pant, 12 * thighWidth, 9 * thighWidth, hipAngle, front ? 0.96 : 0.82);
+  drawSpriteJointCover(leg.knee, pant, 9 * calfWidth, 7 * calfWidth, kneeAngle, front ? 1 : 0.84);
+  drawSpriteCuff(leg.knee, leg.foot, pant, 16 * calfWidth, 0.82);
 
   ctx.fillStyle = front ? outfit.accent : "rgba(255,255,255,0.14)";
   ctx.beginPath();
@@ -3303,8 +3471,14 @@ function drawArm(f, arm, front) {
   const sleeve = front ? outfit.sleeve : darken(outfit.jacket, 34);
   const upperArmWidth = (spec.upperArmWidth ?? spec.limb ?? 1);
   const forearmWidth = (spec.forearmWidth ?? spec.limb ?? 1);
+  const shoulderAngle = Math.atan2(arm.elbow.y - arm.shoulder.y, arm.elbow.x - arm.shoulder.x);
+  const elbowAngle = Math.atan2(arm.hand.y - arm.elbow.y, arm.hand.x - arm.elbow.x);
+
   drawLimbSegment(arm.shoulder, arm.elbow, sleeve, 20 * upperArmWidth, 13 * upperArmWidth);
   drawLimbSegment(arm.elbow, arm.hand, sleeve, 16 * forearmWidth, 9 * forearmWidth);
+  drawSpriteJointCover(arm.shoulder, sleeve, 11 * upperArmWidth, 8 * upperArmWidth, shoulderAngle, front ? 1 : 0.8);
+  drawSpriteJointCover(arm.elbow, sleeve, 8 * forearmWidth, 6.5 * forearmWidth, elbowAngle, front ? 1 : 0.82);
+  drawSpriteCuff(arm.elbow, arm.hand, sleeve, 15 * forearmWidth, 0.78);
 
   if (front) {
     ctx.strokeStyle = outfit.accent;
