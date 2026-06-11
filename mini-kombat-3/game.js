@@ -2303,7 +2303,7 @@ function rasterBodyFrameIndex(f, frameName, walking) {
 function rasterHeadPose(frameName, frameIndex) {
   const pose = {
     x: 0,
-    y: 0,
+    y: -36,
     rotate: 0,
     scale: 0.74,
   };
@@ -2319,24 +2319,24 @@ function rasterHeadPose(frameName, frameIndex) {
     pose.x = frameIndex === 8 ? -5 : -2;
     pose.rotate = frameIndex === 8 ? -0.065 : -0.025;
   } else if (frameName === "block") {
-    pose.y = 4;
+    pose.y = -30;
     pose.scale = 0.72;
   } else if (frameName === "hurt") {
     pose.x = 5;
-    pose.y = 7;
+    pose.y = -25;
     pose.rotate = 0.09;
     pose.scale = 0.72;
   } else if (frameName === "special" || frameName === "victory") {
-    pose.y = -3;
+    pose.y = -40;
     pose.rotate = -0.04;
   } else if (frameName === "sweep") {
     pose.x = 5;
-    pose.y = 28;
+    pose.y = -4;
     pose.rotate = 0.16;
     pose.scale = 0.7;
   } else if (frameName === "defeat") {
     pose.x = 8;
-    pose.y = 57;
+    pose.y = 18;
     pose.rotate = 0.28;
     pose.scale = 0.68;
   }

@@ -55,7 +55,7 @@ const fighters = {
       hand: 1.04,
       foot: 1.04,
     },
-    extras: "bandana",
+    extras: "none",
   },
   akane: {
     title: "Akane body sprite sheet v2",
@@ -307,12 +307,10 @@ function drawFrame(fighter, frame, index) {
   const belt = `<path d="M ${cx - hip - 5} ${torsoBottom - 13} Q ${cx} ${torsoBottom - 3} ${cx + hip + 5} ${torsoBottom - 13} L ${cx + hip + 3} ${torsoBottom + 2} Q ${cx} ${torsoBottom + 12} ${cx - hip - 3} ${torsoBottom + 2} Z" fill="url(#trim)" class="beltEdge"/>
   <path d="M ${cx - 7} ${torsoBottom - 14} L ${cx} ${torsoBottom - 5} L ${cx + 7} ${torsoBottom - 14} L ${cx + 6} ${torsoBottom + 6} L ${cx} ${torsoBottom + 11} L ${cx - 6} ${torsoBottom + 6} Z" fill="url(#jacketDark)" opacity=".72"/>`;
 
-  const identity = fighter.extras === "bandana"
-    ? `<path d="M ${cx - 20} ${neckY + 1} C ${cx - 4} ${neckY - 4} ${cx + 15} ${neckY - 2} ${cx + 27} ${neckY + 3}" stroke="url(#trim)" stroke-width="7" stroke-linecap="round" opacity=".88"/>
-       <path d="M ${cx + 25} ${neckY + 2} C ${cx + 38} ${neckY - 1} ${cx + 45} ${neckY + 7} ${cx + 50} ${neckY + 15}" stroke="url(#trim)" stroke-width="7" stroke-linecap="round" opacity=".82"/>
-       <circle cx="${cx + 9}" cy="${neckY + 1}" r="2.3" fill="#151515"/><circle cx="${cx + 31}" cy="${neckY + 5}" r="2.3" fill="#151515"/>`
-    : `<path d="M ${cx - waist - 7} ${torsoBottom - 46} C ${cx - waist * 0.35} ${torsoBottom - 38} ${cx + waist * 0.35} ${torsoBottom - 38} ${cx + waist + 7} ${torsoBottom - 46}" class="waistShape"/>
-       <path d="M ${cx - shoulder + 12} ${torsoTop + 23} C ${cx - 3} ${torsoTop + 58} ${cx + 18} ${torsoBottom - 29} ${cx + waist + 1} ${torsoBottom - 5}" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>`;
+  const identity = fighter.extras === "sash"
+    ? `<path d="M ${cx - waist - 7} ${torsoBottom - 46} C ${cx - waist * 0.35} ${torsoBottom - 38} ${cx + waist * 0.35} ${torsoBottom - 38} ${cx + waist + 7} ${torsoBottom - 46}" class="waistShape"/>
+       <path d="M ${cx - shoulder + 12} ${torsoTop + 23} C ${cx - 3} ${torsoTop + 58} ${cx + 18} ${torsoBottom - 29} ${cx + waist + 1} ${torsoBottom - 5}" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>`
+    : "";
 
   return `<g transform="translate(${x0} 0)">
     <rect x="0" y="0" width="${FRAME_W}" height="${FRAME_H}" fill="none"/>
