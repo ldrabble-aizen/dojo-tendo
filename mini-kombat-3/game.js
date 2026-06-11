@@ -93,6 +93,8 @@ let roundWinnerId = "";
 let matchWinnerId = "";
 let lastFrameTime = 0;
 let updateAccumulator = 0;
+let roundAdvanceTimer = null;
+let winnerOverlayTimer = null;
 
 const STEP_MS = 1000 / 60;
 const MAX_UPDATE_STEPS = 3;
@@ -646,6 +648,7 @@ function playMusicTick() {
 
 function resetGame() {
   ensureAudio();
+  clearRoundTimers();
   fighters[0].wins = 0;
   fighters[1].wins = 0;
   roundNumber = 1;
@@ -656,6 +659,7 @@ function resetGame() {
 }
 
 function resetRound() {
+  clearRoundTimers();
   Object.assign(fighters[0], {
     x: FIGHTER_START_LEFT_X,
     y: FLOOR,
@@ -714,6 +718,35 @@ function resetRound() {
   paused = false;
   running = true;
   overlay.classList.add("hidden");
+}
+
+function clearRoundTimers() {
+  if (roundAdvanceTimer) {
+    clearTimeout(roundAdvanceTimer);
+    roundAdvanceTimer = null;
+  }
+  if (winnerOverlayTimer) {
+    clearTimeout(winnerOverlayTimer);
+    winnerOverlayTimer = null;
+  }
+}
+
+function scheduleNextRound() {
+  if (roundAdvanceTimer) clearTimeout(roundAdvanceTimer);
+  roundAdvanceTimer = setTimeout(() => {
+    roundAdvanceTimer = null;
+    if (!winner || matchOver) return;
+    roundNumber += 1;
+    resetRound();
+  }, 3200);
+}
+
+function scheduleWinnerOverlay() {
+  if (winnerOverlayTimer) clearTimeout(winnerOverlayTimer);
+  winnerOverlayTimer = setTimeout(() => {
+    winnerOverlayTimer = null;
+    showWinner();
+  }, 760);
 }
 
 function homeOverlayCopy() {
@@ -1009,7 +1042,8 @@ function update() {
     flash = 16;
     addText(winnerFighter.x, winnerFighter.y - 190, matchOver ? "MATCH" : "ROUND", "#fff1bd");
     playSound(matchOver ? tournamentActive && winnerFighter.id !== "right" ? "lose" : "victory" : "ko");
-    setTimeout(showWinner, 760);
+    if (matchOver) scheduleWinnerOverlay();
+    else scheduleNextRound();
   }
 
   if (flash > 0) flash -= 1;
@@ -2308,11 +2342,11 @@ function rasterHeadPose(frameName, frameIndex) {
   };
 
   if (frameName === "walk") {
-    pose.x = frameIndex % 2 === 0 ? -1 : 1;
+    pose.y = -42;
   } else if (frameName === "punch") {
-    pose.y = frameIndex === 5 ? -39 : -38;
+    pose.y = frameIndex === 5 ? -41 : -39;
   } else if (frameName === "kick") {
-    pose.y = frameIndex === 8 ? -37 : -38;
+    pose.y = frameIndex === 8 ? -40 : -39;
   } else if (frameName === "block") {
     pose.y = -36;
     pose.scale = 0.72;
@@ -2368,7 +2402,7 @@ function drawRasterBodySprite(f, crouch, stride, walking) {
 
   ctx.save();
   ctx.translate(headPose.x, 0);
-  drawHead(f, headCrouch, 0, headPose.scale, { drawNeck: false });
+  drawHead(f, headCrouch, 0, headPose.scale, { drawNeck: false, drawShadowImage: false });
   ctx.restore();
   drawFighterStageLighting(f, crouch);
   return true;
@@ -3365,13 +3399,15 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     const clipH = headH - facePad * 1.55;
     const clipRadius = Math.min(24, Math.max(16, headW * 0.23));
 
-    ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.48)";
-    ctx.shadowBlur = 12;
-    ctx.shadowOffsetY = 7;
-    ctx.globalAlpha = 0.82;
-    ctx.drawImage(f.face, x, y, headW, headH);
-    ctx.restore();
+    if (options.drawShadowImage !== false) {
+      ctx.save();
+      ctx.shadowColor = "rgba(0, 0, 0, 0.48)";
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 7;
+      ctx.globalAlpha = 0.82;
+      ctx.drawImage(f.face, x, y, headW, headH);
+      ctx.restore();
+    }
 
     ctx.fillStyle = "rgba(18, 12, 10, 0.12)";
     ctx.beginPath();
