@@ -119,21 +119,21 @@ const SPECIAL_STYLES = {
   p6: { shape: "star", core: "#f5f9ff", rim: "#ff8ac8", trail: "#263f9f" },
 };
 
-const BODY_SPRITE_FRAME_W = 180;
-const BODY_SPRITE_FRAME_H = 260;
-const BODY_SPRITE_ANCHOR_X = 90;
-const BODY_SPRITE_ANCHOR_Y = 244;
+const BODY_SPRITE_FRAME_W = 210;
+const BODY_SPRITE_FRAME_H = 300;
+const BODY_SPRITE_ANCHOR_X = 105;
+const BODY_SPRITE_ANCHOR_Y = 286;
 const BODY_SPRITE_FRAMES = {
-  idle: 0,
-  walk: 1,
-  punch: 2,
-  kick: 3,
-  block: 4,
-  hurt: 5,
-  victory: 6,
-  special: 6,
-  sweep: 7,
-  defeat: 8,
+  idle: [0, 1],
+  walk: [2, 3],
+  punch: [4, 5, 6],
+  kick: [7, 8, 9],
+  block: [10],
+  hurt: [11, 12],
+  special: [13],
+  victory: [14],
+  defeat: [15],
+  sweep: [16],
 };
 
 const BODY_SPECS = {
@@ -2280,17 +2280,81 @@ function rasterBodyFrameFor(f, walking) {
   return "idle";
 }
 
+function rasterBodyFrameIndex(f, frameName, walking) {
+  const frames = BODY_SPRITE_FRAMES[frameName] ?? BODY_SPRITE_FRAMES.idle;
+  if (frames.length === 1) return frames[0];
+
+  if (f.attack && (frameName === "punch" || frameName === "kick")) {
+    const t = clamp(f.attack.frame / Math.max(1, f.attack.duration), 0, 0.999);
+    return frames[Math.floor(t * frames.length)] ?? frames[frames.length - 1];
+  }
+
+  if (frameName === "hurt") {
+    return frames[Math.floor(f.hurt / 5) % frames.length] ?? frames[0];
+  }
+
+  if (frameName === "walk" || walking) {
+    return frames[Math.floor(roundFrame / 8) % frames.length] ?? frames[0];
+  }
+
+  return frames[Math.floor(roundFrame / 34) % frames.length] ?? frames[0];
+}
+
+function rasterHeadPose(frameName, frameIndex) {
+  const pose = {
+    x: 0,
+    y: 0,
+    rotate: 0,
+    scale: 0.74,
+  };
+
+  if (frameName === "walk") {
+    pose.x = frameIndex % 2 === 0 ? -2 : 2;
+    pose.rotate = frameIndex % 2 === 0 ? -0.018 : 0.018;
+  } else if (frameName === "punch") {
+    pose.x = frameIndex === 5 ? 4 : 1;
+    pose.y = frameIndex === 5 ? -2 : 0;
+    pose.rotate = frameIndex === 5 ? 0.035 : 0.012;
+  } else if (frameName === "kick") {
+    pose.x = frameIndex === 8 ? -5 : -2;
+    pose.rotate = frameIndex === 8 ? -0.065 : -0.025;
+  } else if (frameName === "block") {
+    pose.y = 4;
+    pose.scale = 0.72;
+  } else if (frameName === "hurt") {
+    pose.x = 5;
+    pose.y = 7;
+    pose.rotate = 0.09;
+    pose.scale = 0.72;
+  } else if (frameName === "special" || frameName === "victory") {
+    pose.y = -3;
+    pose.rotate = -0.04;
+  } else if (frameName === "sweep") {
+    pose.x = 5;
+    pose.y = 28;
+    pose.rotate = 0.16;
+    pose.scale = 0.7;
+  } else if (frameName === "defeat") {
+    pose.x = 8;
+    pose.y = 57;
+    pose.rotate = 0.28;
+    pose.scale = 0.68;
+  }
+
+  return pose;
+}
+
 function drawRasterBodySprite(f, crouch, stride, walking) {
   const sheet = bodySpriteSheets[f.profileId];
   if (!sheet?.complete || !sheet.naturalWidth) return false;
 
   const frameName = rasterBodyFrameFor(f, walking);
-  const frameIndex = BODY_SPRITE_FRAMES[frameName] ?? BODY_SPRITE_FRAMES.idle;
+  const frameIndex = rasterBodyFrameIndex(f, frameName, walking);
   const frameX = frameIndex * BODY_SPRITE_FRAME_W;
+  const headPose = rasterHeadPose(frameName, frameIndex);
   const headCrouch =
     crouch +
-    (frameName === "defeat" ? 34 : 0) +
-    (frameName === "sweep" ? 18 : 0) +
+    headPose.y +
     (frameName === "hurt" ? 7 : 0) +
     (frameName === "block" ? 4 : 0);
 
@@ -2311,7 +2375,11 @@ function drawRasterBodySprite(f, crouch, stride, walking) {
   );
   ctx.restore();
 
-  drawHead(f, headCrouch, stride, 0.86);
+  ctx.save();
+  ctx.translate(headPose.x, 0);
+  ctx.rotate(headPose.rotate);
+  drawHead(f, headCrouch, stride, headPose.scale);
+  ctx.restore();
   drawFighterStageLighting(f, crouch);
   return true;
 }

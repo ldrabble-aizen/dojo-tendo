@@ -1,216 +1,837 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="260" viewBox="0 0 1620 260">
-  <title>Akane body sprite sheet</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="3570" height="300" viewBox="0 0 3570 300">
+  <title>Akane body sprite sheet v2</title>
+
   <defs>
-    <linearGradient id="p2Jacket" x1="0" y1="78" x2="0" y2="168" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#f15f66" offset="0"/>
+
+    <linearGradient id="jacket" x1="0" y1="70" x2="0" y2="286" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f2696f" offset="0"/>
       <stop stop-color="#cc3a3f" offset="0.58"/>
-      <stop stop-color="#8e1f2b" offset="1"/>
+      <stop stop-color="#8b1d2a" offset="1"/>
     </linearGradient>
-    <linearGradient id="p2Pants" x1="0" y1="148" x2="0" y2="238" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#bd3139" offset="0"/>
-      <stop stop-color="#9f2731" offset="0.55"/>
-      <stop stop-color="#671826" offset="1"/>
+
+    <linearGradient id="jacketDark" x1="0" y1="70" x2="0" y2="286" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#cc3a3f" offset="0"/>
+      <stop stop-color="#8b1d2a" offset="0.58"/>
+      <stop stop-color="#4c111a" offset="1"/>
     </linearGradient>
-    <linearGradient id="p2Trim" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#a3ffe3" offset="0"/>
+
+    <linearGradient id="pants" x1="0" y1="70" x2="0" y2="286" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#c73a43" offset="0"/>
+      <stop stop-color="#9f2731" offset="0.58"/>
+      <stop stop-color="#661525" offset="1"/>
+    </linearGradient>
+
+    <linearGradient id="pantsDark" x1="0" y1="70" x2="0" y2="286" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9f2731" offset="0"/>
+      <stop stop-color="#661525" offset="0.58"/>
+      <stop stop-color="#4c111a" offset="1"/>
+    </linearGradient>
+
+    <linearGradient id="trim" x1="0" y1="70" x2="0" y2="286" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a9ffe7" offset="0"/>
       <stop stop-color="#5ee0b4" offset="0.58"/>
-      <stop stop-color="#269a81" offset="1"/>
+      <stop stop-color="#258f79" offset="1"/>
     </linearGradient>
-    <linearGradient id="p2Skin" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#ffe0c7" offset="0"/>
+
+    <linearGradient id="sleeveDark" x1="0" y1="70" x2="0" y2="286" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#cc3a3f" offset="0"/>
+      <stop stop-color="#8b1d2a" offset="0.58"/>
+      <stop stop-color="#4c111a" offset="1"/>
+    </linearGradient>
+
+    <linearGradient id="shoe" x1="0" y1="70" x2="0" y2="286" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#93f4da" offset="0"/>
+      <stop stop-color="#46ccb0" offset="0.58"/>
+      <stop stop-color="#1f806f" offset="1"/>
+    </linearGradient>
+
+    <radialGradient id="skin" cx="35%" cy="25%" r="78%">
+      <stop stop-color="#ffe2ca" offset="0"/>
       <stop stop-color="#f4c3a3" offset="0.62"/>
       <stop stop-color="#c98e72" offset="1"/>
+    </radialGradient>
+    <linearGradient id="bodySheen" x1="55" y1="75" x2="145" y2="190" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity=".28" offset="0"/>
+      <stop stop-color="#ffffff" stop-opacity=".03" offset=".48"/>
+      <stop stop-color="#000000" stop-opacity=".2" offset="1"/>
     </linearGradient>
   </defs>
   <style>
-    .line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-    .edge { fill: none; stroke: #21130f; stroke-linecap: round; stroke-linejoin: round; opacity: .66; }
-    .fold { fill: none; stroke: #ffe7df; stroke-linecap: round; opacity: .32; }
-    .darkFold { fill: none; stroke: #4b1119; stroke-linecap: round; opacity: .3; }
+    .bodyEdge, .limbEdge, .beltEdge { stroke: #21130f; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+    .limbEdge { stroke-width: 2.5; }
     .skinEdge { stroke: #4c2a1e; stroke-width: 2; }
-    .shoeEdge { stroke: #24473d; stroke-width: 2; }
+    .shoeEdge { stroke: #3d2813; stroke-width: 2; }
+    .fold { fill: none; stroke: #ffe7df; stroke-width: 2.2; stroke-linecap: round; opacity: .34; }
+    .darkFold { fill: none; stroke: #4c111a; stroke-width: 2.2; stroke-linecap: round; opacity: .32; }
+    .trimLine { fill: none; stroke: url(#trim); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+    .waistShape { fill: none; stroke: url(#trim); stroke-width: 2.6; stroke-linecap: round; opacity: .5; }
+    .knuckle { fill: none; stroke: #5b3022; stroke-width: 1.5; stroke-linecap: round; opacity: .5; }
+    .sole { fill: none; stroke: #14110d; stroke-width: 2; stroke-linecap: round; opacity: .46; }
+    .shoeHi { fill: none; stroke: #fff7c9; stroke-width: 2; stroke-linecap: round; opacity: .42; }
   </style>
-
   <g transform="translate(0 0)">
-    <ellipse cx="90" cy="239" rx="47" ry="10" fill="#000" opacity=".17"/>
-    <path class="edge" stroke-width="25" d="M71 157 C66 184 63 208 55 235"/>
-    <path class="edge" stroke-width="25" d="M109 157 C114 185 118 209 127 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M71 157 C66 184 63 208 55 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M109 157 C114 185 118 209 127 235"/>
-    <path class="edge" stroke-width="23" d="M61 104 C49 129 50 146 60 164"/>
-    <path class="edge" stroke-width="23" d="M119 104 C132 129 131 146 120 164"/>
-    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M61 104 C49 129 50 146 60 164"/>
-    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 104 C132 129 131 146 120 164"/>
-    <path d="M55 102 C64 86 78 79 90 79 C102 79 116 86 125 102 C121 124 119 145 116 162 C109 170 71 170 64 162 C61 145 59 124 55 102 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
-    <path d="M60 102 L92 155 L121 102" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
-    <path d="M77 90 C82 108 84 128 83 158" class="fold" stroke-width="2.5"/>
-    <path d="M103 91 C98 112 97 133 98 158" class="darkFold" stroke-width="2.5"/>
-    <rect x="62" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
-    <path d="M79 75 C86 70 96 70 102 75 L100 97 L81 97 Z" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="60" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="120" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <path d="M40 235 C49 230 66 230 74 235 C70 243 47 245 39 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
-    <path d="M112 235 C122 230 139 230 147 236 C143 244 119 245 111 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
-  </g>
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(-1 105 179)">
+      <path d="M 77.60485529126895 173.36152594868452 C 67.60485529126895 206.36152594868452 60.12339870388827 242.15306816407917 47.12339870388827 279.1530681640792 L 58.87660129611173 282.8469318359208 C 71.87660129611173 245.84693183592083 84.39514470873105 211.63847405131548 94.39514470873105 178.63847405131548 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="76" cy="209" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 40.328 276.776 C 49.832 270.968 39.272 271.496 34.52 281.2112 C 41.912 288.392 45.08 288.1808 37.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 47.72 284.5904 L 40.328 283.9568" class="sole"/>
+  <path d="M 51.416 275.9312 Q 42.968 274.4528 38.744 280.1552" class="shoeHi"/><path d="M 114.64684578465993 178.494174457424 C 122.64684578465993 212.494174457424 132.19770602520722 245.81394505994473 145.19770602520722 282.81394505994473 L 158.80229397479278 279.18605494005527 C 145.80229397479278 242.18605494005527 141.35315421534006 207.505825542576 133.35315421534006 173.505825542576 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="132" cy="210" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 139.328 276.776 C 148.832 270.968 165.728 271.496 170.48 281.2112 C 163.088 288.392 144.08 288.1808 136.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 146.72 284.5904 L 164.672 283.9568" class="sole"/>
+  <path d="M 153.584 275.9312 Q 162.032 274.4528 166.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 67.44839277490628 107.66827305189399 C 54.448392774906274 135.66827305189398 56.08629458117971 163.7512047889205 65.08629458117971 186.7512047889205 L 74.91370541882029 187.2487952110795 C 65.91370541882029 164.2487952110795 67.55160722509372 136.33172694810602 80.55160722509372 108.33172694810601 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="61" cy="136" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="70" cy="187" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 66.507712 189 Q 70 190.492288 74.074336 188" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 128.62944187176956 108.37319281661927 C 143.62944187176956 134.37319281661925 145.67681912961135 164.26952814533612 134.67681912961135 187.26952814533612 L 145.32318087038865 186.73047185466388 C 156.32318087038865 163.73047185466388 158.37055812823044 133.62680718338075 143.37055812823044 107.62680718338073 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="151" cy="134" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="140" cy="187" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 136.2848 189 Q 140 190.7152 144.3344 188" class="knuckle"/>
 
-  <g transform="translate(180 0)">
-    <ellipse cx="90" cy="239" rx="56" ry="10" fill="#000" opacity=".17"/>
-    <path class="edge" stroke-width="25" d="M70 157 C62 181 54 205 38 235"/>
-    <path class="edge" stroke-width="25" d="M108 157 C119 181 130 205 145 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M70 157 C62 181 54 205 38 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M108 157 C119 181 130 205 145 235"/>
-    <path class="edge" stroke-width="23" d="M61 104 C70 128 74 145 68 164"/>
-    <path class="edge" stroke-width="23" d="M119 104 C107 128 105 145 114 164"/>
-    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M61 104 C70 128 74 145 68 164"/>
-    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 104 C107 128 105 145 114 164"/>
-    <path d="M55 102 C64 86 78 79 90 79 C102 79 116 86 125 102 C121 124 119 145 116 162 C109 170 71 170 64 162 C61 145 59 124 55 102 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
-    <path d="M60 102 L92 155 L121 102" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
-    <path d="M75 90 C80 110 81 131 80 158" class="fold" stroke-width="2.5"/>
-    <rect x="62" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
-    <path d="M79 75 C86 70 96 70 102 75 L100 97 L81 97 Z" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="68" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="114" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <path d="M20 235 C33 229 51 230 60 236 C55 244 28 246 19 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
-    <path d="M129 235 C141 229 159 230 168 236 C164 244 137 246 128 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
-  </g>
 
-  <g transform="translate(360 0)">
-    <ellipse cx="93" cy="239" rx="61" ry="10" fill="#000" opacity=".17"/>
-    <path class="edge" stroke-width="25" d="M72 157 C67 184 64 209 56 235"/>
-    <path class="edge" stroke-width="25" d="M110 157 C116 184 123 208 136 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M72 157 C67 184 64 209 56 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M110 157 C116 184 123 208 136 235"/>
-    <path class="edge" stroke-width="23" d="M61 105 C51 128 49 146 58 164"/>
-    <path class="edge" stroke-width="23" d="M119 104 C137 103 157 101 172 98"/>
-    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M61 105 C51 128 49 146 58 164"/>
-    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 104 C137 103 157 101 172 98"/>
-    <path d="M56 102 C66 85 80 79 93 80 C106 81 118 87 127 103 C123 125 121 145 118 162 C111 170 73 170 65 162 C62 145 60 124 56 102 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
-    <path d="M61 102 L94 155 L122 103" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
-    <rect x="64" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
-    <path d="M82 76 C89 71 99 71 105 76 L102 98 L83 98 Z" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="58" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="174" cy="98" r="11" fill="url(#p2Skin)" class="skinEdge"/>
-    <path d="M41 235 C50 230 67 230 75 235 C71 243 48 245 40 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
-    <path d="M121 235 C133 230 151 230 159 236 C155 244 129 246 120 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+    </g>
   </g>
+<g transform="translate(210 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(1 105 179)">
+      <path d="M 76.85642278049187 172.66501123391572 C 63.856422780491876 205.66501123391572 54.299495946344315 241.665507863741 36.299495946344315 278.665507863741 L 47.700504053655685 283.334492136259 C 65.70050405365569 246.334492136259 80.14357721950813 212.33498876608428 93.14357721950813 179.33498876608428 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="72" cy="209" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 29.328000000000003 276.776 C 38.832 270.968 28.272 271.496 23.520000000000003 281.2112 C 30.912 288.392 34.08 288.1808 26.688000000000002 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 36.72 284.5904 L 29.328000000000003 283.9568" class="sole"/>
+  <path d="M 40.416 275.9312 Q 31.968 274.4528 27.744 280.1552" class="shoeHi"/><path d="M 113.92572336694548 179.37044560656312 C 123.92572336694548 213.37044560656312 139.40052608505124 246.45123316840954 155.40052608505124 283.45123316840954 L 168.59947391494876 278.54876683159046 C 152.59947391494876 241.54876683159046 142.07427663305452 206.62955439343688 132.07427663305452 172.62955439343688 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="133" cy="210" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 149.328 276.776 C 158.832 270.968 175.728 271.496 180.48 281.2112 C 173.088 288.392 154.08 288.1808 146.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 156.72 284.5904 L 174.672 283.9568" class="sole"/>
+  <path d="M 163.584 275.9312 Q 172.032 274.4528 176.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 67.44839277490628 107.66827305189399 C 54.448392774906274 135.66827305189398 56.08629458117971 163.7512047889205 65.08629458117971 186.7512047889205 L 74.91370541882029 187.2487952110795 C 65.91370541882029 164.2487952110795 67.55160722509372 136.33172694810602 80.55160722509372 108.33172694810601 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="61" cy="136" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="70" cy="187" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 66.507712 189 Q 70 190.492288 74.074336 188" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 128.62944187176956 108.37319281661927 C 143.62944187176956 134.37319281661925 145.67681912961135 164.26952814533612 134.67681912961135 187.26952814533612 L 145.32318087038865 186.73047185466388 C 156.32318087038865 163.73047185466388 158.37055812823044 133.62680718338075 143.37055812823044 107.62680718338073 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="151" cy="134" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="140" cy="187" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 136.2848 189 Q 140 190.7152 144.3344 188" class="knuckle"/>
 
-  <g transform="translate(540 0)">
-    <ellipse cx="94" cy="239" rx="65" ry="10" fill="#000" opacity=".17"/>
-    <path class="edge" stroke-width="25" d="M72 158 C65 184 59 209 48 235"/>
-    <path class="edge" stroke-width="25" d="M109 157 C129 178 150 190 170 205"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M72 158 C65 184 59 209 48 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M109 157 C129 178 150 190 170 205"/>
-    <path class="edge" stroke-width="23" d="M61 105 C51 130 51 146 60 164"/>
-    <path class="edge" stroke-width="23" d="M119 105 C110 129 108 145 115 164"/>
-    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M61 105 C51 130 51 146 60 164"/>
-    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 105 C110 129 108 145 115 164"/>
-    <path d="M56 103 C66 86 80 79 93 80 C106 81 119 88 128 104 C123 126 121 145 118 162 C111 170 73 170 65 162 C62 145 60 125 56 103 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
-    <path d="M61 103 L94 155 L123 104" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
-    <rect x="64" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
-    <path d="M82 76 C89 71 99 71 105 76 L102 98 L83 98 Z" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="60" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="115" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <path d="M32 235 C44 230 62 230 71 236 C67 244 40 246 31 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
-    <path d="M154 204 C166 198 184 199 192 206 C186 214 161 216 153 210 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+
+    </g>
   </g>
+<g transform="translate(420 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(2 105 179)">
+      <path d="M 78.08432820453122 172.15524512791515 C 66.08432820453122 205.15524512791515 54.459029743171854 238.3086715895406 29.459029743171854 278.3086715895406 L 40.540970256828146 283.6913284104594 C 65.54097025682815 243.6913284104594 81.91567179546878 212.84475487208485 93.91567179546878 179.84475487208485 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="74" cy="209" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 22.328000000000003 276.776 C 31.832 270.968 21.272 271.496 16.520000000000003 281.2112 C 23.912 288.392 27.080000000000002 288.1808 19.688000000000002 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 29.72 284.5904 L 22.328000000000003 283.9568" class="sole"/>
+  <path d="M 33.416 275.9312 Q 24.968 274.4528 20.744 280.1552" class="shoeHi"/><path d="M 114.13353612937296 179.88435560046517 C 127.13353612937296 212.88435560046517 141.55166263954396 243.8249858912474 162.55166263954396 283.8249858912474 L 175.44833736045604 278.1750141087526 C 154.44833736045604 238.1750141087526 144.86646387062706 205.11564439953483 131.86646387062706 172.11564439953483 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="136" cy="209" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 156.328 276.776 C 165.832 270.968 182.728 271.496 187.48 281.2112 C 180.088 288.392 161.08 288.1808 153.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 163.72 284.5904 L 181.672 283.9568" class="sole"/>
+  <path d="M 170.584 275.9312 Q 179.032 274.4528 183.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 67.49605982124092 107.1442183975317 C 52.49605982124091 131.1442183975317 50.12204486593068 159.35816379814878 59.12204486593068 183.35816379814878 L 68.87795513406931 184.64183620185122 C 59.87795513406932 160.64183620185122 65.50394017875908 132.8557816024683 80.50394017875908 108.8557816024683 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="59" cy="132" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="64" cy="184" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 60.507712 186 Q 64 187.492288 68.074336 185" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 128.68306729889602 108.96275430277684 C 143.68306729889602 132.96275430277683 149.71554860475825 160.6953225520055 140.71554860475825 184.6953225520055 L 151.28445139524175 183.3046774479945 C 160.28445139524175 159.3046774479945 158.31693270110398 131.03724569722317 143.31693270110398 107.03724569722316 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="151" cy="132" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="146" cy="184" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 142.2848 186 Q 146 187.7152 150.3344 185" class="knuckle"/>
 
-  <g transform="translate(720 0)">
-    <ellipse cx="90" cy="239" rx="47" ry="10" fill="#000" opacity=".17"/>
-    <path class="edge" stroke-width="25" d="M71 157 C66 184 63 208 55 235"/>
-    <path class="edge" stroke-width="25" d="M109 157 C114 185 118 209 127 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M71 157 C66 184 63 208 55 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M109 157 C114 185 118 209 127 235"/>
-    <path class="edge" stroke-width="23" d="M63 106 C75 112 80 126 82 146"/>
-    <path class="edge" stroke-width="23" d="M117 106 C104 112 99 126 97 147"/>
-    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M63 106 C75 112 80 126 82 146"/>
-    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M117 106 C104 112 99 126 97 147"/>
-    <path d="M55 102 C64 86 78 79 90 79 C102 79 116 86 125 102 C121 124 119 145 116 162 C109 170 71 170 64 162 C61 145 59 124 55 102 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
-    <path d="M60 102 L92 155 L121 102" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
-    <rect x="62" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
-    <path d="M79 75 C86 70 96 70 102 75 L100 97 L81 97 Z" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="82" cy="146" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="97" cy="147" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <path d="M40 235 C49 230 66 230 74 235 C70 243 47 245 39 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
-    <path d="M112 235 C122 230 139 230 147 236 C143 244 119 245 111 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+
+    </g>
   </g>
+<g transform="translate(630 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(-2 105 179)">
+      <path d="M 77.30042229489608 174.67435006398415 C 71.30042229489608 208.67435006398415 70.91029560642725 241.07204504478892 63.910295606427255 280.0720450447889 L 76.08970439357275 281.9279549552111 C 83.08970439357275 242.92795495521108 88.69957770510392 211.32564993601585 94.69957770510392 177.32564993601585 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="80" cy="210" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 57.328 276.776 C 66.832 270.968 56.272 271.496 51.52 281.2112 C 58.912 288.392 62.08 288.1808 54.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 64.72 284.5904 L 57.328 283.9568" class="sole"/>
+  <path d="M 68.416 275.9312 Q 59.968 274.4528 55.744 280.1552" class="shoeHi"/><path d="M 113.43046452438568 177.4582149296174 C 118.43046452438568 210.4582149296174 124.04033783591686 243.06051994881267 132.04033783591686 282.06051994881267 L 145.95966216408314 279.93948005118733 C 137.95966216408314 240.93948005118733 137.56953547561432 207.5417850703826 132.56953547561432 174.5417850703826 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="128" cy="209" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 126.328 276.776 C 135.832 270.968 152.728 271.496 157.48 281.2112 C 150.088 288.392 131.08 288.1808 123.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 133.72 284.5904 L 151.672 283.9568" class="sole"/>
+  <path d="M 140.584 275.9312 Q 149.032 274.4528 153.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 67.44906703957874 108.34478594528532 C 58.449067039578736 132.34478594528534 64.08680027968406 160.258589458964 73.08680027968406 184.258589458964 L 82.91319972031594 183.741410541036 C 73.91319972031594 159.741410541036 71.55093296042126 131.65521405471466 80.55093296042126 107.65521405471468 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="65" cy="132" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="78" cy="184" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 74.507712 186 Q 78 187.492288 82.074336 185" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 128.6302004195261 107.612115811554 C 137.6302004195261 131.612115811554 135.67736696965773 159.71986141945567 126.67736696965773 183.71986141945567 L 137.32263303034227 184.28013858054433 C 146.32263303034227 160.28013858054433 152.3697995804739 132.387884188446 143.3697995804739 108.387884188446 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="145" cy="132" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="132" cy="184" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 128.2848 186 Q 132 187.7152 136.3344 185" class="knuckle"/>
 
-  <g transform="translate(900 0)">
-    <ellipse cx="88" cy="239" rx="51" ry="10" fill="#000" opacity=".17"/>
-    <path class="edge" stroke-width="25" d="M68 158 C62 184 63 209 56 235"/>
-    <path class="edge" stroke-width="25" d="M106 158 C113 186 120 209 132 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M68 158 C62 184 63 209 56 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M106 158 C113 186 120 209 132 235"/>
-    <path class="edge" stroke-width="23" d="M60 106 C45 124 45 143 59 164"/>
-    <path class="edge" stroke-width="23" d="M118 105 C135 119 137 140 121 164"/>
-    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M60 106 C45 124 45 143 59 164"/>
-    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M118 105 C135 119 137 140 121 164"/>
-    <path d="M51 104 C61 85 78 80 91 82 C104 84 119 92 128 106 C124 128 121 147 117 163 C110 171 70 170 62 162 C58 145 55 126 51 104 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
-    <path d="M61 104 L89 156 L121 106" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
-    <rect x="61" y="154" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
-    <path d="M79 77 C87 72 98 72 105 79 L101 100 L82 99 Z" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="59" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="121" cy="164" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <path d="M41 235 C50 230 67 230 75 235 C71 243 48 245 40 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
-    <path d="M116 235 C126 230 143 230 151 236 C147 244 123 245 115 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+
+    </g>
   </g>
+<g transform="translate(840 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(4 105 179)">
+      <path d="M 75.70022679375315 173.07531801303682 C 64.70022679375315 207.07531801303682 58.1901587556272 241.95272260912577 41.1901587556272 278.9527226091258 L 52.8098412443728 283.0472773908742 C 69.80984124437279 246.04727739087423 81.29977320624685 212.92468198696318 92.29977320624685 178.92468198696318 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="73" cy="210" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 34.328 276.776 C 43.832 270.968 33.272 271.496 28.520000000000003 281.2112 C 35.912 288.392 39.08 288.1808 31.688000000000002 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 41.72 284.5904 L 34.328 283.9568" class="sole"/>
+  <path d="M 45.416 275.9312 Q 36.968 274.4528 32.744 280.1552" class="shoeHi"/><path d="M 116.87024947312847 179.2171501856595 C 126.87024947312847 213.2171501856595 139.36018143500252 246.33974558957055 156.36018143500252 283.33974558957055 L 169.63981856499748 278.66025441042945 C 152.63981856499748 241.66025441042945 145.12975052687153 206.7828498143405 135.12975052687153 172.7828498143405 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="136" cy="210" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 150.328 276.776 C 159.832 270.968 176.728 271.496 181.48 281.2112 C 174.088 288.392 155.08 288.1808 147.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 157.72 284.5904 L 175.672 283.9568" class="sole"/>
+  <path d="M 164.584 275.9312 Q 173.032 274.4528 177.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 66.56336436541827 107.73377659647572 C 49.563364365418266 126.73377659647572 44.1725232740637 150.0503324473568 56.1725232740637 169.0503324473568 L 65.8274767259363 170.9496675526432 C 53.8274767259363 151.9496675526432 62.436635634581734 129.26622340352426 79.43663563458173 110.26622340352428 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="56" cy="128" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="61" cy="170" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 57.507712 172 Q 61 173.492288 65.074336 171" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 133.13613933957097 113.80166906851892 C 148.13613933957097 111.80166906851892 159.93165618969016 116.9123165494859 171.93165618969016 127.9123165494859 L 176.06834381030984 118.0876834505141 C 164.06834381030984 107.0876834505141 153.86386066042903 98.19833093148108 138.86386066042903 100.19833093148108 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="151" cy="105" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="174" cy="123" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 170.2848 125 Q 174 126.7152 178.3344 124" class="knuckle"/>
 
-  <g transform="translate(1080 0)">
-    <ellipse cx="91" cy="239" rx="51" ry="10" fill="#000" opacity=".17"/>
-    <path class="edge" stroke-width="25" d="M71 157 C66 184 63 208 55 235"/>
-    <path class="edge" stroke-width="25" d="M109 157 C114 184 118 208 127 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M71 157 C66 184 63 208 55 235"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M109 157 C114 184 118 208 127 235"/>
-    <path class="edge" stroke-width="23" d="M62 104 C67 89 74 77 82 62"/>
-    <path class="edge" stroke-width="23" d="M119 104 C114 89 107 77 98 62"/>
-    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M62 104 C67 89 74 77 82 62"/>
-    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 104 C114 89 107 77 98 62"/>
-    <path d="M55 102 C64 86 78 79 91 79 C103 79 117 86 126 102 C122 124 120 145 117 162 C110 170 72 170 65 162 C62 145 59 124 55 102 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
-    <path d="M60 102 L92 155 L122 102" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
-    <rect x="63" y="153" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
-    <path d="M80 75 C87 70 97 70 103 75 L101 97 L82 97 Z" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="82" cy="62" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="98" cy="62" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <path d="M40 235 C49 230 66 230 74 235 C70 243 47 245 39 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
-    <path d="M112 235 C122 230 139 230 147 236 C143 244 119 245 111 240 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+
+    </g>
   </g>
+<g transform="translate(1050 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(8 105 179)">
+      <path d="M 73.9679499491886 172.40470140582727 C 58.967949949188586 207.40470140582727 49.37756496443201 241.4832909840791 29.37756496443201 278.4832909840791 L 40.62243503556799 283.5167090159209 C 60.62243503556799 246.5167090159209 75.0320500508114 214.59529859417273 90.0320500508114 179.59529859417273 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="67" cy="211" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 22.328000000000003 276.776 C 31.832 270.968 21.272 271.496 16.520000000000003 281.2112 C 23.912 288.392 27.080000000000002 288.1808 19.688000000000002 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 29.72 284.5904 L 22.328000000000003 283.9568" class="sole"/>
+  <path d="M 33.416 275.9312 Q 24.968 274.4528 20.744 280.1552" class="shoeHi"/><path d="M 118.49269878147608 180.61824923291297 C 134.49269878147607 214.61824923291297 150.8128718410735 247.3587267148458 177.8128718410735 284.35872671484583 L 190.1871281589265 277.64127328515417 C 163.1871281589265 240.6412732851542 151.50730121852393 205.38175076708703 135.50730121852393 171.38175076708703 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="143" cy="210" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 171.328 276.776 C 180.832 270.968 197.728 271.496 202.48 281.2112 C 195.088 288.392 176.08 288.1808 168.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 178.72 284.5904 L 196.672 283.9568" class="sole"/>
+  <path d="M 185.584 275.9312 Q 194.032 274.4528 198.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 66.44538416031618 109.73427233082363 C 50.44538416031617 136.73427233082361 53.08403812023713 163.8007042481177 65.08403812023712 183.8007042481177 L 74.91596187976288 184.1992957518823 C 62.91596187976287 164.1992957518823 63.55461583968383 137.26572766917639 79.55461583968382 110.26572766917637 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="57" cy="137" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="70" cy="184" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 66.507712 186 Q 70 187.492288 74.074336 185" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 136.62144690652738 113.35378839390742 C 164.62144690652738 109.35378839390742 188.44882276582533 106.3110693955998 207.44882276582533 105.3110693955998 L 206.55117723417467 94.6889306044002 C 187.55117723417467 95.6889306044002 163.37855309347262 94.64621160609258 135.37855309347262 98.64621160609258 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="164" cy="102" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="207" cy="100" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 203.2848 102 Q 207 103.7152 211.3344 101" class="knuckle"/>
 
-  <g transform="translate(1260 0)">
-    <ellipse cx="89" cy="242" rx="55" ry="10" fill="#000" opacity=".16"/>
-    <path class="edge" stroke-width="25" d="M69 176 C64 196 60 216 51 238"/>
-    <path class="edge" stroke-width="25" d="M108 176 C119 196 130 216 145 238"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M69 176 C64 196 60 216 51 238"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="18" d="M108 176 C119 196 130 216 145 238"/>
-    <path class="edge" stroke-width="23" d="M61 122 C51 147 54 166 68 183"/>
-    <path class="edge" stroke-width="23" d="M119 122 C132 146 133 166 120 184"/>
-    <path class="line" stroke="url(#p2Trim)" stroke-width="16" d="M61 122 C51 147 54 166 68 183"/>
-    <path class="line" stroke="#cc3a3f" stroke-width="16" d="M119 122 C132 146 133 166 120 184"/>
-    <path d="M55 119 C65 103 79 97 91 97 C103 97 117 103 126 119 C122 141 120 162 117 177 C110 185 72 185 65 177 C62 162 59 141 55 119 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
-    <path d="M60 119 L91 174 L122 119" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
-    <rect x="63" y="169" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
-    <path d="M80 93 C87 88 97 88 103 93 L101 115 L82 115 Z" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="68" cy="183" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="120" cy="184" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <path d="M35 238 C47 232 65 232 73 238 C69 246 42 248 34 243 Z" fill="url(#p2Trim)" class="shoeEdge"/>
-    <path d="M129 238 C141 232 159 232 167 239 C164 247 137 248 128 243 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+
+    </g>
   </g>
+<g transform="translate(1260 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(2 105 179)">
+      <path d="M 76.85642278049187 172.66501123391572 C 63.856422780491876 205.66501123391572 54.299495946344315 241.665507863741 36.299495946344315 278.665507863741 L 47.700504053655685 283.334492136259 C 65.70050405365569 246.334492136259 80.14357721950813 212.33498876608428 93.14357721950813 179.33498876608428 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="72" cy="209" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 29.328000000000003 276.776 C 38.832 270.968 28.272 271.496 23.520000000000003 281.2112 C 30.912 288.392 34.08 288.1808 26.688000000000002 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 36.72 284.5904 L 29.328000000000003 283.9568" class="sole"/>
+  <path d="M 40.416 275.9312 Q 31.968 274.4528 27.744 280.1552" class="shoeHi"/><path d="M 113.92572336694548 179.37044560656312 C 123.92572336694548 213.37044560656312 139.40052608505124 246.45123316840954 155.40052608505124 283.45123316840954 L 168.59947391494876 278.54876683159046 C 152.59947391494876 241.54876683159046 142.07427663305452 206.62955439343688 132.07427663305452 172.62955439343688 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="133" cy="210" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 149.328 276.776 C 158.832 270.968 175.728 271.496 180.48 281.2112 C 173.088 288.392 154.08 288.1808 146.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 156.72 284.5904 L 174.672 283.9568" class="sole"/>
+  <path d="M 163.584 275.9312 Q 172.032 274.4528 176.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 66.44930992131346 108.65062986247005 C 51.44930992131346 134.65062986247005 54.086982440985096 162.73797239685254 64.0869824409851 183.73797239685254 L 73.9130175590149 184.26202760314746 C 63.913017559014904 163.26202760314746 64.55069007868654 135.34937013752995 79.55069007868654 109.34937013752995 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="58" cy="135" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="69" cy="184" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 65.507712 186 Q 69 187.492288 73.074336 185" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 128.79287687969514 108.58801017905023 C 141.79287687969514 120.58801017905023 151.79485552422426 144.14689624042515 143.79485552422426 167.14689624042515 L 154.20514447577574 164.85310375957485 C 162.20514447577574 141.85310375957485 156.20712312030486 117.41198982094977 143.20712312030486 105.41198982094977 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="149" cy="119" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="149" cy="166" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 145.2848 168 Q 149 169.7152 153.3344 167" class="knuckle"/>
 
-  <g transform="translate(1440 0)">
-    <ellipse cx="92" cy="244" rx="62" ry="9" fill="#000" opacity=".16"/>
-    <path class="edge" stroke-width="23" d="M72 190 C58 203 45 219 31 237"/>
-    <path class="edge" stroke-width="23" d="M108 188 C127 198 143 214 160 233"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="17" d="M72 190 C58 203 45 219 31 237"/>
-    <path class="line" stroke="url(#p2Pants)" stroke-width="17" d="M108 188 C127 198 143 214 160 233"/>
-    <path class="edge" stroke-width="22" d="M62 150 C51 166 50 184 61 199"/>
-    <path class="edge" stroke-width="22" d="M119 150 C132 166 133 184 121 200"/>
-    <path class="line" stroke="url(#p2Trim)" stroke-width="15" d="M62 150 C51 166 50 184 61 199"/>
-    <path class="line" stroke="#cc3a3f" stroke-width="15" d="M119 150 C132 166 133 184 121 200"/>
-    <path d="M55 146 C66 130 81 127 94 131 C107 134 120 143 128 158 C124 176 122 192 118 202 C108 209 73 207 64 198 C61 185 58 166 55 146 Z" fill="url(#p2Jacket)" stroke="#21130f" stroke-width="4"/>
-    <path d="M61 146 L91 199 L122 158" fill="none" stroke="url(#p2Trim)" stroke-width="6" stroke-linecap="round"/>
-    <rect x="64" y="194" width="56" height="13" rx="6" fill="url(#p2Trim)" stroke="#21130f" stroke-width="3"/>
-    <path d="M83 127 C91 122 101 124 107 132 L102 150 L84 148 Z" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="61" cy="199" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <circle cx="121" cy="200" r="10" fill="url(#p2Skin)" class="skinEdge"/>
-    <path d="M18 237 C30 231 49 231 57 237 C53 245 27 247 18 242 Z" fill="url(#p2Trim)" class="shoeEdge"/>
-    <path d="M145 233 C157 227 175 229 183 235 C179 243 153 245 144 239 Z" fill="url(#p2Trim)" class="shoeEdge"/>
+
+    </g>
+  </g>
+<g transform="translate(1470 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(-4 105 179)">
+      <path d="M 75.67567567567568 173.14594594594595 C 63.67567567567568 206.14594594594595 58.17297297297297 242.00216216216216 42.17297297297297 279.00216216216216 L 53.82702702702703 282.99783783783784 C 69.82702702702703 245.99783783783784 80.32432432432432 211.85405405405405 92.32432432432432 178.85405405405405 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="72" cy="209" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 35.328 276.776 C 44.832 270.968 34.272 271.496 29.520000000000003 281.2112 C 36.912 288.392 40.08 288.1808 32.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 42.72 284.5904 L 35.328 283.9568" class="sole"/>
+  <path d="M 46.416 275.9312 Q 37.968 274.4528 33.744 280.1552" class="shoeHi"/><path d="M 126.3477448503517 185.3909794014068 C 141.34774485035172 208.3909794014068 147.70745080025577 190.82980320102314 153.70745080025577 175.82980320102314 L 150.29254919974423 162.17019679897686 C 144.29254919974423 177.17019679897686 136.65225514964828 189.6090205985932 121.6522551496483 166.6090205985932 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="139" cy="199" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 139.328 164.776 C 148.832 158.968 165.728 159.496 170.48 169.2112 C 163.088 176.392 144.08 176.1808 136.688 171.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 146.72 172.5904 L 164.672 171.9568" class="sole"/>
+  <path d="M 153.584 163.9312 Q 162.032 162.4528 166.256 168.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 67.46343031987612 108.44605341693865 C 52.46343031987613 125.44605341693865 53.0975727399071 147.58454006270398 64.0975727399071 167.58454006270398 L 73.9024272600929 168.41545993729602 C 62.9024272600929 148.41545993729602 65.53656968012388 126.55394658306135 80.53656968012388 109.55394658306135 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="59" cy="126" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="69" cy="168" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 65.507712 170 Q 69 171.492288 73.074336 169" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 128.62092952957104 107.88287189729478 C 140.62092952957104 127.88287189729478 139.6706713269124 150.91540748137956 129.6706713269124 170.91540748137956 L 140.3293286730876 171.08459251862044 C 150.3293286730876 151.08459251862044 155.37907047042896 128.1171281027052 143.37907047042896 108.11712810270522 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="148" cy="128" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="135" cy="171" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 131.2848 173 Q 135 174.7152 139.3344 172" class="knuckle"/>
+
+
+    </g>
+  </g>
+<g transform="translate(1680 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(-9 105 179)">
+      <path d="M 75.8838004578435 172.59892590614393 C 61.883800457843506 207.59892590614393 54.31866032049046 242.61924813430076 34.31866032049046 278.6192481343008 L 45.68133967950954 283.3807518656992 C 65.68133967950955 247.38075186569924 78.1161995421565 214.40107409385607 92.1161995421565 179.40107409385607 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="70" cy="211" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 27.328000000000003 276.776 C 36.832 270.968 26.272 271.496 21.520000000000003 281.2112 C 28.912 288.392 32.08 288.1808 24.688000000000002 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 34.72 284.5904 L 27.328000000000003 283.9568" class="sole"/>
+  <path d="M 38.416 275.9312 Q 29.968 274.4528 25.744 280.1552" class="shoeHi"/><path d="M 126.61778467983949 185.31931346022859 C 153.6177846798395 196.31931346022859 182.90384340351963 172.77768251652986 214.90384340351963 157.77768251652986 L 211.09615659648037 144.22231748347014 C 179.09615659648037 159.22231748347014 148.3822153201605 177.68068653977141 121.38221532016051 166.68068653977141 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="151" cy="187" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 200.328 146.776 C 209.832 140.968 226.728 141.496 231.48 151.2112 C 224.088 158.392 205.08 158.1808 197.688 153.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 207.72 154.5904 L 225.672 153.9568" class="sole"/>
+  <path d="M 214.584 145.9312 Q 223.032 144.4528 227.256 150.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 67.46343031987612 108.44605341693865 C 52.46343031987613 125.44605341693865 53.0975727399071 147.58454006270398 64.0975727399071 167.58454006270398 L 73.9024272600929 168.41545993729602 C 62.9024272600929 148.41545993729602 65.53656968012388 126.55394658306135 80.53656968012388 109.55394658306135 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="59" cy="126" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="69" cy="168" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 65.507712 170 Q 69 171.492288 73.074336 169" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 128.62092952957104 107.88287189729478 C 140.62092952957104 127.88287189729478 139.6706713269124 150.91540748137956 129.6706713269124 170.91540748137956 L 140.3293286730876 171.08459251862044 C 150.3293286730876 151.08459251862044 155.37907047042896 128.1171281027052 143.37907047042896 108.11712810270522 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="148" cy="128" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="135" cy="171" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 131.2848 173 Q 135 174.7152 139.3344 172" class="knuckle"/>
+
+      <path d="M 145 166 C 170 141 205 137 236 148" fill="none" stroke="url(#trim)" stroke-width="7" stroke-linecap="round" opacity=".45"/>
+    </g>
+  </g>
+<g transform="translate(1890 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(-3 105 179)">
+      <path d="M 75.67567567567568 173.14594594594595 C 64.67567567567568 208.14594594594595 58.17297297297297 243.00216216216216 42.17297297297297 279.00216216216216 L 53.82702702702703 282.99783783783784 C 69.82702702702703 246.99783783783784 81.32432432432432 213.85405405405405 92.32432432432432 178.85405405405405 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="73" cy="211" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 35.328 276.776 C 44.832 270.968 34.272 271.496 29.520000000000003 281.2112 C 36.912 288.392 40.08 288.1808 32.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 42.72 284.5904 L 35.328 283.9568" class="sole"/>
+  <path d="M 46.416 275.9312 Q 37.968 274.4528 33.744 280.1552" class="shoeHi"/><path d="M 114.84324324324325 179.13945945945946 C 125.84324324324325 206.13945945945946 140.34054054054053 237.28324324324325 153.34054054054053 283.28324324324325 L 166.65945945945947 278.71675675675675 C 153.65945945945947 232.71675675675675 144.15675675675675 199.86054054054054 133.15675675675675 172.86054054054054 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="135" cy="203" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 147.328 276.776 C 156.832 270.968 173.728 271.496 178.48 281.2112 C 171.088 288.392 152.08 288.1808 144.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 154.72 284.5904 L 172.672 283.9568" class="sole"/>
+  <path d="M 161.584 275.9312 Q 170.032 274.4528 174.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 67.44839277490628 107.66827305189399 C 54.448392774906274 135.66827305189398 56.08629458117971 163.7512047889205 65.08629458117971 186.7512047889205 L 74.91370541882029 187.2487952110795 C 65.91370541882029 164.2487952110795 67.55160722509372 136.33172694810602 80.55160722509372 108.33172694810601 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="61" cy="136" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="70" cy="187" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 66.507712 189 Q 70 190.492288 74.074336 188" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 128.62944187176956 108.37319281661927 C 143.62944187176956 134.37319281661925 145.67681912961135 164.26952814533612 134.67681912961135 187.26952814533612 L 145.32318087038865 186.73047185466388 C 156.32318087038865 163.73047185466388 158.37055812823044 133.62680718338075 143.37055812823044 107.62680718338073 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="151" cy="134" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="140" cy="187" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 136.2848 189 Q 140 190.7152 144.3344 188" class="knuckle"/>
+
+
+    </g>
+  </g>
+<g transform="translate(2100 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(-2 105 179)">
+      <path d="M 75.70022679375315 173.07531801303682 C 64.70022679375315 207.07531801303682 58.1901587556272 241.95272260912577 41.1901587556272 278.9527226091258 L 52.8098412443728 283.0472773908742 C 69.80984124437279 246.04727739087423 81.29977320624685 212.92468198696318 92.29977320624685 178.92468198696318 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="73" cy="210" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 34.328 276.776 C 43.832 270.968 33.272 271.496 28.520000000000003 281.2112 C 35.912 288.392 39.08 288.1808 31.688000000000002 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 41.72 284.5904 L 34.328 283.9568" class="sole"/>
+  <path d="M 45.416 275.9312 Q 36.968 274.4528 32.744 280.1552" class="shoeHi"/><path d="M 116.87024947312847 179.2171501856595 C 126.87024947312847 213.2171501856595 139.36018143500252 246.33974558957055 156.36018143500252 283.33974558957055 L 169.63981856499748 278.66025441042945 C 152.63981856499748 241.66025441042945 145.12975052687153 206.7828498143405 135.12975052687153 172.7828498143405 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="136" cy="210" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 150.328 276.776 C 159.832 270.968 176.728 271.496 181.48 281.2112 C 174.088 288.392 155.08 288.1808 147.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 157.72 284.5904 L 175.672 283.9568" class="sole"/>
+  <path d="M 164.584 275.9312 Q 173.032 274.4528 177.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 68.55235845371085 111.20893278992922 C 84.55235845371085 117.20893278992922 88.16426884028314 139.9066995924469 79.16426884028314 158.9066995924469 L 88.83573115971686 157.0933004075531 C 97.83573115971686 138.0933004075531 97.44764154628915 114.79106721007078 81.44764154628915 108.79106721007078 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="91" cy="116" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="84" cy="158" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 80.507712 160 Q 84 161.492288 88.074336 159" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 127.7464032604247 108.63995061132964 C 110.7464032604247 114.63995061132964 110.76129124364006 138.01774210818252 120.76129124364006 157.01774210818252 L 131.23870875635993 158.98225789181748 C 121.23870875635994 139.98225789181748 125.2535967395753 117.36004938867036 142.2535967395753 111.36004938867036 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="118" cy="116" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="126" cy="158" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 122.2848 160 Q 126 161.7152 130.3344 159" class="knuckle"/>
+
+
+    </g>
+  </g>
+<g transform="translate(2310 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(10 105 179)">
+      <path d="M 74.51757947593521 173.65723623621068 C 61.51757947593521 209.65723623621068 57.062305633154644 244.36006536534748 48.062305633154644 279.36006536534745 L 59.937694366845356 282.63993463465255 C 68.93769436684536 247.63993463465252 78.48242052406479 214.34276376378932 91.48242052406479 178.34276376378932 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="70" cy="212" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 41.328 276.776 C 50.832 270.968 40.272 271.496 35.52 281.2112 C 42.912 288.392 46.08 288.1808 38.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 48.72 284.5904 L 41.328 283.9568" class="sole"/>
+  <path d="M 52.416 275.9312 Q 43.968 274.4528 39.744 280.1552" class="shoeHi"/><path d="M 115.22814720484584 180.09353130440527 C 127.22814720484584 218.09353130440527 141.62047069443332 251.97711367593112 166.62047069443332 283.9771136759311 L 179.37952930556668 278.0228863240689 C 154.37952930556668 246.02288632406888 144.77185279515416 209.90646869559473 132.77185279515416 171.90646869559473 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="136" cy="214" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 160.328 276.776 C 169.832 270.968 186.728 271.496 191.48 281.2112 C 184.088 288.392 165.08 288.1808 157.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 167.72 284.5904 L 185.672 283.9568" class="sole"/>
+  <path d="M 174.584 275.9312 Q 183.032 274.4528 187.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 67.65243069307671 109.34411235471566 C 47.6524306930767 124.34411235471566 41.23932301980753 152.75808426603675 51.23932301980753 178.75808426603675 L 60.76067698019247 181.24191573396325 C 50.76067698019247 155.24191573396325 60.3475693069233 127.65588764528434 80.34756930692329 112.65588764528434 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="54" cy="126" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="56" cy="180" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 52.507712 182 Q 56 183.492288 60.074336 181" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 129.73904006346268 112.32017453391587 C 147.73904006346268 135.3201745339159 155.7559733791675 163.95345938560592 145.7559733791675 188.95345938560592 L 156.2440266208325 187.04654061439408 C 166.2440266208325 162.04654061439408 162.26095993653732 132.6798254660841 144.26095993653732 109.67982546608413 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="155" cy="134" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="151" cy="188" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 147.2848 190 Q 151 191.7152 155.3344 189" class="knuckle"/>
+
+
+    </g>
+  </g>
+<g transform="translate(2520 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(5 105 179)">
+      <path d="M 75.24029515097472 193.84946019703298 C 58.24029515097471 218.84946019703298 49.5682066056823 250.0946221379231 31.5682066056823 281.09462213792307 L 42.4317933943177 286.90537786207693 C 60.4317933943177 255.9053778620769 73.75970484902528 227.15053980296702 90.75970484902528 202.15053980296702 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="66" cy="223" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 24.328000000000003 279.776 C 33.832 273.968 23.272 274.496 18.520000000000003 284.2112 C 25.912 291.392 29.080000000000002 291.1808 21.688000000000002 286.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 31.72 287.5904 L 24.328000000000003 286.9568" class="sole"/>
+  <path d="M 35.416 278.9312 Q 26.968 277.4528 22.744 283.1552" class="shoeHi"/><path d="M 116.01786177156755 203.47611808694785 C 133.01786177156754 227.47611808694785 150.19480856114004 256.9826313359621 177.19480856114004 287.9826313359621 L 188.80519143885996 280.0173686640379 C 161.80519143885996 249.01736866403795 148.98213822843246 216.52388191305215 131.98213822843246 192.52388191305215 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="141" cy="222" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 170.328 279.776 C 179.832 273.968 196.728 274.496 201.48 284.2112 C 194.088 291.392 175.08 291.1808 167.688 286.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 177.72 287.5904 L 195.672 286.9568" class="sole"/>
+  <path d="M 184.584 278.9312 Q 193.032 277.4528 197.256 283.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 68.46320622368832 121.44870413934721 C 51.463206223688324 149.4487041393472 51.09740466776624 179.5865281045104 63.09740466776624 204.5865281045104 L 72.90259533223376 205.4134718954896 C 60.90259533223376 180.4134718954896 64.53679377631168 150.5512958606528 81.53679377631168 122.55129586065279 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="58" cy="150" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="68" cy="205" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 64.507712 207 Q 68 208.492288 72.074336 206" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 127.62214161350998 122.17777972015638 C 143.62214161350997 150.1777797201564 144.67154672086832 181.1283964645574 131.67154672086832 205.1283964645574 L 142.32845327913168 204.8716035354426 C 155.32845327913168 180.8716035354426 158.37785838649003 149.8222202798436 142.37785838649003 121.82222027984362 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="151" cy="150" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="137" cy="205" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 133.2848 207 Q 137 208.7152 141.3344 206" class="knuckle"/>
+
+
+    </g>
+  </g>
+<g transform="translate(2730 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(-5 105 179)">
+      <path d="M 73.9679499491886 172.40470140582727 C 58.967949949188586 207.40470140582727 49.37756496443201 241.4832909840791 29.37756496443201 278.4832909840791 L 40.62243503556799 283.5167090159209 C 60.62243503556799 246.5167090159209 75.0320500508114 214.59529859417273 90.0320500508114 179.59529859417273 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="67" cy="211" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 22.328000000000003 276.776 C 31.832 270.968 21.272 271.496 16.520000000000003 281.2112 C 23.912 288.392 27.080000000000002 288.1808 19.688000000000002 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 29.72 284.5904 L 22.328000000000003 283.9568" class="sole"/>
+  <path d="M 33.416 275.9312 Q 24.968 274.4528 20.744 280.1552" class="shoeHi"/><path d="M 118.49269878147608 180.61824923291297 C 134.49269878147607 214.61824923291297 150.8128718410735 247.3587267148458 177.8128718410735 284.35872671484583 L 190.1871281589265 277.64127328515417 C 163.1871281589265 240.6412732851542 151.50730121852393 205.38175076708703 135.50730121852393 171.38175076708703 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="143" cy="210" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 171.328 276.776 C 180.832 270.968 197.728 271.496 202.48 281.2112 C 195.088 288.392 176.08 288.1808 168.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 178.72 284.5904 L 196.672 283.9568" class="sole"/>
+  <path d="M 185.584 275.9312 Q 194.032 274.4528 198.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 80.08452394683756 107.45197233678529 C 97.08452394683756 79.45197233678529 106.56339296012817 57.83897925258896 105.56339296012817 39.83897925258896 L 96.43660703987183 36.16102074741104 C 97.43660703987183 54.16102074741104 84.91547605316244 74.54802766321471 67.91547605316244 102.54802766321471 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="91" cy="77" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="101" cy="38" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 97.507712 40 Q 101 41.492288 105.074336 39" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 138.6141957220603 111.90147670623915 C 164.6141957220603 98.90147670623915 184.8880302437102 88.98439984339495 203.8880302437102 84.98439984339495 L 200.1119697562898 75.01560015660505 C 181.1119697562898 79.01560015660505 159.3858042779397 85.09852329376085 133.3858042779397 98.09852329376085 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="162" cy="92" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="202" cy="80" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 198.2848 82 Q 202 83.7152 206.3344 81" class="knuckle"/>
+      <circle cx="202" cy="80" r="18" fill="none" stroke="url(#trim)" stroke-width="4" opacity=".54"/><circle cx="202" cy="80" r="8" fill="url(#trim)" opacity=".38"/>
+
+    </g>
+  </g>
+<g transform="translate(2940 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(-3 105 179)">
+      <path d="M 77.60485529126895 173.36152594868452 C 67.60485529126895 206.36152594868452 60.12339870388827 242.15306816407917 47.12339870388827 279.1530681640792 L 58.87660129611173 282.8469318359208 C 71.87660129611173 245.84693183592083 84.39514470873105 211.63847405131548 94.39514470873105 178.63847405131548 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="76" cy="209" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 40.328 276.776 C 49.832 270.968 39.272 271.496 34.52 281.2112 C 41.912 288.392 45.08 288.1808 37.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 47.72 284.5904 L 40.328 283.9568" class="sole"/>
+  <path d="M 51.416 275.9312 Q 42.968 274.4528 38.744 280.1552" class="shoeHi"/><path d="M 114.64684578465993 178.494174457424 C 122.64684578465993 212.494174457424 132.19770602520722 245.81394505994473 145.19770602520722 282.81394505994473 L 158.80229397479278 279.18605494005527 C 145.80229397479278 242.18605494005527 141.35315421534006 207.505825542576 133.35315421534006 173.505825542576 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="132" cy="210" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 139.328 276.776 C 148.832 270.968 165.728 271.496 170.48 281.2112 C 163.088 288.392 144.08 288.1808 136.688 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 146.72 284.5904 L 164.672 283.9568" class="sole"/>
+  <path d="M 153.584 275.9312 Q 162.032 274.4528 166.256 280.1552" class="shoeHi"/>
+      <path d="M 75 166 Q 105 176 135 166 L 129 191 Q 105 199 81 191 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 80.52299635562065 106.69578627793287 C 73.52299635562065 77.69578627793287 74.89224726671549 51.521839708449654 86.89224726671549 31.52183970844965 L 77.10775273328451 30.47816029155035 C 65.10775273328451 50.478160291550346 60.477003644379344 76.30421372206713 67.47700364437935 105.30421372206713 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="67" cy="77" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="82" cy="31" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 78.507712 33 Q 82 34.492288 86.074336 32" class="knuckle"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 100
+    C 74 87 80 134 77 179
+    C 96 188 114 188 133 179
+    C 130 134 136 87 137 100
+    Q 105 76 73 100 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 105 L 101 158 L 119 110" class="trimLine"/>
+  <path d="M 92.4 109 C 99.24 140 99.6 165 101.76 177" class="fold"/>
+  <path d="M 114.9 113 C 107.16 141 110.04 150 108.6 173" class="darkFold"/>
+      <path d="M 72 166 Q 105 176 138 166 L 136 181 Q 105 191 74 181 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 165 L 105 174 L 112 165 L 111 185 L 105 190 L 99 185 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 65 C 96.6 76 98.56 87 105 90 C 111.44 87 113.4 76 112.28 65 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="90" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 133 C 98.7 141 111.3 141 130 133" class="waistShape"/>
+       <path d="M 85 105 C 102 140 123 150 124 174" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 143.36952633852235 105.60695859527881 C 153.36952633852235 76.60695859527881 150.3224356889328 50.71613676325692 137.3224356889328 30.716136763256916 L 126.67756431106719 31.283863236743084 C 139.6775643110672 51.28386323674308 138.63047366147765 77.39304140472119 128.63047366147765 106.39304140472119 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="146" cy="77" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="132" cy="31" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 128.2848 33 Q 132 34.7152 136.3344 32" class="knuckle"/>
+
+
+    </g>
+  </g>
+<g transform="translate(3150 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="74" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(16 105 210)">
+      <path d="M 76.17298201114437 200.44735870239742 C 56.17298201114437 218.44735870239742 38.22108740780106 243.1131510916782 17.22108740780106 277.1131510916782 L 26.77891259219894 284.8868489083218 C 47.77891259219894 250.8868489083218 69.82701798885563 229.55264129760258 89.82701798885563 211.55264129760258 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="63" cy="224" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 9.328000000000001 276.776 C 18.832 270.968 8.272 271.496 3.520000000000003 281.2112 C 10.912 288.392 14.080000000000002 288.1808 6.688000000000002 283.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 16.72 284.5904 L 9.328000000000001 283.9568" class="sole"/>
+  <path d="M 20.416 275.9312 Q 11.968 274.4528 7.744 280.1552" class="shoeHi"/><path d="M 116.91357394307171 210.59431313630827 C 139.91357394307173 225.59431313630827 164.84623559496126 246.7958640991333 185.84623559496126 280.79586409913327 L 196.15376440503874 271.20413590086673 C 175.15376440503874 237.2041359008667 154.08642605692827 212.40568686369173 131.08642605692827 197.40568686369173 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="147" cy="219" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 178.328 271.776 C 187.832 265.968 204.728 266.496 209.48 276.2112 C 202.088 283.392 183.08 283.1808 175.688 278.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 185.72 279.5904 L 203.672 278.9568" class="sole"/>
+  <path d="M 192.584 270.9312 Q 201.032 269.4528 205.256 275.1552" class="shoeHi"/>
+      <path d="M 75 192 Q 105 202 135 192 L 129 217 Q 105 225 81 217 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 68.44719517613386 175.69283727388128 C 54.44719517613386 196.69283727388128 53.0853963821004 221.76962795541095 67.0853963821004 239.76962795541095 L 76.9146036178996 240.23037204458905 C 62.9146036178996 222.23037204458905 67.55280482386614 197.30716272611872 81.55280482386614 176.30716272611872 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="61" cy="197" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="72" cy="240" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 68.507712 242 Q 72 243.492288 76.074336 241" class="knuckle"/>
+      <path d="M 73 172
+    C 74 159 80 165 77 210
+    C 96 219 114 219 133 210
+    C 130 165 136 159 137 172
+    Q 105 148 73 172 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 172
+    C 74 159 80 165 77 210
+    C 96 219 114 219 133 210
+    C 130 165 136 159 137 172
+    Q 105 148 73 172 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 177 L 101 189 L 119 182" class="trimLine"/>
+  <path d="M 92.4 181 C 99.24 212 99.6 196 101.76 208" class="fold"/>
+  <path d="M 114.9 185 C 107.16 213 110.04 181 108.6 204" class="darkFold"/>
+      <path d="M 72 197 Q 105 207 138 197 L 136 212 Q 105 222 74 212 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 196 L 105 205 L 112 196 L 111 216 L 105 221 L 99 216 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 137 C 96.6 148 98.56 159 105 162 C 111.44 159 113.4 148 112.28 137 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="162" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 164 C 98.7 172 111.3 172 130 164" class="waistShape"/>
+       <path d="M 85 177 C 102 212 123 181 124 205" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 127.63437197079628 176.46035175182524 C 143.63437197079628 197.46035175182524 148.6803797566862 222.3324762652071 133.6803797566862 240.3324762652071 L 144.3196202433138 239.6675237347929 C 159.3196202433138 221.6675237347929 158.36562802920372 196.53964824817476 142.36562802920372 175.53964824817476 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="151" cy="197" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="139" cy="240" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 135.2848 242 Q 139 243.7152 143.3344 241" class="knuckle"/>
+
+
+    </g>
+  </g>
+<g transform="translate(3360 0)">
+    <rect x="0" y="0" width="210" height="300" fill="none"/>
+    <ellipse cx="105" cy="288" rx="54" ry="10" fill="#000" opacity=".16"/>
+    <g transform="rotate(13 105 190)">
+      <path d="M 76.41908489520127 186.53125004348706 C 57.419084895201266 212.53125004348706 45.69335942664088 247.87187503044095 22.693359426640885 282.87187503044095 L 33.30664057335912 289.12812496955905 C 56.30664057335912 254.12812496955905 72.58091510479873 221.46874995651294 91.58091510479873 195.46874995651294 Z" fill="url(#pantsDark)" class="limbEdge"/>
+    <ellipse cx="65" cy="217" rx="6.16" ry="4.4" fill="url(#pantsDark)" class="limbEdge"/>
+    <path d="M 15.328000000000001 281.776 C 24.832 275.968 14.272 276.496 9.520000000000003 286.2112 C 16.912 293.392 20.080000000000002 293.1808 12.688000000000002 288.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 22.72 289.5904 L 15.328000000000001 288.9568" class="sole"/>
+  <path d="M 26.416 280.9312 Q 17.968 279.4528 13.744 285.1552" class="shoeHi"/><path d="M 119.07231331672706 200.2266489412238 C 148.07231331672708 216.2266489412238 185.87077332125605 224.71029013907184 223.87077332125605 230.71029013907184 L 228.12922667874395 217.28970986092816 C 190.12922667874395 211.28970986092816 153.92768668327292 197.7733510587762 124.92768668327294 181.7733510587762 Z" fill="url(#pants)" class="limbEdge"/>
+    <ellipse cx="151" cy="207" rx="6.16" ry="4.4" fill="url(#pants)" class="limbEdge"/>
+    <path d="M 213.328 219.776 C 222.832 213.968 239.728 214.496 244.48 224.2112 C 237.088 231.392 218.08 231.1808 210.688 226.112 Z" fill="url(#shoe)" class="shoeEdge"/>
+  <path d="M 220.72 227.5904 L 238.672 226.9568" class="sole"/>
+  <path d="M 227.584 218.9312 Q 236.032 217.4528 240.256 223.1552" class="shoeHi"/>
+      <path d="M 75 178 Q 105 188 135 178 L 129 203 Q 105 211 81 203 Z" fill="url(#pants)" class="limbEdge"/>
+      <path d="M 66.45766197809539 138.5189457336835 C 49.457661978095395 159.5189457336835 49.09324648357155 185.63920930026262 63.09324648357155 206.63920930026262 L 72.90675351642845 207.36079069973738 C 58.90675351642845 186.36079069973738 62.542338021904605 160.4810542663165 79.54233802190461 139.4810542663165 Z" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="56" cy="160" rx="4.92" ry="3.9359999999999995" fill="url(#sleeveDark)" class="limbEdge"/>
+    <ellipse cx="68" cy="207" rx="7.2756" ry="5.965991999999999" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 64.507712 209 Q 68 210.492288 72.074336 208" class="knuckle"/>
+      <path d="M 73 144
+    C 74 131 80 145 77 190
+    C 96 199 114 199 133 190
+    C 130 145 136 131 137 144
+    Q 105 120 73 144 Z" fill="url(#jacket)" class="bodyEdge"/>
+      <path d="M 73 144
+    C 74 131 80 145 77 190
+    C 96 199 114 199 133 190
+    C 130 145 136 131 137 144
+    Q 105 120 73 144 Z" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="M 84 149 L 101 169 L 119 154" class="trimLine"/>
+  <path d="M 92.4 153 C 99.24 184 99.6 176 101.76 188" class="fold"/>
+  <path d="M 114.9 157 C 107.16 185 110.04 161 108.6 184" class="darkFold"/>
+      <path d="M 72 177 Q 105 187 138 177 L 136 192 Q 105 202 74 192 Z" fill="url(#trim)" class="beltEdge"/>
+  <path d="M 98 176 L 105 185 L 112 176 L 111 196 L 105 201 L 99 196 Z" fill="url(#jacketDark)" opacity=".72"/>
+      <path d="M 97.72 109 C 96.6 120 98.56 131 105 134 C 111.44 131 113.4 120 112.28 109 Z" fill="url(#skin)" class="skinEdge"/>
+  <ellipse cx="105" cy="134" rx="10.92" ry="6" fill="#21130f" opacity=".22"/>
+      <path d="M 80 144 C 98.7 152 111.3 152 130 144" class="waistShape"/>
+       <path d="M 85 149 C 102 184 123 161 124 185" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>
+      <path d="M 128.6985295810074 140.07374564985184 C 145.6985295810074 161.07374564985184 152.72671580850533 185.77548296933745 140.72671580850533 207.77548296933745 L 151.27328419149467 206.22451703066255 C 163.27328419149467 184.22451703066255 160.3014704189926 158.92625435014816 143.3014704189926 137.92625435014816 Z" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="153" cy="160" rx="4.92" ry="3.9359999999999995" fill="url(#trim)" class="limbEdge"/>
+    <ellipse cx="146" cy="207" rx="7.74" ry="6.3468" fill="url(#skin)" class="skinEdge"/>
+  <path d="M 142.2848 209 Q 146 210.7152 150.3344 208" class="knuckle"/>
+
+
+    </g>
   </g>
 </svg>
