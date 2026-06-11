@@ -15,6 +15,9 @@ const helpButton = document.querySelector("#help");
 const overlayCopy = document.querySelector("#overlay-copy");
 const fighterSelect = document.querySelector("#fighter-select");
 const mobileControls = document.querySelector("#mobile-controls");
+const mobileStick = document.querySelector("#mobile-stick");
+const mobileStickBase = document.querySelector(".mobile-stick-base");
+const mobileStickKnob = document.querySelector("#mobile-stick-knob");
 
 const W = canvas.width;
 const H = canvas.height;
@@ -22,6 +25,7 @@ const FLOOR = 424;
 const GRAVITY = 0.72;
 const keys = new Set();
 let lastControlTap = 0;
+let stickPointerId = null;
 const touchInput = {
   left: false,
   right: false,
@@ -3109,6 +3113,57 @@ function setTouchControl(button, pressed) {
   else if (action === "kick" && touchInput.block) startAttack(player, "sweep");
   else if (action === "punch") startAttack(player, player.grounded ? "punch" : "airPunch");
   else if (action === "kick") startAttack(player, player.grounded ? "kick" : "airKick");
+}
+
+function setStickState(x = 0, y = 0) {
+  const deadZone = 0.26;
+  touchInput.left = x < -deadZone;
+  touchInput.right = x > deadZone;
+  touchInput.jump = y < -0.42;
+  touchInput.block = y > 0.42;
+  if (mobileStickKnob) {
+    mobileStickKnob.style.transform = `translate(calc(-50% + ${Math.round(x * 34)}px), calc(-50% + ${Math.round(y * 34)}px))`;
+  }
+}
+
+function updateStickFromEvent(event) {
+  if (!mobileStickBase) return;
+  const rect = mobileStickBase.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const radius = Math.min(rect.width, rect.height) * 0.34;
+  const dx = event.clientX - centerX;
+  const dy = event.clientY - centerY;
+  const distance = Math.hypot(dx, dy);
+  const scale = distance > radius ? radius / distance : 1;
+  setStickState((dx * scale) / radius, (dy * scale) / radius);
+}
+
+if (mobileStick) {
+  mobileStick.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    ensureAudio();
+    stickPointerId = event.pointerId;
+    mobileStick.setPointerCapture(event.pointerId);
+    updateStickFromEvent(event);
+  });
+  mobileStick.addEventListener("pointermove", (event) => {
+    if (event.pointerId !== stickPointerId) return;
+    event.preventDefault();
+    updateStickFromEvent(event);
+  });
+  const releaseStick = (event) => {
+    if (event.pointerId !== stickPointerId) return;
+    event.preventDefault();
+    stickPointerId = null;
+    setStickState();
+  };
+  mobileStick.addEventListener("pointerup", releaseStick);
+  mobileStick.addEventListener("pointercancel", releaseStick);
+  mobileStick.addEventListener("lostpointercapture", () => {
+    stickPointerId = null;
+    setStickState();
+  });
 }
 
 document.querySelectorAll("[data-touch]").forEach((button) => {

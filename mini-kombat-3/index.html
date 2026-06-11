@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
     <title>Mini Kombat III</title>
-    <link rel="stylesheet" href="styles.css?v=3" />
+    <link rel="stylesheet" href="styles.css?v=4" />
   </head>
   <body>
     <main class="game-shell">
@@ -37,11 +37,11 @@
         </div>
       </div>
       <div id="mobile-controls" class="mobile-controls" aria-label="Controles tactiles">
-        <div class="mobile-pad" aria-label="Movimiento">
-          <button type="button" data-touch="left" aria-label="Mover izquierda">‹</button>
-          <button type="button" data-touch="jump" aria-label="Saltar">↑</button>
-          <button type="button" data-touch="right" aria-label="Mover derecha">›</button>
-          <button type="button" data-touch="block" aria-label="Bloquear">↓</button>
+        <div id="mobile-stick" class="mobile-stick" aria-label="Joystick de movimiento" role="application">
+          <div class="mobile-stick-base">
+            <div id="mobile-stick-knob" class="mobile-stick-knob"></div>
+          </div>
+          <span>mover / saltar / bloquear</span>
         </div>
         <div class="mobile-actions" aria-label="Ataques">
           <button type="button" data-touch="punch" aria-label="Golpe">GOLPE</button>
@@ -51,6 +51,6 @@
         </div>
       </div>
     </main>
-    <script src="game.js?v=3"></script>
+    <script src="game.js?v=4"></script>
   </body>
 </html>
