@@ -52,7 +52,8 @@ También puede abrirse directamente desde `index.html` en un navegador.
 - Efectos de golpe con doble trazo, color por personaje y lineas de velocidad reforzadas.
 - Motor optimizado con pasos fijos, cache del escenario y colores precalculados para mejorar fluidez.
 - Controles tactiles para telefono en horizontal.
-- Selector compacto para iPhone 11 horizontal, con `LUCHAR` siempre visible.
+- Selector ultracompacto para iPhone 11 horizontal, con `LUCHAR` siempre visible aun con la barra de Safari.
+- Bloqueo de gestos/doble toque en controles tactiles para evitar zoom accidental durante la pelea.
 - Entrada Online preparada para salas con codigo usando Firebase Realtime Database.
 
 ## Controles

@@ -14,12 +14,14 @@ const soundButton = document.querySelector("#sound");
 const helpButton = document.querySelector("#help");
 const overlayCopy = document.querySelector("#overlay-copy");
 const fighterSelect = document.querySelector("#fighter-select");
+const mobileControls = document.querySelector("#mobile-controls");
 
 const W = canvas.width;
 const H = canvas.height;
 const FLOOR = 424;
 const GRAVITY = 0.72;
 const keys = new Set();
+let lastControlTap = 0;
 const touchInput = {
   left: false,
   right: false,
@@ -3123,6 +3125,27 @@ document.querySelectorAll("[data-touch]").forEach((button) => {
   button.addEventListener("pointercancel", () => setTouchControl(button, false));
   button.addEventListener("lostpointercapture", () => setTouchControl(button, false));
 });
+
+function preventZoomGesture(event) {
+  if (event.cancelable) event.preventDefault();
+}
+
+["gesturestart", "gesturechange", "gestureend"].forEach((eventName) => {
+  document.addEventListener(eventName, preventZoomGesture, { passive: false });
+});
+
+document.addEventListener("dblclick", (event) => {
+  if (event.target.closest("#mobile-controls")) event.preventDefault();
+}, { passive: false });
+
+if (mobileControls) {
+  mobileControls.addEventListener("touchstart", preventZoomGesture, { passive: false });
+  mobileControls.addEventListener("touchend", (event) => {
+    const now = Date.now();
+    if (now - lastControlTap < 450 && event.cancelable) event.preventDefault();
+    lastControlTap = now;
+  }, { passive: false });
+}
 
 setCpuMode(cpuEnabled);
 setTournamentMode(tournamentMode);
