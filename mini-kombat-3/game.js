@@ -2937,17 +2937,15 @@ function drawPchanHeadBandana(x, y, headW, headH) {
   const yellow = "#f7dc63";
   const shadow = "#b77d19";
   const mark = "#151515";
-  const bandLeft = x + headW * 0.46;
-  const bandRight = x + headW * 0.86;
-  const bandTop = y + headH * 0.18;
-  const knotX = x + headW * 0.84;
+  const bandLeft = x + headW * 0.26;
+  const bandRight = x + headW * 0.76;
+  const bandTop = y + headH * 0.2;
+  const knotX = x + headW * 0.72;
   const knotY = y + headH * 0.28;
 
   ctx.fillStyle = "rgba(0,0,0,0.26)";
   ctx.beginPath();
-  ctx.moveTo(knotX + 4, knotY + 4);
-  ctx.quadraticCurveTo(knotX + 20, knotY + 3, knotX + 29, knotY + 14);
-  ctx.quadraticCurveTo(knotX + 15, knotY + 19, knotX + 4, knotY + 12);
+  ctx.ellipse(knotX + 7, knotY + 5, 12, 8, -0.12, 0, Math.PI * 2);
   ctx.closePath();
   ctx.fill();
 
@@ -2955,41 +2953,41 @@ function drawPchanHeadBandana(x, y, headW, headH) {
   ctx.strokeStyle = shadow;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(bandLeft, bandTop + 10);
-  ctx.quadraticCurveTo(x + headW * 0.64, bandTop + 2, bandRight, bandTop + 7);
-  ctx.lineTo(bandRight - 3, bandTop + 20);
-  ctx.quadraticCurveTo(x + headW * 0.63, bandTop + 15, bandLeft - 3, bandTop + 22);
+  ctx.moveTo(bandLeft, bandTop + 8);
+  ctx.quadraticCurveTo(x + headW * 0.5, bandTop + 1, bandRight, bandTop + 7);
+  ctx.lineTo(bandRight - 2, bandTop + 19);
+  ctx.quadraticCurveTo(x + headW * 0.5, bandTop + 14, bandLeft - 2, bandTop + 20);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.ellipse(knotX, knotY, 6.5, 8.5, -0.35, 0, Math.PI * 2);
+  ctx.ellipse(knotX, knotY, 6.8, 7.8, -0.35, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.moveTo(knotX + 5, knotY - 2);
-  ctx.quadraticCurveTo(knotX + 24, knotY - 6, knotX + 35, knotY + 5);
-  ctx.quadraticCurveTo(knotX + 25, knotY + 13, knotX + 7, knotY + 8);
+  ctx.moveTo(knotX + 4, knotY - 2);
+  ctx.quadraticCurveTo(knotX + 16, knotY - 4, knotX + 25, knotY + 4);
+  ctx.quadraticCurveTo(knotX + 16, knotY + 10, knotX + 5, knotY + 7);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.moveTo(knotX + 2, knotY + 6);
-  ctx.quadraticCurveTo(knotX + 18, knotY + 16, knotX + 24, knotY + 31);
-  ctx.quadraticCurveTo(knotX + 10, knotY + 28, knotX - 3, knotY + 12);
+  ctx.moveTo(knotX + 1, knotY + 5);
+  ctx.quadraticCurveTo(knotX + 12, knotY + 13, knotX + 15, knotY + 24);
+  ctx.quadraticCurveTo(knotX + 5, knotY + 22, knotX - 3, knotY + 10);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
   ctx.fillStyle = mark;
   for (const spot of [
-    [bandLeft + headW * 0.1, bandTop + 9, 4, 8, -0.42],
-    [bandLeft + headW * 0.27, bandTop + 11, 3.6, 8, 0.25],
-    [knotX + 16, knotY + 3, 3.8, 8, 0.72],
-    [knotX + 12, knotY + 19, 3.5, 7.5, -0.2],
+    [bandLeft + headW * 0.13, bandTop + 8, 3.6, 7.4, -0.42],
+    [bandLeft + headW * 0.34, bandTop + 10, 3.4, 7.2, 0.22],
+    [knotX + 12, knotY + 3, 3.4, 7.2, 0.72],
+    [knotX + 7, knotY + 15, 3.2, 6.8, -0.2],
   ]) {
     ctx.save();
     ctx.translate(spot[0], spot[1]);
