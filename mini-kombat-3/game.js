@@ -23,6 +23,12 @@ const W = canvas.width;
 const H = canvas.height;
 const FLOOR = 424;
 const GRAVITY = 0.72;
+const FIGHTER_SCALE = 0.9;
+const FIGHTER_START_LEFT_X = 190;
+const FIGHTER_START_RIGHT_X = W - FIGHTER_START_LEFT_X;
+const FIGHTER_EDGE_PAD = Math.round(64 * FIGHTER_SCALE);
+const FIGHTER_BODY_W = Math.round(62 * FIGHTER_SCALE);
+const FIGHTER_BODY_H = Math.round(146 * FIGHTER_SCALE);
 const keys = new Set();
 let lastControlTap = 0;
 let stickPointerId = null;
@@ -366,6 +372,10 @@ const fighterProfiles = {
 
 let fighters = buildFighters();
 
+function fighterScale(value) {
+  return value * FIGHTER_SCALE;
+}
+
 function loadImage(src, fallback) {
   const image = new Image();
   image.onload = () => {
@@ -382,8 +392,8 @@ function loadImage(src, fallback) {
 function buildFighters() {
   cpuFighterId = "left";
   return [
-    makeFighter({ ...fighterProfiles[selectedLeftId], id: "left", profileId: selectedLeftId, x: 214, dir: 1, controls: leftControls }),
-    makeFighter({ ...fighterProfiles[selectedRightId], id: "right", profileId: selectedRightId, x: 746, dir: -1, controls: rightControls }),
+    makeFighter({ ...fighterProfiles[selectedLeftId], id: "left", profileId: selectedLeftId, x: FIGHTER_START_LEFT_X, dir: 1, controls: leftControls }),
+    makeFighter({ ...fighterProfiles[selectedRightId], id: "right", profileId: selectedRightId, x: FIGHTER_START_RIGHT_X, dir: -1, controls: rightControls }),
   ];
 }
 
@@ -396,8 +406,8 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     y: FLOOR,
     vx: 0,
     vy: 0,
-    w: 62,
-    h: 146,
+    w: FIGHTER_BODY_W,
+    h: FIGHTER_BODY_H,
     dir,
     color,
     trim,
@@ -554,7 +564,7 @@ function resetGame() {
 
 function resetRound() {
   Object.assign(fighters[0], {
-    x: 214,
+    x: FIGHTER_START_LEFT_X,
     y: FLOOR,
     vx: 0,
     vy: 0,
@@ -574,7 +584,7 @@ function resetRound() {
   });
 
   Object.assign(fighters[1], {
-    x: 746,
+    x: FIGHTER_START_RIGHT_X,
     y: FLOOR,
     vx: 0,
     vy: 0,
@@ -728,8 +738,8 @@ function updateAI(f, opponent) {
   const ai = f.ai;
   const difficulty = difficultyLevels[cpuDifficulty];
   const distance = Math.abs(opponent.x - f.x);
-  const close = distance < 95;
-  const mid = distance < 210;
+  const close = distance < fighterScale(95);
+  const mid = distance < fighterScale(210);
   ai.think -= 1;
 
   if (ai.think <= 0) {
@@ -745,7 +755,7 @@ function updateAI(f, opponent) {
 
     if (f.hurt > 0) return;
 
-    if (opponent.attack && distance < 140 && Math.random() < difficulty.block) {
+    if (opponent.attack && distance < fighterScale(140) && Math.random() < difficulty.block) {
       ai.block = true;
       if (Math.random() < 0.3) ai.jump = true;
       return;
@@ -822,8 +832,8 @@ function startSpecial(f) {
   };
   if (f.profileId === "p1") {
     f.pigMorph = 72;
-    coldWaterSplash(f.x, f.y - 118, f.dir);
-    addText(f.x, f.y - 166, "P-CHAN", "#ffe66a");
+    coldWaterSplash(f.x, f.y - fighterScale(118), f.dir);
+    addText(f.x, f.y - fighterScale(166), "P-CHAN", "#ffe66a");
   }
   playSound("special");
 }
@@ -833,17 +843,17 @@ function throwSpecial(f) {
   projectiles.push({
     owner: f.id,
     style,
-    x: f.x + f.dir * 48,
-    y: f.y - 116,
+    x: f.x + f.dir * fighterScale(48),
+    y: f.y - fighterScale(116),
     vx: f.dir * 7.4,
     life: 92,
-    r: 16,
+    r: fighterScale(16),
     damage: 12,
     color: style.rim,
     trail: [],
   });
-  burst(f.x + f.dir * 40, f.y - 116, style.rim, 12);
-  impactGlints(f.x + f.dir * 44, f.y - 118, style.core, false, true);
+  burst(f.x + f.dir * fighterScale(40), f.y - fighterScale(116), style.rim, 12);
+  impactGlints(f.x + f.dir * fighterScale(44), f.y - fighterScale(118), style.core, false, true);
 }
 
 function update() {
@@ -955,7 +965,7 @@ function updateFighter(f, opponent) {
     f.grounded = true;
   }
 
-  f.x = clamp(f.x, 64, W - 64);
+  f.x = clamp(f.x, FIGHTER_EDGE_PAD, W - FIGHTER_EDGE_PAD);
   if (f.cooldown > 0) f.cooldown -= 1;
   if (f.specialCooldown > 0) f.specialCooldown -= 1;
   if (f.healthLag > f.health) f.healthLag += (f.health - f.healthLag) * 0.055;
@@ -1002,7 +1012,7 @@ function updateProjectiles() {
 
 function keepApart(a, b) {
   const overlap = a.w - Math.abs(a.x - b.x);
-  if (overlap > 0 && Math.abs(a.y - b.y) < 120) {
+  if (overlap > 0 && Math.abs(a.y - b.y) < fighterScale(120)) {
     const push = overlap / 2;
     if (a.x < b.x) {
       a.x -= push;
@@ -1011,13 +1021,13 @@ function keepApart(a, b) {
       a.x += push;
       b.x -= push;
     }
-    a.x = clamp(a.x, 64, W - 64);
-    b.x = clamp(b.x, 64, W - 64);
+    a.x = clamp(a.x, FIGHTER_EDGE_PAD, W - FIGHTER_EDGE_PAD);
+    b.x = clamp(b.x, FIGHTER_EDGE_PAD, W - FIGHTER_EDGE_PAD);
   }
 }
 
 function bodyBox(f) {
-  const crouch = f.blocking ? 16 : 0;
+  const crouch = f.blocking ? fighterScale(16) : 0;
   return {
     x: f.x - f.w / 2,
     y: f.y - f.h + crouch,
@@ -1029,12 +1039,13 @@ function bodyBox(f) {
 function attackBox(f) {
   if (!f.attack || f.attack.type === "special") return null;
   const yOffset =
-    f.attack.type === "sweep" ? 34 : f.attack.type === "kick" || f.attack.type === "airKick" ? 77 : 112;
+    f.attack.type === "sweep" ? fighterScale(34) : f.attack.type === "kick" || f.attack.type === "airKick" ? fighterScale(77) : fighterScale(112);
+  const reach = fighterScale(f.attack.reach);
   return {
-    x: f.dir > 0 ? f.x + 21 : f.x - 21 - f.attack.reach,
+    x: f.dir > 0 ? f.x + fighterScale(21) : f.x - fighterScale(21) - reach,
     y: f.y - yOffset,
-    w: f.attack.reach,
-    h: f.attack.height,
+    w: reach,
+    h: fighterScale(f.attack.height),
   };
 }
 
@@ -1230,7 +1241,7 @@ function applyCamera() {
   const center = (a.x + b.x) / 2;
   const mobileView = isMobileFightView();
   const close = 1 - clamp(distance / (mobileView ? 540 : 620), 0, 1);
-  const targetZoom = 1 + close * (mobileView ? 0.032 : 0.075);
+  const targetZoom = 1 + close * (mobileView ? 0.022 : 0.052);
   const targetPan = clamp((W / 2 - center) * (mobileView ? 0.052 : 0.09), mobileView ? -20 : -34, mobileView ? 20 : 34);
   const targetLift = mobileView ? 13 : 8;
   const ease = mobileView ? 0.2 : 0.13;
@@ -1476,7 +1487,7 @@ function drawFloorReflections() {
     reflection.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = reflection;
     ctx.beginPath();
-    ctx.ellipse(f.x, FLOOR + 44, 62, 28, 0, 0, Math.PI * 2);
+    ctx.ellipse(f.x, FLOOR + 44, 62 * FIGHTER_SCALE, 28 * FIGHTER_SCALE, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -1500,8 +1511,8 @@ function drawDynamicFighterShadow(f) {
   const air = lift / 170;
   const attack = f.attack ? attackProgress(f.attack) : 0;
   const speed = clamp(Math.abs(f.vx) / 7, 0, 1);
-  const width = 74 * (1 - air * 0.4) + attack * 10 + speed * 6;
-  const height = 17 * (1 - air * 0.45);
+  const width = (74 * (1 - air * 0.4) + attack * 10 + speed * 6) * FIGHTER_SCALE;
+  const height = 17 * (1 - air * 0.45) * FIGHTER_SCALE;
   const alpha = (f.hurt > 0 ? 0.32 : 0.22) * (1 - air * 0.55);
   const offset = clamp(f.vx * -2.2, -16, 16);
 
@@ -2007,6 +2018,7 @@ function drawFighter(f) {
   ctx.save();
   ctx.translate(baseX, baseY);
   ctx.scale(f.dir * (1 + attackStretch + hurtSquash), 1 + breathing - attackStretch * 0.28);
+  ctx.scale(FIGHTER_SCALE, FIGHTER_SCALE);
 
   const pigForm = f.profileId === "p1" && f.pigMorph > 10 && f.pigMorph < 66;
   if (pigForm) {
@@ -2381,7 +2393,7 @@ function drawAttackArc(f, box) {
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.translate(x, y);
-  ctx.scale(f.dir, 1);
+  ctx.scale(f.dir * FIGHTER_SCALE, FIGHTER_SCALE);
   ctx.rotate(isKick ? -0.16 : -0.06);
 
   const glow = ctx.createRadialGradient(24, 0, 4, 24, 0, isKick ? 96 : 74);
