@@ -53,12 +53,12 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=53"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=53"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=54"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=54"),
 };
 const unifiedSpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-unified.svg?v=53"),
-  p2: loadImage("assets/sprite-akane-unified.svg?v=53"),
+  p1: loadImage("assets/sprite-pchan-unified.svg?v=54"),
+  p2: loadImage("assets/sprite-akane-unified.svg?v=54"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -2797,24 +2797,25 @@ function fighterTransitionMotion(f, walking) {
 
   if (f.attack) {
     const a = f.attack;
-    const windup = 1 - smoothStep01(a.frame / Math.max(1, a.activeStart));
-    const strike = Math.sin(
-      clamp((a.frame - a.activeStart + 2) / Math.max(1, a.activeEnd - a.activeStart + 4), 0, 1) * Math.PI
-    );
-    const recovery = smoothStep01((a.frame - a.activeEnd) / Math.max(1, a.duration - a.activeEnd));
+    const phase = attackPhase(a);
+    const windup = phase.anticipation;
+    const strike = phase.strike;
+    const recovery = phase.recovery;
+    const settle = phase.settle;
     const isKick = a.type === "kick" || a.type === "airKick";
     const isSweep = a.type === "sweep";
     const isSpecial = a.type === "special";
     const isGrab = a.type === "grab";
-    const reach = isKick ? 7.2 : isSweep ? 5.5 : isSpecial ? 5 : isGrab ? 4.5 : 6;
-    const brace = isKick ? 2.1 : isSweep ? 1.5 : 3.1;
+    const reach = isKick ? 9.1 : isSweep ? 7.4 : isSpecial ? 6.6 : isGrab ? 6.2 : 7.5;
+    const brace = isKick ? 4.8 : isSweep ? 3.2 : isSpecial ? 3.7 : isGrab ? 4.1 : 5.3;
+    const returnDrag = isKick ? 1.6 : isSweep ? 1.2 : 1.8;
 
-    motion.x += dir * (strike * reach - windup * brace - recovery * 1.2);
-    motion.y += windup * (isSweep ? 2.8 : 1.2) - strike * (isKick ? 2.4 : isSweep ? -2.8 : 1.1) + recovery * 0.6;
-    motion.rotation += dir * (-windup * 0.026 + strike * (isKick ? -0.032 : isSweep ? 0.052 : 0.038) - recovery * 0.012);
-    motion.scaleX *= 1 + strike * (isKick ? 0.018 : 0.014) - windup * 0.008;
-    motion.scaleY *= 1 + windup * 0.008 - strike * (isSweep ? 0.016 : 0.007);
-    motion.afterimage = (isSpecial ? 0.26 : isGrab ? 0.08 : 0.2) * strike;
+    motion.x += dir * (strike * reach - windup * brace - recovery * returnDrag);
+    motion.y += windup * (isSweep ? 3.2 : isKick ? 1.8 : 1.4) - strike * (isKick ? 3.4 : isSweep ? -3.1 : 1.3) + recovery * 0.9;
+    motion.rotation += dir * (-windup * (isKick ? 0.046 : 0.052) + strike * (isKick ? -0.046 : isSweep ? 0.064 : 0.052) - recovery * 0.018);
+    motion.scaleX *= 1 - windup * 0.018 + strike * (isKick ? 0.026 : 0.021) - settle * 0.006;
+    motion.scaleY *= 1 + windup * 0.018 - strike * (isSweep ? 0.019 : 0.01) + settle * 0.004;
+    motion.afterimage = (isSpecial ? 0.28 : isGrab ? 0.1 : 0.22) * strike + windup * 0.025;
   }
 
   if (f.blocking && !winner) {
@@ -3096,21 +3097,19 @@ function rasterBodyFrameIndex(f, frameName, walking) {
   if (frames.length === 1) return frames[0];
 
   if (f.attack && (frameName === "punch" || frameName === "kick")) {
-    const t = clamp(f.attack.frame / Math.max(1, f.attack.duration), 0, 0.999);
+    const windupT = clamp(f.attack.frame / Math.max(1, f.attack.activeStart), 0, 1);
+    const recoveryT = clamp((f.attack.frame - f.attack.activeEnd) / Math.max(1, f.attack.duration - f.attack.activeEnd), 0, 1);
     if (frameName === "punch") {
-      if (t < 0.18) return frames[0];
-      if (t < 0.38) return frames[1];
-      if (t < 0.62) return frames[2];
-      if (t < 0.82) return frames[3];
-      return frames[4];
+      if (f.attack.frame < f.attack.activeStart) return windupT < 0.58 ? frames[0] : frames[1];
+      if (f.attack.frame <= f.attack.activeEnd) return frames[2];
+      return recoveryT < 0.48 ? frames[3] : frames[4];
     }
     if (frameName === "kick") {
-      if (t < 0.16) return frames[0];
-      if (t < 0.34) return frames[1];
-      if (t < 0.62) return frames[2];
-      if (t < 0.82) return frames[3];
-      return frames[4];
+      if (f.attack.frame < f.attack.activeStart) return windupT < 0.56 ? frames[0] : frames[1];
+      if (f.attack.frame <= f.attack.activeEnd) return frames[2];
+      return recoveryT < 0.5 ? frames[3] : frames[4];
     }
+    const t = clamp(f.attack.frame / Math.max(1, f.attack.duration), 0, 0.999);
     return frames[Math.floor(t * frames.length)] ?? frames[frames.length - 1];
   }
 
@@ -3357,7 +3356,11 @@ function drawSpritePremiumDetails(f, crouch, frameName, stride) {
 }
 
 function drawSpriteCinematicFinish(f, crouch, frameName) {
-  const action = f.attack ? attackProgress(f.attack) : 0;
+  const phase = attackPhase(f.attack);
+  const action = f.attack ? phase.power : 0;
+  const anticipation = phase.anticipation;
+  const strike = phase.strike;
+  const recovery = phase.recovery;
   const hurt = clamp((f.hurt ?? 0) / 24, 0, 1);
   const energy = f.energy >= 45 ? 1 : 0;
   const yOffset = crouch * 0.18;
@@ -3375,11 +3378,43 @@ function drawSpriteCinematicFinish(f, crouch, frameName) {
   ctx.fill();
 
   if (frameName === "punch" || frameName === "kick" || frameName === "special") {
-    ctx.strokeStyle = colorWithAlpha(trim, 0.18 + action * 0.14);
-    ctx.lineWidth = 2.2 + action * 1.2;
+    if (anticipation > 0.05) {
+      ctx.strokeStyle = colorWithAlpha(trim, 0.08 + anticipation * 0.14);
+      ctx.lineWidth = 2 + anticipation * 2.2;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(-18, -107 + yOffset, 58 + anticipation * 16, -0.45, Math.PI * 1.14);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = colorWithAlpha(trim, 0.16 + strike * 0.2 + recovery * 0.05);
+    ctx.lineWidth = 2.2 + strike * 1.6 + anticipation * 0.6;
     ctx.beginPath();
     ctx.ellipse(0, -96 + yOffset, 60 + action * 18, 108 + action * 14, 0.02, 0, Math.PI * 2);
     ctx.stroke();
+
+    if (strike > 0.05) {
+      const isKick = frameName === "kick";
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.18 + strike * 0.18})`;
+      ctx.lineWidth = isKick ? 4.8 : 3.8;
+      ctx.lineCap = "round";
+      for (let i = 0; i < 3; i += 1) {
+        const lane = i - 1;
+        const y = (isKick ? -75 : -128) + yOffset + lane * (isKick ? 9 : 7);
+        ctx.beginPath();
+        ctx.moveTo(20 - lane * 3, y);
+        ctx.quadraticCurveTo(54 + strike * 8, y - 12, isKick ? 106 + strike * 20 : 86 + strike * 18, y + 2);
+        ctx.stroke();
+      }
+    }
+
+    if (recovery > 0.08) {
+      ctx.strokeStyle = colorWithAlpha(trim, 0.07 + recovery * 0.12);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(-4, -102 + yOffset, 48 + recovery * 10, Math.PI * 0.18, Math.PI * 1.18);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 
@@ -3464,15 +3499,16 @@ function drawSpriteHeadMount(f, crouch, headScaleMultiplier = 1) {
 }
 
 function drawAttackBodyGlow(f, crouch) {
-  const progress = attackProgress(f.attack);
+  const phase = attackPhase(f.attack);
+  const progress = phase.power;
   const style = f.attack.type === "special" ? f.specialStyle : null;
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.strokeStyle = style ? style.rim : colorWithAlpha(f.trim, 0.55);
-  ctx.globalAlpha = 0.12 + progress * 0.18;
-  ctx.lineWidth = f.attack.type === "special" ? 5 : 3;
+  ctx.globalAlpha = 0.08 + phase.anticipation * 0.1 + phase.strike * 0.22 + phase.recovery * 0.06;
+  ctx.lineWidth = f.attack.type === "special" ? 5 : 2.6 + phase.strike * 1.2;
   ctx.beginPath();
-  ctx.ellipse(0, -94 + crouch, 58 + progress * 14, 106 + progress * 10, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -94 + crouch, 58 + progress * 18, 106 + progress * 12, 0, 0, Math.PI * 2);
   ctx.stroke();
   if (f.attack.type === "special") {
     ctx.strokeStyle = style.core;
@@ -3814,7 +3850,8 @@ function drawSpeedLines(f, box) {
 
 function drawAttackArc(f, box) {
   const isKick = f.attack.type === "kick" || f.attack.type === "airKick" || f.attack.type === "sweep";
-  const progress = attackProgress(f.attack);
+  const phase = attackPhase(f.attack);
+  const progress = Math.max(phase.strike, phase.anticipation * 0.35, phase.recovery * 0.22);
   const outfit = outfitSpec(f);
   const x = f.dir > 0 ? box.x + box.w * 0.28 : box.x + box.w * 0.72;
   const y = box.y + box.h * 0.45;
@@ -3834,20 +3871,20 @@ function drawAttackArc(f, box) {
   ctx.fill();
 
   ctx.strokeStyle = colorWithAlpha(outfit.accent, 0.78);
-  ctx.globalAlpha = 0.28 + progress * 0.24;
-  ctx.lineWidth = isKick ? 12 : 9;
+  ctx.globalAlpha = 0.2 + phase.anticipation * 0.08 + phase.strike * 0.36 + phase.recovery * 0.12;
+  ctx.lineWidth = (isKick ? 12 : 9) + phase.strike * 2.2;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(-12, 13);
-  ctx.quadraticCurveTo(32, -34, isKick ? 134 : 96, -10);
+  ctx.moveTo(-12 - phase.anticipation * 12, 13 + phase.anticipation * 5);
+  ctx.quadraticCurveTo(32, -34 - phase.strike * 8, isKick ? 134 + phase.strike * 18 : 96 + phase.strike * 14, -10);
   ctx.stroke();
 
   ctx.strokeStyle = isKick ? "#ffe87a" : "#9be7ff";
-  ctx.globalAlpha = 0.35 + progress * 0.22;
-  ctx.lineWidth = isKick ? 7 : 5;
+  ctx.globalAlpha = 0.24 + phase.strike * 0.42 + phase.recovery * 0.1;
+  ctx.lineWidth = (isKick ? 7 : 5) + phase.strike * 1.4;
   ctx.beginPath();
-  ctx.moveTo(-10, 8);
-  ctx.quadraticCurveTo(34, -28, isKick ? 126 : 88, -8);
+  ctx.moveTo(-10 - phase.anticipation * 10, 8 + phase.anticipation * 4);
+  ctx.quadraticCurveTo(34, -28 - phase.strike * 8, isKick ? 126 + phase.strike * 16 : 88 + phase.strike * 12, -8);
   ctx.stroke();
   ctx.globalAlpha = 1;
   ctx.restore();
@@ -3858,26 +3895,56 @@ function attackProgress(attack) {
   return Math.sin(clamp(attack.frame / attack.duration, 0, 1) * Math.PI);
 }
 
+function attackPhase(attack) {
+  if (!attack) {
+    return {
+      anticipation: 0,
+      strike: 0,
+      recovery: 0,
+      settle: 0,
+      power: 0,
+    };
+  }
+
+  const windupT = clamp(attack.frame / Math.max(1, attack.activeStart), 0, 1);
+  const strikeT = clamp(
+    (attack.frame - attack.activeStart + 1) / Math.max(1, attack.activeEnd - attack.activeStart + 2),
+    0,
+    1
+  );
+  const recoveryT = clamp((attack.frame - attack.activeEnd) / Math.max(1, attack.duration - attack.activeEnd), 0, 1);
+  const anticipation = attack.frame < attack.activeStart ? Math.sin(windupT * Math.PI) : 0;
+  const strike = attack.frame >= attack.activeStart && attack.frame <= attack.activeEnd ? Math.sin(strikeT * Math.PI) : 0;
+  const recovery = attack.frame > attack.activeEnd ? Math.sin(recoveryT * Math.PI) : 0;
+  const settle = attack.frame > attack.activeEnd ? smoothStep01(recoveryT) : 0;
+
+  return {
+    anticipation,
+    strike,
+    recovery,
+    settle,
+    power: Math.max(strike, anticipation * 0.34, recovery * 0.18),
+  };
+}
+
 function getPose(f, stride) {
   const spec = bodySpec(f);
   const crouch = f.crouch * 18;
-  const progress = attackProgress(f.attack);
+  const phase = attackPhase(f.attack);
+  const progress = f.attack ? phase.power : 0;
   const attackType = f.attack?.type;
-  const activePulse = f.attack
-    ? Math.sin(clamp((f.attack.frame - f.attack.activeStart + 2) / Math.max(1, f.attack.activeEnd - f.attack.activeStart + 4), 0, 1) * Math.PI)
-    : 0;
-  const windup = f.attack
-    ? Math.sin(clamp(f.attack.frame / Math.max(1, f.attack.activeStart), 0, 1) * Math.PI)
-    : 0;
+  const activePulse = phase.strike;
+  const windup = phase.anticipation;
+  const recovery = phase.recovery;
   const airborne = !f.grounded;
   const torsoTilt =
     (f.hurt > 0 ? -0.07 : 0) +
     (airborne ? -0.05 : 0) +
-    (attackType === "punch" || attackType === "airPunch" ? 0.08 * progress - 0.03 * windup : 0) +
-    (attackType === "kick" || attackType === "airKick" ? -0.09 * progress : 0) +
-    (attackType === "sweep" ? 0.16 * progress : 0) +
-    (attackType === "grab" ? 0.08 * progress : 0) +
-    (attackType === "special" ? -0.08 * progress : 0);
+    (attackType === "punch" || attackType === "airPunch" ? 0.12 * activePulse - 0.08 * windup - 0.03 * recovery : 0) +
+    (attackType === "kick" || attackType === "airKick" ? -0.13 * activePulse + 0.04 * windup + 0.025 * recovery : 0) +
+    (attackType === "sweep" ? 0.2 * activePulse - 0.05 * windup : 0) +
+    (attackType === "grab" ? 0.1 * activePulse - 0.05 * windup : 0) +
+    (attackType === "special" ? -0.1 * activePulse + 0.04 * windup : 0);
 
   const hipY = -62 + crouch;
   const shoulderY = -124 + crouch;
@@ -3923,44 +3990,44 @@ function getPose(f, stride) {
   }
 
   if (attackType === "punch" || attackType === "airPunch") {
-    base.frontArm.elbow = { x: 56 + progress * 22 + activePulse * 8, y: -103 + crouch - progress * 5 };
-    base.frontArm.hand = { x: 70 + progress * 48 + activePulse * 8, y: -99 + crouch - progress * 7 };
-    base.backArm.elbow = { x: -45 - windup * 7, y: -107 + crouch - windup * 5 };
-    base.backArm.hand = { x: -19 - windup * 9, y: -91 + crouch - windup * 6 };
-    base.frontLeg.foot.x += 7 * progress;
-    base.backLeg.foot.x -= 9 * progress;
+    base.frontArm.elbow = { x: 48 - windup * 14 + activePulse * 46 - recovery * 9, y: -104 + crouch - windup * 7 - activePulse * 3 + recovery * 8 };
+    base.frontArm.hand = { x: 58 - windup * 22 + activePulse * 78 - recovery * 12, y: -99 + crouch - windup * 9 - activePulse * 6 + recovery * 9 };
+    base.backArm.elbow = { x: -42 - windup * 13 + activePulse * 3 + recovery * 8, y: -107 + crouch - windup * 7 + recovery * 7 };
+    base.backArm.hand = { x: -17 - windup * 17 + activePulse * 2 + recovery * 10, y: -91 + crouch - windup * 9 + recovery * 8 };
+    base.frontLeg.foot.x += 5 * activePulse - 2 * windup;
+    base.backLeg.foot.x -= 11 * activePulse + 4 * windup - recovery * 5;
   } else if (attackType === "kick" || attackType === "airKick") {
-    base.frontLeg.knee = { x: 42 + progress * 31, y: -45 - progress * 17 + crouch };
-    base.frontLeg.foot = { x: 59 + progress * 66 + activePulse * 6, y: -24 - progress * 30 };
-    base.backLeg.knee = { x: -29 - progress * 5, y: -31 + crouch };
-    base.backLeg.foot = { x: -42 - progress * 9, y: -1 };
-    base.frontArm.elbow = { x: 36 - progress * 6, y: -86 + crouch + progress * 5 };
-    base.frontArm.hand = { x: 47 - progress * 7, y: -63 + crouch + progress * 2 };
-    base.backArm.elbow = { x: -42 - progress * 7, y: -108 + crouch - progress * 6 };
-    base.backArm.hand = { x: -24 - progress * 12, y: -90 + crouch - progress * 7 };
+    base.frontLeg.knee = { x: 35 - windup * 13 + activePulse * 48 - recovery * 8, y: -43 - windup * 5 - activePulse * 23 + crouch + recovery * 8 };
+    base.frontLeg.foot = { x: 49 - windup * 22 + activePulse * 92 + recovery * 4, y: -19 + windup * 4 - activePulse * 39 + recovery * 14 };
+    base.backLeg.knee = { x: -29 - activePulse * 7 - windup * 5, y: -31 + crouch + recovery * 3 };
+    base.backLeg.foot = { x: -42 - activePulse * 13 - windup * 8 + recovery * 6, y: -1 };
+    base.frontArm.elbow = { x: 36 - windup * 5 - activePulse * 10, y: -86 + crouch + activePulse * 8 + recovery * 5 };
+    base.frontArm.hand = { x: 47 - windup * 7 - activePulse * 12, y: -63 + crouch + activePulse * 4 + recovery * 5 };
+    base.backArm.elbow = { x: -42 - windup * 11 - activePulse * 9, y: -108 + crouch - windup * 7 - activePulse * 7 + recovery * 6 };
+    base.backArm.hand = { x: -24 - windup * 15 - activePulse * 16, y: -90 + crouch - windup * 9 - activePulse * 8 + recovery * 7 };
   } else if (attackType === "sweep") {
-    base.frontLeg.knee = { x: 36 + progress * 28, y: -25 + crouch + progress * 7 };
-    base.frontLeg.foot = { x: 70 + progress * 56, y: -1 };
-    base.backLeg.knee = { x: -32, y: -23 + crouch + progress * 8 };
+    base.frontLeg.knee = { x: 32 - windup * 9 + activePulse * 45, y: -25 + crouch + activePulse * 11 };
+    base.frontLeg.foot = { x: 62 - windup * 14 + activePulse * 78 - recovery * 8, y: -1 };
+    base.backLeg.knee = { x: -32 - windup * 4, y: -23 + crouch + activePulse * 10 };
     base.backLeg.foot = { x: -58, y: 0 };
-    base.frontArm.elbow = { x: 31, y: -84 + crouch + progress * 11 };
-    base.frontArm.hand = { x: 42, y: -61 + crouch + progress * 12 };
-    base.backArm.elbow = { x: -32, y: -89 + crouch + progress * 10 };
-    base.backArm.hand = { x: -45, y: -66 + crouch + progress * 12 };
+    base.frontArm.elbow = { x: 31 - windup * 5, y: -84 + crouch + activePulse * 13 };
+    base.frontArm.hand = { x: 42 - windup * 7, y: -61 + crouch + activePulse * 15 };
+    base.backArm.elbow = { x: -32 - windup * 8, y: -89 + crouch + activePulse * 11 };
+    base.backArm.hand = { x: -45 - windup * 8, y: -66 + crouch + activePulse * 14 };
   } else if (attackType === "grab") {
-    base.frontArm.elbow = { x: 55 + progress * 23, y: -96 + crouch - progress * 3 };
-    base.frontArm.hand = { x: 78 + progress * 35, y: -92 + crouch - progress * 1 };
-    base.backArm.elbow = { x: 27 + progress * 27, y: -114 + crouch - progress * 2 };
-    base.backArm.hand = { x: 59 + progress * 37, y: -111 + crouch + progress * 3 };
-    base.frontLeg.foot.x += 12 * progress;
-    base.backLeg.foot.x -= 8 * progress;
+    base.frontArm.elbow = { x: 48 - windup * 11 + activePulse * 34 - recovery * 8, y: -96 + crouch - windup * 3 - activePulse * 4 + recovery * 4 };
+    base.frontArm.hand = { x: 68 - windup * 17 + activePulse * 52 - recovery * 11, y: -92 + crouch - windup * 2 - activePulse * 1 + recovery * 6 };
+    base.backArm.elbow = { x: 22 - windup * 9 + activePulse * 41 - recovery * 8, y: -114 + crouch - windup * 4 - activePulse * 2 + recovery * 4 };
+    base.backArm.hand = { x: 49 - windup * 13 + activePulse * 56 - recovery * 10, y: -111 + crouch - windup * 4 + activePulse * 3 + recovery * 5 };
+    base.frontLeg.foot.x += 10 * activePulse - 3 * windup;
+    base.backLeg.foot.x -= 9 * activePulse + 4 * windup - recovery * 4;
   } else if (attackType === "special") {
-    base.frontArm.elbow = { x: 48 + progress * 10, y: -121 + crouch - progress * 6 };
-    base.frontArm.hand = { x: 74 + progress * 24, y: -106 + crouch - progress * 4 };
-    base.backArm.elbow = { x: 18 + progress * 10, y: -123 + crouch - progress * 7 };
-    base.backArm.hand = { x: 54 + progress * 22, y: -107 + crouch - progress * 4 };
-    base.frontLeg.foot.x += 6 * progress;
-    base.backLeg.foot.x -= 6 * progress;
+    base.frontArm.elbow = { x: 42 - windup * 7 + activePulse * 20, y: -121 + crouch - windup * 4 - activePulse * 8 };
+    base.frontArm.hand = { x: 66 - windup * 12 + activePulse * 36, y: -106 + crouch - windup * 5 - activePulse * 5 };
+    base.backArm.elbow = { x: 12 - windup * 8 + activePulse * 24, y: -123 + crouch - windup * 5 - activePulse * 9 };
+    base.backArm.hand = { x: 46 - windup * 12 + activePulse * 35, y: -107 + crouch - windup * 4 - activePulse * 6 };
+    base.frontLeg.foot.x += 7 * activePulse - 3 * windup;
+    base.backLeg.foot.x -= 7 * activePulse + 3 * windup;
   }
 
   if (airborne) {
