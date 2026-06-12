@@ -3856,12 +3856,23 @@ function fighterTransitionMotion(f, walking) {
     const pulse = 0.5 + Math.sin(roundFrame * 0.58) * 0.5;
     const guard = clamp((f.guardPulse ?? 0) / 18, 0, 1);
     const guardHit = clamp((f.guardImpact ?? 0) / 16, 0, 1);
-    motion.x -= dir * (1.2 + pulse * 0.85 + guard * 0.7 + guardHit * 4.8);
-    motion.y += 0.45 + pulse * 0.5 + guardHit * 2.2;
-    motion.rotation -= dir * (0.009 + pulse * 0.005 + guard * 0.006 + guardHit * 0.038);
-    motion.scaleX *= 0.994 - guardHit * 0.01;
-    motion.scaleY *= 1.008 + guardHit * 0.024;
+    motion.x -= dir * (1.65 + pulse * 0.72 + guard * 1.15 + guardHit * 5.6);
+    motion.y += 1.05 + pulse * 0.42 + guard * 0.8 + guardHit * 2.7;
+    motion.rotation -= dir * (0.014 + pulse * 0.004 + guard * 0.012 + guardHit * 0.044);
+    motion.scaleX *= 1.004 + guard * 0.008 - guardHit * 0.006;
+    motion.scaleY *= 0.992 - guard * 0.012 + guardHit * 0.018;
     motion.afterimage = Math.max(motion.afterimage, guardHit * 0.09);
+  }
+
+  const counterReady = clamp((f.counterWindow ?? 0) / 34, 0, 1);
+  if (counterReady > 0.03 && f.hurt <= 0 && !f.attack && !winner) {
+    const coil = Math.sin((1 - counterReady) * Math.PI);
+    motion.x += dir * (counterReady * 1.1 + coil * 0.8);
+    motion.y += counterReady * 0.5;
+    motion.rotation += dir * (counterReady * 0.014 + coil * 0.014);
+    motion.scaleX *= 1 + counterReady * 0.008 + coil * 0.006;
+    motion.scaleY *= 1 - counterReady * 0.006;
+    motion.afterimage = Math.max(motion.afterimage, counterReady * 0.035);
   }
 
   const effectiveHurt = winner ? Math.max(0, (f.hurt ?? 0) - resultFrame * 0.9) : (f.hurt ?? 0);
@@ -4148,6 +4159,7 @@ function drawFighter(f) {
   if (drawRasterBodySprite(f, crouch, walking ? stride : 0, walking, transition)) {
     if (f.attack) drawAttackKineticFX(f, crouch, "front");
     if (f.blocking) drawGuard(f.trim, crouch, f);
+    else if ((f.counterWindow ?? 0) > 0 && f.hurt <= 0 && !winner) drawCounterReadyFX(f.trim, crouch, f);
     if (f.hitFlash > 0) drawHitFlash(f, crouch);
     if (f.hurt > 0) drawHurtRim(f, crouch);
     drawDamageReactionFX(f, crouch);
@@ -4184,6 +4196,7 @@ function drawFighter(f) {
   drawFighterStageLighting(f, crouch);
 
   if (f.blocking) drawGuard(f.trim, crouch, f);
+  else if ((f.counterWindow ?? 0) > 0 && f.hurt <= 0 && !winner) drawCounterReadyFX(f.trim, crouch, f);
   if (f.hitFlash > 0) drawHitFlash(f, crouch);
   if (f.hurt > 0) drawHurtRim(f, crouch);
   drawDamageReactionFX(f, crouch);
@@ -4538,6 +4551,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
     drawSpritePoseTransitionBlend(f, unifiedSheet, frameIndex, crouch);
     drawSpriteContactOcclusion(f, crouch, frameName, walking ? stride : 0);
     drawSpriteHeadActingWarp(f, crouch, walking ? stride : 0);
+    drawSpriteGuardPoseOverlay(f, crouch, frameName);
     drawSpriteAttackFrameWarp(f, unifiedSheet, frameX, crouch);
     drawSpriteAttackSilhouetteExtension(f, crouch, frameName);
     drawSpriteImpactWarp(f, unifiedSheet, frameX, crouch);
@@ -4581,6 +4595,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   drawSpriteReactionPoseWarp(f, sheet, frameX, crouch);
   drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
   drawSpriteContactOcclusion(f, crouch, frameName, walking ? stride : 0);
+  drawSpriteGuardPoseOverlay(f, crouch, frameName);
   drawSpriteExtremityDetails(f, crouch, frameName, walking ? stride : 0);
 
   ctx.save();
@@ -4971,6 +4986,105 @@ function drawSpriteFootDetail(foot, shoe, trim) {
   ctx.moveTo(-foot.w * 0.34, foot.h * 0.34);
   ctx.lineTo(foot.w * 0.42, foot.h * 0.22);
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
+  const guard = f.blocking ? clamp((f.guardPulse ?? 0) / 18, 0, 1) : 0;
+  const impact = clamp((f.guardImpact ?? 0) / 16, 0, 1);
+  const counter = clamp((f.counterWindow ?? 0) / 34, 0, 1);
+  const active = Math.max(guard, impact, counter * 0.84);
+  if (active <= 0.04 || f.attack || f.hurt > 0 || winner) return;
+
+  const outfit = outfitSpec(f) ?? {};
+  const sleeve = outfit.sleeve ?? f.color ?? "#497ac4";
+  const skin = f.skin ?? "#f3bd98";
+  const trim = f.trim ?? "#fff1bd";
+  const localCrouch = crouch * 0.18;
+  const breath = Math.sin(roundFrame * 0.12 + f.x * 0.01);
+  const recoil = impact * impact;
+  const counterPulse = counter * (0.7 + Math.sin(roundFrame * 0.32) * 0.3);
+
+  const frontShoulder = { x: 34 - recoil * 3, y: -154 + localCrouch + guard * 2 };
+  const frontElbow = { x: 52 + recoil * 4, y: -132 + localCrouch + guard * 7 + breath };
+  const frontHand = { x: 36 + recoil * 9 + counter * 5, y: -111 + localCrouch + guard * 6 + impact * 4 };
+  const backShoulder = { x: -31, y: -150 + localCrouch + guard * 4 };
+  const backElbow = { x: 9 + recoil * 5, y: -134 + localCrouch + guard * 9 - breath * 0.6 };
+  const backHand = { x: 13 + recoil * 7, y: -107 + localCrouch + guard * 8 + impact * 3 };
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.globalAlpha = clamp(0.24 + active * 0.46, 0.2, 0.72);
+  ctx.shadowColor = "rgba(9, 7, 6, 0.38)";
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 1.5;
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = darken(sleeve, 18);
+  ctx.lineWidth = 17 + guard * 2 + impact * 4;
+  ctx.beginPath();
+  ctx.moveTo(backShoulder.x, backShoulder.y);
+  ctx.quadraticCurveTo(backElbow.x - 12, backElbow.y - 3, backHand.x, backHand.y);
+  ctx.moveTo(frontShoulder.x, frontShoulder.y);
+  ctx.quadraticCurveTo(frontElbow.x + 7, frontElbow.y - 4, frontHand.x, frontHand.y);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(sleeve, 0.96);
+  ctx.lineWidth = 11 + guard * 2.2 + impact * 2.4;
+  ctx.beginPath();
+  ctx.moveTo(backShoulder.x + 3, backShoulder.y + 1);
+  ctx.quadraticCurveTo(backElbow.x - 5, backElbow.y - 1, backHand.x + 2, backHand.y);
+  ctx.moveTo(frontShoulder.x - 2, frontShoulder.y + 1);
+  ctx.quadraticCurveTo(frontElbow.x + 2, frontElbow.y, frontHand.x - 2, frontHand.y);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(skin, 0.92);
+  ctx.lineWidth = 8.4 + impact * 1.4;
+  ctx.beginPath();
+  ctx.moveTo(backHand.x - 5, backHand.y + 1);
+  ctx.lineTo(backHand.x + 10, backHand.y + 2);
+  ctx.moveTo(frontHand.x - 4, frontHand.y + 1);
+  ctx.lineTo(frontHand.x + 13, frontHand.y + 1);
+  ctx.stroke();
+
+  ctx.fillStyle = colorWithAlpha(skin, 0.96);
+  ctx.beginPath();
+  ctx.ellipse(backHand.x + 11, backHand.y + 2, 9.5 + impact * 2, 7.4, 0.05, 0, Math.PI * 2);
+  ctx.ellipse(frontHand.x + 14, frontHand.y + 1, 10.5 + impact * 2.4, 7.6, -0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.globalCompositeOperation = "multiply";
+  ctx.globalAlpha = clamp(0.08 + active * 0.12, 0.06, 0.22);
+  ctx.strokeStyle = "rgba(19, 10, 8, 0.9)";
+  ctx.lineWidth = 4 + guard * 2;
+  ctx.beginPath();
+  ctx.moveTo(-38, -73 + localCrouch + guard * 5);
+  ctx.quadraticCurveTo(-15, -57 + localCrouch + guard * 8, 4, -40 + localCrouch + guard * 7);
+  ctx.moveTo(36, -72 + localCrouch + guard * 4);
+  ctx.quadraticCurveTo(21, -55 + localCrouch + guard * 8, 38, -39 + localCrouch + guard * 7);
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = clamp(0.08 + guard * 0.13 + counterPulse * 0.2 + impact * 0.2, 0.05, 0.34);
+  ctx.strokeStyle = counter > 0.05 ? colorWithAlpha(trim, 0.96) : "rgba(189, 234, 255, 0.82)";
+  ctx.lineWidth = 1.5 + guard * 1.2 + counter * 1.4 + impact * 1.6;
+  ctx.beginPath();
+  ctx.moveTo(backShoulder.x - 1, backShoulder.y - 6);
+  ctx.quadraticCurveTo(4 + recoil * 5, -157 + localCrouch - counter * 6, frontShoulder.x + 9, frontShoulder.y - 5);
+  ctx.moveTo(backHand.x - 7, backHand.y - 9);
+  ctx.quadraticCurveTo(20 + counter * 8, -124 + localCrouch - counter * 5, frontHand.x + 20, frontHand.y - 8);
+  ctx.stroke();
+
+  if (counter > 0.05) {
+    ctx.globalAlpha = clamp(0.1 + counterPulse * 0.26, 0.08, 0.36);
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(28 + counter * 5, -115 + localCrouch, 34 + counter * 8, -0.92, 0.78);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -8324,6 +8438,58 @@ function drawGuard(color, crouch, f) {
     ctx.beginPath();
     ctx.arc(centerX - 2, centerY, radius + 18, -0.85, 0.82);
     ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawCounterReadyFX(color, crouch, f) {
+  const counter = clamp((f?.counterWindow ?? 0) / 34, 0, 1);
+  if (counter <= 0.04) return;
+
+  const pulse = 0.5 + Math.sin(roundFrame * 0.38) * 0.5;
+  const spark = counter * (0.7 + pulse * 0.3);
+  const centerX = 31 + counter * 4;
+  const centerY = -112 + crouch;
+  const radius = 32 + spark * 12;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  const glow = ctx.createRadialGradient(centerX, centerY, 4, centerX, centerY, radius + 28);
+  glow.addColorStop(0, colorWithAlpha(color, 0.1 + spark * 0.14));
+  glow.addColorStop(0.42, "rgba(255, 241, 189, 0.08)");
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(centerX, centerY, radius + 20, radius + 28, -0.12, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(255, 241, 189, ${0.16 + spark * 0.34})`;
+  ctx.lineWidth = 2 + spark * 1.8;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius, -0.92, 0.82);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(color, 0.18 + spark * 0.26);
+  ctx.lineWidth = 1.5 + spark * 1.2;
+  ctx.beginPath();
+  ctx.moveTo(centerX - 26, centerY - 18);
+  ctx.quadraticCurveTo(centerX + 6 + spark * 10, centerY - 36 - spark * 8, centerX + 38 + spark * 10, centerY - 12);
+  ctx.moveTo(centerX - 18, centerY + 12);
+  ctx.quadraticCurveTo(centerX + 11 + spark * 8, centerY + 25 + spark * 3, centerX + 44 + spark * 9, centerY + 8);
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(255, 241, 189, ${0.16 + spark * 0.32})`;
+  for (let i = 0; i < 3; i += 1) {
+    const angle = -0.55 + i * 0.42 + pulse * 0.08;
+    const x = centerX + Math.cos(angle) * (radius + 4 + i * 3);
+    const y = centerY + Math.sin(angle) * (radius * 0.72 + i * 2);
+    ctx.beginPath();
+    ctx.ellipse(x, y, 2.2 + spark * 1.8, 1.2 + spark, angle, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
