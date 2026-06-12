@@ -52,12 +52,12 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=48"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=48"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=49"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=49"),
 };
 const unifiedSpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-unified.svg?v=48"),
-  p2: loadImage("assets/sprite-akane-unified.svg?v=48"),
+  p1: loadImage("assets/sprite-pchan-unified.svg?v=49"),
+  p2: loadImage("assets/sprite-akane-unified.svg?v=49"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -115,6 +115,10 @@ const mobileFightQuery = window.matchMedia("(pointer: coarse), (max-width: 920px
 let cameraZoom = 1;
 let cameraPan = 0;
 let cameraLift = 8;
+let cameraImpactPulse = 0;
+let cameraImpactMax = 1;
+let cameraImpactDir = 1;
+let cameraImpactStrength = 0;
 
 const SPECIAL_STYLES = {
   p1: { shape: "wave", core: "#fff1bd", rim: "#5bd7ff", trail: "#47b5ff" },
@@ -534,6 +538,8 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     impactPulse: 0,
     impactDir: dir,
     impactLift: 0,
+    impactStrength: 0,
+    contactFlash: 0,
     wins: 0,
     ai: {
       left: false,
@@ -684,6 +690,8 @@ function resetRound() {
     impactPulse: 0,
     impactDir: 1,
     impactLift: 0,
+    impactStrength: 0,
+    contactFlash: 0,
     blocking: false,
     grounded: true,
     specialCooldown: 0,
@@ -707,6 +715,8 @@ function resetRound() {
     impactPulse: 0,
     impactDir: -1,
     impactLift: 0,
+    impactStrength: 0,
+    contactFlash: 0,
     blocking: false,
     grounded: true,
     specialCooldown: 0,
@@ -725,6 +735,10 @@ function resetRound() {
   cameraZoom = 1;
   cameraPan = 0;
   cameraLift = 8;
+  cameraImpactPulse = 0;
+  cameraImpactMax = 1;
+  cameraImpactDir = 1;
+  cameraImpactStrength = 0;
   koFreeze = 0;
   roundFrame = 0;
   countdownFrames = 180;
@@ -995,9 +1009,15 @@ function throwSpecial(f) {
   impactGlints(f.x + f.dir * fighterScale(44), f.y - fighterScale(118), style.core, false, true);
 }
 
+function updateCameraImpactPulse() {
+  if (cameraImpactPulse > 0) cameraImpactPulse -= 1;
+  else cameraImpactStrength = 0;
+}
+
 function update() {
   if (hitStopFrames > 0) {
     hitStopFrames -= 1;
+    updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
     return;
@@ -1005,12 +1025,14 @@ function update() {
 
   if (koFreeze > 0) {
     koFreeze -= 1;
+    updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
     return;
   }
 
   if (!running) {
+    updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
     return;
@@ -1019,6 +1041,7 @@ function update() {
   if (paused) return;
   if (countdownFrames > 0) {
     countdownFrames -= 1;
+    updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
     return;
@@ -1061,6 +1084,7 @@ function update() {
 
   if (flash > 0) flash -= 1;
   if (shake > 0) shake -= 1;
+  updateCameraImpactPulse();
 }
 
 function updateFighter(f, opponent) {
@@ -1074,6 +1098,7 @@ function updateFighter(f, opponent) {
   f.crouch += ((wantBlock ? 1 : 0) - f.crouch) * 0.18;
   if (f.counterWindow > 0) f.counterWindow -= 1;
   if (f.hitFlash > 0) f.hitFlash -= 1;
+  if (f.contactFlash > 0) f.contactFlash -= 1;
   if (f.impactPulse > 0) f.impactPulse -= 1;
   if (f.pigMorph > 0) f.pigMorph -= 1;
 
@@ -1199,26 +1224,31 @@ function landHit(attacker, target, damage, projectile = false) {
   const finalDamage = blocked ? Math.ceil(damage * 0.28) : damage + (counter ? 4 : 0);
   const impactDir = attacker?.dir ?? target.dir * -1;
   const impactColor = blocked ? "#bdeaff" : projectile ? "#fff0a6" : counter ? "#fff1bd" : "#ffd44d";
+  const impactStrength = blocked ? 0.42 : counter ? 1.35 : projectile ? 1.18 : heavyImpact ? 1.08 : 0.78;
 
   target.health = clamp(target.health - finalDamage, 0, 100);
   target.hurt = blocked ? 9 : attacker?.attack?.type === "grab" ? 30 : projectile ? 21 : 24;
-  target.hitFlash = blocked ? 8 : projectile ? 18 : 14;
-  target.impactPulse = blocked ? 7 : heavyImpact ? 16 : 12;
+  target.hitFlash = blocked ? 8 : projectile ? 20 : heavyImpact ? 17 : 14;
+  target.contactFlash = blocked ? 7 : heavyImpact ? 14 : 11;
+  target.impactPulse = blocked ? 8 : Math.round(13 + impactStrength * 5);
   target.impactDir = impactDir;
-  target.impactLift = blocked ? 0.45 : projectile ? 1.15 : heavyImpact ? 1.35 : 0.9;
-  target.vx = impactDir * (blocked ? 3 : projectile ? 5 : 6.2);
-  target.vy = target.grounded ? (blocked ? -1.4 : projectile ? -3.2 : -4.2) : target.vy;
+  target.impactLift = blocked ? 0.45 : projectile ? 1.35 : heavyImpact ? 1.48 : 1;
+  target.impactStrength = impactStrength;
+  target.vx = impactDir * (blocked ? 3.1 : projectile ? 5.8 : heavyImpact ? 7 : 5.9);
+  target.vy = target.grounded ? (blocked ? -1.35 : projectile ? -3.45 : heavyImpact ? -4.45 : -3.75) : target.vy;
   if (attacker) {
     attacker.energy = clamp(attacker.energy + (blocked ? 3 : 8), 0, 100);
     attacker.impactPulse = Math.max(attacker.impactPulse ?? 0, blocked ? 3 : heavyImpact ? 5 : 4);
     attacker.impactDir = impactDir;
     attacker.impactLift = 0.22;
+    attacker.impactStrength = Math.max(attacker.impactStrength ?? 0, blocked ? 0.25 : 0.4);
+    attacker.vx -= impactDir * (blocked ? 0.35 : 0.18);
   }
   if (blocked) target.counterWindow = 34;
   if (counter && attacker) attacker.counterWindow = 0;
-  flash = blocked ? 2 : heavyImpact ? 7 : 5;
-  shake = blocked ? Math.max(shake, 3) : Math.max(shake, projectile ? 8 : heavyImpact ? 7 : 5);
-  hitStopFrames = blocked ? Math.max(hitStopFrames, 1) : Math.max(hitStopFrames, heavyImpact ? 4 : 2);
+  flash = blocked ? 2 : heavyImpact ? 8 : 5;
+  shake = blocked ? Math.max(shake, 3) : Math.max(shake, projectile ? 9 : heavyImpact ? 8 : 6);
+  hitStopFrames = blocked ? Math.max(hitStopFrames, 2) : Math.max(hitStopFrames, counter ? 6 : heavyImpact ? 5 : 3);
   playSound(blocked ? "block" : "hit");
   addText(
     target.x,
@@ -1228,6 +1258,7 @@ function landHit(attacker, target, damage, projectile = false) {
   );
   const impactX = target.x - target.dir * 26;
   const impactY = target.y - (projectile ? 116 : blocked ? 108 : heavyImpact ? 88 : 96);
+  triggerCameraImpact(impactDir, blocked, heavyImpact, counter, impactStrength);
   burst(
     target.x - target.dir * 22,
     target.y - (heavyImpact ? 92 : 102),
@@ -1249,8 +1280,74 @@ function landHit(attacker, target, damage, projectile = false) {
     heavyImpact,
   );
   impactGlints(impactX, impactY, impactColor, blocked, heavyImpact);
+  contactFlashBurst(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   cinematicImpact(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   floorDust(target.x, target.y + 3, blocked ? 4 : heavyImpact ? 10 : 7);
+}
+
+function triggerCameraImpact(dir, blocked, heavyImpact, counter, strength) {
+  const pulse = blocked ? 6 : counter ? 14 : heavyImpact ? 12 : 9;
+  if (pulse < cameraImpactPulse) return;
+
+  cameraImpactPulse = pulse;
+  cameraImpactMax = pulse;
+  cameraImpactDir = dir || 1;
+  cameraImpactStrength = blocked ? 0.45 : counter ? 1.28 : strength;
+}
+
+function contactFlashBurst(x, y, color, dir, blocked, heavyImpact, counter) {
+  const strength = blocked ? 0.48 : counter ? 1.35 : heavyImpact ? 1.08 : 0.82;
+  particles.push({
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    angle: dir > 0 ? 0 : Math.PI,
+    life: blocked ? 8 : counter ? 13 : heavyImpact ? 12 : 10,
+    maxLife: blocked ? 8 : counter ? 13 : heavyImpact ? 12 : 10,
+    size: blocked ? 22 : counter ? 42 : heavyImpact ? 36 : 30,
+    color,
+    strength,
+    kind: "contactFlash",
+  });
+
+  if (!blocked) {
+    particles.push({
+      x: x - dir * 7,
+      y: y + 6,
+      vx: dir * 0.8,
+      vy: 0,
+      angle: dir > 0 ? -0.08 : Math.PI + 0.08,
+      life: heavyImpact ? 15 : 12,
+      maxLife: heavyImpact ? 15 : 12,
+      size: heavyImpact ? 74 : 54,
+      color,
+      strength,
+      kind: "recoilArc",
+    });
+  }
+
+  const shardCount = blocked ? 4 : heavyImpact ? 10 : 7;
+  const spread = blocked ? 0.78 : heavyImpact ? 1.18 : 0.98;
+  const base = dir > 0 ? 0 : Math.PI;
+  for (let i = 0; i < shardCount; i += 1) {
+    const lane = shardCount === 1 ? 0 : i / (shardCount - 1) - 0.5;
+    const angle = base + lane * spread + (Math.random() - 0.5) * 0.16;
+    const speed = blocked ? 1.1 : heavyImpact ? 3.2 : 2.45;
+    particles.push({
+      x,
+      y: y + lane * 18,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.42 - (blocked ? 0.2 : 0.45),
+      angle,
+      life: blocked ? 10 + Math.random() * 5 : 13 + Math.random() * 7,
+      maxLife: blocked ? 12 : 17,
+      size: blocked ? 8 : heavyImpact ? 14 : 11,
+      color,
+      strength,
+      kind: "hitShard",
+    });
+  }
 }
 
 function burst(x, y, color, count) {
@@ -1416,7 +1513,7 @@ function updateParticles() {
   particles = particles.filter((p) => {
     p.x += p.vx ?? 0;
     p.y += p.vy ?? 0;
-    if (!["slash", "ring", "impactCore", "impactLine"].includes(p.kind)) p.vy = (p.vy ?? 0) + 0.13;
+    if (!["slash", "ring", "impactCore", "impactLine", "contactFlash", "recoilArc"].includes(p.kind)) p.vy = (p.vy ?? 0) + 0.13;
     p.life -= 1;
     return p.life > 0;
   });
@@ -1453,8 +1550,14 @@ function applyCamera() {
   cameraPan += (targetPan - cameraPan) * ease;
   cameraLift += (targetLift - cameraLift) * ease;
 
-  ctx.translate(W / 2 + cameraPan, H / 2 + cameraLift);
-  ctx.scale(cameraZoom, cameraZoom);
+  const impactT = cameraImpactPulse > 0 ? clamp(cameraImpactPulse / Math.max(1, cameraImpactMax), 0, 1) : 0;
+  const impactEase = impactT * impactT * cameraImpactStrength;
+  const impactZoom = impactEase * (mobileView ? 0.012 : 0.028);
+  const impactPan = cameraImpactDir * impactEase * (mobileView ? 4.5 : 8.5);
+  const impactLift = -impactEase * (mobileView ? 1.8 : 3.8);
+
+  ctx.translate(W / 2 + cameraPan + impactPan, H / 2 + cameraLift + impactLift);
+  ctx.scale(cameraZoom + impactZoom, cameraZoom + impactZoom);
   ctx.translate(-W / 2, -H / 2);
 }
 
@@ -2257,13 +2360,15 @@ function fighterTransitionMotion(f, walking) {
   if (f.hurt > 0) {
     const hurtT = clamp(f.hurt / 24, 0, 1);
     const impactT = clamp((f.impactPulse ?? 0) / 16, 0, 1);
+    const strength = clamp(f.impactStrength ?? 0.8, 0.35, 1.45);
+    const contactT = clamp((f.contactFlash ?? 0) / 14, 0, 1);
     const shakePulse = Math.sin(roundFrame * 1.75) * hurtT;
     const impactDir = f.impactDir ?? dir;
-    motion.x += impactDir * (impactT * 2.6 + hurtT * 1.2) + shakePulse * 0.9;
-    motion.y += Math.sin(f.hurt * 0.82) * hurtT * 0.8 - impactT * 0.45;
-    motion.rotation += impactDir * (impactT * 0.018 + hurtT * 0.012) + shakePulse * 0.005;
-    motion.scaleX *= 1 + impactT * 0.012;
-    motion.scaleY *= 1 - impactT * 0.006;
+    motion.x += impactDir * (impactT * (2.4 + strength * 3.1) + hurtT * (0.8 + strength * 0.9)) + shakePulse * 0.9;
+    motion.y += Math.sin(f.hurt * 0.82) * hurtT * 0.8 - impactT * (0.35 + strength * 0.45) + contactT * 0.8;
+    motion.rotation += impactDir * (impactT * (0.016 + strength * 0.023) + hurtT * 0.012) + shakePulse * 0.005;
+    motion.scaleX *= 1 + impactT * (0.008 + strength * 0.012) + contactT * 0.006;
+    motion.scaleY *= 1 - impactT * (0.004 + strength * 0.006) + contactT * 0.004;
   }
 
   if (winner) {
@@ -3070,6 +3175,8 @@ function drawHurtRim(f, crouch) {
 
 function drawHitFlash(f, crouch) {
   const alpha = clamp(f.hitFlash / 16, 0, 1);
+  const contact = clamp((f.contactFlash ?? 0) / 14, 0, 1);
+  const strength = clamp(f.impactStrength ?? 0.8, 0.45, 1.45);
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   const glow = ctx.createRadialGradient(0, -102 + crouch, 8, 0, -102 + crouch, 78);
@@ -3089,6 +3196,29 @@ function drawHitFlash(f, crouch) {
   ctx.moveTo(22, -134 + crouch);
   ctx.lineTo(-26, -66 + crouch);
   ctx.stroke();
+
+  if (contact > 0) {
+    const dir = f.impactDir ?? f.dir;
+    const localDir = dir === f.dir ? 1 : -1;
+    ctx.translate(localDir * 18, -104 + crouch);
+    ctx.rotate(localDir * -0.12);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.48 * contact})`;
+    ctx.lineWidth = 4.5 * strength;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-28, -9);
+    ctx.lineTo(30, 8);
+    ctx.moveTo(-20, 13);
+    ctx.lineTo(20, -14);
+    ctx.stroke();
+
+    ctx.strokeStyle = colorWithAlpha(f.trim, 0.28 * contact);
+    ctx.lineWidth = 9 * strength;
+    ctx.beginPath();
+    ctx.moveTo(-34, 0);
+    ctx.quadraticCurveTo(0, -22, 38, -5);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -4723,6 +4853,82 @@ function drawParticles() {
       ctx.lineWidth = Math.max(1.2, p.size * 0.58);
       ctx.beginPath();
       ctx.moveTo(-length * 0.38, 0);
+      ctx.lineTo(length * 0.62, 0);
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === "contactFlash") {
+      const progress = 1 - p.life / (p.maxLife ?? 10);
+      const radius = p.size * (1 + progress * 0.55);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle ?? 0);
+      ctx.globalCompositeOperation = "screen";
+      const core = ctx.createRadialGradient(0, 0, 1, 0, 0, radius);
+      core.addColorStop(0, `rgba(255, 255, 255, ${0.86 * alpha})`);
+      core.addColorStop(0.23, colorWithAlpha(p.color, 0.68 * alpha));
+      core.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = core;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, radius * 1.12, radius * 0.64, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.lineCap = "round";
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.72 * alpha})`;
+      ctx.lineWidth = Math.max(2, 5.5 * (1 - progress));
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.9, 0);
+      ctx.lineTo(radius * 1.05, 0);
+      ctx.moveTo(0, -radius * 0.52);
+      ctx.lineTo(0, radius * 0.52);
+      ctx.stroke();
+      ctx.strokeStyle = colorWithAlpha(p.color, 0.44 * alpha);
+      ctx.lineWidth = Math.max(1.4, 3.5 * (1 - progress));
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.52, -radius * 0.34);
+      ctx.lineTo(radius * 0.58, radius * 0.34);
+      ctx.moveTo(-radius * 0.36, radius * 0.32);
+      ctx.lineTo(radius * 0.42, -radius * 0.32);
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === "recoilArc") {
+      const progress = 1 - p.life / (p.maxLife ?? 12);
+      const length = p.size * (1 - progress * 0.3);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle ?? 0);
+      ctx.globalCompositeOperation = "screen";
+      ctx.lineCap = "round";
+      ctx.strokeStyle = colorWithAlpha(p.color, 0.26 * alpha);
+      ctx.lineWidth = 13 * (1 - progress * 0.42);
+      ctx.beginPath();
+      ctx.moveTo(-length * 0.46, 0);
+      ctx.quadraticCurveTo(0, -length * 0.26, length * 0.56, -length * 0.04);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.32 * alpha})`;
+      ctx.lineWidth = Math.max(1.4, 4.8 * (1 - progress));
+      ctx.beginPath();
+      ctx.moveTo(-length * 0.32, -2);
+      ctx.quadraticCurveTo(0, -length * 0.18, length * 0.42, -length * 0.02);
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === "hitShard") {
+      const progress = 1 - p.life / (p.maxLife ?? 16);
+      const length = p.size * (2.8 - progress * 1.2);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle ?? 0);
+      ctx.globalCompositeOperation = "screen";
+      ctx.fillStyle = colorWithAlpha(p.color, 0.52 * alpha);
+      ctx.beginPath();
+      ctx.moveTo(length * 0.7, 0);
+      ctx.lineTo(-length * 0.35, -p.size * 0.32);
+      ctx.lineTo(-length * 0.12, p.size * 0.32);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.42 * alpha})`;
+      ctx.lineWidth = Math.max(1, p.size * 0.12);
+      ctx.beginPath();
+      ctx.moveTo(-length * 0.18, 0);
       ctx.lineTo(length * 0.62, 0);
       ctx.stroke();
       ctx.restore();
