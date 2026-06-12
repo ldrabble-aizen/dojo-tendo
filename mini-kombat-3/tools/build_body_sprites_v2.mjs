@@ -12,16 +12,16 @@ const ANCHOR_X = 105;
 const ANCHOR_Y = 286;
 
 const frames = [
-  { key: "idle1", pose: "idle", lean: -1, arm: "ready", legs: "stanceA" },
-  { key: "idle2", pose: "idle", lean: 1, arm: "ready", legs: "stanceB" },
-  { key: "walk1", pose: "walk", lean: 2, arm: "walkA", legs: "walkA" },
-  { key: "walk2", pose: "walk", lean: -2, arm: "walkB", legs: "walkB" },
-  { key: "punch1", pose: "punch", lean: 4, arm: "punchPrep", legs: "brace" },
-  { key: "punch2", pose: "punch", lean: 8, arm: "punchHit", legs: "braceWide" },
-  { key: "punch3", pose: "punch", lean: 2, arm: "punchRecover", legs: "stanceB" },
-  { key: "kick1", pose: "kick", lean: -4, arm: "counter", legs: "kickPrep" },
-  { key: "kick2", pose: "kick", lean: -9, arm: "counter", legs: "kickHit" },
-  { key: "kick3", pose: "kick", lean: -3, arm: "ready", legs: "kickRecover" },
+  { key: "idle1", pose: "idle", lean: -1, arm: "ready", legs: "stanceA", torsoTop: 1, shadowRx: 52 },
+  { key: "idle2", pose: "idle", lean: 1, arm: "ready", legs: "stanceB", torsoTop: -1, shadowRx: 54 },
+  { key: "walk1", pose: "walk", lean: 4, arm: "walkA", legs: "walkA", torsoTop: 1, shadowRx: 58 },
+  { key: "walk2", pose: "walk", lean: -4, arm: "walkB", legs: "walkB", torsoTop: -1, shadowRx: 48 },
+  { key: "punch1", pose: "punch", lean: -5, arm: "punchPrep", legs: "braceLoad", torsoTop: 4, torsoBottom: 3, shadowRx: 62 },
+  { key: "punch2", pose: "punch", lean: 12, arm: "punchHit", legs: "lunge", torsoTop: -3, torsoBottom: -1, shadowRx: 72 },
+  { key: "punch3", pose: "punch", lean: 1, arm: "punchRecover", legs: "rebound", torsoTop: 2, torsoBottom: 1, shadowRx: 56 },
+  { key: "kick1", pose: "kick", lean: -8, arm: "kickGuard", legs: "kickChamber", torsoTop: 3, torsoBottom: 2, shadowRx: 58 },
+  { key: "kick2", pose: "kick", lean: -13, arm: "kickGuard", legs: "kickHit", torsoTop: -2, torsoBottom: -2, shadowRx: 74 },
+  { key: "kick3", pose: "kick", lean: -2, arm: "ready", legs: "kickRecover", torsoTop: 1, shadowRx: 55 },
   { key: "block", pose: "block", lean: -2, arm: "block", legs: "brace" },
   { key: "hurt1", pose: "hurt", lean: 10, arm: "hurt", legs: "stumble" },
   { key: "hurt2", pose: "hurt", lean: 5, arm: "hurtLow", legs: "stumbleLow" },
@@ -159,16 +159,20 @@ function armPose(kind, b) {
       [{ x: 136, y: shoulderY }, { x: 145, y: 132 }, { x: 141, y: 160 }, { x: 132, y: 184 }],
     ],
     punchPrep: [
-      [{ x: 73, y: 109 }, { x: 56, y: 128 }, { x: 49, y: 151 }, { x: 61, y: 170 }],
-      [{ x: 136, y: 107 }, { x: 151, y: 105 }, { x: 162, y: 112 }, { x: 174, y: 123 }],
+      [{ x: 73, y: 110 }, { x: 61, y: 124 }, { x: 58, y: 145 }, { x: 70, y: 160 }],
+      [{ x: 136, y: 107 }, { x: 123, y: 107 }, { x: 115, y: 119 }, { x: 108, y: 133 }],
     ],
     punchHit: [
-      [{ x: 73, y: 110 }, { x: 57, y: 137 }, { x: 58, y: 164 }, { x: 70, y: 184 }],
-      [{ x: 136, y: 106 }, { x: 164, y: 102 }, { x: 188, y: 101 }, { x: 207, y: 100 }],
+      [{ x: 73, y: 110 }, { x: 62, y: 130 }, { x: 64, y: 151 }, { x: 77, y: 167 }],
+      [{ x: 136, y: 106 }, { x: 164, y: 98 }, { x: 188, y: 97 }, { x: 207, y: 96 }],
     ],
     punchRecover: [
-      [{ x: 73, y: 109 }, { x: 58, y: 135 }, { x: 59, y: 163 }, { x: 69, y: 184 }],
-      [{ x: 136, y: 107 }, { x: 149, y: 119 }, { x: 157, y: 143 }, { x: 149, y: 166 }],
+      [{ x: 73, y: 110 }, { x: 59, y: 134 }, { x: 59, y: 160 }, { x: 70, y: 181 }],
+      [{ x: 136, y: 107 }, { x: 151, y: 121 }, { x: 155, y: 145 }, { x: 144, y: 166 }],
+    ],
+    kickGuard: [
+      [{ x: 74, y: 109 }, { x: 61, y: 124 }, { x: 58, y: 146 }, { x: 67, y: 165 }],
+      [{ x: 136, y: 108 }, { x: 121, y: 117 }, { x: 117, y: 139 }, { x: 126, y: 158 }],
     ],
     counter: [
       [{ x: 74, y: 109 }, { x: 59, y: 126 }, { x: 58, y: 148 }, { x: 69, y: 168 }],
@@ -238,17 +242,33 @@ function legPose(kind, b) {
       [{ x: 84, y: hipY }, { x: 73, y: 210 }, { x: 64, y: 244 }, { x: 47, y: 281 }],
       [{ x: 126, y: hipY }, { x: 136, y: 210 }, { x: 146, y: 244 }, { x: 163, y: 281 }],
     ],
+    braceLoad: [
+      [{ x: 83, y: hipY + 2 }, { x: 70, y: 216 }, { x: 60, y: 249 }, { x: 39, y: 281 }],
+      [{ x: 126, y: hipY + 2 }, { x: 139, y: 216 }, { x: 151, y: 249 }, { x: 172, y: 281 }],
+    ],
     braceWide: [
       [{ x: 82, y: hipY }, { x: 67, y: 211 }, { x: 55, y: 244 }, { x: 35, y: 281 }],
       [{ x: 127, y: hipY }, { x: 143, y: 210 }, { x: 157, y: 244 }, { x: 184, y: 281 }],
+    ],
+    lunge: [
+      [{ x: 82, y: hipY }, { x: 66, y: 213 }, { x: 52, y: 246 }, { x: 28, y: 281 }],
+      [{ x: 127, y: hipY }, { x: 147, y: 209 }, { x: 164, y: 242 }, { x: 190, y: 281 }],
+    ],
+    rebound: [
+      [{ x: 84, y: hipY + 1 }, { x: 74, y: 212 }, { x: 66, y: 246 }, { x: 51, y: 281 }],
+      [{ x: 125, y: hipY + 1 }, { x: 136, y: 212 }, { x: 148, y: 246 }, { x: 166, y: 281 }],
     ],
     kickPrep: [
       [{ x: 84, y: hipY }, { x: 72, y: 209 }, { x: 64, y: 244 }, { x: 48, y: 281 }],
       [{ x: 124, y: hipY }, { x: 139, y: 199 }, { x: 146, y: 184 }, { x: 152, y: 169 }],
     ],
+    kickChamber: [
+      [{ x: 83, y: hipY + 2 }, { x: 69, y: 216 }, { x: 57, y: 250 }, { x: 38, y: 281 }],
+      [{ x: 124, y: hipY - 1 }, { x: 143, y: 195 }, { x: 142, y: 171 }, { x: 127, y: 155 }],
+    ],
     kickHit: [
       [{ x: 84, y: hipY }, { x: 70, y: 211 }, { x: 60, y: 245 }, { x: 40, y: 281 }],
-      [{ x: 124, y: hipY }, { x: 151, y: 187 }, { x: 181, y: 166 }, { x: 213, y: 151 }],
+      [{ x: 124, y: hipY }, { x: 153, y: 185 }, { x: 184, y: 164 }, { x: 213, y: 147 }],
     ],
     kickRecover: [
       [{ x: 84, y: hipY }, { x: 73, y: 211 }, { x: 64, y: 245 }, { x: 48, y: 281 }],
@@ -308,8 +328,8 @@ function drawFrame(fighter, frame, index) {
   const b = fighter.build;
   const x0 = index * FRAME_W;
   const lean = frame.lean;
-  const torsoTop = frame.pose === "defeat" ? 154 : frame.pose === "sweep" ? 126 : 82;
-  const torsoBottom = frame.pose === "defeat" ? 210 : frame.pose === "sweep" ? 190 : 179;
+  const torsoTop = (frame.pose === "defeat" ? 154 : frame.pose === "sweep" ? 126 : 82) + (frame.torsoTop ?? 0);
+  const torsoBottom = (frame.pose === "defeat" ? 210 : frame.pose === "sweep" ? 190 : 179) + (frame.torsoBottom ?? 0);
   const neckY = torsoTop - 17;
   const arms = armPose(frame.arm, b);
   const legs = legPose(frame.legs, b);
@@ -317,8 +337,10 @@ function drawFrame(fighter, frame, index) {
   const chest = b.chest;
   const waist = b.waist;
   const hip = b.hip;
-  const hipY = frame.pose === "defeat" ? 203 : frame.pose === "sweep" ? 189 : 177;
+  const hipY = (frame.pose === "defeat" ? 203 : frame.pose === "sweep" ? 189 : 177) + (frame.torsoBottom ?? 0);
   const cx = 105;
+  const shadowRx = frame.shadowRx ?? (frame.pose === "defeat" ? 74 : 54);
+  const shadowOpacity = frame.pose === "kick" && frame.legs === "kickHit" ? 0.11 : 0.16;
 
   const legSvg = legs.map((leg, legIndex) => {
     const color = legIndex === 0 ? "url(#pantsDark)" : "url(#pants)";
@@ -383,7 +405,7 @@ function drawFrame(fighter, frame, index) {
 
   return `<g transform="translate(${x0} 0)">
     <rect x="0" y="0" width="${FRAME_W}" height="${FRAME_H}" fill="none"/>
-    <ellipse cx="${ANCHOR_X}" cy="${ANCHOR_Y + 2}" rx="${frame.pose === "defeat" ? 74 : 54}" ry="10" fill="#000" opacity=".16"/>
+    <ellipse cx="${ANCHOR_X}" cy="${ANCHOR_Y + 2}" rx="${shadowRx}" ry="10" fill="#000" opacity="${shadowOpacity}"/>
     <g transform="rotate(${lean} ${cx} ${torsoBottom})">
       ${legSvg}
       <path d="${hipPlate}" fill="url(#pants)" class="limbEdge"/>

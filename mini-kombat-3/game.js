@@ -52,8 +52,8 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=34"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=34"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=35"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=35"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -2317,6 +2317,16 @@ function rasterBodyFrameIndex(f, frameName, walking) {
 
   if (f.attack && (frameName === "punch" || frameName === "kick")) {
     const t = clamp(f.attack.frame / Math.max(1, f.attack.duration), 0, 0.999);
+    if (frameName === "punch") {
+      if (t < 0.28) return frames[0];
+      if (t < 0.7) return frames[1];
+      return frames[2];
+    }
+    if (frameName === "kick") {
+      if (t < 0.34) return frames[0];
+      if (t < 0.72) return frames[1];
+      return frames[2];
+    }
     return frames[Math.floor(t * frames.length)] ?? frames[frames.length - 1];
   }
 
@@ -2341,9 +2351,11 @@ function rasterHeadPose(f, frameName, frameIndex) {
   if (frameName === "walk") {
     pose.y = -43;
   } else if (frameName === "punch") {
-    pose.y = frameIndex === 5 ? -44 : -43;
+    pose.x = frameIndex === 4 ? -2 : frameIndex === 5 ? 2 : 0;
+    pose.y = frameIndex === 5 ? -45 : frameIndex === 4 ? -42 : -43;
   } else if (frameName === "kick") {
-    pose.y = frameIndex === 8 ? -43 : -42;
+    pose.x = frameIndex === 7 ? -2 : frameIndex === 8 ? -3 : 0;
+    pose.y = frameIndex === 8 ? -44 : -42;
   } else if (frameName === "block") {
     pose.y = -40;
     pose.scale = 0.72;
