@@ -52,8 +52,8 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=36"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=36"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=37"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=37"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -527,6 +527,9 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     specialCooldown: 0,
     counterWindow: 0,
     hitFlash: 0,
+    impactPulse: 0,
+    impactDir: dir,
+    impactLift: 0,
     wins: 0,
     ai: {
       left: false,
@@ -674,6 +677,9 @@ function resetRound() {
     hurt: 0,
     pigMorph: 0,
     hitFlash: 0,
+    impactPulse: 0,
+    impactDir: 1,
+    impactLift: 0,
     blocking: false,
     grounded: true,
     specialCooldown: 0,
@@ -694,6 +700,9 @@ function resetRound() {
     hurt: 0,
     pigMorph: 0,
     hitFlash: 0,
+    impactPulse: 0,
+    impactDir: -1,
+    impactLift: 0,
     blocking: false,
     grounded: true,
     specialCooldown: 0,
@@ -1061,6 +1070,7 @@ function updateFighter(f, opponent) {
   f.crouch += ((wantBlock ? 1 : 0) - f.crouch) * 0.18;
   if (f.counterWindow > 0) f.counterWindow -= 1;
   if (f.hitFlash > 0) f.hitFlash -= 1;
+  if (f.impactPulse > 0) f.impactPulse -= 1;
   if (f.pigMorph > 0) f.pigMorph -= 1;
 
   if (f.hurt > 0) {
@@ -1183,13 +1193,23 @@ function landHit(attacker, target, damage, projectile = false) {
   const attackType = attacker?.attack?.type ?? "";
   const heavyImpact = projectile || attackType === "kick" || attackType === "airKick" || attackType === "sweep" || attackType === "grab";
   const finalDamage = blocked ? Math.ceil(damage * 0.28) : damage + (counter ? 4 : 0);
+  const impactDir = attacker?.dir ?? target.dir * -1;
+  const impactColor = blocked ? "#bdeaff" : projectile ? "#fff0a6" : counter ? "#fff1bd" : "#ffd44d";
 
   target.health = clamp(target.health - finalDamage, 0, 100);
   target.hurt = blocked ? 9 : attacker?.attack?.type === "grab" ? 30 : projectile ? 21 : 24;
   target.hitFlash = blocked ? 8 : projectile ? 18 : 14;
-  target.vx = (attacker?.dir ?? target.dir * -1) * (blocked ? 3 : projectile ? 5 : 6.2);
+  target.impactPulse = blocked ? 7 : heavyImpact ? 16 : 12;
+  target.impactDir = impactDir;
+  target.impactLift = blocked ? 0.45 : projectile ? 1.15 : heavyImpact ? 1.35 : 0.9;
+  target.vx = impactDir * (blocked ? 3 : projectile ? 5 : 6.2);
   target.vy = target.grounded ? (blocked ? -1.4 : projectile ? -3.2 : -4.2) : target.vy;
-  if (attacker) attacker.energy = clamp(attacker.energy + (blocked ? 3 : 8), 0, 100);
+  if (attacker) {
+    attacker.energy = clamp(attacker.energy + (blocked ? 3 : 8), 0, 100);
+    attacker.impactPulse = Math.max(attacker.impactPulse ?? 0, blocked ? 3 : heavyImpact ? 5 : 4);
+    attacker.impactDir = impactDir;
+    attacker.impactLift = 0.22;
+  }
   if (blocked) target.counterWindow = 34;
   if (counter && attacker) attacker.counterWindow = 0;
   flash = blocked ? 2 : heavyImpact ? 7 : 5;
@@ -1213,18 +1233,19 @@ function landHit(attacker, target, damage, projectile = false) {
   impactBurst(
     impactX,
     impactY,
-    blocked ? "#bdeaff" : projectile ? "#fff0a6" : counter ? "#fff1bd" : "#ffd44d",
+    impactColor,
     blocked,
     heavyImpact,
   );
   impactShockwave(
     impactX - target.dir * 2,
     target.y - (projectile ? 116 : heavyImpact ? 90 : 100),
-    blocked ? "#bdeaff" : projectile ? "#fff0a6" : counter ? "#fff1bd" : "#ffd44d",
+    impactColor,
     blocked,
     heavyImpact,
   );
-  impactGlints(impactX, impactY, blocked ? "#bdeaff" : counter ? "#fff1bd" : projectile ? "#fff0a6" : "#ffd44d", blocked, heavyImpact);
+  impactGlints(impactX, impactY, impactColor, blocked, heavyImpact);
+  cinematicImpact(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   floorDust(target.x, target.y + 3, blocked ? 4 : heavyImpact ? 10 : 7);
 }
 
@@ -1304,6 +1325,57 @@ function impactGlints(x, y, color, blocked, heavyImpact) {
   }
 }
 
+function cinematicImpact(x, y, color, dir, blocked, heavyImpact, counter) {
+  particles.push({
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    life: blocked ? 8 : heavyImpact ? 13 : 10,
+    maxLife: blocked ? 8 : heavyImpact ? 13 : 10,
+    size: blocked ? 12 : heavyImpact ? 22 : 17,
+    color,
+    kind: "impactCore",
+  });
+
+  const count = blocked ? 2 : heavyImpact ? 6 : 4;
+  const spread = blocked ? 0.44 : heavyImpact ? 0.78 : 0.6;
+  const baseAngle = dir > 0 ? 0 : Math.PI;
+  for (let i = 0; i < count; i += 1) {
+    const lane = count === 1 ? 0 : i / (count - 1) - 0.5;
+    const angle = baseAngle + lane * spread + (Math.random() - 0.5) * 0.08;
+    const speed = blocked ? 0.85 : heavyImpact ? 1.65 : 1.25;
+    particles.push({
+      x: x - Math.cos(angle) * (blocked ? 4 : 8),
+      y: y - 8 + lane * 24,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.35,
+      angle,
+      length: blocked ? 24 : heavyImpact ? 68 : 48,
+      life: blocked ? 10 : heavyImpact ? 16 : 13,
+      maxLife: blocked ? 10 : heavyImpact ? 16 : 13,
+      size: blocked ? 2.4 : heavyImpact ? 4.6 : 3.4,
+      color,
+      kind: "impactLine",
+    });
+  }
+
+  if (counter || heavyImpact) {
+    particles.push({
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      life: counter ? 18 : 14,
+      maxLife: counter ? 18 : 14,
+      size: counter ? 31 : 24,
+      growth: counter ? 2.6 : 2.1,
+      color: counter ? "#fff1bd" : color,
+      kind: "ring",
+    });
+  }
+}
+
 function coldWaterSplash(x, y, dir) {
   for (let i = 0; i < 18; i += 1) {
     const angle = -Math.PI * 0.78 + (i / 17) * Math.PI * 0.62;
@@ -1340,7 +1412,7 @@ function updateParticles() {
   particles = particles.filter((p) => {
     p.x += p.vx ?? 0;
     p.y += p.vy ?? 0;
-    if (p.kind !== "slash" && p.kind !== "ring") p.vy = (p.vy ?? 0) + 0.13;
+    if (!["slash", "ring", "impactCore", "impactLine"].includes(p.kind)) p.vy = (p.vy ?? 0) + 0.13;
     p.life -= 1;
     return p.life > 0;
   });
@@ -2130,17 +2202,23 @@ function drawFighter(f) {
   const walking = Math.abs(f.vx) > 0.5 && f.grounded && f.hurt <= 0;
   const bob = Math.sin(t * 9) * (walking ? 3.2 : f.grounded ? 1.3 : 0);
   const hurtShift = f.hurt > 0 ? Math.sin(f.hurt * 1.4) * 4 : 0;
+  const impactT = clamp((f.impactPulse ?? 0) / 16, 0, 1);
+  const impactEase = impactT * impactT;
+  const impactShift = (f.impactDir ?? f.dir) * impactEase * (f.hurt > 0 ? 5.2 : 2.2);
+  const impactRise = impactEase * (f.impactLift ?? 0) * 3.4;
+  const impactLean = (f.impactDir ?? f.dir) * impactEase * (f.hurt > 0 ? 0.035 : 0.012);
   const crouch = f.crouch * 18;
-  const baseX = f.x + hurtShift;
-  const baseY = f.y + bob;
+  const baseX = f.x + hurtShift + impactShift;
+  const baseY = f.y + bob - impactRise;
   const stride = walking ? Math.sin(t * 14) : 0;
   const pose = getPose(f, stride);
   const attackStretch = f.attack ? attackProgress(f.attack) * 0.012 : 0;
   const breathing = f.grounded && f.hurt <= 0 ? Math.sin(t * 2.7 + f.x * 0.02) * 0.012 : 0;
-  const hurtSquash = f.hurt > 0 ? Math.sin(f.hurt * 0.7) * 0.012 : 0;
+  const hurtSquash = f.hurt > 0 ? Math.sin(f.hurt * 0.7) * 0.012 + impactEase * 0.014 : impactEase * 0.005;
 
   ctx.save();
   ctx.translate(baseX, baseY);
+  ctx.rotate(impactLean);
   ctx.scale(f.dir * (1 + attackStretch + hurtSquash), 1 + breathing - attackStretch * 0.28);
   ctx.scale(FIGHTER_SCALE, FIGHTER_SCALE);
 
@@ -2702,6 +2780,29 @@ function drawResultPoseEffect(f, crouch) {
   ctx.save();
   if (f.id === roundWinnerId) {
     ctx.globalCompositeOperation = "screen";
+    const floorPulse = 0.5 + Math.sin(roundFrame * 0.08) * 0.18;
+    ctx.strokeStyle = colorWithAlpha(f.trim, 0.28 + floorPulse * 0.16);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, -4 + crouch, 62 + floorPulse * 10, 13 + floorPulse * 3, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i += 1) {
+      const x = -44 + i * 29 + Math.sin(roundFrame * 0.04 + i) * 4;
+      const top = -204 + crouch + Math.cos(roundFrame * 0.03 + i) * 8;
+      const bottom = -36 + crouch;
+      const ray = ctx.createLinearGradient(x, top, x + 12, bottom);
+      ray.addColorStop(0, colorWithAlpha(f.trim, 0));
+      ray.addColorStop(0.44, colorWithAlpha(f.trim, 0.16));
+      ray.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.strokeStyle = ray;
+      ctx.beginPath();
+      ctx.moveTo(x, bottom);
+      ctx.lineTo(x + 14, top);
+      ctx.stroke();
+    }
+
     const spotlight = ctx.createRadialGradient(0, -142 + crouch, 12, 0, -96 + crouch, 126);
     spotlight.addColorStop(0, colorWithAlpha(f.trim, 0.2));
     spotlight.addColorStop(0.45, "rgba(255, 241, 189, 0.08)");
@@ -2729,16 +2830,33 @@ function drawResultPoseEffect(f, crouch) {
       ctx.fill();
     }
   } else {
-    ctx.globalAlpha = 0.72;
-    ctx.strokeStyle = "rgba(255, 241, 189, 0.58)";
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(12, 8, 7, 0.28)";
+    ctx.beginPath();
+    ctx.ellipse(0, -2 + crouch, 58, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalCompositeOperation = "screen";
+    ctx.globalAlpha = 0.62;
+    ctx.strokeStyle = "rgba(255, 241, 189, 0.48)";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(0, -170 + crouch, 21, 0, Math.PI * 2);
+    ctx.ellipse(0, -170 + crouch, 23, 10, 0.08, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.fillStyle = "rgba(255, 241, 189, 0.62)";
+    ctx.fillStyle = "rgba(255, 241, 189, 0.5)";
     for (let i = 0; i < 3; i += 1) {
       ctx.beginPath();
       ctx.arc(-18 + i * 18, -171 + crouch + Math.sin(roundFrame * 0.12 + i) * 4, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = colorWithAlpha(f.trim, 0.38);
+    for (let i = 0; i < 4; i += 1) {
+      const x = -34 + i * 22 + Math.sin(roundFrame * 0.05 + i) * 3;
+      const y = -20 + crouch - Math.sin(roundFrame * 0.07 + i) * 5;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 9 + i, 4, 0.1, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -4079,6 +4197,41 @@ function drawParticles() {
       ctx.beginPath();
       ctx.moveTo(-p.length * 0.4, 0);
       ctx.quadraticCurveTo(0, -p.length * 0.22, p.length * 0.6, 0);
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === "impactCore") {
+      const progress = 1 - p.life / (p.maxLife ?? 12);
+      const radius = p.size * (1 + progress * 0.7);
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      const core = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, radius);
+      core.addColorStop(0, `rgba(255, 255, 255, ${0.72 * alpha})`);
+      core.addColorStop(0.32, colorWithAlpha(p.color, 0.48 * alpha));
+      core.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = core;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, radius * 1.05, radius * 0.72, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (p.kind === "impactLine") {
+      const progress = 1 - p.life / (p.maxLife ?? 14);
+      const length = p.length * (1 - progress * 0.22);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      ctx.globalCompositeOperation = "screen";
+      ctx.lineCap = "round";
+      ctx.strokeStyle = colorWithAlpha(p.color, 0.28 * alpha);
+      ctx.lineWidth = p.size * 2.4;
+      ctx.beginPath();
+      ctx.moveTo(-length * 0.48, 0);
+      ctx.lineTo(length * 0.52, 0);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.42 * alpha})`;
+      ctx.lineWidth = Math.max(1.2, p.size * 0.58);
+      ctx.beginPath();
+      ctx.moveTo(-length * 0.38, 0);
+      ctx.lineTo(length * 0.62, 0);
       ctx.stroke();
       ctx.restore();
     } else if (p.kind === "ring") {
