@@ -12,15 +12,15 @@ const ANCHOR_X = 105;
 const ANCHOR_Y = 286;
 
 const frames = [
-  { key: "idle1", pose: "idle", lean: -1, arm: "ready", legs: "stanceA", torsoTop: 1, shadowRx: 52 },
-  { key: "idle2", pose: "idle", lean: 1, arm: "ready", legs: "stanceB", torsoTop: -1, shadowRx: 54 },
+  { key: "idle1", pose: "idle", lean: -2, arm: "ready", legs: "stanceA", torsoTop: 1, torsoBottom: 1, shadowRx: 53 },
+  { key: "idle2", pose: "idle", lean: 2, arm: "ready", legs: "stanceB", torsoTop: -2, torsoBottom: -1, shadowRx: 55 },
   { key: "walk1", pose: "walk", lean: 4, arm: "walkA", legs: "walkA", torsoTop: 1, shadowRx: 58 },
   { key: "walk2", pose: "walk", lean: -4, arm: "walkB", legs: "walkB", torsoTop: -1, shadowRx: 48 },
   { key: "punch1", pose: "punch", lean: -5, arm: "punchPrep", legs: "braceLoad", torsoTop: 4, torsoBottom: 3, shadowRx: 62 },
-  { key: "punch2", pose: "punch", lean: 12, arm: "punchHit", legs: "lunge", torsoTop: -3, torsoBottom: -1, shadowRx: 72 },
+  { key: "punch2", pose: "punch", lean: 15, arm: "punchHit", legs: "lunge", torsoTop: -4, torsoBottom: -1, shadowRx: 74 },
   { key: "punch3", pose: "punch", lean: 1, arm: "punchRecover", legs: "rebound", torsoTop: 2, torsoBottom: 1, shadowRx: 56 },
   { key: "kick1", pose: "kick", lean: -8, arm: "kickGuard", legs: "kickChamber", torsoTop: 3, torsoBottom: 2, shadowRx: 58 },
-  { key: "kick2", pose: "kick", lean: -13, arm: "kickGuard", legs: "kickHit", torsoTop: -2, torsoBottom: -2, shadowRx: 74 },
+  { key: "kick2", pose: "kick", lean: -16, arm: "kickGuard", legs: "kickHit", torsoTop: -3, torsoBottom: -3, shadowRx: 76 },
   { key: "kick3", pose: "kick", lean: -2, arm: "ready", legs: "kickRecover", torsoTop: 1, shadowRx: 55 },
   { key: "block", pose: "block", lean: -2, arm: "block", legs: "brace" },
   { key: "hurt1", pose: "hurt", lean: 10, arm: "hurt", legs: "stumble" },
@@ -30,9 +30,9 @@ const frames = [
   { key: "defeat", pose: "defeat", lean: 16, arm: "defeat", legs: "defeat" },
   { key: "sweep", pose: "sweep", lean: 13, arm: "sweep", legs: "sweep" },
   { key: "punchDrive", pose: "punch", lean: 6, arm: "punchDrive", legs: "lungeLoad", torsoTop: 0, torsoBottom: 1, shadowRx: 66 },
-  { key: "punchFollow", pose: "punch", lean: 15, arm: "punchFollow", legs: "lungeDeep", torsoTop: -5, torsoBottom: -3, shadowRx: 76 },
+  { key: "punchFollow", pose: "punch", lean: 18, arm: "punchFollow", legs: "lungeDeep", torsoTop: -6, torsoBottom: -4, shadowRx: 78 },
   { key: "kickWind", pose: "kick", lean: -4, arm: "kickBalance", legs: "kickPrep", torsoTop: 2, torsoBottom: 2, shadowRx: 62 },
-  { key: "kickFollow", pose: "kick", lean: -16, arm: "kickBalanceWide", legs: "kickFollow", torsoTop: -2, torsoBottom: -3, shadowRx: 78 },
+  { key: "kickFollow", pose: "kick", lean: -19, arm: "kickBalanceWide", legs: "kickFollow", torsoTop: -3, torsoBottom: -4, shadowRx: 80 },
   { key: "walk3", pose: "walk", lean: 2, arm: "walkCross", legs: "walkCross", torsoTop: 0, shadowRx: 56 },
   { key: "idle3", pose: "idle", lean: 0, arm: "readyHigh", legs: "stanceA", torsoTop: 0, shadowRx: 53 },
 ];
@@ -196,25 +196,47 @@ function bodyPaintLayers(fighter, cx, shoulder, chest, waist, hip, torsoTop, tor
 function styleArmPoint(point, b, kind, armIndex, pointIndex) {
   const p = { ...point };
   if (b.motion === "power") {
-    if (kind === "punchDrive" && armIndex === 1) {
-      p.x += [0, 2, 4, 4][pointIndex] ?? 0;
-      p.y += [0, -2, -3, -2][pointIndex] ?? 0;
+    if (kind === "ready" || kind === "readyHigh") {
+      p.x += armIndex === 0 ? [0, -4, -7, -8][pointIndex] ?? 0 : [0, 3, 6, 7][pointIndex] ?? 0;
+      p.y += armIndex === 0 ? [0, 0, -2, -6][pointIndex] ?? 0 : [0, -3, -8, -12][pointIndex] ?? 0;
+    } else if (kind === "punchPrep" && armIndex === 1) {
+      p.x -= [0, 8, 16, 20][pointIndex] ?? 0;
+      p.y += [0, -2, -6, -9][pointIndex] ?? 0;
+    } else if (kind === "punchDrive" && armIndex === 1) {
+      p.x += [0, 5, 10, 13][pointIndex] ?? 0;
+      p.y += [0, -4, -6, -6][pointIndex] ?? 0;
+    } else if (kind === "punchHit" && armIndex === 1) {
+      p.x += [0, 5, 12, 15][pointIndex] ?? 0;
+      p.y += [0, -4, -7, -8][pointIndex] ?? 0;
     } else if (kind === "punchFollow" && armIndex === 1) {
-      p.x += [0, 2, 3, 1][pointIndex] ?? 0;
-      p.y += [0, -2, -3, -4][pointIndex] ?? 0;
+      p.x += [0, 6, 12, 14][pointIndex] ?? 0;
+      p.y += [0, -3, -7, -8][pointIndex] ?? 0;
     } else if (kind.includes("punch") && armIndex === 0) {
-      p.x -= [0, 2, 4, 5][pointIndex] ?? 0;
-      p.y += [0, 2, 3, 3][pointIndex] ?? 0;
+      p.x -= [0, 5, 9, 10][pointIndex] ?? 0;
+      p.y += [0, 4, 8, 10][pointIndex] ?? 0;
+    } else if (kind.includes("kick") && armIndex === 0) {
+      p.x -= [0, 7, 12, 14][pointIndex] ?? 0;
+      p.y += [0, -2, -6, -8][pointIndex] ?? 0;
+    } else if (kind.includes("kick") && armIndex === 1) {
+      p.x += [0, 3, 6, 7][pointIndex] ?? 0;
+      p.y += [0, 2, 4, 5][pointIndex] ?? 0;
     }
   } else if (b.motion === "agile") {
     if (kind === "ready" || kind === "readyHigh") {
-      p.y -= armIndex === 1 ? [0, 3, 5, 5][pointIndex] ?? 0 : [0, 1, 2, 2][pointIndex] ?? 0;
-      p.x += armIndex === 1 ? [0, -2, -3, -3][pointIndex] ?? 0 : [0, 1, 2, 2][pointIndex] ?? 0;
+      p.y -= armIndex === 1 ? [0, 7, 13, 18][pointIndex] ?? 0 : [0, 4, 8, 12][pointIndex] ?? 0;
+      p.x += armIndex === 1 ? [0, -5, -8, -10][pointIndex] ?? 0 : [0, 4, 7, 8][pointIndex] ?? 0;
     } else if (kind.includes("kick") && armIndex === 0) {
-      p.y -= [0, 3, 5, 6][pointIndex] ?? 0;
-      p.x -= [0, 1, 2, 3][pointIndex] ?? 0;
+      p.y -= [0, 8, 15, 20][pointIndex] ?? 0;
+      p.x -= [0, 5, 9, 12][pointIndex] ?? 0;
+    } else if (kind.includes("kick") && armIndex === 1) {
+      p.y += [0, 2, 5, 8][pointIndex] ?? 0;
+      p.x += [0, 4, 8, 10][pointIndex] ?? 0;
     } else if (kind.includes("punch") && armIndex === 1) {
-      p.y -= [0, 1, 2, 2][pointIndex] ?? 0;
+      p.x += [0, 4, 9, 12][pointIndex] ?? 0;
+      p.y -= [0, 4, 8, 10][pointIndex] ?? 0;
+    } else if (kind.includes("punch") && armIndex === 0) {
+      p.x -= [0, 2, 5, 7][pointIndex] ?? 0;
+      p.y += [0, 2, 5, 6][pointIndex] ?? 0;
     }
   }
   return p;
@@ -223,22 +245,46 @@ function styleArmPoint(point, b, kind, armIndex, pointIndex) {
 function styleLegPoint(point, b, kind, legIndex, pointIndex) {
   const p = { ...point };
   if (b.motion === "power") {
-    if (kind.includes("lunge")) {
+    if (kind === "stanceA" || kind === "stanceB" || kind === "brace") {
       const dir = legIndex === 0 ? -1 : 1;
-      p.x += dir * ([0, 2, 5, 7][pointIndex] ?? 0);
-      p.y += [0, 1, 1, 0][pointIndex] ?? 0;
+      p.x += dir * ([0, 2, 5, 9][pointIndex] ?? 0);
+      p.y += [0, 2, 3, 1][pointIndex] ?? 0;
+    } else if (kind.includes("lunge")) {
+      const dir = legIndex === 0 ? -1 : 1;
+      p.x += dir * ([0, 5, 11, 16][pointIndex] ?? 0);
+      p.y += [0, 3, 4, 1][pointIndex] ?? 0;
     } else if (kind === "braceLoad" && pointIndex > 0) {
-      p.x += legIndex === 0 ? -3 : 3;
+      p.x += legIndex === 0 ? -8 : 8;
+      p.y += pointIndex === 1 ? 4 : 2;
+    } else if (kind === "kickHit" || kind === "kickFollow") {
+      if (legIndex === 1) {
+        p.x += [0, 5, 11, 17][pointIndex] ?? 0;
+        p.y += [0, -3, -6, -7][pointIndex] ?? 0;
+      } else if (pointIndex > 0) {
+        p.x -= [0, 4, 8, 12][pointIndex] ?? 0;
+        p.y += [0, 3, 6, 4][pointIndex] ?? 0;
+      }
     }
   } else if (b.motion === "agile") {
-    if (kind === "kickHit" || kind === "kickFollow") {
+    if (kind === "stanceA" || kind === "stanceB" || kind === "brace") {
+      const dir = legIndex === 0 ? -1 : 1;
+      p.x += dir * ([0, 0, 2, 4][pointIndex] ?? 0);
+      p.y -= [0, 1, 2, 1][pointIndex] ?? 0;
+    } else if (kind === "kickHit" || kind === "kickFollow") {
       if (legIndex === 1) {
-        p.x += [0, 2, 4, 5][pointIndex] ?? 0;
-        p.y -= [0, 2, 4, 5][pointIndex] ?? 0;
+        p.x += [0, 3, 5, 0][pointIndex] ?? 0;
+        p.y -= [0, 8, 18, 28][pointIndex] ?? 0;
       } else if (pointIndex > 1) {
-        p.x -= 3;
-        p.y += 1;
+        p.x -= 7;
+        p.y += 3;
       }
+    } else if (kind === "kickChamber" && legIndex === 1) {
+      p.x += [0, 5, 7, 1][pointIndex] ?? 0;
+      p.y -= [0, 7, 15, 20][pointIndex] ?? 0;
+    } else if (kind.includes("lunge")) {
+      const dir = legIndex === 0 ? -1 : 1;
+      p.x += dir * ([0, 2, 5, 8][pointIndex] ?? 0);
+      p.y -= [0, 1, 1, 2][pointIndex] ?? 0;
     } else if (kind === "walkCross" && pointIndex > 1) {
       p.y -= 2;
     }
@@ -251,12 +297,12 @@ function armPose(kind, b) {
   const l = b.arm;
   const poses = {
     ready: [
-      [{ x: 74, y: shoulderY }, { x: 61, y: 136 }, { x: 61, y: 164 }, { x: 70, y: 187 }],
-      [{ x: 136, y: shoulderY }, { x: 151, y: 134 }, { x: 151, y: 164 }, { x: 140, y: 187 }],
+      [{ x: 74, y: shoulderY }, { x: 62, y: 126 }, { x: 65, y: 145 }, { x: 79, y: 158 }],
+      [{ x: 136, y: shoulderY }, { x: 149, y: 122 }, { x: 148, y: 140 }, { x: 136, y: 153 }],
     ],
     readyHigh: [
-      [{ x: 74, y: shoulderY }, { x: 61, y: 132 }, { x: 60, y: 158 }, { x: 69, y: 179 }],
-      [{ x: 136, y: shoulderY }, { x: 150, y: 130 }, { x: 150, y: 156 }, { x: 139, y: 179 }],
+      [{ x: 74, y: shoulderY }, { x: 62, y: 122 }, { x: 66, y: 140 }, { x: 82, y: 151 }],
+      [{ x: 136, y: shoulderY }, { x: 148, y: 118 }, { x: 147, y: 136 }, { x: 134, y: 146 }],
     ],
     walkA: [
       [{ x: 74, y: shoulderY }, { x: 59, y: 132 }, { x: 55, y: 160 }, { x: 64, y: 184 }],
@@ -571,6 +617,14 @@ function drawFrame(fighter, frame, index) {
     ? `<path d="M ${cx - waist - 7} ${torsoBottom - 46} C ${cx - waist * 0.35} ${torsoBottom - 38} ${cx + waist * 0.35} ${torsoBottom - 38} ${cx + waist + 7} ${torsoBottom - 46}" class="waistShape"/>
        <path d="M ${cx - shoulder + 12} ${torsoTop + 23} C ${cx - 3} ${torsoTop + 58} ${cx + 18} ${torsoBottom - 29} ${cx + waist + 1} ${torsoBottom - 5}" stroke="url(#trim)" stroke-width="5" stroke-linecap="round" opacity=".95"/>`
     : "";
+  const punchTrail = frame.pose === "punch" && (frame.arm === "punchDrive" || frame.arm === "punchHit" || frame.arm === "punchFollow")
+    ? `<path d="M ${cx + 38} ${torsoTop + 29} C ${cx + 68} ${torsoTop + 4} ${cx + 95} ${torsoTop + 2} ${cx + 122} ${torsoTop + 12}" class="punchTrail"/>
+       <path d="M ${cx + 48} ${torsoTop + 44} C ${cx + 76} ${torsoTop + 28} ${cx + 104} ${torsoTop + 30} ${cx + 127} ${torsoTop + 40}" class="punchTrail fine"/>`
+    : "";
+  const kickTrail = frame.pose === "kick" && (frame.legs === "kickHit" || frame.legs === "kickFollow")
+    ? `<path d="M 140 162 C 162 135 190 128 208 142" class="kickTrail"/>
+       <path d="M 132 176 C 161 153 190 153 206 164" class="kickTrail fine"/>`
+    : "";
 
   return `<g transform="translate(${x0} 0)">
     <rect x="0" y="0" width="${FRAME_W}" height="${FRAME_H}" fill="none"/>
@@ -590,8 +644,9 @@ function drawFrame(fighter, frame, index) {
       ${neck}
       ${identity}
       ${armSvg(frontArm, true)}
+      ${punchTrail}
       ${frame.pose === "special" ? `<circle cx="202" cy="80" r="18" fill="none" stroke="url(#trim)" stroke-width="4" opacity=".54"/><circle cx="202" cy="80" r="8" fill="url(#trim)" opacity=".38"/>` : ""}
-      ${frame.pose === "kick" && frame.legs === "kickHit" ? `<path d="M 145 166 C 170 141 205 137 236 148" fill="none" stroke="url(#trim)" stroke-width="7" stroke-linecap="round" opacity=".45"/>` : ""}
+      ${kickTrail}
     </g>
   </g>`;
 }
@@ -682,6 +737,8 @@ function makeSheet(fighter) {
     .sole { fill: none; stroke: #14110d; stroke-width: 2; stroke-linecap: round; opacity: .46; }
     .heel { fill: none; stroke: #14110d; stroke-width: 1.6; stroke-linecap: round; opacity: .32; }
     .shoeHi { fill: none; stroke: #fff7c9; stroke-width: 2; stroke-linecap: round; opacity: .42; }
+    .punchTrail, .kickTrail { fill: none; stroke: url(#trim); stroke-width: 6; stroke-linecap: round; opacity: .34; }
+    .punchTrail.fine, .kickTrail.fine { stroke-width: 2.4; opacity: .28; }
   </style>`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${FRAME_W * frames.length}" height="${FRAME_H}" viewBox="0 0 ${FRAME_W * frames.length} ${FRAME_H}">
