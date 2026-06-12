@@ -52,12 +52,12 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=47"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=47"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=48"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=48"),
 };
 const unifiedSpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-unified.svg?v=47"),
-  p2: loadImage("assets/sprite-akane-unified.svg?v=47"),
+  p1: loadImage("assets/sprite-pchan-unified.svg?v=48"),
+  p2: loadImage("assets/sprite-akane-unified.svg?v=48"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -2201,6 +2201,85 @@ function outfitSpec(f) {
   return f.outfit;
 }
 
+function smoothStep01(value) {
+  const t = clamp(value, 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function fighterTransitionMotion(f, walking) {
+  const motion = {
+    x: 0,
+    y: 0,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    afterimage: 0,
+  };
+  const dir = f.dir || 1;
+
+  if (walking) {
+    const walk = Math.sin(roundFrame * 0.34);
+    motion.x += walk * 0.35;
+    motion.y += Math.abs(walk) * 0.35;
+  }
+
+  if (f.attack) {
+    const a = f.attack;
+    const windup = 1 - smoothStep01(a.frame / Math.max(1, a.activeStart));
+    const strike = Math.sin(
+      clamp((a.frame - a.activeStart + 2) / Math.max(1, a.activeEnd - a.activeStart + 4), 0, 1) * Math.PI
+    );
+    const recovery = smoothStep01((a.frame - a.activeEnd) / Math.max(1, a.duration - a.activeEnd));
+    const isKick = a.type === "kick" || a.type === "airKick";
+    const isSweep = a.type === "sweep";
+    const isSpecial = a.type === "special";
+    const isGrab = a.type === "grab";
+    const reach = isKick ? 7.2 : isSweep ? 5.5 : isSpecial ? 5 : isGrab ? 4.5 : 6;
+    const brace = isKick ? 2.1 : isSweep ? 1.5 : 3.1;
+
+    motion.x += dir * (strike * reach - windup * brace - recovery * 1.2);
+    motion.y += windup * (isSweep ? 2.8 : 1.2) - strike * (isKick ? 2.4 : isSweep ? -2.8 : 1.1) + recovery * 0.6;
+    motion.rotation += dir * (-windup * 0.026 + strike * (isKick ? -0.032 : isSweep ? 0.052 : 0.038) - recovery * 0.012);
+    motion.scaleX *= 1 + strike * (isKick ? 0.018 : 0.014) - windup * 0.008;
+    motion.scaleY *= 1 + windup * 0.008 - strike * (isSweep ? 0.016 : 0.007);
+    motion.afterimage = (isSpecial ? 0.26 : isGrab ? 0.08 : 0.2) * strike;
+  }
+
+  if (f.blocking && !winner) {
+    const pulse = 0.5 + Math.sin(roundFrame * 0.58) * 0.5;
+    motion.x -= dir * (1.2 + pulse * 0.85);
+    motion.y += 0.45 + pulse * 0.5;
+    motion.rotation -= dir * (0.009 + pulse * 0.005);
+    motion.scaleX *= 0.994;
+    motion.scaleY *= 1.008;
+  }
+
+  if (f.hurt > 0) {
+    const hurtT = clamp(f.hurt / 24, 0, 1);
+    const impactT = clamp((f.impactPulse ?? 0) / 16, 0, 1);
+    const shakePulse = Math.sin(roundFrame * 1.75) * hurtT;
+    const impactDir = f.impactDir ?? dir;
+    motion.x += impactDir * (impactT * 2.6 + hurtT * 1.2) + shakePulse * 0.9;
+    motion.y += Math.sin(f.hurt * 0.82) * hurtT * 0.8 - impactT * 0.45;
+    motion.rotation += impactDir * (impactT * 0.018 + hurtT * 0.012) + shakePulse * 0.005;
+    motion.scaleX *= 1 + impactT * 0.012;
+    motion.scaleY *= 1 - impactT * 0.006;
+  }
+
+  if (winner) {
+    const settle = 0.5 + Math.sin(roundFrame * 0.08) * 0.5;
+    if (f.id === roundWinnerId) {
+      motion.y -= settle * 0.8;
+      motion.rotation += dir * 0.006 * settle;
+    } else {
+      motion.y += 0.8;
+      motion.rotation -= dir * 0.012;
+    }
+  }
+
+  return motion;
+}
+
 function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const spec = bodySpec(f);
   const air = clamp((FLOOR - f.y) / 132, 0, 1);
@@ -2239,6 +2318,7 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
 function drawFighter(f) {
   const t = performance.now() / 1000;
   const walking = Math.abs(f.vx) > 0.5 && f.grounded && f.hurt <= 0;
+  const transition = fighterTransitionMotion(f, walking);
   const bob = Math.sin(t * 9) * (walking ? 3.2 : f.grounded ? 1.3 : 0);
   const hurtShift = f.hurt > 0 ? Math.sin(f.hurt * 1.4) * 4 : 0;
   const impactT = clamp((f.impactPulse ?? 0) / 16, 0, 1);
@@ -2249,8 +2329,8 @@ function drawFighter(f) {
   const idleEase = f.grounded && !walking && f.hurt <= 0 && !f.attack && !winner ? 1 : 0;
   const idlePulse = Math.sin(t * 2.15 + f.x * 0.015) * idleEase;
   const crouch = f.crouch * 18;
-  const baseX = f.x + hurtShift + impactShift;
-  const baseY = f.y + bob - impactRise - idlePulse * 0.8;
+  const baseX = f.x + hurtShift + impactShift + transition.x;
+  const baseY = f.y + bob - impactRise - idlePulse * 0.8 + transition.y;
   const stride = walking ? Math.sin(t * 14) : 0;
   const pose = getPose(f, stride);
   const attackStretch = f.attack ? attackProgress(f.attack) * 0.012 : 0;
@@ -2261,8 +2341,11 @@ function drawFighter(f) {
 
   ctx.save();
   ctx.translate(baseX, baseY);
-  ctx.rotate(impactLean);
-  ctx.scale(f.dir * (1 + attackStretch + hurtSquash), 1 + breathing - attackStretch * 0.28);
+  ctx.rotate(impactLean + transition.rotation);
+  ctx.scale(
+    f.dir * (1 + attackStretch + hurtSquash) * transition.scaleX,
+    (1 + breathing - attackStretch * 0.28) * transition.scaleY
+  );
   ctx.scale(FIGHTER_SCALE, FIGHTER_SCALE);
 
   const pigForm = f.profileId === "p1" && f.pigMorph > 10 && f.pigMorph < 66;
@@ -2284,7 +2367,7 @@ function drawFighter(f) {
   if (f.energy >= 45 && f.hurt <= 0) drawEnergyAura(f.trim, crouch);
   drawSpriteUnderlay(f, pose, crouch);
 
-  if (drawRasterBodySprite(f, crouch, walking ? stride : 0, walking)) {
+  if (drawRasterBodySprite(f, crouch, walking ? stride : 0, walking, transition)) {
     if (f.blocking) drawGuard(f.trim, crouch);
     if (f.hitFlash > 0) drawHitFlash(f, crouch);
     if (f.hurt > 0) drawHurtRim(f, crouch);
@@ -2505,7 +2588,7 @@ function rasterHeadPose(f, frameName, frameIndex) {
   return pose;
 }
 
-function drawRasterBodySprite(f, crouch, stride, walking) {
+function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   const sheet = bodySpriteSheets[f.profileId];
   const unifiedSheet = unifiedSpriteSheets[f.profileId];
 
@@ -2513,6 +2596,28 @@ function drawRasterBodySprite(f, crouch, stride, walking) {
   const frameIndex = rasterBodyFrameIndex(f, frameName, walking);
   const frameX = frameIndex * BODY_SPRITE_FRAME_W;
   if (unifiedSheet?.complete && unifiedSheet.naturalWidth) {
+    if ((transition?.afterimage ?? 0) > 0.035) {
+      const ghostAlpha = clamp(transition.afterimage, 0, 0.24);
+      const ghostOffset = -10 - transition.afterimage * 22;
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = ghostAlpha;
+      ctx.shadowColor = colorWithAlpha(f.trim, 0.32);
+      ctx.shadowBlur = 8;
+      ctx.drawImage(
+        unifiedSheet,
+        frameX,
+        0,
+        BODY_SPRITE_FRAME_W,
+        BODY_SPRITE_FRAME_H,
+        -BODY_SPRITE_ANCHOR_X + ghostOffset,
+        -BODY_SPRITE_ANCHOR_Y + crouch * 0.18 + 1.5,
+        BODY_SPRITE_FRAME_W,
+        BODY_SPRITE_FRAME_H
+      );
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.shadowColor = "rgba(10, 8, 7, 0.5)";
     ctx.shadowBlur = 4;
