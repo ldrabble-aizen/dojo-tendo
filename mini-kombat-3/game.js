@@ -52,8 +52,8 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=33"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=33"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=34"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=34"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -2400,15 +2400,84 @@ function drawRasterBodySprite(f, crouch, stride, walking) {
 
   ctx.save();
   ctx.translate(headPose.x, 0);
+  drawSpriteHeadMount(f, headCrouch, headPose.scale);
   drawHead(f, headCrouch, 0, headPose.scale, {
     drawNeck: false,
     drawShadowImage: false,
     drawFaceGlow: false,
     lockRotation: true,
+    faceMask: "sprite",
   });
   ctx.restore();
   drawFighterStageLighting(f, crouch);
   return true;
+}
+
+function drawSpriteHeadMount(f, crouch, headScaleMultiplier = 1) {
+  const spec = bodySpec(f);
+  const outfit = outfitSpec(f) ?? {};
+  const headScale = (spec.headScale ?? 0.94) * headScaleMultiplier;
+  const headW = spec.headW * headScale;
+  const headH = spec.headH * headScale;
+  const y = -224 + crouch + spec.headY;
+  const skin = f.skin ?? "#f2b891";
+  const neckTop = y + headH * 0.72;
+  const neckBottom = y + headH + 9;
+  const neckW = Math.max(14, spec.neckW * headScale * 0.82);
+  const collarY = y + headH + 2;
+  const jacket = outfit.jacket ?? f.color;
+  const trim = outfit.sleeve ?? f.trim;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(12, 8, 7, 0.28)";
+  ctx.beginPath();
+  ctx.ellipse(0, collarY + 2, headW * 0.34, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const neckGrad = ctx.createLinearGradient(0, neckTop, 0, neckBottom);
+  neckGrad.addColorStop(0, lighten(skin, 12));
+  neckGrad.addColorStop(0.58, skin);
+  neckGrad.addColorStop(1, darken(skin, 22));
+  ctx.fillStyle = neckGrad;
+  ctx.beginPath();
+  ctx.roundRect(-neckW / 2, neckTop, neckW, neckBottom - neckTop, 7);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(48, 24, 18, 0.24)";
+  ctx.beginPath();
+  ctx.ellipse(0, neckTop + 2, neckW * 0.56, 4.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = jacket;
+  ctx.strokeStyle = "rgba(28, 16, 13, 0.58)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-headW * 0.36, collarY + 2);
+  ctx.quadraticCurveTo(-headW * 0.21, collarY - 4, -neckW * 0.34, neckTop + 11);
+  ctx.lineTo(-3, collarY + 17);
+  ctx.quadraticCurveTo(-headW * 0.22, collarY + 14, -headW * 0.42, collarY + 12);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(headW * 0.36, collarY + 2);
+  ctx.quadraticCurveTo(headW * 0.21, collarY - 4, neckW * 0.34, neckTop + 11);
+  ctx.lineTo(3, collarY + 17);
+  ctx.quadraticCurveTo(headW * 0.22, collarY + 14, headW * 0.42, collarY + 12);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.strokeStyle = trim;
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(-headW * 0.25, collarY + 4);
+  ctx.lineTo(-4, collarY + 14);
+  ctx.moveTo(headW * 0.25, collarY + 4);
+  ctx.lineTo(4, collarY + 14);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawAttackBodyGlow(f, crouch) {
@@ -3391,8 +3460,7 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
   ctx.fill();
 
   ctx.fillStyle = "rgba(22, 14, 12, 0.16)";
-  ctx.beginPath();
-  ctx.roundRect(x + 12, y + 8, headW - 24, headH - 15, 18);
+  drawFaceMaskPath(x + 12, y + 8, headW - 24, headH - 15, 18, options.faceMask);
   ctx.fill();
 
   if (f.face.complete) {
@@ -3414,13 +3482,11 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     }
 
     ctx.fillStyle = "rgba(18, 12, 10, 0.12)";
-    ctx.beginPath();
-    ctx.roundRect(clipX - 2, clipY - 2, clipW + 4, clipH + 4, clipRadius + 2);
+    drawFaceMaskPath(clipX - 2, clipY - 2, clipW + 4, clipH + 4, clipRadius + 2, options.faceMask);
     ctx.fill();
 
     ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(clipX, clipY, clipW, clipH, clipRadius);
+    drawFaceMaskPath(clipX, clipY, clipW, clipH, clipRadius, options.faceMask);
     ctx.clip();
     ctx.drawImage(f.face, x, y, headW, headH);
 
@@ -3445,19 +3511,18 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     rim.addColorStop(0.48, "rgba(255,255,255,0)");
     rim.addColorStop(1, "rgba(0,0,0,0.2)");
     ctx.fillStyle = rim;
-    ctx.beginPath();
-    ctx.roundRect(clipX, clipY, clipW, clipH, clipRadius);
+    drawFaceMaskPath(clipX, clipY, clipW, clipH, clipRadius, options.faceMask);
     ctx.fill();
 
     ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = "rgba(36, 21, 16, 0.28)";
+    ctx.fillStyle = options.faceMask === "sprite" ? "rgba(36, 21, 16, 0.18)" : "rgba(36, 21, 16, 0.28)";
     ctx.beginPath();
-    ctx.ellipse(0, y + headH - 12, headW * 0.28, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, y + headH - 11, headW * 0.27, 7, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = colorWithAlpha(f.trim, 0.32);
+    ctx.strokeStyle = colorWithAlpha(f.trim, options.faceMask === "sprite" ? 0.22 : 0.32);
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, y + headH * 0.53, headW * 0.4, -0.72, 0.72);
+    ctx.arc(0, y + headH * 0.53, headW * 0.4, -0.68, 0.68);
     ctx.stroke();
 
     if (f.headwear === "pchanBandana") drawPchanHeadBandana(x, y, headW, headH);
@@ -3466,6 +3531,21 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     ctx.fillRect(x, y, headW, headH);
   }
   ctx.restore();
+}
+
+function drawFaceMaskPath(x, y, w, h, radius, mode) {
+  ctx.beginPath();
+  if (mode === "sprite") {
+    const cx = x + w / 2;
+    ctx.moveTo(cx, y);
+    ctx.bezierCurveTo(x + w * 0.84, y + h * 0.03, x + w * 0.98, y + h * 0.22, x + w * 0.92, y + h * 0.55);
+    ctx.bezierCurveTo(x + w * 0.86, y + h * 0.86, x + w * 0.66, y + h * 1.02, cx, y + h);
+    ctx.bezierCurveTo(x + w * 0.34, y + h * 1.02, x + w * 0.14, y + h * 0.86, x + w * 0.08, y + h * 0.55);
+    ctx.bezierCurveTo(x + w * 0.02, y + h * 0.22, x + w * 0.16, y + h * 0.03, cx, y);
+    ctx.closePath();
+    return;
+  }
+  ctx.roundRect(x, y, w, h, radius);
 }
 
 function drawPchanHeadBandana(x, y, headW, headH) {
