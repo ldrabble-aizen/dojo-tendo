@@ -52,8 +52,8 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=39"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=39"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=40"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=40"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -2545,6 +2545,7 @@ function drawRasterBodySprite(f, crouch, stride, walking) {
   });
   ctx.restore();
   drawFighterStageLighting(f, crouch);
+  drawSpriteCinematicFinish(f, crouch, frameName);
   return true;
 }
 
@@ -2640,6 +2641,46 @@ function drawSpritePremiumDetails(f, crouch, frameName, stride) {
       ctx.fill();
     }
   }
+  ctx.restore();
+}
+
+function drawSpriteCinematicFinish(f, crouch, frameName) {
+  const action = f.attack ? attackProgress(f.attack) : 0;
+  const hurt = clamp((f.hurt ?? 0) / 24, 0, 1);
+  const energy = f.energy >= 45 ? 1 : 0;
+  const yOffset = crouch * 0.18;
+  const trim = f.trim ?? "#fff1bd";
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  const rim = ctx.createLinearGradient(-70, -220 + yOffset, 74, -24 + yOffset);
+  rim.addColorStop(0, "rgba(255, 240, 190, 0.18)");
+  rim.addColorStop(0.35, colorWithAlpha(trim, 0.1 + action * 0.08 + energy * 0.05));
+  rim.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = rim;
+  ctx.beginPath();
+  ctx.ellipse(-8, -114 + yOffset, 66, 122, -0.06, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (frameName === "punch" || frameName === "kick" || frameName === "special") {
+    ctx.strokeStyle = colorWithAlpha(trim, 0.18 + action * 0.14);
+    ctx.lineWidth = 2.2 + action * 1.2;
+    ctx.beginPath();
+    ctx.ellipse(0, -96 + yOffset, 60 + action * 18, 108 + action * 14, 0.02, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  const occlusion = ctx.createRadialGradient(4, -101 + yOffset, 10, 7, -88 + yOffset, 90);
+  occlusion.addColorStop(0, `rgba(24, 12, 9, ${0.04 + hurt * 0.08})`);
+  occlusion.addColorStop(0.55, "rgba(24, 12, 9, 0.035)");
+  occlusion.addColorStop(1, "rgba(24, 12, 9, 0)");
+  ctx.fillStyle = occlusion;
+  ctx.beginPath();
+  ctx.ellipse(8, -95 + yOffset, 62, 102, 0.03, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -3741,6 +3782,8 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     const clipH = headH - facePad * 1.55;
     const clipRadius = Math.min(24, Math.max(16, headW * 0.23));
 
+    drawHeadBackSilhouette(f, x, y, headW, headH, options.faceMask);
+
     if (options.drawShadowImage !== false) {
       ctx.save();
       ctx.shadowColor = "rgba(0, 0, 0, 0.48)";
@@ -3758,7 +3801,9 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     ctx.save();
     drawFaceMaskPath(clipX, clipY, clipW, clipH, clipRadius, options.faceMask);
     ctx.clip();
+    ctx.filter = options.faceMask === "sprite" ? "saturate(0.92) contrast(1.08) brightness(1.03)" : "none";
     ctx.drawImage(f.face, x, y, headW, headH);
+    ctx.filter = "none";
 
     if (options.drawFaceGlow !== false) {
       ctx.globalCompositeOperation = "screen";
@@ -3774,6 +3819,7 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     faceShade.addColorStop(1, "rgba(0,0,0,0.18)");
     ctx.fillStyle = faceShade;
     ctx.fillRect(clipX, clipY, clipW, clipH);
+    drawFacePaintPass(f, clipX, clipY, clipW, clipH, options.faceMask);
     ctx.restore();
 
     const rim = ctx.createLinearGradient(x, y, x + headW, y + headH);
@@ -3794,6 +3840,7 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     ctx.beginPath();
     ctx.arc(0, y + headH * 0.53, headW * 0.4, -0.68, 0.68);
     ctx.stroke();
+    drawHeadIntegrationPass(f, x, y, headW, headH, options.faceMask);
 
     if (f.profileId === "p2") drawAkaneHairWisps(f, x, y, headW, headH);
     if (f.headwear === "pchanBandana") drawPchanHeadBandana(f, x, y, headW, headH);
@@ -3817,6 +3864,138 @@ function drawFaceMaskPath(x, y, w, h, radius, mode) {
     return;
   }
   ctx.roundRect(x, y, w, h, radius);
+}
+
+function drawHeadBackSilhouette(f, x, y, headW, headH, maskMode) {
+  if (maskMode !== "sprite") return;
+
+  const skin = f.skin ?? "#f2b891";
+  const hair = f.profileId === "p2" ? "#211417" : "#3b2f28";
+  const sway = Math.sin(roundFrame * 0.075 + f.x * 0.011) * 1.6 + clamp((f.vx ?? 0) * 0.22, -1.8, 1.8);
+
+  if (f.profileId !== "p2") {
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = "rgba(34, 18, 13, 0.2)";
+    ctx.beginPath();
+    ctx.ellipse(0, y + headH * 0.59, headW * 0.42, headH * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = colorWithAlpha(darken(skin, 18), 0.18);
+    ctx.beginPath();
+    ctx.ellipse(-headW * 0.36, y + headH * 0.52, headW * 0.11, headH * 0.28, -0.18, 0, Math.PI * 2);
+    ctx.ellipse(headW * 0.36, y + headH * 0.52, headW * 0.11, headH * 0.28, 0.18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.42)";
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = hair;
+  ctx.globalAlpha = 0.78;
+  ctx.beginPath();
+  ctx.moveTo(x + headW * 0.48, y - 4);
+  ctx.bezierCurveTo(x + headW * 0.76, y - 5, x + headW * 0.92 + sway, y + headH * 0.12, x + headW * 0.94, y + headH * 0.38);
+  ctx.bezierCurveTo(x + headW * 0.82, y + headH * 0.24, x + headW * 0.64, y + headH * 0.12, x + headW * 0.5, y + headH * 0.12);
+  ctx.bezierCurveTo(x + headW * 0.34, y + headH * 0.12, x + headW * 0.18, y + headH * 0.24, x + headW * 0.06, y + headH * 0.38);
+  ctx.bezierCurveTo(x + headW * 0.08 - sway, y + headH * 0.12, x + headW * 0.22, y - 5, x + headW * 0.48, y - 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = hair;
+  ctx.globalAlpha = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(x + headW * 0.16 + sway, y + headH * 0.16);
+  ctx.bezierCurveTo(x + headW * 0.02 + sway, y + headH * 0.42, x + headW * 0.05, y + headH * 0.74, x + headW * 0.24, y + headH * 0.94);
+  ctx.bezierCurveTo(x + headW * 0.2, y + headH * 0.65, x + headW * 0.22, y + headH * 0.34, x + headW * 0.3, y + headH * 0.09);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(x + headW * 0.84 + sway, y + headH * 0.18);
+  ctx.bezierCurveTo(x + headW * 0.98 + sway, y + headH * 0.42, x + headW * 0.95, y + headH * 0.74, x + headW * 0.76, y + headH * 0.94);
+  ctx.bezierCurveTo(x + headW * 0.8, y + headH * 0.65, x + headW * 0.78, y + headH * 0.34, x + headW * 0.7, y + headH * 0.09);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawFacePaintPass(f, clipX, clipY, clipW, clipH, maskMode) {
+  if (maskMode !== "sprite") return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "soft-light";
+  ctx.fillStyle = "rgba(255, 232, 196, 0.16)";
+  ctx.beginPath();
+  ctx.ellipse(clipX + clipW * 0.34, clipY + clipH * 0.35, clipW * 0.24, clipH * 0.28, -0.25, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(55, 26, 18, 0.14)";
+  ctx.beginPath();
+  ctx.ellipse(clipX + clipW * 0.64, clipY + clipH * 0.74, clipW * 0.31, clipH * 0.16, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.strokeStyle = "rgba(42, 22, 17, 0.16)";
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(clipX + clipW * 0.22, clipY + clipH * 0.86);
+  ctx.quadraticCurveTo(clipX + clipW * 0.5, clipY + clipH * 0.99, clipX + clipW * 0.78, clipY + clipH * 0.86);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = f.profileId === "p2" ? "rgba(255, 245, 232, 0.12)" : "rgba(255, 244, 218, 0.14)";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(clipX + clipW * 0.2, clipY + clipH * 0.16);
+  ctx.bezierCurveTo(clipX + clipW * 0.34, clipY + clipH * 0.06, clipX + clipW * 0.64, clipY + clipH * 0.05, clipX + clipW * 0.82, clipY + clipH * 0.19);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawHeadIntegrationPass(f, x, y, headW, headH, maskMode) {
+  if (maskMode !== "sprite") return;
+
+  const trim = f.trim ?? "#fff1bd";
+  const skin = f.skin ?? "#f2b891";
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = "rgba(34, 18, 14, 0.24)";
+  ctx.beginPath();
+  ctx.ellipse(0, y + headH * 0.92, headW * 0.34, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const jaw = ctx.createLinearGradient(0, y + headH * 0.62, 0, y + headH);
+  jaw.addColorStop(0, "rgba(255,255,255,0)");
+  jaw.addColorStop(0.55, "rgba(73, 34, 25, 0.12)");
+  jaw.addColorStop(1, "rgba(34, 18, 14, 0.2)");
+  ctx.fillStyle = jaw;
+  ctx.beginPath();
+  ctx.ellipse(0, y + headH * 0.7, headW * 0.43, headH * 0.31, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(trim, 0.3);
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.arc(0, y + headH * 0.51, headW * 0.45, -0.92, 0.78);
+  ctx.stroke();
+  ctx.strokeStyle = colorWithAlpha(lighten(skin, 20), 0.12);
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, y + headH * 0.52, headW * 0.48, -2.45, -1.05);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawAkaneHairWisps(f, x, y, headW, headH) {
