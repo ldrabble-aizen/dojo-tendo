@@ -582,6 +582,11 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     landingDir: dir,
     airFrames: 0,
     moveIntent: 0,
+    poseState: "idle",
+    previousPoseState: "idle",
+    poseTransitionPulse: 0,
+    poseTransitionMax: 1,
+    poseTransitionDir: dir,
     wins: 0,
     ai: {
       left: false,
@@ -769,6 +774,11 @@ function resetRound() {
     landingDir: 1,
     airFrames: 0,
     moveIntent: 0,
+    poseState: "idle",
+    previousPoseState: "idle",
+    poseTransitionPulse: 0,
+    poseTransitionMax: 1,
+    poseTransitionDir: 1,
     blocking: false,
     grounded: true,
     specialCooldown: 0,
@@ -829,6 +839,11 @@ function resetRound() {
     landingDir: -1,
     airFrames: 0,
     moveIntent: 0,
+    poseState: "idle",
+    previousPoseState: "idle",
+    poseTransitionPulse: 0,
+    poseTransitionMax: 1,
+    poseTransitionDir: -1,
     blocking: false,
     grounded: true,
     specialCooldown: 0,
@@ -1500,6 +1515,7 @@ function updateFighter(f, opponent) {
     }
   }
 
+  updatePoseTransition(f);
   f.energy = clamp(f.energy + 0.045 + (Math.abs(f.vx) > 1 ? 0.012 : 0), 0, 100);
 }
 
@@ -3438,6 +3454,87 @@ function localizedImpactProfile(f) {
   };
 }
 
+function isAttackPoseState(state) {
+  return state === "punch" || state === "kick" || state === "sweep" || state === "special" || state === "grab";
+}
+
+function fighterPoseState(f) {
+  if (winner) {
+    if (f.id === roundWinnerId) return "victory";
+    return resultFrame < 18 ? "hurt" : "defeat";
+  }
+  if (f.hurt > 0) return "hurt";
+  if (f.blocking) return "block";
+
+  const type = f.attack?.type;
+  if (type === "punch" || type === "airPunch") return "punch";
+  if (type === "kick" || type === "airKick") return "kick";
+  if (type === "sweep") return "sweep";
+  if (type === "special") return "special";
+  if (type === "grab") return "grab";
+  if (!f.grounded) return "air";
+  if (Math.abs(f.vx ?? 0) > 0.5) return "walk";
+  return "idle";
+}
+
+function poseTransitionDuration(from, to) {
+  if (from === to) return 1;
+  if (to === "special") return 12;
+  if (to === "kick" || to === "sweep") return 10;
+  if (to === "punch" || to === "grab") return 8;
+  if (isAttackPoseState(from) && !isAttackPoseState(to)) return 11;
+  if (to === "block" || from === "block") return 8;
+  if (to === "hurt" || from === "hurt") return 5;
+  if (to === "air" || from === "air") return 7;
+  if (to === "walk" || from === "walk") return 6;
+  return 7;
+}
+
+function updatePoseTransition(f) {
+  const nextPose = fighterPoseState(f);
+  if (!f.poseState) {
+    f.poseState = nextPose;
+    f.previousPoseState = nextPose;
+    f.poseTransitionPulse = 0;
+    f.poseTransitionMax = 1;
+    f.poseTransitionDir = f.dir || 1;
+    return;
+  }
+
+  if (nextPose !== f.poseState) {
+    f.previousPoseState = f.poseState;
+    f.poseState = nextPose;
+    f.poseTransitionMax = poseTransitionDuration(f.previousPoseState, nextPose);
+    f.poseTransitionPulse = f.poseTransitionMax;
+    f.poseTransitionDir = f.dir || f.poseTransitionDir || 1;
+    return;
+  }
+
+  if ((f.poseTransitionPulse ?? 0) > 0) {
+    f.poseTransitionPulse -= 1;
+  }
+}
+
+function poseTransitionProfile(f) {
+  const max = Math.max(1, f.poseTransitionMax ?? 1);
+  const raw = clamp((f.poseTransitionPulse ?? 0) / max, 0, 1);
+  const progress = 1 - raw;
+  const wave = Math.sin(progress * Math.PI);
+  const from = f.previousPoseState || f.poseState || "idle";
+  const to = f.poseState || "idle";
+  return {
+    t: raw,
+    progress,
+    wave,
+    settle: smoothStep01(raw),
+    from,
+    to,
+    intoAttack: isAttackPoseState(to),
+    fromAttack: isAttackPoseState(from),
+    dir: f.poseTransitionDir || f.dir || 1,
+  };
+}
+
 function fighterTransitionMotion(f, walking) {
   const motion = {
     x: 0,
@@ -3514,6 +3611,46 @@ function fighterTransitionMotion(f, walking) {
     motion.rotation -= side * braceT * 0.012;
     motion.scaleX *= 1 + braceT * 0.014;
     motion.scaleY *= 1 - braceT * 0.018;
+  }
+
+  const poseShift = poseTransitionProfile(f);
+  if (!winner && poseShift.t > 0.025) {
+    const wave = poseShift.wave;
+    const progress = poseShift.progress;
+    const release = poseShift.settle;
+    const poseDir = poseShift.dir;
+
+    if (poseShift.intoAttack) {
+      const attackWeight = poseShift.to === "special" ? 1.18 : poseShift.to === "kick" || poseShift.to === "sweep" ? 1.08 : 0.92;
+      const pull = (1 - progress) * attackWeight;
+      motion.x -= poseDir * pull * 1.1;
+      motion.y += wave * (poseShift.to === "sweep" ? 1.15 : 0.62);
+      motion.rotation -= poseDir * wave * (0.012 + attackWeight * 0.004);
+      motion.scaleX *= 1 - wave * 0.006;
+      motion.scaleY *= 1 + wave * 0.009;
+      motion.afterimage = Math.max(motion.afterimage, wave * (poseShift.to === "special" ? 0.075 : 0.045));
+    } else if (poseShift.fromAttack) {
+      const rebound = wave * (poseShift.from === "special" ? 1.12 : 1);
+      motion.x -= poseDir * rebound * 0.95;
+      motion.y += rebound * 0.48;
+      motion.rotation += poseDir * rebound * 0.011;
+      motion.scaleX *= 1 + rebound * 0.006;
+      motion.scaleY *= 1 - rebound * 0.006;
+    } else if (poseShift.to === "walk" || poseShift.from === "walk") {
+      const walkEase = wave * 0.72;
+      motion.x -= poseDir * walkEase * 0.42;
+      motion.y += walkEase * 0.34;
+      motion.rotation -= poseDir * walkEase * 0.006;
+    } else if (poseShift.to === "block" || poseShift.from === "block") {
+      motion.x -= poseDir * release * 0.7;
+      motion.y += wave * 0.7;
+      motion.rotation -= poseDir * wave * 0.01;
+      motion.scaleX *= 1 + wave * 0.006;
+      motion.scaleY *= 1 - wave * 0.008;
+    } else if (poseShift.to === "air" || poseShift.from === "air") {
+      motion.y -= wave * 0.75;
+      motion.rotation += poseDir * wave * 0.009;
+    }
   }
 
   if (!winner) {
@@ -4108,6 +4245,80 @@ function rasterBodyFrameIndex(f, frameName, walking) {
   return frames[Math.floor(roundFrame / 34) % frames.length] ?? frames[0];
 }
 
+function spriteFrameNameForPoseState(state) {
+  if (state === "grab") return "punch";
+  if (state === "air") return "kick";
+  if (state === "punch" || state === "kick" || state === "sweep" || state === "special") return state;
+  if (state === "block" || state === "hurt" || state === "victory" || state === "defeat" || state === "walk") return state;
+  return "idle";
+}
+
+function spriteFrameIndexForPoseState(state) {
+  const frameName = spriteFrameNameForPoseState(state);
+  const frames = BODY_SPRITE_FRAMES[frameName] ?? BODY_SPRITE_FRAMES.idle;
+  if (frameName === "walk") return frames[1] ?? frames[0];
+  if (frameName === "punch") return state === "grab" ? frames[1] ?? frames[0] : frames[0];
+  if (frameName === "kick") return frames[0];
+  if (frameName === "sweep") return 16;
+  if (frameName === "special") return 13;
+  return frames[0];
+}
+
+function drawSpritePoseTransitionBlend(f, image, currentFrameIndex, crouch) {
+  const poseShift = poseTransitionProfile(f);
+  if (poseShift.t <= 0.045 || !image?.complete || !image.naturalWidth) return;
+
+  const previousIndex = spriteFrameIndexForPoseState(poseShift.from);
+  if (previousIndex === currentFrameIndex) return;
+
+  const alpha = clamp(poseShift.t * (poseShift.fromAttack || poseShift.intoAttack ? 0.09 : 0.062), 0, 0.1);
+  if (alpha <= 0.008) return;
+
+  const bodyClipTop = -BODY_SPRITE_ANCHOR_Y + 146 + crouch * 0.18;
+  const bodyClipHeight = BODY_SPRITE_FRAME_H - 132;
+  const lag = poseShift.t * (poseShift.intoAttack ? 4.4 : 3.1);
+  const lift = poseShift.wave * (poseShift.fromAttack ? 1.2 : 0.7);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-BODY_SPRITE_ANCHOR_X - 24, bodyClipTop, BODY_SPRITE_FRAME_W + 48, bodyClipHeight);
+  ctx.clip();
+  ctx.globalAlpha = alpha;
+  ctx.translate(-poseShift.dir * lag, lift);
+  ctx.rotate(-poseShift.dir * poseShift.wave * 0.008);
+  ctx.drawImage(
+    image,
+    previousIndex * BODY_SPRITE_FRAME_W,
+    0,
+    BODY_SPRITE_FRAME_W,
+    BODY_SPRITE_FRAME_H,
+    -BODY_SPRITE_ANCHOR_X,
+    -BODY_SPRITE_ANCHOR_Y + crouch * 0.18,
+    BODY_SPRITE_FRAME_W,
+    BODY_SPRITE_FRAME_H
+  );
+  ctx.restore();
+
+  if ((poseShift.intoAttack || poseShift.fromAttack) && poseShift.wave > 0.15) {
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.globalAlpha = clamp(poseShift.wave * 0.045, 0, 0.065);
+    ctx.strokeStyle = colorWithAlpha(f.trim, 0.9);
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = "round";
+    const shoulderY = -147 + crouch * 0.18;
+    const hipY = -56 + crouch * 0.18;
+    const lean = poseShift.dir * poseShift.wave * 7;
+    ctx.beginPath();
+    ctx.moveTo(-28 - lean, shoulderY);
+    ctx.quadraticCurveTo(-10 - lean * 0.4, -103 + crouch * 0.18, -22, hipY);
+    ctx.moveTo(28 - lean, shoulderY + 4);
+    ctx.quadraticCurveTo(12 - lean * 0.35, -100 + crouch * 0.18, 20, hipY + 3);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function rasterHeadPose(f, frameName, frameIndex) {
   const pose = {
     x: 0,
@@ -4210,6 +4421,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
     );
     ctx.restore();
 
+    drawSpritePoseTransitionBlend(f, unifiedSheet, frameIndex, crouch);
     drawSpriteContactOcclusion(f, crouch, frameName, walking ? stride : 0);
     drawSpriteHeadActingWarp(f, crouch, walking ? stride : 0);
     drawSpriteAttackFrameWarp(f, unifiedSheet, frameX, crouch);
@@ -4246,6 +4458,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   );
   ctx.restore();
 
+  drawSpritePoseTransitionBlend(f, sheet, frameIndex, crouch);
   drawSpriteAttackFrameWarp(f, sheet, frameX, crouch);
   drawSpriteImpactWarp(f, sheet, frameX, crouch);
   drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
