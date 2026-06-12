@@ -4169,6 +4169,14 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
         ctx.globalAlpha = ghostAlpha;
         ctx.shadowColor = colorWithAlpha(f.trim, 0.32);
         ctx.shadowBlur = 8 + i * 2;
+        ctx.beginPath();
+        ctx.rect(
+          -BODY_SPRITE_ANCHOR_X - 20,
+          -BODY_SPRITE_ANCHOR_Y + 108,
+          BODY_SPRITE_FRAME_W + 40,
+          BODY_SPRITE_FRAME_H - 102
+        );
+        ctx.clip();
         ctx.drawImage(
           unifiedSheet,
           frameX,
@@ -4201,6 +4209,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
     );
     ctx.restore();
 
+    drawSpriteHeadActingWarp(f, crouch, walking ? stride : 0);
     drawSpriteAttackFrameWarp(f, unifiedSheet, frameX, crouch);
     drawSpriteImpactWarp(f, unifiedSheet, frameX, crouch);
     drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
@@ -4252,6 +4261,60 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   drawFighterStageLighting(f, crouch);
   drawSpriteCinematicFinish(f, crouch, frameName);
   return true;
+}
+
+function drawSpriteHeadActingWarp(f, crouch, stride) {
+  const acting = headActingProfile(f, stride);
+  const active = Math.max(acting.focus * 0.62, Math.abs(acting.rotation) * 7, acting.bandanaFlutter * 0.36);
+  if (active <= 0.05 && f.hurt <= 0 && !f.attack && !f.blocking) return;
+
+  const localY = -BODY_SPRITE_ANCHOR_Y + 34 + crouch * 0.18;
+  const localX = -BODY_SPRITE_ANCHOR_X + 38;
+  const w = 134;
+  const h = 108;
+  const cx = localX + w * 0.5;
+
+  ctx.save();
+  ctx.translate(acting.x * 0.18, acting.y * 0.16);
+  ctx.translate(cx, localY + h * 0.44);
+  ctx.rotate(acting.rotation * 0.24);
+  ctx.translate(-cx, -(localY + h * 0.44));
+
+  ctx.globalCompositeOperation = "multiply";
+  ctx.globalAlpha = clamp(0.035 + acting.squint * 0.07 + active * 0.012, 0.03, 0.12);
+  ctx.fillStyle = "rgba(24, 12, 11, 0.9)";
+  ctx.beginPath();
+  ctx.ellipse(localX + w * 0.35, localY + h * 0.39, w * (0.17 + acting.squint * 0.025), 6 + acting.squint * 2.8, -0.1, 0, Math.PI * 2);
+  ctx.ellipse(localX + w * 0.66, localY + h * 0.39, w * (0.17 + acting.squint * 0.025), 6 + acting.squint * 2.8, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(24, 12, 11, 0.76)";
+  ctx.lineWidth = 1.2 + acting.focus * 0.55;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(localX + w * 0.24, localY + h * 0.25);
+  ctx.quadraticCurveTo(localX + w * 0.36, localY + h * (0.18 - acting.focus * 0.018), localX + w * 0.49, localY + h * 0.27);
+  ctx.moveTo(localX + w * 0.55, localY + h * 0.27);
+  ctx.quadraticCurveTo(localX + w * 0.69, localY + h * (0.18 - acting.focus * 0.018), localX + w * 0.82, localY + h * 0.26);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = clamp(0.025 + acting.focus * 0.045 + acting.cheek * 0.035, 0.025, 0.11);
+  ctx.strokeStyle = colorWithAlpha(f.trim, 0.9);
+  ctx.lineWidth = 1.3 + acting.focus * 0.45;
+  ctx.beginPath();
+  ctx.moveTo(localX + w * 0.25, localY + h * 0.23);
+  ctx.quadraticCurveTo(cx, localY + h * 0.14 - acting.focus * 2.5, localX + w * 0.76, localY + h * 0.24);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255, 238, 202, 0.9)";
+  ctx.beginPath();
+  ctx.ellipse(localX + w * 0.31, localY + h * 0.6, w * 0.14, h * 0.065, -0.18, 0, Math.PI * 2);
+  ctx.ellipse(localX + w * 0.69, localY + h * 0.6, w * 0.14, h * 0.065, 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawSpriteAttackFrameWarp(f, image, frameX, crouch) {
@@ -5558,6 +5621,61 @@ function attackFrameProfile(f) {
   };
 }
 
+function headActingProfile(f, stride = 0) {
+  const localizedImpact = localizedImpactProfile(f);
+  const phase = attackPhase(f.attack);
+  const type = f.attack?.type ?? "";
+  const dir = f.dir || 1;
+  const speed = clamp(Math.abs(f.vx ?? 0) / 3.35, 0, 1.3);
+  const walkSway = Math.sin((f.walkCycle ?? roundFrame * 0.2) + 0.7) * speed;
+  const attackDrive = f.attack ? Math.max(phase.strike, phase.snap * 1.1, phase.followThrough * 0.65) : 0;
+  const attackPrep = f.attack ? phase.anticipation : 0;
+  const attackRecover = f.attack ? phase.recovery : 0;
+  const headHit =
+    localizedImpact.zone === "head" && f.hitZone !== "guard"
+      ? localizedImpact.snap
+      : f.hurt > 0
+        ? localizedImpact.rebound * 0.14
+        : 0;
+  const guard = f.blocking ? clamp((f.guardPulse ?? 0) / 18, 0, 1) : 0;
+  const guardHit = clamp((f.guardImpact ?? 0) / 16, 0, 1);
+  const specialFocus = type === "special" ? Math.max(phase.anticipation * 0.8, phase.strike, phase.snap) : 0;
+  const kickFocus = type === "kick" || type === "airKick" || type === "sweep" ? attackDrive : 0;
+  const hurtSquint = clamp((f.hurt ?? 0) / 26, 0, 1);
+  const effort = clamp(attackPrep * 0.5 + attackDrive * 0.85 + specialFocus * 0.25 + guardHit * 0.55 + headHit * 0.8, 0, 1.8);
+
+  return {
+    x:
+      -localizedImpact.localDir * headHit * 5.6 +
+      localizedImpact.shake * 0.8 -
+      dir * attackPrep * 2.2 +
+      dir * attackDrive * (type === "special" ? 2.2 : 1.35) +
+      walkSway * 1.1,
+    y:
+      -headHit * 2.2 +
+      (localizedImpact.zone === "legs" ? localizedImpact.rebound * 1.2 : 0) -
+      specialFocus * 1.6 +
+      kickFocus * 0.85 +
+      guard * 0.6,
+    rotation:
+      (stride * 0.018) -
+      localizedImpact.localDir * headHit * 0.075 +
+      localizedImpact.shake * 0.012 -
+      dir * attackPrep * 0.025 +
+      dir * attackDrive * (type === "special" ? 0.052 : type === "sweep" ? 0.04 : type === "kick" || type === "airKick" ? 0.034 : 0.024) -
+      dir * attackRecover * 0.014 -
+      dir * guardHit * 0.045 +
+      walkSway * 0.01,
+    scaleX: 1 + headHit * 0.024 + attackDrive * 0.006,
+    scaleY: 1 - headHit * 0.018 - attackDrive * 0.004 + guardHit * 0.006,
+    focus: clamp(effort + hurtSquint * 0.4, 0, 1.45),
+    squint: clamp(hurtSquint * 0.75 + attackDrive * 0.42 + guardHit * 0.55, 0, 1.2),
+    cheek: clamp(attackDrive * 0.45 + headHit * 0.8 + guardHit * 0.45, 0, 1.1),
+    bandanaFlutter: clamp(speed * 0.45 + attackDrive * 0.95 + specialFocus * 0.85 + guardHit * 0.55 + headHit * 0.9, 0, 1.8),
+    bandanaLift: -attackDrive * 2.8 - specialFocus * 3.2 + headHit * 1.4 + guardHit * 1.8,
+  };
+}
+
 function getPose(f, stride) {
   const spec = bodySpec(f);
   const crouch = f.crouch * 18;
@@ -6461,22 +6579,13 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
   }
 
   ctx.save();
-  const localizedImpact = localizedImpactProfile(f);
-  const headImpact =
-    localizedImpact.zone === "head" && f.hitZone !== "guard"
-      ? localizedImpact.snap
-      : f.hurt > 0
-        ? localizedImpact.rebound * 0.14
-        : 0;
-  const headShiftX = -localizedImpact.localDir * headImpact * 5.6 + localizedImpact.shake * 0.8;
-  const headShiftY = -headImpact * 2.2 + (localizedImpact.zone === "legs" ? localizedImpact.rebound * 1.2 : 0);
+  const acting = headActingProfile(f, options.lockRotation ? 0 : stride);
   const headAngle =
-    (options.lockRotation ? 0 : stride * 0.018 + (f.hurt > 0 ? Math.sin(f.hurt) * 0.03 : 0)) -
-    localizedImpact.localDir * headImpact * 0.075 +
-    localizedImpact.shake * 0.012;
-  ctx.translate(headShiftX, headShiftY);
+    (options.lockRotation ? 0 : f.hurt > 0 ? Math.sin(f.hurt) * 0.03 : 0) +
+    acting.rotation;
+  ctx.translate(acting.x, acting.y);
   ctx.rotate(headAngle);
-  ctx.scale(1 + headImpact * 0.024, 1 - headImpact * 0.018);
+  ctx.scale(acting.scaleX, acting.scaleY);
   ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
   ctx.beginPath();
   ctx.ellipse(0, -146 + crouch + spec.headY, 38, 14, 0, 0, Math.PI * 2);
@@ -6532,6 +6641,7 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     ctx.fillStyle = faceShade;
     ctx.fillRect(clipX, clipY, clipW, clipH);
     drawFacePaintPass(f, clipX, clipY, clipW, clipH, options.faceMask);
+    drawFaceActingPass(f, clipX, clipY, clipW, clipH, acting, options.faceMask);
     ctx.restore();
 
     const rim = ctx.createLinearGradient(x, y, x + headW, y + headH);
@@ -6673,6 +6783,53 @@ function drawFacePaintPass(f, clipX, clipY, clipW, clipH, maskMode) {
   ctx.restore();
 }
 
+function drawFaceActingPass(f, clipX, clipY, clipW, clipH, acting, maskMode) {
+  if (maskMode !== "sprite") return;
+  const focus = clamp(acting.focus ?? 0, 0, 1.45);
+  const squint = clamp(acting.squint ?? 0, 0, 1.2);
+  const cheek = clamp(acting.cheek ?? 0, 0, 1.1);
+  if (focus <= 0.03 && squint <= 0.03 && cheek <= 0.03) return;
+
+  const eyeY = clipY + clipH * 0.38;
+  const mouthY = clipY + clipH * 0.76;
+  const lean = clamp(acting.rotation * 14, -0.7, 0.7);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(31, 16, 14, ${0.06 + squint * 0.1})`;
+  ctx.beginPath();
+  ctx.ellipse(clipX + clipW * 0.35 + lean * 4, eyeY, clipW * (0.18 + squint * 0.03), clipH * (0.055 + squint * 0.02), -0.08 + lean * 0.08, 0, Math.PI * 2);
+  ctx.ellipse(clipX + clipW * 0.66 + lean * 4, eyeY + 1, clipW * (0.18 + squint * 0.03), clipH * (0.055 + squint * 0.02), 0.08 + lean * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(32, 15, 13, ${0.07 + focus * 0.1})`;
+  ctx.lineWidth = 1.4 + focus * 0.8;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(clipX + clipW * 0.22, eyeY - clipH * (0.15 + focus * 0.035));
+  ctx.quadraticCurveTo(clipX + clipW * 0.35, eyeY - clipH * (0.2 + focus * 0.04), clipX + clipW * 0.48, eyeY - clipH * 0.13);
+  ctx.moveTo(clipX + clipW * 0.54, eyeY - clipH * 0.13);
+  ctx.quadraticCurveTo(clipX + clipW * 0.69, eyeY - clipH * (0.2 + focus * 0.04), clipX + clipW * 0.83, eyeY - clipH * (0.14 + focus * 0.035));
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = `rgba(255, 237, 204, ${0.035 + cheek * 0.055})`;
+  ctx.beginPath();
+  ctx.ellipse(clipX + clipW * 0.31 - lean * 4, clipY + clipH * 0.62, clipW * 0.17, clipH * 0.09, -0.18, 0, Math.PI * 2);
+  ctx.ellipse(clipX + clipW * 0.69 - lean * 4, clipY + clipH * 0.62, clipW * 0.17, clipH * 0.09, 0.18, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(255, 248, 218, ${0.055 + focus * 0.07})`;
+  ctx.lineWidth = 1.2 + focus * 0.45;
+  ctx.beginPath();
+  ctx.moveTo(clipX + clipW * 0.3, mouthY + cheek * 1.3);
+  ctx.quadraticCurveTo(clipX + clipW * 0.5, mouthY + clipH * (0.04 + cheek * 0.02), clipX + clipW * 0.72, mouthY + cheek * 1.1);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawHeadIntegrationPass(f, x, y, headW, headH, maskMode) {
   if (maskMode !== "sprite") return;
 
@@ -6750,15 +6907,19 @@ function drawPchanHeadBandana(f, x, y, headW, headH) {
   const yellow = "#f7dc63";
   const shadow = "#b77d19";
   const mark = "#151515";
-  const action = f.attack ? attackProgress(f.attack) : 0;
-  const flutter = Math.sin(roundFrame * 0.13 + f.x * 0.018) * 2 + clamp((f.vx ?? 0) * 0.48, -3.5, 3.5);
-  const hurtFlick = f.hurt > 0 ? Math.sin(f.hurt * 0.85) * 2.2 : 0;
-  const tailLift = Math.cos(roundFrame * 0.1 + f.x * 0.01) * 1.2 - action * 2.8;
+  const acting = headActingProfile(f, 0);
+  const action = f.attack ? Math.max(attackProgress(f.attack), acting.bandanaFlutter * 0.55) : acting.bandanaFlutter * 0.25;
+  const flutter =
+    Math.sin(roundFrame * (0.13 + acting.bandanaFlutter * 0.035) + f.x * 0.018) * (2 + acting.bandanaFlutter * 2.2) +
+    clamp((f.vx ?? 0) * 0.48, -3.5, 3.5) -
+    f.dir * acting.rotation * 18;
+  const hurtFlick = f.hurt > 0 ? Math.sin(f.hurt * 0.85) * (2.2 + acting.bandanaFlutter * 1.2) : 0;
+  const tailLift = Math.cos(roundFrame * 0.1 + f.x * 0.01) * 1.2 - action * 2.8 + acting.bandanaLift;
   const bandLeft = x + headW * 0.26;
   const bandRight = x + headW * 0.76;
-  const bandTop = y - headH * 0.025 + 2.6;
-  const knotX = x + headW * 0.72;
-  const knotY = y + headH * 0.055 + 2.2;
+  const bandTop = y - headH * 0.025 + 2.2 - clamp(acting.focus * 0.85, 0, 1.2);
+  const knotX = x + headW * 0.72 + clamp(acting.x * 0.08, -1.1, 1.1);
+  const knotY = y + headH * 0.055 + 1.9 + clamp(acting.y * 0.06, -0.9, 0.9);
 
   ctx.fillStyle = "rgba(0,0,0,0.26)";
   ctx.beginPath();
@@ -6771,9 +6932,9 @@ function drawPchanHeadBandana(f, x, y, headW, headH) {
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(bandLeft, bandTop + 8);
-  ctx.quadraticCurveTo(x + headW * 0.5, bandTop + 1, bandRight, bandTop + 7);
-  ctx.lineTo(bandRight - 2, bandTop + 15);
-  ctx.quadraticCurveTo(x + headW * 0.5, bandTop + 10, bandLeft - 2, bandTop + 16);
+  ctx.quadraticCurveTo(x + headW * 0.5 + acting.rotation * 22, bandTop + 0.5 - acting.focus * 0.5, bandRight, bandTop + 7);
+  ctx.lineTo(bandRight - 2, bandTop + 15 + action * 0.7);
+  ctx.quadraticCurveTo(x + headW * 0.5 - acting.rotation * 16, bandTop + 10 + action * 0.3, bandLeft - 2, bandTop + 16);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
@@ -6785,19 +6946,39 @@ function drawPchanHeadBandana(f, x, y, headW, headH) {
 
   ctx.beginPath();
   ctx.moveTo(knotX + 4, knotY - 2);
-  ctx.quadraticCurveTo(knotX + 16 + flutter, knotY - 4 + tailLift, knotX + 25 + flutter * 1.4, knotY + 4 + tailLift + hurtFlick);
-  ctx.quadraticCurveTo(knotX + 16 + flutter * 0.6, knotY + 10 + tailLift, knotX + 5, knotY + 7);
+  ctx.quadraticCurveTo(
+    knotX + 16 + flutter,
+    knotY - 4 + tailLift,
+    knotX + 25 + flutter * (1.35 + acting.bandanaFlutter * 0.08),
+    knotY + 4 + tailLift + hurtFlick
+  );
+  ctx.quadraticCurveTo(knotX + 16 + flutter * 0.6, knotY + 10 + tailLift + action * 1.5, knotX + 5, knotY + 7);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
   ctx.beginPath();
   ctx.moveTo(knotX + 1, knotY + 5);
-  ctx.quadraticCurveTo(knotX + 12 + flutter * 0.5, knotY + 13 + tailLift, knotX + 15 + flutter * 0.7, knotY + 24 + hurtFlick);
-  ctx.quadraticCurveTo(knotX + 5 + flutter * 0.25, knotY + 22 + tailLift, knotX - 3, knotY + 10);
+  ctx.quadraticCurveTo(knotX + 12 + flutter * 0.5, knotY + 13 + tailLift + action * 1.2, knotX + 15 + flutter * 0.75, knotY + 24 + hurtFlick + action * 2.2);
+  ctx.quadraticCurveTo(knotX + 5 + flutter * 0.25, knotY + 22 + tailLift + action * 1.4, knotX - 3, knotY + 10);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+
+  if (acting.bandanaFlutter > 0.18) {
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.globalAlpha = clamp(0.08 + acting.bandanaFlutter * 0.08, 0.08, 0.22);
+    ctx.strokeStyle = "#fff1bd";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(bandLeft + 8, bandTop + 6);
+    ctx.quadraticCurveTo(x + headW * 0.5, bandTop + 1, bandRight - 8, bandTop + 6);
+    ctx.moveTo(knotX + 7, knotY - 1);
+    ctx.quadraticCurveTo(knotX + 18 + flutter * 0.55, knotY + tailLift, knotX + 25 + flutter, knotY + 3 + tailLift);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   ctx.fillStyle = mark;
   for (const spot of [
