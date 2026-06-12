@@ -121,6 +121,11 @@ let cameraImpactPulse = 0;
 let cameraImpactMax = 1;
 let cameraImpactDir = 1;
 let cameraImpactStrength = 0;
+let cinematicHitPulse = 0;
+let cinematicHitMax = 1;
+let cinematicHitDir = 1;
+let cinematicHitColor = "#fff1bd";
+let cinematicHitStrength = 0;
 
 const SPECIAL_STYLES = {
   p1: { shape: "wave", core: "#fff1bd", rim: "#5bd7ff", trail: "#47b5ff" },
@@ -801,6 +806,11 @@ function resetRound() {
   cameraImpactMax = 1;
   cameraImpactDir = 1;
   cameraImpactStrength = 0;
+  cinematicHitPulse = 0;
+  cinematicHitMax = 1;
+  cinematicHitDir = 1;
+  cinematicHitColor = "#fff1bd";
+  cinematicHitStrength = 0;
   koFreeze = 0;
   roundFrame = 0;
   resultFrame = 0;
@@ -1053,6 +1063,8 @@ function startSpecial(f) {
     coldWaterSplash(f.x, f.y - fighterScale(118), f.dir);
     addText(f.x, f.y - fighterScale(166), "P-CHAN", "#ffe66a");
   }
+  specialChargeFX(f);
+  triggerCinematicHit(f.dir, f.specialStyle?.rim ?? "#fff1bd", 0.62, 10);
   playSound("special");
 }
 
@@ -1068,15 +1080,125 @@ function throwSpecial(f) {
     r: fighterScale(16),
     damage: 12,
     color: style.rim,
+    profileId: f.profileId,
+    dir: f.dir,
     trail: [],
   });
   burst(f.x + f.dir * fighterScale(40), f.y - fighterScale(116), style.rim, 12);
   impactGlints(f.x + f.dir * fighterScale(44), f.y - fighterScale(118), style.core, false, true);
+  specialReleaseFX(f);
+}
+
+function fighterSignatureStyle(f) {
+  const style = f?.specialStyle ?? SPECIAL_STYLES.p1;
+  if (f?.profileId === "p1") {
+    return { ...style, core: "#fff3a6", rim: "#5bd7ff", trail: "#ffe66a", shadow: "#173b7a" };
+  }
+  if (f?.profileId === "p2") {
+    return { ...style, core: "#fff6df", rim: "#5ff0c7", trail: "#ff5f6f", shadow: "#7f1f35" };
+  }
+  return { ...style, shadow: style.trail };
+}
+
+function specialChargeFX(f) {
+  const style = fighterSignatureStyle(f);
+  const dir = f.dir || 1;
+  const x = f.x + dir * fighterScale(24);
+  const y = f.y - fighterScale(f.profileId === "p2" ? 122 : 116);
+
+  particles.push({
+    x,
+    y,
+    vx: dir * 0.18,
+    vy: 0,
+    angle: dir > 0 ? 0 : Math.PI,
+    life: 18,
+    maxLife: 18,
+    size: f.profileId === "p1" ? 34 : 31,
+    growth: 2,
+    color: style.rim,
+    kind: "airRipple",
+  });
+
+  for (let i = 0; i < 9; i += 1) {
+    const lane = i / 8 - 0.5;
+    const arc = lane * Math.PI * 0.72;
+    const radius = fighterScale(22 + Math.random() * 22);
+    particles.push({
+      x: x - dir * 8 + Math.cos(arc) * radius * dir,
+      y: y + Math.sin(arc) * radius * 0.72,
+      vx: dir * (0.25 + Math.random() * 0.56),
+      vy: -0.18 - Math.random() * 0.5 + lane * 0.2,
+      angle: dir > 0 ? arc : Math.PI - arc,
+      length: fighterScale(22 + Math.random() * 28),
+      life: 15 + Math.random() * 9,
+      maxLife: 20,
+      size: 2.1 + Math.random() * 1.8,
+      color: i % 2 ? style.core : style.trail,
+      kind: f.profileId === "p2" ? "hitShard" : "impactNeedle",
+    });
+  }
+
+  if (f.profileId === "p1") {
+    for (let i = 0; i < 6; i += 1) {
+      particles.push({
+        x: x - dir * fighterScale(16) + Math.random() * 18 * dir,
+        y: y - fighterScale(12) + Math.random() * 20,
+        vx: dir * (0.28 + Math.random() * 0.35),
+        vy: -0.9 - Math.random() * 1.1,
+        life: 16 + Math.random() * 9,
+        size: 3 + Math.random() * 3.2,
+        color: "rgba(143, 226, 255, 0.78)",
+        kind: "droplet",
+      });
+    }
+  }
+}
+
+function specialReleaseFX(f) {
+  const style = fighterSignatureStyle(f);
+  const dir = f.dir || 1;
+  const x = f.x + dir * fighterScale(50);
+  const y = f.y - fighterScale(116);
+  const baseAngle = dir > 0 ? 0 : Math.PI;
+
+  particles.push({
+    x,
+    y,
+    vx: dir * 0.25,
+    vy: 0,
+    angle: baseAngle,
+    life: 16,
+    maxLife: 16,
+    size: 46,
+    color: style.rim,
+    strength: 1.15,
+    kind: "contactFlash",
+  });
+
+  for (let i = 0; i < 11; i += 1) {
+    const lane = i / 10 - 0.5;
+    particles.push({
+      x: x - dir * fighterScale(18),
+      y: y + lane * fighterScale(38),
+      vx: dir * (0.78 + Math.random() * 0.72),
+      vy: lane * 0.24,
+      angle: baseAngle + lane * 0.46,
+      length: fighterScale(54 + Math.random() * 45),
+      life: 14 + Math.random() * 8,
+      maxLife: 18,
+      size: 2.8 + Math.random() * 2.2,
+      color: i % 2 ? style.core : style.trail,
+      kind: "impactNeedle",
+    });
+  }
 }
 
 function updateCameraImpactPulse() {
   if (cameraImpactPulse > 0) cameraImpactPulse -= 1;
   else cameraImpactStrength = 0;
+  if (cinematicHitPulse > 0) cinematicHitPulse -= 1;
+  else cinematicHitStrength = 0;
 }
 
 function update() {
@@ -1293,7 +1415,7 @@ function updateProjectiles() {
     const target = fighters.find((f) => f.id !== p.owner);
     if (target && p.life > 0 && circleRectOverlap(p, bodyBox(target))) {
       const owner = fighters.find((f) => f.id === p.owner);
-      landHit(owner, target, p.damage, true);
+      landHit(owner, target, p.damage, true, p);
       p.life = 0;
     }
   }
@@ -1344,7 +1466,7 @@ function attackBox(f) {
   };
 }
 
-function landHit(attacker, target, damage, projectile = false) {
+function landHit(attacker, target, damage, projectile = false, projectileInfo = null) {
   const unblockable = attacker?.attack?.type === "grab";
   const counter = attacker?.counterWindow > 0;
   const blocked = !unblockable && target.blocking && attacker && target.dir !== attacker.dir;
@@ -1357,6 +1479,7 @@ function landHit(attacker, target, damage, projectile = false) {
   const previousHealth = target.health;
   const nextHealth = clamp(target.health - finalDamage, 0, 100);
   const finishingHit = !blocked && previousHealth > 0 && nextHealth <= 0;
+  const cinematicHit = !blocked && (finishingHit || counter || projectile || attackType === "kick" || attackType === "airKick" || attackType === "grab");
 
   target.health = nextHealth;
   target.hurt = finishingHit ? 38 : blocked ? 9 : attacker?.attack?.type === "grab" ? 30 : projectile ? 21 : 24;
@@ -1389,9 +1512,9 @@ function landHit(attacker, target, damage, projectile = false) {
   }
   if (blocked) target.counterWindow = 34;
   if (counter && attacker) attacker.counterWindow = 0;
-  flash = blocked ? 2 : heavyImpact ? 8 : 5;
-  shake = blocked ? Math.max(shake, 3) : Math.max(shake, projectile ? 9 : heavyImpact ? 8 : 6);
-  hitStopFrames = blocked ? Math.max(hitStopFrames, 2) : Math.max(hitStopFrames, counter ? 6 : heavyImpact ? 5 : 3);
+  flash = blocked ? 2 : Math.max(flash, finishingHit ? 12 : projectile || counter ? 10 : heavyImpact ? 8 : 5);
+  shake = blocked ? Math.max(shake, 3) : Math.max(shake, finishingHit ? 13 : projectile || counter ? 10 : heavyImpact ? 8 : 6);
+  hitStopFrames = blocked ? Math.max(hitStopFrames, 2) : Math.max(hitStopFrames, finishingHit ? 8 : counter ? 7 : projectile ? 7 : heavyImpact ? 5 : 3);
   playSound(blocked ? "block" : "hit");
   addText(
     target.x,
@@ -1402,6 +1525,10 @@ function landHit(attacker, target, damage, projectile = false) {
   const impactX = target.x - target.dir * 26;
   const impactY = target.y - (projectile ? 116 : blocked ? 108 : heavyImpact ? 88 : 96);
   triggerCameraImpact(impactDir, blocked, heavyImpact, counter, impactStrength);
+  if (cinematicHit) {
+    const cinematicStrength = finishingHit ? 1.62 : counter ? 1.42 : projectile ? 1.28 : 1.04;
+    triggerCinematicHit(impactDir, impactColor, cinematicStrength, finishingHit ? 18 : projectile || counter ? 15 : 11);
+  }
   burst(
     target.x - target.dir * 22,
     target.y - (heavyImpact ? 92 : 102),
@@ -1426,6 +1553,7 @@ function landHit(attacker, target, damage, projectile = false) {
   contactFlashBurst(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   cinematicImpact(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   premiumImpactFX(impactX, impactY, target, impactColor, impactDir, blocked, heavyImpact, counter, projectile);
+  if (cinematicHit) cinematicSpecialImpactFX(impactX, impactY, target, attacker, projectileInfo, impactColor, impactDir, finishingHit, projectile, counter);
   floorDust(target.x, target.y + 3, blocked ? 4 : heavyImpact ? 10 : 7);
 }
 
@@ -1437,6 +1565,15 @@ function triggerCameraImpact(dir, blocked, heavyImpact, counter, strength) {
   cameraImpactMax = pulse;
   cameraImpactDir = dir || 1;
   cameraImpactStrength = blocked ? 0.45 : counter ? 1.28 : strength;
+}
+
+function triggerCinematicHit(dir, color, strength = 1, pulse = 12) {
+  if (pulse < cinematicHitPulse) return;
+  cinematicHitPulse = pulse;
+  cinematicHitMax = pulse;
+  cinematicHitDir = dir || 1;
+  cinematicHitColor = color || "#fff1bd";
+  cinematicHitStrength = strength;
 }
 
 function contactFlashBurst(x, y, color, dir, blocked, heavyImpact, counter) {
@@ -1771,6 +1908,91 @@ function premiumImpactFX(x, y, target, color, dir, blocked, heavyImpact, counter
   });
 }
 
+function cinematicSpecialImpactFX(x, y, target, attacker, projectileInfo, color, dir, finishingHit, projectile, counter) {
+  const style = fighterSignatureStyle(attacker ?? { specialStyle: projectileInfo?.style });
+  const strength = finishingHit ? 1.55 : counter ? 1.36 : projectile ? 1.24 : 1;
+  const baseAngle = dir > 0 ? 0 : Math.PI;
+  const bloomSize = projectile ? 76 : counter ? 70 : 58;
+
+  particles.push({
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    angle: baseAngle,
+    life: finishingHit ? 17 : 13,
+    maxLife: finishingHit ? 17 : 13,
+    size: bloomSize,
+    color: style.rim,
+    strength,
+    kind: "impactBloom",
+  });
+
+  particles.push({
+    x: x - dir * fighterScale(6),
+    y,
+    vx: 0,
+    vy: 0,
+    angle: baseAngle,
+    life: finishingHit ? 20 : 16,
+    maxLife: finishingHit ? 20 : 16,
+    size: projectile ? 48 : 38,
+    growth: finishingHit ? 2.9 : 2.35,
+    color: style.core,
+    kind: "ring",
+  });
+
+  const laneCount = projectile || counter ? 13 : 9;
+  for (let i = 0; i < laneCount; i += 1) {
+    const lane = i / Math.max(1, laneCount - 1) - 0.5;
+    const angle = baseAngle + lane * (projectile ? 0.92 : 0.72) + (Math.random() - 0.5) * 0.08;
+    particles.push({
+      x: x - dir * fighterScale(16),
+      y: y + lane * fighterScale(48),
+      vx: Math.cos(angle) * (0.68 + strength * 0.28),
+      vy: Math.sin(angle) * 0.42,
+      angle,
+      length: fighterScale((projectile ? 92 : 72) * (0.82 + Math.random() * 0.36)),
+      life: 14 + Math.random() * (projectile ? 10 : 7),
+      maxLife: projectile ? 22 : 18,
+      size: 3.1 + strength * 1.2,
+      color: i % 2 ? style.core : style.trail,
+      kind: "impactNeedle",
+    });
+  }
+
+  if (attacker?.profileId === "p2") {
+    for (let i = 0; i < 7; i += 1) {
+      const angle = baseAngle + (i / 6 - 0.5) * 0.82;
+      particles.push({
+        x: x - dir * fighterScale(12),
+        y: y + (Math.random() - 0.5) * fighterScale(42),
+        vx: Math.cos(angle) * (0.78 + Math.random() * 0.45),
+        vy: Math.sin(angle) * 0.5 - 0.18,
+        angle,
+        life: 16 + Math.random() * 7,
+        maxLife: 21,
+        size: 7 + Math.random() * 5,
+        color: i % 2 ? style.trail : style.rim,
+        kind: "hitShard",
+      });
+    }
+  } else if (attacker?.profileId === "p1") {
+    for (let i = 0; i < 8; i += 1) {
+      particles.push({
+        x: target.x + (Math.random() - 0.5) * fighterScale(58),
+        y: target.y - fighterScale(92 + Math.random() * 54),
+        vx: -dir * (0.18 + Math.random() * 0.44),
+        vy: -0.55 - Math.random() * 1.15,
+        life: 17 + Math.random() * 10,
+        size: 3.4 + Math.random() * 3.8,
+        color: "rgba(143, 226, 255, 0.82)",
+        kind: "droplet",
+      });
+    }
+  }
+}
+
 function attackVisualSpec(type = "") {
   const punch = type === "punch" || type === "airPunch";
   const kick = type === "kick" || type === "airKick";
@@ -1982,9 +2204,11 @@ function applyCamera() {
 
   const impactT = cameraImpactPulse > 0 ? clamp(cameraImpactPulse / Math.max(1, cameraImpactMax), 0, 1) : 0;
   const impactEase = impactT * impactT * cameraImpactStrength;
-  const impactZoom = impactEase * (mobileView ? 0.012 : 0.028);
-  const impactPan = cameraImpactDir * impactEase * (mobileView ? 4.5 : 8.5);
-  const impactLift = -impactEase * (mobileView ? 1.8 : 3.8);
+  const cinematicT = cinematicHitPulse > 0 ? clamp(cinematicHitPulse / Math.max(1, cinematicHitMax), 0, 1) : 0;
+  const cinematicEase = cinematicT * cinematicT * cinematicHitStrength;
+  const impactZoom = impactEase * (mobileView ? 0.012 : 0.028) + cinematicEase * (mobileView ? 0.01 : 0.022);
+  const impactPan = cameraImpactDir * impactEase * (mobileView ? 4.5 : 8.5) + cinematicHitDir * cinematicEase * (mobileView ? 3.2 : 6.4);
+  const impactLift = -impactEase * (mobileView ? 1.8 : 3.8) - cinematicEase * (mobileView ? 1.1 : 2.6);
   const drawZoom = cameraZoom + impactZoom;
   const drawPan = clamp(cameraPan + impactPan, -cameraPanLimit(drawZoom, mobileView), cameraPanLimit(drawZoom, mobileView));
 
@@ -2012,12 +2236,45 @@ function draw() {
   drawHud();
   drawCountdown();
   drawKOBanner();
+  drawCinematicHitOverlay();
 
   if (flash > 0) {
     ctx.fillStyle = `rgba(255, 245, 205, ${Math.min(0.24, flash / 64)})`;
     ctx.fillRect(0, 0, W, H);
   }
 
+}
+
+function drawCinematicHitOverlay() {
+  if (cinematicHitPulse <= 0 || cinematicHitStrength <= 0) return;
+  const t = clamp(cinematicHitPulse / Math.max(1, cinematicHitMax), 0, 1);
+  const ease = t * t * cinematicHitStrength;
+  const bandAlpha = Math.min(0.1, ease * 0.075);
+  const flareAlpha = Math.min(0.18, ease * 0.14);
+  const shift = cinematicHitDir * ease * 18;
+
+  ctx.save();
+  ctx.fillStyle = `rgba(6, 3, 2, ${bandAlpha})`;
+  ctx.fillRect(0, 0, W, 34);
+  ctx.fillRect(0, H - 34, W, 34);
+
+  ctx.globalCompositeOperation = "screen";
+  const flare = ctx.createRadialGradient(W / 2 + shift, H / 2 - 30, 10, W / 2 + shift, H / 2 - 30, 410);
+  flare.addColorStop(0, colorWithAlpha(cinematicHitColor, flareAlpha));
+  flare.addColorStop(0.26, colorWithAlpha(cinematicHitColor, flareAlpha * 0.42));
+  flare.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = flare;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = colorWithAlpha(cinematicHitColor, Math.min(0.28, ease * 0.22));
+  ctx.lineWidth = 2.2 + ease * 2.4;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.18 + shift, 38);
+  ctx.lineTo(W * 0.82 + shift, 22);
+  ctx.moveTo(W * 0.18 - shift, H - 28);
+  ctx.lineTo(W * 0.82 - shift, H - 44);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawFloatingTexts() {
@@ -3061,6 +3318,16 @@ function fighterTransitionMotion(f, walking) {
     motion.scaleX *= 1 - windup * 0.026 + strike * (isKick ? 0.035 : 0.028) + snap * 0.034 - settle * 0.006;
     motion.scaleY *= 1 + windup * 0.026 - strike * (isSweep ? 0.026 : 0.014) - snap * 0.016 + settle * 0.004;
     motion.afterimage = (isSpecial ? 0.34 : isGrab ? 0.16 : spec.echo) * strike + snap * 0.16 + windup * 0.035 + follow * 0.06;
+
+    if (isSpecial) {
+      const profileWeight = f.profileId === "p2" ? 1.08 : f.profileId === "p1" ? 1.14 : 1;
+      motion.x += dir * (-windup * 2.4 + strike * 5.2 + snap * 4.4) * profileWeight;
+      motion.y -= (strike * 1.2 + snap * 1.7) * profileWeight;
+      motion.rotation += dir * (-windup * 0.015 + strike * 0.026 + snap * 0.018) * profileWeight;
+      motion.scaleX *= 1 + strike * 0.012 + snap * 0.016;
+      motion.scaleY *= 1 - strike * 0.006 - snap * 0.008;
+      motion.afterimage = Math.max(motion.afterimage, windup * 0.1 + strike * 0.42 + snap * 0.22);
+    }
   }
 
   if (f.blocking && !winner) {
@@ -3866,7 +4133,7 @@ function drawSpriteHeadMount(f, crouch, headScaleMultiplier = 1) {
 function drawAttackBodyGlow(f, crouch) {
   const phase = attackPhase(f.attack);
   const progress = phase.power;
-  const style = f.attack.type === "special" ? f.specialStyle : null;
+  const style = f.attack.type === "special" ? fighterSignatureStyle(f) : null;
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.strokeStyle = style ? style.rim : colorWithAlpha(f.trim, 0.55);
@@ -3884,6 +4151,29 @@ function drawAttackBodyGlow(f, crouch) {
       ctx.arc(Math.cos(a) * 20, -108 + crouch + Math.sin(a) * 16, 18 + progress * 10, 0.2, Math.PI * 1.55);
       ctx.stroke();
     }
+
+    const handY = f.profileId === "p2" ? -126 + crouch : -112 + crouch;
+    const handX = f.profileId === "p2" ? 58 + phase.strike * 18 : 46 + phase.strike * 14;
+    const aura = ctx.createRadialGradient(handX, handY, 2, handX, handY, 54 + progress * 36);
+    aura.addColorStop(0, `rgba(255,255,255,${0.2 + progress * 0.26})`);
+    aura.addColorStop(0.35, colorWithAlpha(style.rim, 0.13 + progress * 0.18));
+    aura.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.ellipse(handX, handY, 46 + progress * 28, 34 + progress * 24, -0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = colorWithAlpha(style.trail, 0.18 + progress * 0.32);
+    ctx.lineWidth = 2.2 + progress * 2;
+    ctx.beginPath();
+    if (f.profileId === "p2") {
+      ctx.moveTo(-34, -96 + crouch);
+      ctx.bezierCurveTo(2, -154 + crouch, 50 + progress * 16, -154 + crouch, 78 + progress * 28, -115 + crouch);
+    } else {
+      ctx.moveTo(-28, -78 + crouch);
+      ctx.bezierCurveTo(10, -137 + crouch, 46 + progress * 14, -148 + crouch, 78 + progress * 26, -105 + crouch);
+    }
+    ctx.stroke();
   }
   ctx.globalAlpha = 1;
   ctx.restore();
@@ -3893,6 +4183,10 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
   if (!f.attack) return;
   const phase = attackPhase(f.attack);
   const spec = attackVisualSpec(f.attack.type);
+  const signature = spec.special ? fighterSignatureStyle(f) : null;
+  const trailColor = signature?.trail ?? spec.color;
+  const coreColor = signature?.core ?? spec.core;
+  const rimColor = signature?.rim ?? spec.color;
   const prep = phase.anticipation;
   const strike = Math.max(phase.strike, phase.snap * 0.9);
   const recover = Math.max(phase.recovery * 0.72, phase.followThrough);
@@ -3911,14 +4205,14 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
 
   if (layer === "back") {
     if (prep > 0.04) {
-      ctx.strokeStyle = colorWithAlpha(spec.color, 0.08 + prep * 0.16);
+      ctx.strokeStyle = colorWithAlpha(trailColor, 0.08 + prep * 0.16);
       ctx.lineWidth = 2.4 + prep * (spec.heavy ? 4.2 : 3);
       ctx.beginPath();
       ctx.moveTo(-44 - prep * 18, baseY + height * 0.34);
       ctx.bezierCurveTo(-18, baseY - height * 1.25, 24 + prep * 24, baseY - height * 1.15, 50 + prep * 18, baseY - height * 0.08);
       ctx.stroke();
 
-      ctx.fillStyle = colorWithAlpha(spec.color, 0.035 + prep * 0.055);
+      ctx.fillStyle = colorWithAlpha(trailColor, 0.035 + prep * 0.055);
       ctx.beginPath();
       ctx.ellipse(-18 - prep * 12, -94 + yOffset, 62 + prep * 18, 108 + prep * 10, -0.08, 0, Math.PI * 2);
       ctx.fill();
@@ -3940,14 +4234,14 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
     const coreY = baseY + (spec.sweep ? 3 : spec.kick ? 2 : 0);
     const glow = ctx.createRadialGradient(coreX, coreY, 2, coreX, coreY, reach * 0.52);
     glow.addColorStop(0, `rgba(255,255,255,${0.12 + strike * 0.22})`);
-    glow.addColorStop(0.34, colorWithAlpha(spec.color, 0.1 + strike * 0.2));
+    glow.addColorStop(0.34, colorWithAlpha(trailColor, 0.1 + strike * 0.2));
     glow.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.ellipse(coreX, coreY, reach * (spec.sweep ? 0.58 : 0.5), height * (spec.kick ? 1.25 : spec.special ? 1.45 : 1), spec.sweep ? 0.02 : -0.09, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = colorWithAlpha(spec.core, 0.28 + strike * 0.46);
+    ctx.strokeStyle = colorWithAlpha(coreColor, 0.28 + strike * 0.46);
     ctx.lineWidth = (spec.kick || spec.sweep ? 6.5 : 5) + phase.snap * 2.5;
     ctx.beginPath();
     ctx.moveTo(12 - prep * 10, baseY + height * 0.35);
@@ -3961,6 +4255,23 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
     );
     ctx.stroke();
 
+    if (spec.special) {
+      ctx.strokeStyle = colorWithAlpha(rimColor, 0.2 + strike * 0.5);
+      ctx.lineWidth = 3.6 + phase.snap * 2.6;
+      for (let i = 0; i < 3; i += 1) {
+        const lane = i - 1;
+        ctx.beginPath();
+        if (f.profileId === "p2") {
+          ctx.moveTo(12 + lane * 5, baseY - height * (0.35 + lane * 0.08));
+          ctx.bezierCurveTo(reach * 0.32, baseY - height * (1.35 + lane * 0.18), reach * 0.72, baseY - height * (0.18 - lane * 0.08), reach * (1.08 + lane * 0.05), baseY + height * (0.12 + lane * 0.08));
+        } else {
+          ctx.moveTo(8 + lane * 6, baseY + height * (0.2 + lane * 0.12));
+          ctx.bezierCurveTo(reach * 0.28, baseY - height * (1.02 + lane * 0.15), reach * 0.66, baseY - height * (0.86 - lane * 0.05), reach * (1.02 + lane * 0.04), baseY - height * (0.08 - lane * 0.1));
+        }
+        ctx.stroke();
+      }
+    }
+
     ctx.strokeStyle = `rgba(255,255,255,${0.18 + strike * 0.28})`;
     ctx.lineWidth = Math.max(1.6, 2.4 + phase.snap * 1.4);
     for (let i = 0; i < 3; i += 1) {
@@ -3973,7 +4284,7 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
   }
 
   if (recover > 0.05) {
-    ctx.strokeStyle = colorWithAlpha(spec.color, 0.08 + recover * 0.16);
+    ctx.strokeStyle = colorWithAlpha(trailColor, 0.08 + recover * 0.16);
     ctx.lineWidth = 2 + recover * 2.2;
     ctx.beginPath();
     ctx.moveTo(reach * 0.72, baseY + height * 0.24);
@@ -4619,12 +4930,32 @@ function getPose(f, stride) {
     base.frontLeg.foot.x += 10 * activePulse - 3 * windup;
     base.backLeg.foot.x -= 9 * activePulse + 4 * windup - recovery * 4;
   } else if (attackType === "special") {
-    base.frontArm.elbow = { x: 42 - windup * 7 + activePulse * 20, y: -121 + crouch - windup * 4 - activePulse * 8 };
-    base.frontArm.hand = { x: 66 - windup * 12 + activePulse * 36, y: -106 + crouch - windup * 5 - activePulse * 5 };
-    base.backArm.elbow = { x: 12 - windup * 8 + activePulse * 24, y: -123 + crouch - windup * 5 - activePulse * 9 };
-    base.backArm.hand = { x: 46 - windup * 12 + activePulse * 35, y: -107 + crouch - windup * 4 - activePulse * 6 };
-    base.frontLeg.foot.x += 7 * activePulse - 3 * windup;
-    base.backLeg.foot.x -= 7 * activePulse + 3 * windup;
+    if (f.profileId === "p2") {
+      base.torsoTilt = -0.08 * activePulse + 0.03 * windup;
+      base.frontArm.elbow = { x: 44 - windup * 14 + activePulse * 38, y: -133 + crouch - windup * 8 - activePulse * 9 };
+      base.frontArm.hand = { x: 66 - windup * 21 + activePulse * 66, y: -129 + crouch - windup * 11 - activePulse * 6 };
+      base.backArm.elbow = { x: -28 - windup * 10 - activePulse * 16, y: -139 + crouch - windup * 12 - activePulse * 15 };
+      base.backArm.hand = { x: -42 - windup * 14 - activePulse * 21, y: -163 + crouch - windup * 14 - activePulse * 18 };
+      base.frontLeg.knee.x += 10 * activePulse - 5 * windup;
+      base.frontLeg.foot.x += 14 * activePulse - 4 * windup;
+      base.backLeg.foot.x -= 12 * activePulse + 5 * windup;
+    } else if (f.profileId === "p1") {
+      base.torsoTilt = -0.13 * activePulse + 0.06 * windup;
+      base.frontArm.elbow = { x: 36 - windup * 12 + activePulse * 24, y: -134 + crouch - windup * 7 - activePulse * 14 };
+      base.frontArm.hand = { x: 52 - windup * 20 + activePulse * 48, y: -121 + crouch - windup * 8 - activePulse * 11 };
+      base.backArm.elbow = { x: -18 - windup * 16 + activePulse * 16, y: -126 + crouch - windup * 8 - activePulse * 12 };
+      base.backArm.hand = { x: 20 - windup * 24 + activePulse * 44, y: -114 + crouch - windup * 9 - activePulse * 10 };
+      base.frontLeg.knee.x += 7 * activePulse;
+      base.frontLeg.foot.x += 11 * activePulse - 4 * windup;
+      base.backLeg.foot.x -= 12 * activePulse + 5 * windup;
+    } else {
+      base.frontArm.elbow = { x: 42 - windup * 7 + activePulse * 20, y: -121 + crouch - windup * 4 - activePulse * 8 };
+      base.frontArm.hand = { x: 66 - windup * 12 + activePulse * 36, y: -106 + crouch - windup * 5 - activePulse * 5 };
+      base.backArm.elbow = { x: 12 - windup * 8 + activePulse * 24, y: -123 + crouch - windup * 5 - activePulse * 9 };
+      base.backArm.hand = { x: 46 - windup * 12 + activePulse * 35, y: -107 + crouch - windup * 4 - activePulse * 6 };
+      base.frontLeg.foot.x += 7 * activePulse - 3 * windup;
+      base.backLeg.foot.x -= 7 * activePulse + 3 * windup;
+    }
   }
 
   if (airborne) {
