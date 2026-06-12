@@ -3403,6 +3403,41 @@ function smoothStep01(value) {
   return t * t * (3 - 2 * t);
 }
 
+function localizedImpactProfile(f) {
+  const rawZone = winner ? Math.max(0, (f.hitZonePulse ?? 0) - resultFrame * 0.78) : (f.hitZonePulse ?? 0);
+  const rawImpact = winner ? Math.max(0, (f.impactPulse ?? 0) - resultFrame * 0.86) : (f.impactPulse ?? 0);
+  const rawDamage = winner ? Math.max(0, (f.damagePulse ?? 0) - resultFrame * 0.78) : (f.damagePulse ?? 0);
+  const zone = f.hitZone === "head" || f.hitZone === "legs" ? f.hitZone : "torso";
+  const zoneMax = zone === "head" ? 30 : zone === "legs" ? 28 : 26;
+  const zoneT = clamp(rawZone / zoneMax, 0, 1);
+  const impactT = clamp(rawImpact / 22, 0, 1);
+  const damageT = clamp(rawDamage / 34, 0, 1);
+  const t = Math.max(zoneT, impactT * 0.82, damageT * 0.72);
+  if (t <= 0.01) {
+    return {
+      zone,
+      t: 0,
+      snap: 0,
+      rebound: 0,
+      shake: 0,
+      localDir: 1,
+      strength: 0,
+    };
+  }
+
+  const localDir = (f.impactDir ?? f.dir) === f.dir ? 1 : -1;
+  const strength = clamp(f.impactStrength ?? 0.8, 0.45, 1.65);
+  return {
+    zone,
+    t,
+    snap: smoothStep01(t) * strength,
+    rebound: Math.sin(t * Math.PI) * strength,
+    shake: Math.sin((roundFrame + resultFrame) * 2.35) * t * strength,
+    localDir,
+    strength,
+  };
+}
+
 function fighterTransitionMotion(f, walking) {
   const motion = {
     x: 0,
@@ -4139,6 +4174,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
     );
     ctx.restore();
 
+    drawSpriteImpactWarp(f, unifiedSheet, frameX, crouch);
     drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
     drawFighterStageLighting(f, crouch);
     drawSpriteCinematicFinish(f, crouch, frameName);
@@ -4170,6 +4206,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   );
   ctx.restore();
 
+  drawSpriteImpactWarp(f, sheet, frameX, crouch);
   drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
 
   ctx.save();
@@ -4186,6 +4223,64 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   drawFighterStageLighting(f, crouch);
   drawSpriteCinematicFinish(f, crouch, frameName);
   return true;
+}
+
+function drawSpriteImpactWarp(f, image, frameX, crouch) {
+  const impact = localizedImpactProfile(f);
+  if (impact.t <= 0.035 || f.hitZone === "guard") return;
+
+  const zones = {
+    head: { srcY: 38, h: 104, yBoost: -5, xKick: 8.2, scaleX: 0.042, scaleY: -0.026, rot: 0.07 },
+    torso: { srcY: 146, h: 76, yBoost: -2, xKick: 6.2, scaleX: 0.032, scaleY: -0.034, rot: 0.035 },
+    legs: { srcY: 202, h: 90, yBoost: 3, xKick: 5.2, scaleX: 0.045, scaleY: -0.048, rot: -0.045 },
+  };
+  const zone = zones[impact.zone] ?? zones.torso;
+  const pad = 14;
+  const localY = -BODY_SPRITE_ANCHOR_Y + zone.srcY + crouch * 0.18;
+  const centerY = localY + zone.h * 0.5 + zone.yBoost;
+  const kick = -impact.localDir * zone.xKick * impact.snap + impact.shake * 2.2;
+  const squashX = 1 + zone.scaleX * impact.snap;
+  const squashY = 1 + zone.scaleY * impact.snap;
+  const rotation = -impact.localDir * zone.rot * impact.rebound;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-BODY_SPRITE_ANCHOR_X - pad, localY - pad, BODY_SPRITE_FRAME_W + pad * 2, zone.h + pad * 2);
+  ctx.clip();
+  ctx.globalAlpha = clamp(0.34 + impact.t * 0.28, 0.2, 0.68);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.translate(kick, centerY + impact.shake * 1.3);
+  ctx.rotate(rotation);
+  ctx.scale(squashX, squashY);
+  ctx.translate(0, -centerY);
+  ctx.drawImage(
+    image,
+    frameX,
+    0,
+    BODY_SPRITE_FRAME_W,
+    BODY_SPRITE_FRAME_H,
+    -BODY_SPRITE_ANCHOR_X,
+    -BODY_SPRITE_ANCHOR_Y + crouch * 0.18,
+    BODY_SPRITE_FRAME_W,
+    BODY_SPRITE_FRAME_H
+  );
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = clamp(0.12 + impact.t * 0.18, 0.08, 0.34);
+  ctx.strokeStyle = impact.zone === "legs" ? "rgba(255, 232, 142, 0.9)" : "rgba(255, 246, 207, 0.9)";
+  ctx.lineWidth = 1.8 + impact.snap * 1.4;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 3; i += 1) {
+    const lane = i - 1;
+    const y = centerY + lane * (impact.zone === "torso" ? 18 : 13) + impact.shake * 4;
+    ctx.beginPath();
+    ctx.moveTo(impact.localDir * (-54 - impact.snap * 9), y - lane * 5);
+    ctx.quadraticCurveTo(impact.localDir * -8, y - 12 * impact.rebound, impact.localDir * (46 + impact.snap * 12), y + lane * 4);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawSpritePremiumDetails(f, crouch, frameName, stride) {
@@ -4756,6 +4851,7 @@ function drawDamageReactionFX(f, crouch) {
   const rawDamage = winner ? Math.max(0, (f.damagePulse ?? 0) - resultFrame * 0.78) : (f.damagePulse ?? 0);
   const damage = clamp(rawDamage / 34, 0, 1);
   const level = clamp(f.damageLevel ?? 0, 0, 1.7);
+  const localizedImpact = localizedImpactProfile(f);
   const ko = winner && f.id !== roundWinnerId ? clamp(resultFrame / 58, 0, 1) : 0;
   if (damage <= 0.03 && ko <= 0.03) return;
 
@@ -4802,6 +4898,39 @@ function drawDamageReactionFX(f, crouch) {
     ctx.moveTo(localDir * -34, centerY - glowRy * 0.28);
     ctx.quadraticCurveTo(localDir * 8, centerY + shake * 8, localDir * 34, centerY + glowRy * 0.28);
     ctx.stroke();
+
+    if (localizedImpact.t > 0.04) {
+      const compression = localizedImpact.snap;
+      const impactCenterX = -localizedImpact.localDir * (zone === "head" ? 18 : zone === "legs" ? 12 : 15);
+      ctx.strokeStyle = `rgba(255, 246, 206, ${0.2 * damage + compression * 0.12})`;
+      ctx.lineWidth = 1.5 + compression * 1.9;
+      for (let i = 0; i < 3; i += 1) {
+        const ring = i / 2;
+        ctx.beginPath();
+        ctx.ellipse(
+          impactCenterX + localizedImpact.localDir * ring * 6,
+          centerY + shake * 3,
+          glowRx * (0.42 + ring * 0.18) + compression * 8,
+          glowRy * (0.28 + ring * 0.12) + compression * 5,
+          -localizedImpact.localDir * 0.16,
+          0,
+          Math.PI * 2
+        );
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = `rgba(255, 93, 66, ${0.12 * level + compression * 0.08})`;
+      ctx.lineWidth = 4 + compression * 2.5;
+      ctx.beginPath();
+      ctx.moveTo(impactCenterX - localizedImpact.localDir * (glowRx * 0.35), centerY - glowRy * 0.18);
+      ctx.quadraticCurveTo(
+        impactCenterX + localizedImpact.localDir * compression * 16,
+        centerY + localizedImpact.shake * 7,
+        impactCenterX + localizedImpact.localDir * (glowRx * 0.36),
+        centerY + glowRy * 0.16
+      );
+      ctx.stroke();
+    }
   }
 
   if (ko > 0.03) {
@@ -5392,6 +5521,53 @@ function getPose(f, stride) {
     }
   }
 
+  const localizedImpact = localizedImpactProfile(f);
+  if (!winner && localizedImpact.t > 0.035 && f.hurt > 0) {
+    const snap = localizedImpact.snap;
+    const recoil = localizedImpact.rebound;
+    const localDir = localizedImpact.localDir;
+
+    if (localizedImpact.zone === "head") {
+      base.torsoTilt -= localDir * (0.035 + recoil * 0.028);
+      base.frontArm.elbow.x += localDir * snap * 7 * spec.stance;
+      base.frontArm.elbow.y -= snap * 8;
+      base.frontArm.hand.x += localDir * snap * 9 * spec.stance;
+      base.frontArm.hand.y -= snap * 12;
+      base.backArm.elbow.x += localDir * snap * 5 * spec.stance;
+      base.backArm.elbow.y -= snap * 6;
+      base.backArm.hand.x += localDir * snap * 7 * spec.stance;
+      base.backArm.hand.y -= snap * 10;
+      base.frontLeg.knee.y += recoil * 3;
+      base.backLeg.foot.x -= localDir * snap * 4 * spec.stance;
+    } else if (localizedImpact.zone === "legs") {
+      base.torsoTilt += localDir * (0.028 + snap * 0.018);
+      base.frontLeg.knee.x -= localDir * snap * 12 * spec.stance;
+      base.frontLeg.knee.y += snap * 14;
+      base.frontLeg.foot.x += localDir * snap * 10 * spec.stance;
+      base.backLeg.knee.x += localDir * snap * 8 * spec.stance;
+      base.backLeg.knee.y += snap * 12;
+      base.backLeg.foot.x -= localDir * snap * 12 * spec.stance;
+      base.frontArm.elbow.y += recoil * 8;
+      base.frontArm.hand.y += recoil * 11;
+      base.backArm.elbow.y += recoil * 6;
+      base.backArm.hand.y += recoil * 8;
+    } else {
+      base.torsoTilt += localDir * (0.026 + recoil * 0.018);
+      base.frontArm.elbow.x -= localDir * snap * 5 * spec.stance;
+      base.frontArm.hand.x -= localDir * snap * 7 * spec.stance;
+      base.backArm.elbow.x -= localDir * snap * 4 * spec.stance;
+      base.backArm.hand.x -= localDir * snap * 6 * spec.stance;
+      base.frontArm.elbow.y += recoil * 6;
+      base.frontArm.hand.y += recoil * 8;
+      base.backArm.elbow.y += recoil * 4;
+      base.backArm.hand.y += recoil * 6;
+      base.frontLeg.knee.y += snap * 5;
+      base.backLeg.knee.y += snap * 4;
+      base.frontLeg.foot.x += localDir * snap * 5 * spec.stance;
+      base.backLeg.foot.x -= localDir * snap * 7 * spec.stance;
+    }
+  }
+
   if (f.hurt > 0 && !winner) {
     const zoneT = clamp((f.hitZonePulse ?? 0) / 26, 0, 1);
     const hitDir = f.impactDir ?? f.dir;
@@ -5963,8 +6139,22 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
   }
 
   ctx.save();
-  const headAngle = options.lockRotation ? 0 : stride * 0.018 + (f.hurt > 0 ? Math.sin(f.hurt) * 0.03 : 0);
+  const localizedImpact = localizedImpactProfile(f);
+  const headImpact =
+    localizedImpact.zone === "head" && f.hitZone !== "guard"
+      ? localizedImpact.snap
+      : f.hurt > 0
+        ? localizedImpact.rebound * 0.14
+        : 0;
+  const headShiftX = -localizedImpact.localDir * headImpact * 5.6 + localizedImpact.shake * 0.8;
+  const headShiftY = -headImpact * 2.2 + (localizedImpact.zone === "legs" ? localizedImpact.rebound * 1.2 : 0);
+  const headAngle =
+    (options.lockRotation ? 0 : stride * 0.018 + (f.hurt > 0 ? Math.sin(f.hurt) * 0.03 : 0)) -
+    localizedImpact.localDir * headImpact * 0.075 +
+    localizedImpact.shake * 0.012;
+  ctx.translate(headShiftX, headShiftY);
   ctx.rotate(headAngle);
+  ctx.scale(1 + headImpact * 0.024, 1 - headImpact * 0.018);
   ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
   ctx.beginPath();
   ctx.ellipse(0, -146 + crouch + spec.headY, 38, 14, 0, 0, Math.PI * 2);
