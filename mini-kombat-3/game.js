@@ -3933,6 +3933,7 @@ function drawFighter(f) {
   drawArm(f, pose.frontArm, true);
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
+  drawVectorContactOcclusion(f, crouch, walking ? stride : 0);
   drawHead(f, crouch, walking ? stride : 0);
   if (f.attack) drawAttackKineticFX(f, crouch, "front");
   drawFighterStageLighting(f, crouch);
@@ -4209,6 +4210,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
     );
     ctx.restore();
 
+    drawSpriteContactOcclusion(f, crouch, frameName, walking ? stride : 0);
     drawSpriteHeadActingWarp(f, crouch, walking ? stride : 0);
     drawSpriteAttackFrameWarp(f, unifiedSheet, frameX, crouch);
     drawSpriteImpactWarp(f, unifiedSheet, frameX, crouch);
@@ -4246,6 +4248,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   drawSpriteAttackFrameWarp(f, sheet, frameX, crouch);
   drawSpriteImpactWarp(f, sheet, frameX, crouch);
   drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
+  drawSpriteContactOcclusion(f, crouch, frameName, walking ? stride : 0);
 
   ctx.save();
   ctx.translate(headPose.x, 0);
@@ -4314,6 +4317,148 @@ function drawSpriteHeadActingWarp(f, crouch, stride) {
   ctx.ellipse(localX + w * 0.31, localY + h * 0.6, w * 0.14, h * 0.065, -0.18, 0, Math.PI * 2);
   ctx.ellipse(localX + w * 0.69, localY + h * 0.6, w * 0.14, h * 0.065, 0.18, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+function drawSpriteContactOcclusion(f, crouch, frameName, stride) {
+  const acting = headActingProfile(f, stride);
+  const phase = attackPhase(f.attack);
+  const action = f.attack ? Math.max(phase.strike, phase.snap, phase.followThrough * 0.6) : 0;
+  const localCrouch = crouch * 0.18;
+  const breath = Math.sin(roundFrame * 0.055 + f.x * 0.012);
+  const hurt = clamp((f.hurt ?? 0) / 22, 0, 1);
+  const guard = f.blocking ? 1 : 0;
+  const trim = f.trim ?? "#fff1bd";
+  const neckY = -185 + localCrouch + acting.y * 0.12;
+  const chestY = -144 + localCrouch + breath * 0.6;
+  const shoulderY = -166 + localCrouch;
+  const shoulderLift = frameName === "block" ? -4 : frameName === "hurt" ? 3 : 0;
+  const profileWeight = f.profileId === "p2" ? 0.9 : 1.05;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+
+  const chinShade = ctx.createRadialGradient(acting.x * 0.08, neckY - 7, 4, acting.x * 0.08, neckY - 2, 42);
+  chinShade.addColorStop(0, `rgba(20, 10, 8, ${0.25 + hurt * 0.08 + action * 0.06})`);
+  chinShade.addColorStop(0.58, "rgba(30, 14, 10, 0.12)");
+  chinShade.addColorStop(1, "rgba(30, 14, 10, 0)");
+  ctx.fillStyle = chinShade;
+  ctx.beginPath();
+  ctx.ellipse(acting.x * 0.08, neckY, 31 * profileWeight, 10 + action * 1.6, acting.rotation * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(22, 11, 8, ${0.12 + action * 0.04 + guard * 0.04})`;
+  ctx.beginPath();
+  ctx.moveTo(-27, neckY + 2);
+  ctx.quadraticCurveTo(0, neckY + 13 + breath * 0.4, 27, neckY + 2);
+  ctx.bezierCurveTo(17, neckY + 22, -17, neckY + 22, -27, neckY + 2);
+  ctx.fill();
+
+  ctx.globalAlpha = 0.72;
+  ctx.fillStyle = "rgba(19, 10, 8, 0.14)";
+  ctx.beginPath();
+  ctx.ellipse(-39, shoulderY + shoulderLift, 26, 9, -0.24, 0, Math.PI * 2);
+  ctx.ellipse(39, shoulderY + shoulderLift, 26, 9, 0.24, 0, Math.PI * 2);
+  ctx.fill();
+
+  const armShadow = clamp(0.08 + action * 0.12 + guard * 0.1 + hurt * 0.04, 0.06, 0.28);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = `rgba(22, 11, 8, ${armShadow})`;
+  ctx.lineCap = "round";
+  ctx.lineWidth = 7 + guard * 2 + action * 2;
+
+  if (frameName === "block") {
+    ctx.beginPath();
+    ctx.moveTo(-37, -130 + localCrouch);
+    ctx.quadraticCurveTo(-20, -116 + localCrouch, -7, chestY + 18);
+    ctx.moveTo(37, -130 + localCrouch);
+    ctx.quadraticCurveTo(20, -116 + localCrouch, 7, chestY + 18);
+    ctx.stroke();
+  } else if (frameName === "punch" || frameName === "special") {
+    ctx.beginPath();
+    ctx.moveTo(-42, -126 + localCrouch);
+    ctx.quadraticCurveTo(-17 - action * 5, -116 + localCrouch, -5, chestY + 15);
+    ctx.moveTo(42, -126 + localCrouch);
+    ctx.quadraticCurveTo(18 + action * 5, -116 + localCrouch, 8, chestY + 13);
+    ctx.stroke();
+  } else {
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(-34, -124 + localCrouch);
+    ctx.quadraticCurveTo(-21, -111 + localCrouch, -15, chestY + 10);
+    ctx.moveTo(34, -124 + localCrouch);
+    ctx.quadraticCurveTo(21, -111 + localCrouch, 15, chestY + 10);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(trim, 0.08 + action * 0.045);
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-35, shoulderY - 7 + shoulderLift);
+  ctx.quadraticCurveTo(-20, shoulderY - 14 + shoulderLift, -5, shoulderY - 8 + shoulderLift);
+  ctx.moveTo(35, shoulderY - 7 + shoulderLift);
+  ctx.quadraticCurveTo(20, shoulderY - 14 + shoulderLift, 5, shoulderY - 8 + shoulderLift);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255, 242, 206, 0.075)";
+  ctx.lineWidth = 2.1;
+  ctx.beginPath();
+  ctx.moveTo(-18, neckY + 16);
+  ctx.quadraticCurveTo(0, neckY + 24 + breath * 0.5, 18, neckY + 16);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawVectorContactOcclusion(f, crouch, stride) {
+  const spec = bodySpec(f);
+  const action = f.attack ? attackProgress(f.attack) : 0;
+  const guard = f.blocking ? 1 : 0;
+  const hurt = clamp((f.hurt ?? 0) / 22, 0, 1);
+  const breath = Math.sin(roundFrame * 0.055 + f.x * 0.012);
+  const shoulder = spec.shoulder;
+  const neckY = -134 + crouch + spec.headY * 0.18;
+  const collarY = -125 + crouch;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(24, 12, 9, ${0.16 + action * 0.04 + guard * 0.04 + hurt * 0.04})`;
+  ctx.beginPath();
+  ctx.ellipse(stride * 0.5, neckY, 28, 8.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(18, 9, 7, 0.12)";
+  ctx.beginPath();
+  ctx.ellipse(-shoulder + 9, collarY + 9, 18, 8, -0.35, 0, Math.PI * 2);
+  ctx.ellipse(shoulder - 9, collarY + 9, 18, 8, 0.35, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(18, 9, 7, ${0.08 + action * 0.08 + guard * 0.1})`;
+  ctx.lineWidth = 5.8 + guard * 1.6;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-shoulder + 6, -112 + crouch);
+  ctx.quadraticCurveTo(-18, -105 + crouch, -9, -82 + crouch + breath);
+  ctx.moveTo(shoulder - 6, -112 + crouch);
+  ctx.quadraticCurveTo(18, -105 + crouch, 9, -82 + crouch + breath);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(f.trim, 0.12 + action * 0.06);
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-shoulder + 9, collarY);
+  ctx.quadraticCurveTo(-20, collarY - 7, -4, collarY - 2);
+  ctx.moveTo(shoulder - 9, collarY);
+  ctx.quadraticCurveTo(20, collarY - 7, 4, collarY - 2);
+  ctx.stroke();
   ctx.restore();
 }
 
