@@ -73,6 +73,7 @@ let shake = 0;
 let hitStopFrames = 0;
 let koFreeze = 0;
 let roundFrame = 0;
+let resultFrame = 0;
 let cpuEnabled = true;
 let cpuFighterId = "p1";
 let selectedLeftId = "p1";
@@ -541,6 +542,12 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     impactLift: 0,
     impactStrength: 0,
     contactFlash: 0,
+    damagePulse: 0,
+    damageLevel: 0,
+    koFall: 0,
+    koFallDir: dir,
+    koFallStrength: 0,
+    victoryPulse: 0,
     guardPulse: 0,
     guardImpact: 0,
     staggerPulse: 0,
@@ -707,6 +714,12 @@ function resetRound() {
     impactLift: 0,
     impactStrength: 0,
     contactFlash: 0,
+    damagePulse: 0,
+    damageLevel: 0,
+    koFall: 0,
+    koFallDir: 1,
+    koFallStrength: 0,
+    victoryPulse: 0,
     guardPulse: 0,
     guardImpact: 0,
     staggerPulse: 0,
@@ -746,6 +759,12 @@ function resetRound() {
     impactLift: 0,
     impactStrength: 0,
     contactFlash: 0,
+    damagePulse: 0,
+    damageLevel: 0,
+    koFall: 0,
+    koFallDir: -1,
+    koFallStrength: 0,
+    victoryPulse: 0,
     guardPulse: 0,
     guardImpact: 0,
     staggerPulse: 0,
@@ -784,6 +803,7 @@ function resetRound() {
   cameraImpactStrength = 0;
   koFreeze = 0;
   roundFrame = 0;
+  resultFrame = 0;
   countdownFrames = 180;
   paused = false;
   running = true;
@@ -1070,6 +1090,7 @@ function update() {
 
   if (koFreeze > 0) {
     koFreeze -= 1;
+    if (winner) resultFrame += 1;
     updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
@@ -1077,6 +1098,7 @@ function update() {
   }
 
   if (!running) {
+    if (winner) resultFrame += 1;
     updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
@@ -1112,6 +1134,7 @@ function update() {
 
   if (!winner && (a.health <= 0 || b.health <= 0)) {
     const winnerFighter = a.health > b.health ? a : b;
+    const loserFighter = winnerFighter === a ? b : a;
     winner = winnerFighter.name;
     roundWinnerId = winnerFighter.id;
     winnerFighter.wins += 1;
@@ -1119,9 +1142,17 @@ function update() {
     if (matchOver) matchWinnerId = winnerFighter.id;
     running = false;
     koFreeze = 18;
+    resultFrame = 0;
+    loserFighter.koFall = Math.max(loserFighter.koFall ?? 0, 90);
+    loserFighter.koFallDir = loserFighter.impactDir || winnerFighter.dir || 1;
+    loserFighter.koFallStrength = Math.max(loserFighter.koFallStrength ?? 0, loserFighter.impactStrength ?? 1);
+    loserFighter.damagePulse = Math.max(loserFighter.damagePulse ?? 0, 34);
+    loserFighter.damageLevel = Math.max(loserFighter.damageLevel ?? 0, 1.55);
+    winnerFighter.victoryPulse = 60;
     shake = 16;
     flash = 16;
     addText(winnerFighter.x, winnerFighter.y - 190, matchOver ? "MATCH" : "ROUND", "#fff1bd");
+    koCollapseFX(loserFighter, winnerFighter);
     playSound(matchOver ? tournamentActive && winnerFighter.id !== "right" ? "lose" : "victory" : "ko");
     if (matchOver) scheduleWinnerOverlay();
     else scheduleNextRound();
@@ -1147,6 +1178,8 @@ function updateFighter(f, opponent) {
   if (f.hitFlash > 0) f.hitFlash -= 1;
   if (f.contactFlash > 0) f.contactFlash -= 1;
   if (f.impactPulse > 0) f.impactPulse -= 1;
+  if (f.damagePulse > 0) f.damagePulse -= 1;
+  if (f.victoryPulse > 0) f.victoryPulse -= 1;
   if (f.guardImpact > 0) f.guardImpact -= 1;
   if (f.staggerPulse > 0) f.staggerPulse -= 1;
   if (f.jumpPulse > 0) f.jumpPulse -= 1;
@@ -1321,21 +1354,31 @@ function landHit(attacker, target, damage, projectile = false) {
   const impactDir = attacker?.dir ?? target.dir * -1;
   const impactColor = blocked ? "#bdeaff" : projectile ? "#fff0a6" : counter ? "#fff1bd" : "#ffd44d";
   const impactStrength = blocked ? 0.42 : counter ? 1.35 : projectile ? 1.18 : heavyImpact ? 1.08 : 0.78;
+  const previousHealth = target.health;
+  const nextHealth = clamp(target.health - finalDamage, 0, 100);
+  const finishingHit = !blocked && previousHealth > 0 && nextHealth <= 0;
 
-  target.health = clamp(target.health - finalDamage, 0, 100);
-  target.hurt = blocked ? 9 : attacker?.attack?.type === "grab" ? 30 : projectile ? 21 : 24;
+  target.health = nextHealth;
+  target.hurt = finishingHit ? 38 : blocked ? 9 : attacker?.attack?.type === "grab" ? 30 : projectile ? 21 : 24;
   target.hitFlash = blocked ? 8 : projectile ? 20 : heavyImpact ? 17 : 14;
   target.contactFlash = blocked ? 7 : heavyImpact ? 14 : 11;
-  target.impactPulse = blocked ? 8 : Math.round(13 + impactStrength * 5);
+  target.impactPulse = finishingHit ? 24 : blocked ? 8 : Math.round(13 + impactStrength * 5);
   target.impactDir = impactDir;
-  target.impactLift = blocked ? 0.45 : projectile ? 1.35 : heavyImpact ? 1.48 : 1;
+  target.impactLift = finishingHit ? 2.1 : blocked ? 0.45 : projectile ? 1.35 : heavyImpact ? 1.48 : 1;
   target.impactStrength = impactStrength;
+  target.damagePulse = blocked ? Math.max(target.damagePulse ?? 0, 8) : finishingHit ? 34 : Math.max(target.damagePulse ?? 0, heavyImpact || projectile || counter ? 24 : 18);
+  target.damageLevel = blocked ? 0.35 : finishingHit ? 1.65 : counter ? 1.45 : projectile ? 1.22 : heavyImpact ? 1.08 : 0.82;
+  if (finishingHit) {
+    target.koFall = Math.max(target.koFall ?? 0, 86);
+    target.koFallDir = impactDir;
+    target.koFallStrength = impactStrength;
+  }
   target.guardImpact = blocked ? Math.max(target.guardImpact ?? 0, heavyImpact || projectile ? 16 : 13) : 0;
   if (!blocked && target.health < 32) {
     target.staggerPulse = Math.max(target.staggerPulse ?? 0, heavyImpact || projectile ? 18 : 13);
   }
-  target.vx = impactDir * (blocked ? 3.1 : projectile ? 5.8 : heavyImpact ? 7 : 5.9);
-  target.vy = target.grounded ? (blocked ? -1.35 : projectile ? -3.45 : heavyImpact ? -4.45 : -3.75) : target.vy;
+  target.vx = impactDir * (blocked ? 3.1 : finishingHit ? 8.4 : projectile ? 5.8 : heavyImpact ? 7 : 5.9);
+  target.vy = target.grounded ? (blocked ? -1.35 : finishingHit ? -5.4 : projectile ? -3.45 : heavyImpact ? -4.45 : -3.75) : target.vy;
   if (attacker) {
     attacker.energy = clamp(attacker.energy + (blocked ? 3 : 8), 0, 100);
     attacker.impactPulse = Math.max(attacker.impactPulse ?? 0, blocked ? 3 : heavyImpact ? 5 : 4);
@@ -1770,6 +1813,53 @@ function coldWaterSplash(x, y, dir) {
     });
   }
   impactShockwave(x, y + 8, "#8fe2ff", false, true);
+}
+
+function koCollapseFX(loser, winnerFighter) {
+  const dir = loser.koFallDir || loser.impactDir || winnerFighter?.dir || 1;
+  const floorY = Math.min(FLOOR + 5, loser.y + 5);
+  const color = loser.trim ?? "#ffd44d";
+  particles.push({
+    x: loser.x + dir * fighterScale(6),
+    y: floorY,
+    vx: dir * 0.28,
+    vy: 0,
+    angle: dir > 0 ? 0 : Math.PI,
+    life: 28,
+    maxLife: 28,
+    size: 58,
+    growth: 2.75,
+    color: "rgba(226, 197, 135, 0.78)",
+    kind: "floorShock",
+  });
+  particles.push({
+    x: loser.x - dir * fighterScale(18),
+    y: loser.y - fighterScale(94),
+    vx: dir * 0.25,
+    vy: 0,
+    angle: dir > 0 ? 0.08 : Math.PI - 0.08,
+    life: 18,
+    maxLife: 18,
+    size: 62,
+    color,
+    strength: 1.35,
+    kind: "contactFlash",
+  });
+  for (let i = 0; i < 12; i += 1) {
+    particles.push({
+      x: loser.x + (Math.random() - 0.5) * fighterScale(64),
+      y: floorY + Math.random() * 4,
+      vx: -dir * (0.35 + Math.random() * 1.35),
+      vy: -0.35 - Math.random() * 0.8,
+      angle: (Math.random() - 0.5) * 0.18,
+      life: 18 + Math.random() * 16,
+      maxLife: 28,
+      size: 9 + Math.random() * 16,
+      color: "rgba(214, 182, 120, 0.56)",
+      kind: "dustRibbon",
+    });
+  }
+  impactShockwave(loser.x - dir * fighterScale(12), loser.y - fighterScale(96), color, false, true);
 }
 
 function floorDust(x, y, count) {
@@ -2985,15 +3075,18 @@ function fighterTransitionMotion(f, walking) {
     motion.afterimage = Math.max(motion.afterimage, guardHit * 0.09);
   }
 
-  if (f.hurt > 0) {
-    const hurtT = clamp(f.hurt / 24, 0, 1);
-    const impactT = clamp((f.impactPulse ?? 0) / 16, 0, 1);
+  const effectiveHurt = winner ? Math.max(0, (f.hurt ?? 0) - resultFrame * 0.9) : (f.hurt ?? 0);
+  if (effectiveHurt > 0) {
+    const hurtT = clamp(effectiveHurt / 24, 0, 1);
+    const effectiveImpact = winner ? Math.max(0, (f.impactPulse ?? 0) - resultFrame * 0.86) : (f.impactPulse ?? 0);
+    const impactT = clamp(effectiveImpact / 16, 0, 1);
     const strength = clamp(f.impactStrength ?? 0.8, 0.35, 1.45);
-    const contactT = clamp((f.contactFlash ?? 0) / 14, 0, 1);
-    const shakePulse = Math.sin(roundFrame * 1.75) * hurtT;
+    const effectiveContact = winner ? Math.max(0, (f.contactFlash ?? 0) - resultFrame * 0.9) : (f.contactFlash ?? 0);
+    const contactT = clamp(effectiveContact / 14, 0, 1);
+    const shakePulse = Math.sin((roundFrame + resultFrame) * 1.75) * hurtT;
     const impactDir = f.impactDir ?? dir;
     motion.x += impactDir * (impactT * (2.4 + strength * 3.1) + hurtT * (0.8 + strength * 0.9)) + shakePulse * 0.9;
-    motion.y += Math.sin(f.hurt * 0.82) * hurtT * 0.8 - impactT * (0.35 + strength * 0.45) + contactT * 0.8;
+    motion.y += Math.sin(effectiveHurt * 0.82) * hurtT * 0.8 - impactT * (0.35 + strength * 0.45) + contactT * 0.8;
     motion.rotation += impactDir * (impactT * (0.016 + strength * 0.023) + hurtT * 0.012) + shakePulse * 0.005;
     motion.scaleX *= 1 + impactT * (0.008 + strength * 0.012) + contactT * 0.006;
     motion.scaleY *= 1 - impactT * (0.004 + strength * 0.006) + contactT * 0.004;
@@ -3011,13 +3104,24 @@ function fighterTransitionMotion(f, walking) {
   }
 
   if (winner) {
-    const settle = 0.5 + Math.sin(roundFrame * 0.08) * 0.5;
+    const settle = 0.5 + Math.sin((roundFrame + resultFrame) * 0.08) * 0.5;
     if (f.id === roundWinnerId) {
-      motion.y -= settle * 0.8;
-      motion.rotation += dir * 0.006 * settle;
+      const victory = clamp(Math.max(0, (f.victoryPulse ?? 60) - resultFrame * 0.9) / 60, 0, 1);
+      motion.y -= settle * 0.8 + victory * 1.8;
+      motion.rotation += dir * (0.006 * settle - victory * 0.012);
+      motion.scaleX *= 1 + victory * 0.012;
+      motion.scaleY *= 1 - victory * 0.006;
     } else {
-      motion.y += 0.8;
-      motion.rotation -= dir * 0.012;
+      const fall = smoothStep01(clamp(resultFrame / 46, 0, 1));
+      const bounce = Math.max(0, Math.sin(clamp((resultFrame - 16) / 28, 0, 1) * Math.PI));
+      const impact = Math.max(0, 1 - resultFrame / 34);
+      const fallDir = f.koFallDir || f.impactDir || -dir;
+      motion.x += fallDir * (fall * 12 + impact * 4.8);
+      motion.y += 0.8 + fall * 21 - bounce * 4.5;
+      motion.rotation += fallDir * (0.045 + fall * 0.16 + impact * 0.035);
+      motion.scaleX *= 1 + impact * 0.02 + fall * 0.025;
+      motion.scaleY *= 1 - impact * 0.012 - fall * 0.018;
+      motion.afterimage = Math.max(motion.afterimage, impact * 0.12);
     }
   }
 
@@ -3139,21 +3243,23 @@ function drawFighter(f) {
   const plant = walking ? clamp(f.walkPlant ?? Math.abs(Math.cos(walkCycle)), 0, 1) : 0;
   const transition = fighterTransitionMotion(f, walking);
   const bob = walking ? plant * 2.35 - Math.max(0, Math.sin(walkCycle * 2)) * 0.55 : Math.sin(t * 9) * (f.grounded ? 1.3 : 0);
-  const hurtShift = f.hurt > 0 ? Math.sin(f.hurt * 1.4) * 4 : 0;
-  const impactT = clamp((f.impactPulse ?? 0) / 16, 0, 1);
+  const effectiveHurt = winner ? Math.max(0, (f.hurt ?? 0) - resultFrame * 0.9) : (f.hurt ?? 0);
+  const effectiveImpact = winner ? Math.max(0, (f.impactPulse ?? 0) - resultFrame * 0.86) : (f.impactPulse ?? 0);
+  const hurtShift = effectiveHurt > 0 ? Math.sin((effectiveHurt + resultFrame) * 1.4) * 4 : 0;
+  const impactT = clamp(effectiveImpact / 16, 0, 1);
   const impactEase = impactT * impactT;
   const impactShift = (f.impactDir ?? f.dir) * impactEase * (f.hurt > 0 ? 5.2 : 2.2);
   const impactRise = impactEase * (f.impactLift ?? 0) * 3.4;
   const impactLean = (f.impactDir ?? f.dir) * impactEase * (f.hurt > 0 ? 0.035 : 0.012);
-  const idleEase = f.grounded && !walking && f.hurt <= 0 && !f.attack && !winner ? 1 : 0;
+  const idleEase = f.grounded && !walking && effectiveHurt <= 0 && !f.attack && !winner ? 1 : 0;
   const idlePulse = Math.sin(t * 2.15 + f.x * 0.015) * idleEase;
   const crouch = f.crouch * 18;
   const baseX = f.x + hurtShift + impactShift + transition.x;
   const baseY = f.y + bob - impactRise - idlePulse * 0.8 + transition.y;
   const pose = getPose(f, stride);
   const attackStretch = f.attack ? attackProgress(f.attack) * 0.012 : 0;
-  const breathing = f.grounded && f.hurt <= 0 ? Math.sin(t * 2.7 + f.x * 0.02) * 0.012 + idlePulse * 0.006 : 0;
-  const hurtSquash = f.hurt > 0 ? Math.sin(f.hurt * 0.7) * 0.012 + impactEase * 0.014 : impactEase * 0.005;
+  const breathing = f.grounded && effectiveHurt <= 0 ? Math.sin(t * 2.7 + f.x * 0.02) * 0.012 + idlePulse * 0.006 : 0;
+  const hurtSquash = effectiveHurt > 0 ? Math.sin((effectiveHurt + resultFrame) * 0.7) * 0.012 + impactEase * 0.014 : impactEase * 0.005;
 
   drawWorldContactShadow(f, baseX, walking, stride, impactEase);
 
@@ -3170,6 +3276,7 @@ function drawFighter(f) {
   if (pigForm) {
     drawPchanPigForm(f, crouch);
     if (f.hitFlash > 0) drawHitFlash(f, crouch);
+    drawDamageReactionFX(f, crouch);
     if (winner) drawResultPoseEffect(f, crouch);
     ctx.restore();
     const box = attackBox(f);
@@ -3192,6 +3299,7 @@ function drawFighter(f) {
     if (f.blocking) drawGuard(f.trim, crouch, f);
     if (f.hitFlash > 0) drawHitFlash(f, crouch);
     if (f.hurt > 0) drawHurtRim(f, crouch);
+    drawDamageReactionFX(f, crouch);
     if (f.health < 30 && f.hurt <= 0 && !winner) drawLowHealthStagger(f, crouch);
     if (winner) drawResultPoseEffect(f, crouch);
     ctx.restore();
@@ -3226,6 +3334,7 @@ function drawFighter(f) {
   if (f.blocking) drawGuard(f.trim, crouch, f);
   if (f.hitFlash > 0) drawHitFlash(f, crouch);
   if (f.hurt > 0) drawHurtRim(f, crouch);
+  drawDamageReactionFX(f, crouch);
   if (f.health < 30 && f.hurt <= 0 && !winner) drawLowHealthStagger(f, crouch);
   if (winner) drawResultPoseEffect(f, crouch);
   ctx.restore();
@@ -3325,7 +3434,11 @@ function drawSpriteUnderlay(f, pose, crouch) {
 }
 
 function rasterBodyFrameFor(f, walking) {
-  if (winner) return f.id === roundWinnerId ? "victory" : "defeat";
+  if (winner) {
+    if (f.id === roundWinnerId) return "victory";
+    if (resultFrame < 18) return "hurt";
+    return "defeat";
+  }
   if (f.hurt > 0) return "hurt";
   if (f.blocking) return "block";
 
@@ -4028,6 +4141,71 @@ function drawHurtRim(f, crouch) {
   ctx.restore();
 }
 
+function drawDamageReactionFX(f, crouch) {
+  const rawDamage = winner ? Math.max(0, (f.damagePulse ?? 0) - resultFrame * 0.78) : (f.damagePulse ?? 0);
+  const damage = clamp(rawDamage / 34, 0, 1);
+  const level = clamp(f.damageLevel ?? 0, 0, 1.7);
+  const ko = winner && f.id !== roundWinnerId ? clamp(resultFrame / 58, 0, 1) : 0;
+  if (damage <= 0.03 && ko <= 0.03) return;
+
+  const localDir = (f.impactDir ?? f.dir) === f.dir ? 1 : -1;
+  const shake = Math.sin((roundFrame + resultFrame) * 1.55) * damage;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  if (damage > 0.03) {
+    const glow = ctx.createRadialGradient(localDir * 16, -104 + crouch, 5, localDir * 10, -96 + crouch, 94 + level * 14);
+    glow.addColorStop(0, `rgba(255, 247, 212, ${0.18 * damage})`);
+    glow.addColorStop(0.42, `rgba(255, 84, 66, ${0.12 * damage * level})`);
+    glow.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(localDir * 8, -102 + crouch, 58 + level * 10, 92 + level * 8, -localDir * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(255, 248, 206, ${0.36 * damage})`;
+    ctx.lineWidth = 2.2 + level * 1.8;
+    for (let i = 0; i < 3; i += 1) {
+      const lane = i - 1;
+      const y = -138 + crouch + lane * 33 + shake * 5;
+      ctx.beginPath();
+      ctx.moveTo(localDir * (-44 - damage * 8), y - lane * 6);
+      ctx.lineTo(localDir * (-18 + damage * 18), y + 13);
+      ctx.moveTo(localDir * (37 + damage * 10), y + 4);
+      ctx.lineTo(localDir * (18 - damage * 14), y + 17);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = `rgba(255, 83, 64, ${0.16 * damage * level})`;
+    ctx.lineWidth = 6 + level * 2.5;
+    ctx.beginPath();
+    ctx.moveTo(localDir * -34, -126 + crouch);
+    ctx.quadraticCurveTo(localDir * 8, -104 + crouch + shake * 8, localDir * 34, -78 + crouch);
+    ctx.stroke();
+  }
+
+  if (ko > 0.03) {
+    const settle = smoothStep01(ko);
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = `rgba(34, 17, 10, ${0.1 + settle * 0.12})`;
+    ctx.beginPath();
+    ctx.ellipse(localDir * (14 + settle * 24), -6 + crouch + settle * 8, 58 + settle * 28, 10 + settle * 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = `rgba(255, 225, 156, ${0.18 * (1 - settle)})`;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.ellipse(localDir * (10 + settle * 18), -7 + crouch, 48 + settle * 44, 9 + settle * 6, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 function drawLowHealthStagger(f, crouch) {
   const danger = clamp((30 - f.health) / 30, 0, 1);
   const stagger = clamp((f.staggerPulse ?? 0) / 18, 0, 1);
@@ -4121,10 +4299,11 @@ function drawHitFlash(f, crouch) {
 }
 
 function drawResultPoseEffect(f, crouch) {
+  const clock = roundFrame + resultFrame;
   ctx.save();
   if (f.id === roundWinnerId) {
     ctx.globalCompositeOperation = "screen";
-    const floorPulse = 0.5 + Math.sin(roundFrame * 0.08) * 0.18;
+    const floorPulse = 0.5 + Math.sin(clock * 0.08) * 0.18;
     ctx.strokeStyle = colorWithAlpha(f.trim, 0.28 + floorPulse * 0.16);
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -4133,8 +4312,8 @@ function drawResultPoseEffect(f, crouch) {
 
     ctx.lineWidth = 2;
     for (let i = 0; i < 4; i += 1) {
-      const x = -44 + i * 29 + Math.sin(roundFrame * 0.04 + i) * 4;
-      const top = -204 + crouch + Math.cos(roundFrame * 0.03 + i) * 8;
+      const x = -44 + i * 29 + Math.sin(clock * 0.04 + i) * 4;
+      const top = -204 + crouch + Math.cos(clock * 0.03 + i) * 8;
       const bottom = -36 + crouch;
       const ray = ctx.createLinearGradient(x, top, x + 12, bottom);
       ray.addColorStop(0, colorWithAlpha(f.trim, 0));
@@ -4157,7 +4336,7 @@ function drawResultPoseEffect(f, crouch) {
     ctx.fill();
 
     for (let i = 0; i < 5; i += 1) {
-      const angle = roundFrame * 0.035 + i * 1.26;
+      const angle = clock * 0.035 + i * 1.26;
       const x = Math.cos(angle) * 44;
       const y = -148 + crouch + Math.sin(angle * 1.4) * 18;
       ctx.fillStyle = colorWithAlpha(f.trim, 0.45);
@@ -4190,15 +4369,15 @@ function drawResultPoseEffect(f, crouch) {
     ctx.fillStyle = "rgba(255, 241, 189, 0.5)";
     for (let i = 0; i < 3; i += 1) {
       ctx.beginPath();
-      ctx.arc(-18 + i * 18, -171 + crouch + Math.sin(roundFrame * 0.12 + i) * 4, 3, 0, Math.PI * 2);
+      ctx.arc(-18 + i * 18, -171 + crouch + Math.sin(clock * 0.12 + i) * 4, 3, 0, Math.PI * 2);
       ctx.fill();
     }
 
     ctx.globalAlpha = 0.3;
     ctx.fillStyle = colorWithAlpha(f.trim, 0.38);
     for (let i = 0; i < 4; i += 1) {
-      const x = -34 + i * 22 + Math.sin(roundFrame * 0.05 + i) * 3;
-      const y = -20 + crouch - Math.sin(roundFrame * 0.07 + i) * 5;
+      const x = -34 + i * 22 + Math.sin(clock * 0.05 + i) * 3;
+      const y = -20 + crouch - Math.sin(clock * 0.07 + i) * 5;
       ctx.beginPath();
       ctx.ellipse(x, y, 9 + i, 4, 0.1, 0, Math.PI * 2);
       ctx.fill();
@@ -4457,27 +4636,29 @@ function getPose(f, stride) {
 
   if (winner) {
     if (f.id === roundWinnerId) {
-      base.torsoTilt = -0.08;
+      const victory = clamp(Math.max(0, (f.victoryPulse ?? 60) - resultFrame * 0.9) / 60, 0, 1);
+      base.torsoTilt = -0.08 - victory * 0.04;
       base.frontArm = {
         shoulder: { x: shoulderX, y: shoulderY },
-        elbow: { x: 42 * spec.stance, y: -155 + crouch },
-        hand: { x: 54 * spec.stance, y: -184 + crouch },
+        elbow: { x: 42 * spec.stance, y: -155 + crouch - victory * 7 },
+        hand: { x: 54 * spec.stance, y: -184 + crouch - victory * 9 },
       };
       base.backArm = {
         shoulder: { x: -shoulderX, y: shoulderY + 4 },
-        elbow: { x: -42 * spec.stance, y: -151 + crouch },
-        hand: { x: -54 * spec.stance, y: -178 + crouch },
+        elbow: { x: -42 * spec.stance, y: -151 + crouch - victory * 6 },
+        hand: { x: -54 * spec.stance, y: -178 + crouch - victory * 8 },
       };
       base.frontLeg.foot.x += 8 * spec.stance;
       base.backLeg.foot.x -= 8 * spec.stance;
     } else {
-      base.torsoTilt = 0.2;
-      base.frontArm.hand = { x: 48 * spec.stance, y: -42 + crouch };
-      base.backArm.hand = { x: -40 * spec.stance, y: -38 + crouch };
-      base.frontLeg.knee.y += 10;
-      base.backLeg.knee.y += 12;
-      base.frontLeg.foot.x += 12 * spec.stance;
-      base.backLeg.foot.x -= 14 * spec.stance;
+      const fall = smoothStep01(clamp(resultFrame / 46, 0, 1));
+      base.torsoTilt = 0.16 + fall * 0.24;
+      base.frontArm.hand = { x: (48 + fall * 12) * spec.stance, y: -42 + crouch + fall * 16 };
+      base.backArm.hand = { x: (-40 - fall * 10) * spec.stance, y: -38 + crouch + fall * 18 };
+      base.frontLeg.knee.y += 10 + fall * 14;
+      base.backLeg.knee.y += 12 + fall * 16;
+      base.frontLeg.foot.x += (12 + fall * 10) * spec.stance;
+      base.backLeg.foot.x -= (14 + fall * 10) * spec.stance;
     }
   }
 
