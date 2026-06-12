@@ -557,7 +557,13 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     victoryPulse: 0,
     guardPulse: 0,
     guardImpact: 0,
+    guardEntryPulse: 0,
+    guardExitPulse: 0,
     staggerPulse: 0,
+    attackEntryPulse: 0,
+    attackRecoverPulse: 0,
+    hurtRecoverPulse: 0,
+    moveTurnPulse: 0,
     jumpPulse: 0,
     landingPulse: 0,
     stepPulse: 0,
@@ -738,7 +744,13 @@ function resetRound() {
     victoryPulse: 0,
     guardPulse: 0,
     guardImpact: 0,
+    guardEntryPulse: 0,
+    guardExitPulse: 0,
     staggerPulse: 0,
+    attackEntryPulse: 0,
+    attackRecoverPulse: 0,
+    hurtRecoverPulse: 0,
+    moveTurnPulse: 0,
     jumpPulse: 0,
     landingPulse: 0,
     stepPulse: 0,
@@ -792,7 +804,13 @@ function resetRound() {
     victoryPulse: 0,
     guardPulse: 0,
     guardImpact: 0,
+    guardEntryPulse: 0,
+    guardExitPulse: 0,
     staggerPulse: 0,
+    attackEntryPulse: 0,
+    attackRecoverPulse: 0,
+    hurtRecoverPulse: 0,
+    moveTurnPulse: 0,
     jumpPulse: 0,
     landingPulse: 0,
     stepPulse: 0,
@@ -1062,6 +1080,8 @@ function startAttack(f, type) {
     whoosh: false,
   };
   f.blocking = false;
+  f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, grab ? 11 : sweep ? 10 : heavy ? 11 : 8);
+  f.guardExitPulse = Math.max(f.guardExitPulse ?? 0, (f.guardPulse ?? 0) > 2 ? 8 : 0);
   f.cooldown = grab ? 28 : sweep ? 25 : heavy ? 24 : 13;
   playSound(heavy || sweep ? "kick" : "punch");
 }
@@ -1071,6 +1091,8 @@ function startSpecial(f) {
 
   f.energy -= 45;
   f.blocking = false;
+  f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, 14);
+  f.guardExitPulse = Math.max(f.guardExitPulse ?? 0, (f.guardPulse ?? 0) > 2 ? 8 : 0);
   f.specialCooldown = 66;
   f.cooldown = 28;
   f.attack = {
@@ -1319,6 +1341,9 @@ function updateFighter(f, opponent) {
   const move = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   const baseSpeed = wantBlock ? 1.2 : 3.35;
   const wasGrounded = f.grounded;
+  const wasBlocking = f.blocking;
+  const wasHurt = f.hurt > 0;
+  const previousMoveIntent = f.moveIntent ?? 0;
   const opponentDir = opponent ? Math.sign(opponent.x - f.x) || f.dir : f.dir;
   const distance = opponent ? Math.abs(opponent.x - f.x) : 999;
   const movingTowardOpponent = move !== 0 && move === opponentDir;
@@ -1332,6 +1357,11 @@ function updateFighter(f, opponent) {
 
   f.moveIntent = move;
   f.blocking = wantBlock;
+  if (f.grounded && f.hurt <= 0 && !f.attack && previousMoveIntent !== move) {
+    f.moveTurnPulse = Math.max(f.moveTurnPulse ?? 0, move === 0 ? 7 : previousMoveIntent === 0 ? 8 : 10);
+  }
+  if (wantBlock && !wasBlocking) f.guardEntryPulse = Math.max(f.guardEntryPulse ?? 0, 12);
+  if (!wantBlock && wasBlocking) f.guardExitPulse = Math.max(f.guardExitPulse ?? 0, 10);
   f.crouch += ((wantBlock ? 1 : 0) - f.crouch) * 0.18;
   if (f.counterWindow > 0) f.counterWindow -= 1;
   if (f.hitFlash > 0) f.hitFlash -= 1;
@@ -1341,7 +1371,13 @@ function updateFighter(f, opponent) {
   if (f.hitZonePulse > 0) f.hitZonePulse -= 1;
   if (f.victoryPulse > 0) f.victoryPulse -= 1;
   if (f.guardImpact > 0) f.guardImpact -= 1;
+  if (f.guardEntryPulse > 0) f.guardEntryPulse -= 1;
+  if (f.guardExitPulse > 0) f.guardExitPulse -= 1;
   if (f.staggerPulse > 0) f.staggerPulse -= 1;
+  if (f.attackEntryPulse > 0) f.attackEntryPulse -= 1;
+  if (f.attackRecoverPulse > 0) f.attackRecoverPulse -= 1;
+  if (f.hurtRecoverPulse > 0) f.hurtRecoverPulse -= 1;
+  if (f.moveTurnPulse > 0) f.moveTurnPulse -= 1;
   if (f.jumpPulse > 0) f.jumpPulse -= 1;
   if (f.landingPulse > 0) f.landingPulse -= 1;
   if (f.stepPulse > 0) f.stepPulse -= 1;
@@ -1355,6 +1391,7 @@ function updateFighter(f, opponent) {
   if (f.hurt > 0) {
     f.hurt -= 1;
     f.vx *= 0.88;
+    if (wasHurt && f.hurt <= 0) f.hurtRecoverPulse = Math.max(f.hurtRecoverPulse ?? 0, 14);
   } else {
     const airControl = f.grounded ? 1 : 0.82;
     const acceleration = f.grounded ? 0.4 : 0.16;
@@ -1455,7 +1492,12 @@ function updateFighter(f, opponent) {
       landHit(f, opponent, f.attack.damage);
       f.attack.hit = true;
     }
-    if (f.attack.frame >= f.attack.duration) f.attack = null;
+    if (f.attack.frame >= f.attack.duration) {
+      const endedType = f.attack.type;
+      const endedHeavy = endedType === "kick" || endedType === "airKick" || endedType === "sweep" || endedType === "grab";
+      f.attackRecoverPulse = Math.max(f.attackRecoverPulse ?? 0, endedType === "special" ? 16 : endedHeavy ? 12 : 9);
+      f.attack = null;
+    }
   }
 
   f.energy = clamp(f.energy + 0.045 + (Math.abs(f.vx) > 1 ? 0.012 : 0), 0, 100);
@@ -3439,6 +3481,68 @@ function fighterTransitionMotion(f, walking) {
     motion.scaleY *= 1 - braceT * 0.018;
   }
 
+  if (!winner) {
+    const attackEntry = clamp((f.attackEntryPulse ?? 0) / 14, 0, 1);
+    const attackRecover = clamp((f.attackRecoverPulse ?? 0) / 16, 0, 1);
+    const guardEntry = clamp((f.guardEntryPulse ?? 0) / 12, 0, 1);
+    const guardExit = clamp((f.guardExitPulse ?? 0) / 10, 0, 1);
+    const hurtRecover = clamp((f.hurtRecoverPulse ?? 0) / 14, 0, 1);
+    const moveTurn = clamp((f.moveTurnPulse ?? 0) / 10, 0, 1);
+    const moveDir = f.moveIntent || Math.sign(f.vx) || dir;
+    const impactDir = f.impactDir ?? dir;
+
+    if (moveTurn > 0.02 && f.grounded && f.hurt <= 0 && !f.attack) {
+      motion.x -= moveDir * moveTurn * 1.15;
+      motion.y += moveTurn * 0.52;
+      motion.rotation -= moveDir * moveTurn * 0.014;
+      motion.scaleX *= 1 + moveTurn * 0.01;
+      motion.scaleY *= 1 - moveTurn * 0.009;
+    }
+
+    if (attackEntry > 0.02) {
+      motion.x -= dir * attackEntry * 1.6;
+      motion.y += attackEntry * 1.15;
+      motion.rotation -= dir * attackEntry * 0.018;
+      motion.scaleX *= 1 - attackEntry * 0.01;
+      motion.scaleY *= 1 + attackEntry * 0.018;
+      motion.afterimage = Math.max(motion.afterimage, attackEntry * 0.055);
+    }
+
+    if (attackRecover > 0.02) {
+      const settle = smoothStep01(attackRecover);
+      motion.x -= dir * settle * 1.25;
+      motion.y += settle * 0.7;
+      motion.rotation += dir * settle * 0.012;
+      motion.scaleX *= 1 + settle * 0.008;
+      motion.scaleY *= 1 - settle * 0.008;
+    }
+
+    if (guardEntry > 0.02) {
+      motion.x -= dir * guardEntry * 1.45;
+      motion.y += guardEntry * 1.35;
+      motion.rotation -= dir * guardEntry * 0.024;
+      motion.scaleX *= 1 + guardEntry * 0.012;
+      motion.scaleY *= 1 - guardEntry * 0.018;
+    }
+
+    if (guardExit > 0.02 && !f.blocking) {
+      motion.x += dir * guardExit * 0.65;
+      motion.y -= guardExit * 0.55;
+      motion.rotation += dir * guardExit * 0.01;
+      motion.scaleX *= 1 - guardExit * 0.006;
+      motion.scaleY *= 1 + guardExit * 0.01;
+    }
+
+    if (hurtRecover > 0.02 && f.hurt <= 0) {
+      const rebound = Math.sin(hurtRecover * Math.PI);
+      motion.x -= impactDir * rebound * 1.4;
+      motion.y -= rebound * 0.75;
+      motion.rotation -= impactDir * rebound * 0.018;
+      motion.scaleX *= 1 - rebound * 0.008;
+      motion.scaleY *= 1 + rebound * 0.014;
+    }
+  }
+
   if (f.attack) {
     const a = f.attack;
     const phase = attackPhase(a);
@@ -5118,6 +5222,13 @@ function getPose(f, stride) {
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, braceT * 0.82);
   }
 
+  const attackEntryT = clamp((f.attackEntryPulse ?? 0) / 14, 0, 1);
+  const attackRecoverT = clamp((f.attackRecoverPulse ?? 0) / 16, 0, 1);
+  const guardEntryT = clamp((f.guardEntryPulse ?? 0) / 12, 0, 1);
+  const guardExitT = clamp((f.guardExitPulse ?? 0) / 10, 0, 1);
+  const hurtRecoverT = clamp((f.hurtRecoverPulse ?? 0) / 14, 0, 1);
+  const moveTurnT = clamp((f.moveTurnPulse ?? 0) / 10, 0, 1);
+
   if (f.blocking) {
     base.frontArm = {
       shoulder: { x: 26, y: shoulderY },
@@ -5191,6 +5302,93 @@ function getPose(f, stride) {
       base.backArm.hand = { x: 46 - windup * 12 + activePulse * 35, y: -107 + crouch - windup * 4 - activePulse * 6 };
       base.frontLeg.foot.x += 7 * activePulse - 3 * windup;
       base.backLeg.foot.x -= 7 * activePulse + 3 * windup;
+    }
+  }
+
+  if (!winner) {
+    if (moveTurnT > 0.02 && walkingPose) {
+      const moveLocal = Math.sign(f.vx) === f.dir ? 1 : -1;
+      base.torsoTilt += moveLocal * moveTurnT * 0.025;
+      base.frontArm.elbow.x -= moveLocal * moveTurnT * 4.5 * spec.stance;
+      base.frontArm.hand.x -= moveLocal * moveTurnT * 6 * spec.stance;
+      base.backArm.elbow.x -= moveLocal * moveTurnT * 3.5 * spec.stance;
+      base.backArm.hand.x -= moveLocal * moveTurnT * 5 * spec.stance;
+      base.frontLeg.knee.y += moveTurnT * 3;
+      base.backLeg.knee.y += moveTurnT * 4;
+      base.frontLeg.foot.x += moveLocal * moveTurnT * 4 * spec.stance;
+      base.backLeg.foot.x -= moveLocal * moveTurnT * 4 * spec.stance;
+    }
+
+    if (guardEntryT > 0.02 && f.blocking && !f.attack) {
+      base.torsoTilt -= guardEntryT * 0.035;
+      base.frontArm.elbow.x += guardEntryT * 3 * spec.stance;
+      base.frontArm.elbow.y -= guardEntryT * 8;
+      base.frontArm.hand.x += guardEntryT * 2 * spec.stance;
+      base.frontArm.hand.y -= guardEntryT * 10;
+      base.backArm.elbow.x += guardEntryT * 5 * spec.stance;
+      base.backArm.elbow.y -= guardEntryT * 7;
+      base.backArm.hand.x += guardEntryT * 5 * spec.stance;
+      base.backArm.hand.y -= guardEntryT * 9;
+      base.frontLeg.knee.y += guardEntryT * 4;
+      base.backLeg.knee.y += guardEntryT * 5;
+      base.backLeg.foot.x -= guardEntryT * 7 * spec.stance;
+    }
+
+    if (guardExitT > 0.02 && !f.blocking && !f.attack && f.hurt <= 0) {
+      const open = smoothStep01(guardExitT);
+      base.torsoTilt += open * 0.018;
+      base.frontArm.elbow.x += open * 6 * spec.stance;
+      base.frontArm.elbow.y -= open * 3;
+      base.frontArm.hand.x += open * 8 * spec.stance;
+      base.frontArm.hand.y -= open * 5;
+      base.backArm.elbow.x -= open * 4 * spec.stance;
+      base.backArm.hand.x -= open * 5 * spec.stance;
+      base.frontLeg.foot.x += open * 3 * spec.stance;
+      base.backLeg.foot.x -= open * 4 * spec.stance;
+    }
+
+    if (attackEntryT > 0.02 && f.attack) {
+      base.torsoTilt -= attackEntryT * 0.035;
+      base.frontArm.elbow.x -= attackEntryT * 5 * spec.stance;
+      base.frontArm.elbow.y += attackEntryT * 3;
+      base.frontArm.hand.x -= attackEntryT * 8 * spec.stance;
+      base.frontArm.hand.y += attackEntryT * 4;
+      base.backArm.elbow.x -= attackEntryT * 3 * spec.stance;
+      base.backArm.elbow.y -= attackEntryT * 3;
+      base.backArm.hand.x -= attackEntryT * 5 * spec.stance;
+      base.backArm.hand.y -= attackEntryT * 5;
+      base.frontLeg.knee.y += attackEntryT * 3;
+      base.backLeg.knee.y += attackEntryT * 5;
+      base.backLeg.foot.x -= attackEntryT * 5 * spec.stance;
+    }
+
+    if (attackRecoverT > 0.02 && !f.attack && f.hurt <= 0) {
+      const settle = smoothStep01(attackRecoverT);
+      base.torsoTilt += settle * 0.02;
+      base.frontArm.elbow.x -= settle * 3 * spec.stance;
+      base.frontArm.elbow.y += settle * 4;
+      base.frontArm.hand.x -= settle * 4 * spec.stance;
+      base.frontArm.hand.y += settle * 6;
+      base.backArm.elbow.x += settle * 3 * spec.stance;
+      base.backArm.elbow.y += settle * 3;
+      base.backArm.hand.x += settle * 4 * spec.stance;
+      base.backArm.hand.y += settle * 4;
+      base.frontLeg.knee.y += settle * 3;
+      base.backLeg.knee.y += settle * 2;
+    }
+
+    if (hurtRecoverT > 0.02 && f.hurt <= 0 && !f.attack) {
+      const rebound = Math.sin(hurtRecoverT * Math.PI);
+      const impactDir = f.impactDir ?? f.dir;
+      base.torsoTilt -= impactDir * rebound * 0.035;
+      base.frontArm.elbow.x -= impactDir * rebound * 5 * spec.stance;
+      base.frontArm.elbow.y -= rebound * 5;
+      base.frontArm.hand.x -= impactDir * rebound * 7 * spec.stance;
+      base.frontArm.hand.y -= rebound * 6;
+      base.backArm.elbow.x -= impactDir * rebound * 4 * spec.stance;
+      base.backArm.hand.x -= impactDir * rebound * 5 * spec.stance;
+      base.frontLeg.knee.y += rebound * 3;
+      base.backLeg.foot.x -= impactDir * rebound * 6 * spec.stance;
     }
   }
 
