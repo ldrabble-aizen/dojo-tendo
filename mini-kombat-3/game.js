@@ -52,12 +52,12 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=51"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=51"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=52"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=52"),
 };
 const unifiedSpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-unified.svg?v=51"),
-  p2: loadImage("assets/sprite-akane-unified.svg?v=51"),
+  p1: loadImage("assets/sprite-pchan-unified.svg?v=52"),
+  p2: loadImage("assets/sprite-akane-unified.svg?v=52"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -2238,156 +2238,363 @@ function drawHud() {
   drawHudPanel(22, 16, 390, fighters[0], false);
   drawHudPanel(W - 412, 16, 390, fighters[1], true);
 
-  const centerPanel = ctx.createLinearGradient(W / 2 - 52, 18, W / 2 + 52, 84);
-  centerPanel.addColorStop(0, "rgba(58, 23, 18, 0.92)");
-  centerPanel.addColorStop(0.5, "rgba(18, 12, 12, 0.94)");
-  centerPanel.addColorStop(1, "rgba(96, 51, 22, 0.9)");
+  const cx = W / 2;
+  const x = cx - 54;
+  const y = 18;
+  const width = 108;
+  const height = 68;
+  const centerPanel = ctx.createLinearGradient(x, y, x + width, y + height);
+  centerPanel.addColorStop(0, "rgba(99, 34, 21, 0.96)");
+  centerPanel.addColorStop(0.42, "rgba(20, 13, 12, 0.96)");
+  centerPanel.addColorStop(1, "rgba(126, 72, 24, 0.94)");
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.46)";
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 5;
   ctx.fillStyle = centerPanel;
   ctx.beginPath();
-  ctx.roundRect(W / 2 - 52, 18, 104, 66, 8);
+  ctx.roundRect(x, y, width, height, 9);
   ctx.fill();
-  ctx.strokeStyle = "rgba(255, 241, 189, 0.72)";
+  ctx.restore();
+
+  ctx.strokeStyle = "rgba(255, 231, 143, 0.82)";
   ctx.lineWidth = 2;
-  ctx.strokeRect(W / 2 - 44, 26, 88, 50);
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
-  ctx.fillRect(W / 2 - 40, 28, 80, 7);
+  ctx.beginPath();
+  ctx.roundRect(x + 5, y + 5, width - 10, height - 10, 7);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x + 11, y + 11, width - 22, height - 22, 5);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255,255,255,0.1)";
+  ctx.fillRect(x + 12, y + 11, width - 24, 6);
+  ctx.fillStyle = "rgba(255, 205, 85, 0.14)";
+  ctx.beginPath();
+  ctx.moveTo(cx - 44, y + height - 9);
+  ctx.lineTo(cx, y + 10);
+  ctx.lineTo(cx + 44, y + height - 9);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.72)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 2;
   ctx.fillStyle = "#fff1bd";
   ctx.font = "900 34px system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(winner ? "KO" : "VS", W / 2, 63);
+  ctx.fillText(winner ? "KO" : "VS", cx, y + 45);
   ctx.font = "900 13px system-ui, sans-serif";
-  ctx.fillText(matchOver ? "MATCH" : `ROUND ${roundNumber}`, W / 2, 84);
+  ctx.fillStyle = "rgba(255, 244, 205, 0.9)";
+  ctx.fillText(matchOver ? "MATCH" : `ROUND ${toRoman(roundNumber)}`, cx, y + 65);
+  ctx.restore();
 }
 
 function drawHudPanel(x, y, width, f, reverse) {
-  const panel = ctx.createLinearGradient(x, y, x + width, y + 72);
-  panel.addColorStop(0, reverse ? "rgba(25, 42, 34, 0.82)" : "rgba(48, 29, 18, 0.82)");
-  panel.addColorStop(0.45, "rgba(16, 14, 13, 0.82)");
-  panel.addColorStop(1, reverse ? "rgba(65, 24, 24, 0.8)" : "rgba(24, 34, 48, 0.8)");
+  const height = 76;
+  const panel = ctx.createLinearGradient(x, y, x + width, y + height);
+  panel.addColorStop(0, reverse ? "rgba(23, 50, 42, 0.88)" : "rgba(64, 38, 18, 0.88)");
+  panel.addColorStop(0.44, "rgba(15, 14, 14, 0.88)");
+  panel.addColorStop(1, reverse ? "rgba(78, 24, 29, 0.86)" : "rgba(21, 42, 66, 0.86)");
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.42)";
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 5;
   ctx.fillStyle = panel;
   ctx.beginPath();
-  ctx.roundRect(x, y, width, 72, 8);
+  ctx.roundRect(x, y, width, height, 8);
   ctx.fill();
-  ctx.strokeStyle = "rgba(255, 241, 189, 0.54)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x + 5, y + 5, width - 10, 62);
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 8);
+  ctx.clip();
+  ctx.fillStyle = colorWithAlpha(f.trim, 0.12);
+  ctx.beginPath();
+  if (reverse) {
+    ctx.moveTo(x + width - 112, y);
+    ctx.lineTo(x + width - 22, y);
+    ctx.lineTo(x + width - 82, y + height);
+    ctx.lineTo(x + width - 172, y + height);
+  } else {
+    ctx.moveTo(x + 22, y);
+    ctx.lineTo(x + 112, y);
+    ctx.lineTo(x + 172, y + height);
+    ctx.lineTo(x + 82, y + height);
+  }
+  ctx.closePath();
+  ctx.fill();
   ctx.fillStyle = "rgba(255,255,255,0.07)";
   ctx.fillRect(x + 8, y + 8, width - 16, 7);
+  ctx.strokeStyle = "rgba(255,255,255,0.04)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i += 1) {
+    ctx.beginPath();
+    ctx.moveTo(x + 12, y + 22 + i * 10);
+    ctx.lineTo(x + width - 12, y + 22 + i * 10);
+    ctx.stroke();
+  }
+  ctx.restore();
 
-  const portraitX = reverse ? x + width - 60 : x + 12;
-  drawHudPortrait(portraitX, y + 11, f);
+  const dangerPulse = f.health < 26 ? 0.1 + Math.sin(roundFrame * 0.16) * 0.05 : 0;
+  if (dangerPulse > 0) {
+    ctx.fillStyle = `rgba(255, 40, 30, ${dangerPulse})`;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, 8);
+    ctx.fill();
+  }
 
-  const barX = reverse ? x + 20 : x + 74;
-  const nameX = reverse ? x + width - 74 : x + 74;
+  ctx.strokeStyle = "rgba(255, 230, 145, 0.64)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x + 5, y + 5, width - 10, height - 10, 6);
+  ctx.stroke();
+  ctx.strokeStyle = colorWithAlpha(f.trim, 0.48);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(x + 10, y + 10, width - 20, height - 20, 5);
+  ctx.stroke();
+
+  const portraitX = reverse ? x + width - 64 : x + 12;
+  drawHudPortrait(portraitX, y + 12, f, reverse);
+
+  const barX = reverse ? x + 28 : x + 78;
+  const nameX = reverse ? x + width - 78 : x + 78;
   const align = reverse ? "right" : "left";
 
-  ctx.fillStyle = "rgba(255, 247, 214, 0.95)";
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.72)";
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 2;
+  ctx.strokeStyle = "rgba(35, 16, 12, 0.78)";
+  ctx.lineWidth = 3;
   ctx.font = "900 14px system-ui, sans-serif";
   ctx.textAlign = align;
-  ctx.fillText(f.name.toUpperCase(), nameX, y + 18);
+  ctx.strokeText(f.name.toUpperCase(), nameX, y + 20);
+  ctx.fillStyle = "rgba(255, 247, 214, 0.95)";
+  ctx.fillText(f.name.toUpperCase(), nameX, y + 20);
+  ctx.restore();
 
-  drawHealth(barX, y + 25, 288, f, reverse);
-  drawEnergy(reverse ? x + width - 264 : x + 74, y + 57, 190, f, reverse);
-  drawWins(reverse ? x + 42 : x + width - 80, y + 57, f, reverse);
+  drawHealth(barX, y + 26, 284, f, reverse);
+  drawEnergy(reverse ? x + width - 264 : x + 78, y + 60, 186, f, reverse);
+  drawWins(reverse ? x + 48 : x + width - 70, y + 58, f, reverse);
 }
 
-function drawHudPortrait(x, y, f) {
-  const glow = ctx.createRadialGradient(x + 24, y + 24, 8, x + 24, y + 24, 38);
-  glow.addColorStop(0, colorWithAlpha(f.trim, 0.26));
+function drawHudPortrait(x, y, f, reverse) {
+  const size = 52;
+  const glow = ctx.createRadialGradient(x + size / 2, y + size / 2, 8, x + size / 2, y + size / 2, 42);
+  glow.addColorStop(0, colorWithAlpha(f.trim, 0.34));
   glow.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(x + 24, y + 24, 38, 0, Math.PI * 2);
+  ctx.arc(x + size / 2, y + size / 2, 42, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
+  const frame = ctx.createLinearGradient(x, y, x + size, y + size);
+  frame.addColorStop(0, "rgba(255, 229, 136, 0.72)");
+  frame.addColorStop(0.5, "rgba(50, 34, 20, 0.86)");
+  frame.addColorStop(1, colorWithAlpha(f.trim, 0.7));
+  ctx.fillStyle = frame;
   ctx.beginPath();
-  ctx.roundRect(x, y, 48, 48, 6);
+  ctx.roundRect(x, y, size, size, 7);
   ctx.fill();
-  ctx.strokeStyle = f.trim;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x + 3, y + 3, 42, 42);
+
+  ctx.fillStyle = "rgba(5, 4, 4, 0.66)";
+  ctx.beginPath();
+  ctx.roundRect(x + 3, y + 3, size - 6, size - 6, 5);
+  ctx.fill();
   if (f.face.complete) {
     ctx.save();
     ctx.beginPath();
-    ctx.roundRect(x + 4, y + 4, 40, 40, 5);
+    ctx.roundRect(x + 5, y + 5, size - 10, size - 10, 5);
     ctx.clip();
-    ctx.drawImage(f.face, x - 2, y - 4, 56, 56);
+    ctx.drawImage(f.face, x - 3, y - 5, 58, 58);
+    const shade = ctx.createLinearGradient(x, y, x, y + size);
+    shade.addColorStop(0, "rgba(255,255,255,0.18)");
+    shade.addColorStop(0.48, "rgba(255,255,255,0)");
+    shade.addColorStop(1, "rgba(0,0,0,0.24)");
+    ctx.fillStyle = shade;
+    ctx.fillRect(x + 5, y + 5, size - 10, size - 10);
     ctx.restore();
   }
+  ctx.strokeStyle = "rgba(255, 247, 205, 0.5)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(x + 4, y + 4, size - 8, size - 8, 5);
+  ctx.stroke();
+
+  ctx.fillStyle = colorWithAlpha(f.trim, 0.92);
+  ctx.beginPath();
+  ctx.arc(reverse ? x + 8 : x + size - 8, y + size - 8, 11, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#19120f";
+  ctx.font = "900 12px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(f.mark ?? "", reverse ? x + 8 : x + size - 8, y + size - 8);
+  ctx.textBaseline = "alphabetic";
 }
 
 function drawHealth(x, y, width, f, reverse) {
-  ctx.fillStyle = "rgba(42, 24, 18, 0.72)";
+  const height = 28;
+  const innerX = x + 5;
+  const innerY = y + 5;
+  const innerW = width - 10;
+  const innerH = height - 10;
+  const pct = clamp(f.health / 100, 0, 1);
+  const lagPct = clamp((f.healthLag ?? f.health) / 100, 0, 1);
+
+  ctx.fillStyle = "rgba(13, 10, 9, 0.78)";
   ctx.beginPath();
-  ctx.roundRect(x, y, width, 28, 6);
+  ctx.roundRect(x, y, width, height, 7);
+  ctx.fill();
+  const groove = ctx.createLinearGradient(x, y, x, y + height);
+  groove.addColorStop(0, "rgba(255,255,255,0.12)");
+  groove.addColorStop(0.42, "rgba(0,0,0,0)");
+  groove.addColorStop(1, "rgba(0,0,0,0.32)");
+  ctx.fillStyle = groove;
+  ctx.beginPath();
+  ctx.roundRect(x + 2, y + 2, width - 4, height - 4, 6);
   ctx.fill();
 
-  const pct = f.health / 100;
-  const lagPct = clamp((f.healthLag ?? f.health) / 100, 0, 1);
-  const lagWidth = Math.max(0, (width - 8) * lagPct);
-  const lagX = reverse ? x + width - 4 - lagWidth : x + 4;
+  const lagWidth = Math.max(0, innerW * lagPct);
+  const lagX = reverse ? innerX + innerW - lagWidth : innerX;
   if (lagPct > pct + 0.004) {
-    ctx.fillStyle = "rgba(255, 228, 114, 0.52)";
+    const lag = ctx.createLinearGradient(lagX, y, lagX + lagWidth, y);
+    lag.addColorStop(0, "rgba(255, 217, 87, 0.66)");
+    lag.addColorStop(1, "rgba(231, 75, 48, 0.54)");
+    ctx.fillStyle = lag;
     ctx.beginPath();
-    ctx.roundRect(lagX, y + 4, lagWidth, 20, 4);
+    ctx.roundRect(lagX, innerY, lagWidth, innerH, 4);
     ctx.fill();
   }
 
-  const barWidth = Math.max(0, (width - 8) * pct);
-  const bx = reverse ? x + width - 4 - barWidth : x + 4;
-  const gradient = ctx.createLinearGradient(x, y, x + width, y);
-  gradient.addColorStop(0, "#37c878");
-  gradient.addColorStop(0.58, "#ffe16a");
-  gradient.addColorStop(1, "#e94b4f");
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.roundRect(bx, y + 4, barWidth, 20, 4);
-  ctx.fill();
+  const barWidth = Math.max(0, innerW * pct);
+  const bx = reverse ? innerX + innerW - barWidth : innerX;
+  const gradient = ctx.createLinearGradient(reverse ? x + width : x, y, reverse ? x : x + width, y);
+  if (pct < 0.28) {
+    gradient.addColorStop(0, "#ff5a46");
+    gradient.addColorStop(0.58, "#ff8d3c");
+    gradient.addColorStop(1, "#ffd15b");
+  } else if (pct < 0.56) {
+    gradient.addColorStop(0, "#ffcf57");
+    gradient.addColorStop(0.62, "#ffe777");
+    gradient.addColorStop(1, "#7bdc77");
+  } else {
+    gradient.addColorStop(0, "#37c878");
+    gradient.addColorStop(0.58, "#74e594");
+    gradient.addColorStop(1, "#e7f88f");
+  }
+  if (barWidth > 0.2) {
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(bx, innerY, barWidth, innerH, 4);
+    ctx.fill();
 
-  ctx.fillStyle = "rgba(255,255,255,0.22)";
-  ctx.beginPath();
-  ctx.roundRect(bx, y + 5, barWidth, 5, 3);
-  ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.24)";
+    ctx.beginPath();
+    ctx.roundRect(bx, innerY + 1, barWidth, 5, 3);
+    ctx.fill();
+  }
 
-  ctx.strokeStyle = "rgba(0,0,0,0.38)";
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 10; i += 1) {
+    const tx = innerX + innerW * (i / 10);
+    ctx.beginPath();
+    ctx.moveTo(tx, innerY + 2);
+    ctx.lineTo(tx, innerY + innerH - 2);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = f.health < 26 ? "rgba(255, 80, 54, 0.8)" : "rgba(255, 231, 158, 0.34)";
   ctx.lineWidth = 2;
-  ctx.strokeRect(x + 4, y + 4, width - 8, 20);
+  ctx.beginPath();
+  ctx.roundRect(innerX, innerY, innerW, innerH, 4);
+  ctx.stroke();
 }
 
 function drawEnergy(x, y, width, f, reverse) {
-  ctx.fillStyle = "rgba(20, 32, 42, 0.74)";
-  ctx.beginPath();
-  ctx.roundRect(x, y, width, 10, 4);
-  ctx.fill();
-
-  const barWidth = (width - 4) * (f.energy / 100);
-  const bx = reverse ? x + width - 2 - barWidth : x + 2;
-  if (f.energy >= 45) {
+  const height = 12;
+  const ready = f.energy >= 45;
+  const pulse = 0.16 + Math.sin(roundFrame * 0.12) * 0.06;
+  if (ready) {
     ctx.save();
     ctx.globalCompositeOperation = "screen";
-    ctx.fillStyle = colorWithAlpha(f.trim, 0.18 + Math.sin(roundFrame * 0.12) * 0.06);
+    ctx.fillStyle = colorWithAlpha(f.trim, pulse);
     ctx.beginPath();
-    ctx.roundRect(x - 2, y - 3, width + 4, 16, 6);
+    ctx.roundRect(x - 4, y - 4, width + 8, height + 8, 7);
     ctx.fill();
     ctx.restore();
   }
-  const energy = ctx.createLinearGradient(x, y, x + width, y);
-  energy.addColorStop(0, f.energy >= 45 ? "#fff0a6" : "#69c8ff");
-  energy.addColorStop(1, f.energy >= 45 ? f.trim : "#3f7fb4");
-  ctx.fillStyle = energy;
+
+  ctx.fillStyle = "rgba(9, 15, 22, 0.76)";
   ctx.beginPath();
-  ctx.roundRect(bx, y + 2, barWidth, 6, 3);
+  ctx.roundRect(x, y, width, height, 5);
   ctx.fill();
+
+  const segments = 5;
+  const gap = 4;
+  const segmentW = (width - 4 - gap * (segments - 1)) / segments;
+  const pct = clamp(f.energy / 100, 0, 1);
+  const energy = ctx.createLinearGradient(reverse ? x + width : x, y, reverse ? x : x + width, y);
+  energy.addColorStop(0, ready ? "#fff0a6" : "#69c8ff");
+  energy.addColorStop(1, ready ? f.trim : "#3f7fb4");
+
+  for (let i = 0; i < segments; i += 1) {
+    const logicalIndex = reverse ? segments - 1 - i : i;
+    const sx = x + 2 + i * (segmentW + gap);
+    const filled = clamp((pct - logicalIndex / segments) * segments, 0, 1);
+
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.beginPath();
+    ctx.roundRect(sx, y + 3, segmentW, height - 6, 3);
+    ctx.fill();
+
+    if (filled > 0) {
+      const fillW = segmentW * filled;
+      const fx = reverse ? sx + segmentW - fillW : sx;
+      ctx.fillStyle = energy;
+      ctx.beginPath();
+      ctx.roundRect(fx, y + 3, fillW, height - 6, 3);
+      ctx.fill();
+    }
+  }
+
+  ctx.strokeStyle = ready ? "rgba(255, 239, 168, 0.82)" : "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x + 1, y + 1, width - 2, height - 2, 4);
+  ctx.stroke();
 }
 
 function drawWins(x, y, f, reverse) {
   for (let i = 0; i < 2; i += 1) {
     const px = reverse ? x - i * 18 : x + i * 18;
-    ctx.fillStyle = i < f.wins ? "#fff1bd" : "rgba(42, 24, 18, 0.68)";
+    const won = i < f.wins;
+    if (won) {
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.fillStyle = "rgba(255, 226, 101, 0.26)";
+      ctx.beginPath();
+      ctx.arc(px, y + 6, 11, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    const medallion = ctx.createRadialGradient(px - 2, y + 3, 1, px, y + 6, 9);
+    medallion.addColorStop(0, won ? "#fff6cd" : "rgba(92, 74, 52, 0.74)");
+    medallion.addColorStop(1, won ? "#c47a23" : "rgba(27, 18, 15, 0.82)");
+    ctx.fillStyle = medallion;
     ctx.beginPath();
-    ctx.arc(px, y + 5, 6, 0, Math.PI * 2);
+    ctx.arc(px, y + 6, 7, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = won ? "rgba(255, 244, 194, 0.9)" : "rgba(255, 231, 168, 0.26)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
 }
 
