@@ -52,12 +52,12 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=50"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=50"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=51"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=51"),
 };
 const unifiedSpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-unified.svg?v=50"),
-  p2: loadImage("assets/sprite-akane-unified.svg?v=50"),
+  p1: loadImage("assets/sprite-pchan-unified.svg?v=51"),
+  p2: loadImage("assets/sprite-akane-unified.svg?v=51"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -1596,16 +1596,46 @@ function isMobileFightView() {
   return mobileFightQuery.matches || window.innerWidth <= 920 || window.innerHeight <= 520;
 }
 
+function cameraAttackLead(f) {
+  if (!f.attack) return 0;
+  const progress = attackProgress(f.attack);
+  const reach = f.attack.type === "kick" || f.attack.type === "airKick" ? 18 : f.attack.type === "special" ? 26 : 12;
+  return f.dir * reach * progress;
+}
+
+function cameraPanLimit(zoom, mobileView) {
+  const safe = Math.max(0, (zoom - 1) * W * 0.5 + (mobileView ? 7 : 12));
+  return Math.min(mobileView ? 31 : 52, safe);
+}
+
 function applyCamera() {
   const [a, b] = fighters;
   const distance = Math.abs(a.x - b.x);
-  const center = (a.x + b.x) / 2;
+  const minX = Math.min(a.x, b.x);
+  const maxX = Math.max(a.x, b.x);
   const mobileView = isMobileFightView();
-  const close = 1 - clamp(distance / (mobileView ? 540 : 620), 0, 1);
-  const targetZoom = 1 + close * (mobileView ? 0.022 : 0.052);
-  const targetPan = clamp((W / 2 - center) * (mobileView ? 0.052 : 0.09), mobileView ? -20 : -34, mobileView ? 20 : 34);
-  const targetLift = mobileView ? 13 : 8;
-  const ease = mobileView ? 0.2 : 0.13;
+  const margin = mobileView ? 116 : 138;
+  const center = (a.x + b.x) / 2;
+  const velocityLead = clamp((a.vx + b.vx) * (mobileView ? 1.6 : 2.4), mobileView ? -16 : -25, mobileView ? 16 : 25);
+  const attackLead = clamp((cameraAttackLead(a) + cameraAttackLead(b)) * 0.5, mobileView ? -16 : -24, mobileView ? 16 : 24);
+  const focusX = clamp(center + velocityLead + attackLead, margin, W - margin);
+  const leftPressure = clamp((margin - minX) / margin, 0, 1);
+  const rightPressure = clamp((maxX - (W - margin)) / margin, 0, 1);
+  const edgePressure = Math.max(leftPressure, rightPressure);
+  const edgeBias = (leftPressure - rightPressure) * (mobileView ? 19 : 34);
+  const close = 1 - clamp(distance / (mobileView ? 560 : 650), 0, 1);
+  const speed = clamp((Math.abs(a.vx) + Math.abs(b.vx)) / 7.2, 0, 1);
+  const action = clamp((a.attack ? attackProgress(a.attack) : 0) + (b.attack ? attackProgress(b.attack) : 0), 0, 1);
+  const air = clamp(((FLOOR - a.y) + (FLOOR - b.y)) / 220, 0, 1);
+  const targetZoom = clamp(
+    1 + close * (mobileView ? 0.03 : 0.068) + action * (mobileView ? 0.004 : 0.008) + edgePressure * (mobileView ? 0.004 : 0.01) - speed * (mobileView ? 0.004 : 0.008),
+    1,
+    mobileView ? 1.052 : 1.092
+  );
+  const panLimit = cameraPanLimit(targetZoom, mobileView);
+  const targetPan = clamp((W / 2 - focusX) * (mobileView ? 0.068 : 0.108) + edgeBias, -panLimit, panLimit);
+  const targetLift = (mobileView ? 13 : 8) + air * (mobileView ? 9 : 14) - close * (mobileView ? 0.8 : 1.5);
+  const ease = mobileView ? 0.22 : 0.145;
 
   cameraZoom += (targetZoom - cameraZoom) * ease;
   cameraPan += (targetPan - cameraPan) * ease;
@@ -1616,9 +1646,11 @@ function applyCamera() {
   const impactZoom = impactEase * (mobileView ? 0.012 : 0.028);
   const impactPan = cameraImpactDir * impactEase * (mobileView ? 4.5 : 8.5);
   const impactLift = -impactEase * (mobileView ? 1.8 : 3.8);
+  const drawZoom = cameraZoom + impactZoom;
+  const drawPan = clamp(cameraPan + impactPan, -cameraPanLimit(drawZoom, mobileView), cameraPanLimit(drawZoom, mobileView));
 
-  ctx.translate(W / 2 + cameraPan + impactPan, H / 2 + cameraLift + impactLift);
-  ctx.scale(cameraZoom + impactZoom, cameraZoom + impactZoom);
+  ctx.translate(W / 2 + drawPan, H / 2 + cameraLift + impactLift);
+  ctx.scale(drawZoom, drawZoom);
   ctx.translate(-W / 2, -H / 2);
 }
 
