@@ -105,26 +105,38 @@ function spriteHeadPose(profileId, frameName, frameIndex) {
     pose.x = frameIndex === 19 ? 1 : frameIndex === 7 ? -1 : frameIndex === 8 ? -3 : frameIndex === 20 ? -4 : 0;
     pose.y = frameIndex === 8 || frameIndex === 20 ? -44 : frameIndex === 19 ? -43 : -42;
   } else if (frameName === "block") {
-    pose.y = -40;
+    pose.x = -3;
+    pose.y = -38;
     pose.scale = 0.72;
   } else if (frameName === "hurt") {
-    pose.x = 1;
-    pose.y = -42;
-    pose.scale = 0.72;
+    pose.x = frameIndex === 12 ? 8 : 5;
+    pose.y = frameIndex === 12 ? -33 : -36;
+    pose.scale = 0.7;
   } else if (frameName === "special" || frameName === "victory") {
+    pose.x = frameName === "victory" ? -2 : 0;
     pose.y = -44;
   } else if (frameName === "sweep") {
     pose.x = 4;
     pose.y = -31;
     pose.scale = 0.7;
   } else if (frameName === "defeat") {
-    pose.x = 8;
-    pose.y = -12;
-    pose.scale = 0.68;
+    pose.x = 14;
+    pose.y = 0;
+    pose.scale = 0.64;
   }
 
   if (profileId === "p1") pose.y -= 3;
   return pose;
+}
+
+function headTilt(profileId, frameName, frameIndex) {
+  const agile = profileId === "p2";
+  if (frameName === "block") return agile ? -9 : -7;
+  if (frameName === "hurt") return frameIndex === 12 ? (agile ? 24 : 20) : (agile ? 16 : 14);
+  if (frameName === "victory") return agile ? -7 : -5;
+  if (frameName === "defeat") return agile ? 28 : 24;
+  if (frameName === "sweep") return agile ? 13 : 11;
+  return 0;
 }
 
 function faceMaskPath(x, y, w, h) {
@@ -254,12 +266,15 @@ function akaneWisps(g, frameIndex) {
 function headOverlay(fighter, profileId, frameName, frameIndex) {
   const g = headFrameGeometry(fighter, profileId, frameName, frameIndex);
   const clipId = `${profileId}-clip-${frameIndex}`;
+  const tilt = headTilt(profileId, frameName, frameIndex);
   return `<g transform="translate(${frameIndex * FRAME_W} 0)">
+    <g transform="rotate(${tilt} ${g.cx} ${g.y + g.headH * 0.78})">
     ${headSilhouette(fighter, g, profileId, frameIndex)}
     ${neckAndCollar(fighter, g)}
     ${faceAndFinish(fighter, g, clipId)}
     ${profileId === "p2" ? akaneWisps(g, frameIndex) : ""}
     ${fighter.headwear === "bandana" ? pchanBandana(g, frameIndex) : ""}
+    </g>
   </g>`;
 }
 
