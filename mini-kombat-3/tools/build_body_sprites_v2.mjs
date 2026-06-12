@@ -160,7 +160,7 @@ function armPose(kind, b) {
     ],
     punchPrep: [
       [{ x: 73, y: 110 }, { x: 61, y: 124 }, { x: 58, y: 145 }, { x: 70, y: 160 }],
-      [{ x: 136, y: 107 }, { x: 123, y: 107 }, { x: 115, y: 119 }, { x: 108, y: 133 }],
+      [{ x: 136, y: 107 }, { x: 132, y: 104 }, { x: 126, y: 116 }, { x: 124, y: 129 }],
     ],
     punchHit: [
       [{ x: 73, y: 110 }, { x: 62, y: 130 }, { x: 64, y: 151 }, { x: 77, y: 167 }],
@@ -172,7 +172,7 @@ function armPose(kind, b) {
     ],
     kickGuard: [
       [{ x: 74, y: 109 }, { x: 61, y: 124 }, { x: 58, y: 146 }, { x: 67, y: 165 }],
-      [{ x: 136, y: 108 }, { x: 121, y: 117 }, { x: 117, y: 139 }, { x: 126, y: 158 }],
+      [{ x: 136, y: 108 }, { x: 126, y: 114 }, { x: 124, y: 135 }, { x: 132, y: 152 }],
     ],
     counter: [
       [{ x: 74, y: 109 }, { x: 59, y: 126 }, { x: 58, y: 148 }, { x: 69, y: 168 }],
@@ -311,17 +311,26 @@ function legPose(kind, b) {
 
 function hand(point, fighter, scale = 1) {
   const r = 9 * fighter.build.hand * scale;
-  return `<ellipse cx="${point.x}" cy="${point.y}" rx="${r}" ry="${r * 0.82}" fill="url(#skin)" class="skinEdge"/>
-  <path d="M ${point.x - r * 0.48} ${point.y + 2} Q ${point.x} ${point.y + r * 0.48} ${point.x + r * 0.56} ${point.y + 1}" class="knuckle"/>`;
+  return `<g>
+    <ellipse cx="${point.x}" cy="${point.y}" rx="${r}" ry="${r * 0.82}" fill="url(#skin)" class="skinEdge"/>
+    <ellipse cx="${point.x + r * 0.2}" cy="${point.y + r * 0.04}" rx="${r * 0.46}" ry="${r * 0.38}" fill="url(#skin)" class="fingerMass"/>
+    <path d="M ${point.x - r * 0.55} ${point.y + r * 0.02} Q ${point.x - r * 0.18} ${point.y + r * 0.42} ${point.x + r * 0.55} ${point.y + r * 0.05}" class="knuckle"/>
+    <path d="M ${point.x - r * 0.18} ${point.y + r * 0.06} L ${point.x - r * 0.06} ${point.y + r * 0.42} M ${point.x + r * 0.18} ${point.y + r * 0.03} L ${point.x + r * 0.24} ${point.y + r * 0.36}" class="fingerLine"/>
+    <ellipse cx="${point.x - r * 0.22}" cy="${point.y - r * 0.2}" rx="${r * 0.28}" ry="${r * 0.16}" fill="#fff7df" opacity=".18"/>
+  </g>`;
 }
 
 function foot(point, fighter, dir = 1) {
   const b = fighter.build;
   const w = 30 * b.foot;
   const h = 12 * b.foot;
-  return `<path d="M ${point.x - w * 0.48} ${point.y - h * 0.4} C ${point.x - w * 0.12} ${point.y - h * 0.95} ${point.x + w * 0.52 * dir} ${point.y - h * 0.9} ${point.x + w * 0.7 * dir} ${point.y + h * 0.02} C ${point.x + w * 0.42 * dir} ${point.y + h * 0.7} ${point.x - w * 0.3} ${point.y + h * 0.68} ${point.x - w * 0.58} ${point.y + h * 0.2} Z" fill="url(#shoe)" class="shoeEdge"/>
-  <path d="M ${point.x - w * 0.2} ${point.y + h * 0.34} L ${point.x + w * 0.48 * dir} ${point.y + h * 0.28}" class="sole"/>
-  <path d="M ${point.x + w * 0.06 * dir} ${point.y - h * 0.48} Q ${point.x + w * 0.38 * dir} ${point.y - h * 0.62} ${point.x + w * 0.54 * dir} ${point.y - h * 0.08}" class="shoeHi"/>`;
+  return `<g>
+    <path d="M ${point.x - w * 0.48} ${point.y - h * 0.4} C ${point.x - w * 0.12} ${point.y - h * 0.95} ${point.x + w * 0.52 * dir} ${point.y - h * 0.9} ${point.x + w * 0.7 * dir} ${point.y + h * 0.02} C ${point.x + w * 0.42 * dir} ${point.y + h * 0.7} ${point.x - w * 0.3} ${point.y + h * 0.68} ${point.x - w * 0.58} ${point.y + h * 0.2} Z" fill="url(#shoe)" class="shoeEdge"/>
+    <path d="M ${point.x - w * 0.44} ${point.y + h * 0.26} C ${point.x - w * 0.06} ${point.y + h * 0.58} ${point.x + w * 0.42 * dir} ${point.y + h * 0.52} ${point.x + w * 0.62 * dir} ${point.y + h * 0.16}" class="sole"/>
+    <path d="M ${point.x - w * 0.36} ${point.y + h * 0.12} Q ${point.x - w * 0.48} ${point.y + h * 0.54} ${point.x - w * 0.18} ${point.y + h * 0.64}" class="heel"/>
+    <path d="M ${point.x + w * 0.06 * dir} ${point.y - h * 0.48} Q ${point.x + w * 0.38 * dir} ${point.y - h * 0.62} ${point.x + w * 0.54 * dir} ${point.y - h * 0.08}" class="shoeHi"/>
+    <ellipse cx="${point.x + w * 0.38 * dir}" cy="${point.y - h * 0.2}" rx="${w * 0.14}" ry="${h * 0.16}" fill="#fff7c9" opacity=".2"/>
+  </g>`;
 }
 
 function drawFrame(fighter, frame, index) {
@@ -354,8 +363,11 @@ function drawFrame(fighter, frame, index) {
     const shinPath = limbPath(leg[1], lerpPoint(leg[1], leg[2], 0.38), leg[2], leg[3], calfStart, ankleWidth);
     return `<path d="${thighPath}" fill="${color}" class="limbEdge"/>
     <path d="${shinPath}" fill="${color}" class="limbEdge"/>
+    <path d="${thighPath}" fill="url(#limbSheen)" opacity="${legIndex === 0 ? ".2" : ".3"}"/>
+    <path d="${shinPath}" fill="url(#limbShade)" opacity="${legIndex === 0 ? ".28" : ".2"}"/>
     <ellipse cx="${leg[1].x}" cy="${leg[1].y}" rx="${7.2 * thighScale}" ry="${5.2 * thighScale}" fill="${color}" class="jointEdge"/>
     <path d="M ${leg[0].x - 4} ${leg[0].y + 14} C ${leg[1].x - 3} ${leg[1].y - 7} ${leg[1].x + 2} ${leg[1].y + 3} ${leg[2].x + 2} ${leg[2].y - 5}" class="limbHi"/>
+    <path d="M ${leg[1].x - 2} ${leg[1].y + 7} C ${leg[2].x - 5} ${leg[2].y + 8} ${leg[3].x - 7} ${leg[3].y - 8} ${leg[3].x - 5} ${leg[3].y - 1}" class="clothCrease"/>
     ${foot(leg[3], fighter, legIndex === 0 ? -1 : 1)}`;
   }).join("");
 
@@ -373,8 +385,11 @@ function drawFrame(fighter, frame, index) {
     const forearmPath = limbPath(arm[1], lerpPoint(arm[1], arm[2], 0.42), arm[2], arm[3], forearmStart, wristWidth);
     return `<path d="${upperPath}" fill="${color}" class="limbEdge"/>
     <path d="${forearmPath}" fill="${color}" class="limbEdge"/>
+    <path d="${upperPath}" fill="url(#limbSheen)" opacity="${front ? ".32" : ".2"}"/>
+    <path d="${forearmPath}" fill="url(#limbShade)" opacity="${front ? ".18" : ".27"}"/>
     <ellipse cx="${arm[1].x}" cy="${arm[1].y}" rx="${6.2 * upperScale}" ry="${4.8 * upperScale}" fill="${color}" class="jointEdge"/>
     <path d="M ${arm[0].x - (front ? -2 : 2)} ${arm[0].y + 8} C ${arm[1].x} ${arm[1].y - 4} ${arm[2].x} ${arm[2].y - 3} ${arm[3].x} ${arm[3].y - 5}" class="limbHi"/>
+    <path d="M ${arm[1].x - 2} ${arm[1].y + 7} C ${arm[2].x - 4} ${arm[2].y + 6} ${arm[3].x - 5} ${arm[3].y - 5} ${arm[3].x - 4} ${arm[3].y + 1}" class="clothCrease"/>
     ${hand(arm[3], fighter, front ? 1 : 0.94)}`;
   };
 
@@ -393,7 +408,9 @@ function drawFrame(fighter, frame, index) {
 
   const folds = `<path d="M ${cx - shoulder + 11} ${torsoTop + 23} L ${cx - 4} ${torsoBottom - 21} L ${cx + waist - 4} ${torsoTop + 28}" class="trimLine"/>
   <path d="M ${cx - waist * 0.7} ${torsoTop + 27} C ${cx - waist * 0.32} ${torsoTop + 58} ${cx - waist * 0.3} ${torsoBottom - 14} ${cx - waist * 0.18} ${torsoBottom - 2}" class="fold"/>
-  <path d="M ${cx + waist * 0.55} ${torsoTop + 31} C ${cx + waist * 0.12} ${torsoTop + 59} ${cx + waist * 0.28} ${torsoBottom - 29} ${cx + waist * 0.2} ${torsoBottom - 6}" class="darkFold"/>`;
+  <path d="M ${cx + waist * 0.55} ${torsoTop + 31} C ${cx + waist * 0.12} ${torsoTop + 59} ${cx + waist * 0.28} ${torsoBottom - 29} ${cx + waist * 0.2} ${torsoBottom - 6}" class="darkFold"/>
+  <path d="M ${cx - chest * 0.52} ${torsoTop + 39} C ${cx - chest * 0.28} ${torsoTop + 53} ${cx - chest * 0.18} ${torsoBottom - 37} ${cx - waist * 0.32} ${torsoBottom - 18}" class="clothCrease"/>
+  <path d="M ${cx + chest * 0.54} ${torsoTop + 40} C ${cx + chest * 0.34} ${torsoTop + 60} ${cx + chest * 0.23} ${torsoBottom - 34} ${cx + waist * 0.36} ${torsoBottom - 18}" class="shadowCrease"/>`;
 
   const belt = `<path d="M ${cx - hip - 5} ${torsoBottom - 13} Q ${cx} ${torsoBottom - 3} ${cx + hip + 5} ${torsoBottom - 13} L ${cx + hip + 3} ${torsoBottom + 2} Q ${cx} ${torsoBottom + 12} ${cx - hip - 3} ${torsoBottom + 2} Z" fill="url(#trim)" class="beltEdge"/>
   <path d="M ${cx - 7} ${torsoBottom - 14} L ${cx} ${torsoBottom - 5} L ${cx + 7} ${torsoBottom - 14} L ${cx + 6} ${torsoBottom + 6} L ${cx} ${torsoBottom + 11} L ${cx - 6} ${torsoBottom + 6} Z" fill="url(#jacketDark)" opacity=".72"/>`;
@@ -409,9 +426,11 @@ function drawFrame(fighter, frame, index) {
     <g transform="rotate(${lean} ${cx} ${torsoBottom})">
       ${legSvg}
       <path d="${hipPlate}" fill="url(#pants)" class="limbEdge"/>
+      <path d="${hipPlate}" fill="url(#hipShade)" opacity=".42"/>
       ${armSvg(backArm, false)}
       <path d="${torsoPath}" fill="url(#jacket)" class="bodyEdge"/>
       <path d="${torsoPath}" fill="url(#bodySheen)" opacity=".72"/>
+      <path d="${torsoPath}" fill="url(#torsoShade)" opacity=".5"/>
       ${shoulderCaps}
       ${folds}
       ${belt}
@@ -440,6 +459,25 @@ function makeSheet(fighter) {
       <stop stop-color="#ffffff" stop-opacity=".03" offset=".48"/>
       <stop stop-color="#000000" stop-opacity=".2" offset="1"/>
     </linearGradient>
+    <linearGradient id="torsoShade" x1="58" y1="85" x2="151" y2="184" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity=".16" offset="0"/>
+      <stop stop-color="#000000" stop-opacity="0" offset=".42"/>
+      <stop stop-color="#000000" stop-opacity=".28" offset="1"/>
+    </linearGradient>
+    <linearGradient id="limbSheen" x1="50" y1="90" x2="130" y2="260" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity=".22" offset="0"/>
+      <stop stop-color="#ffffff" stop-opacity=".02" offset=".58"/>
+      <stop stop-color="#000000" stop-opacity="0" offset="1"/>
+    </linearGradient>
+    <linearGradient id="limbShade" x1="48" y1="100" x2="180" y2="280" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#000000" stop-opacity="0" offset="0"/>
+      <stop stop-color="#000000" stop-opacity=".18" offset=".66"/>
+      <stop stop-color="#000000" stop-opacity=".3" offset="1"/>
+    </linearGradient>
+    <linearGradient id="hipShade" x1="70" y1="164" x2="140" y2="205" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity=".08" offset="0"/>
+      <stop stop-color="#000000" stop-opacity=".2" offset="1"/>
+    </linearGradient>
   </defs>`;
 
   const css = `<style>
@@ -452,9 +490,14 @@ function makeSheet(fighter) {
     .darkFold { fill: none; stroke: ${fighter.dark}; stroke-width: 2.2; stroke-linecap: round; opacity: .32; }
     .trimLine { fill: none; stroke: url(#trim); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
     .limbHi { fill: none; stroke: ${fighter.light}; stroke-width: 1.55; stroke-linecap: round; opacity: .22; }
+    .clothCrease { fill: none; stroke: ${fighter.light}; stroke-width: 1.25; stroke-linecap: round; opacity: .22; }
+    .shadowCrease { fill: none; stroke: ${fighter.dark}; stroke-width: 1.35; stroke-linecap: round; opacity: .28; }
     .waistShape { fill: none; stroke: url(#trim); stroke-width: 2.6; stroke-linecap: round; opacity: .5; }
     .knuckle { fill: none; stroke: #5b3022; stroke-width: 1.5; stroke-linecap: round; opacity: .5; }
+    .fingerLine { fill: none; stroke: #5b3022; stroke-width: 1.1; stroke-linecap: round; opacity: .38; }
+    .fingerMass { stroke: #4c2a1e; stroke-width: 1.2; opacity: .72; }
     .sole { fill: none; stroke: #14110d; stroke-width: 2; stroke-linecap: round; opacity: .46; }
+    .heel { fill: none; stroke: #14110d; stroke-width: 1.6; stroke-linecap: round; opacity: .32; }
     .shoeHi { fill: none; stroke: #fff7c9; stroke-width: 2; stroke-linecap: round; opacity: .42; }
   </style>`;
 

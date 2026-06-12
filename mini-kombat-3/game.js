@@ -52,8 +52,8 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=35"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=35"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=36"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=36"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
