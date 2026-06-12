@@ -565,6 +565,13 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     walkCycle: 0,
     walkWeight: 0,
     walkPlant: 0,
+    walkStrideSmooth: 0,
+    footPlantSide: 1,
+    footPlantPulse: 0,
+    footPlantCooldown: 0,
+    rangePressure: 0,
+    rangeSide: dir,
+    bracePulse: 0,
     jumpDir: dir,
     landingDir: dir,
     airFrames: 0,
@@ -739,6 +746,13 @@ function resetRound() {
     walkCycle: 0,
     walkWeight: 0,
     walkPlant: 0,
+    walkStrideSmooth: 0,
+    footPlantSide: 1,
+    footPlantPulse: 0,
+    footPlantCooldown: 0,
+    rangePressure: 0,
+    rangeSide: 1,
+    bracePulse: 0,
     jumpDir: 1,
     landingDir: 1,
     airFrames: 0,
@@ -786,6 +800,13 @@ function resetRound() {
     walkCycle: 0,
     walkWeight: 0,
     walkPlant: 0,
+    walkStrideSmooth: 0,
+    footPlantSide: -1,
+    footPlantPulse: 0,
+    footPlantCooldown: 0,
+    rangePressure: 0,
+    rangeSide: -1,
+    bracePulse: 0,
     jumpDir: -1,
     landingDir: -1,
     airFrames: 0,
@@ -1296,8 +1317,18 @@ function updateFighter(f, opponent) {
   const wantSpecial = input.special;
   const wantBlock = input.block && f.grounded && !f.attack && !wantSpecial;
   const move = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-  const speed = wantBlock ? 1.2 : 3.35;
+  const baseSpeed = wantBlock ? 1.2 : 3.35;
   const wasGrounded = f.grounded;
+  const opponentDir = opponent ? Math.sign(opponent.x - f.x) || f.dir : f.dir;
+  const distance = opponent ? Math.abs(opponent.x - f.x) : 999;
+  const movingTowardOpponent = move !== 0 && move === opponentDir;
+  const rangeTarget = f.grounded && f.hurt <= 0 && !f.attack
+    ? clamp((fighterScale(128) - distance) / fighterScale(58), 0, 1)
+    : 0;
+  f.rangePressure = (f.rangePressure ?? 0) + (rangeTarget - (f.rangePressure ?? 0)) * 0.22;
+  f.rangeSide = opponentDir;
+  const entryBrake = movingTowardOpponent ? 1 - (f.rangePressure ?? 0) * 0.48 : 1;
+  const speed = baseSpeed * entryBrake;
 
   f.moveIntent = move;
   f.blocking = wantBlock;
@@ -1315,6 +1346,9 @@ function updateFighter(f, opponent) {
   if (f.landingPulse > 0) f.landingPulse -= 1;
   if (f.stepPulse > 0) f.stepPulse -= 1;
   if (f.stepCooldown > 0) f.stepCooldown -= 1;
+  if (f.footPlantPulse > 0) f.footPlantPulse -= 1;
+  if (f.footPlantCooldown > 0) f.footPlantCooldown -= 1;
+  if (f.bracePulse > 0) f.bracePulse -= 1;
   if (f.pigMorph > 0) f.pigMorph -= 1;
   f.guardPulse = f.blocking ? Math.min(18, (f.guardPulse ?? 0) + 1) : (f.guardPulse ?? 0) * 0.72;
 
@@ -1325,6 +1359,10 @@ function updateFighter(f, opponent) {
     const airControl = f.grounded ? 1 : 0.82;
     const acceleration = f.grounded ? 0.4 : 0.16;
     f.vx += (move * speed * airControl - f.vx) * acceleration;
+    if (f.grounded && movingTowardOpponent && Math.sign(f.vx) === move && (f.rangePressure ?? 0) > 0.05) {
+      f.vx *= 1 - (f.rangePressure ?? 0) * 0.13;
+      f.bracePulse = Math.max(f.bracePulse ?? 0, Math.round(5 + (f.rangePressure ?? 0) * 8));
+    }
   }
 
   if (input.jump && f.grounded && !wantBlock && f.hurt <= 0) {
@@ -1366,16 +1404,27 @@ function updateFighter(f, opponent) {
   }
 
   f.x = clamp(f.x, FIGHTER_EDGE_PAD, W - FIGHTER_EDGE_PAD);
-  const walkSpeed = clamp(Math.abs(f.vx) / speed, 0, 1.25);
+  const walkSpeed = clamp(Math.abs(f.vx) / baseSpeed, 0, 1.25);
   const walkingNow = f.grounded && f.hurt <= 0 && !f.attack && Math.abs(f.vx) > 0.35;
   if (walkingNow) {
     const cycleDir = Math.sign(f.vx) || f.dir;
     f.walkCycle = (f.walkCycle ?? 0) + cycleDir * (0.2 + walkSpeed * 0.18);
     f.walkWeight = (f.walkWeight ?? 0) + (walkSpeed - (f.walkWeight ?? 0)) * 0.18;
-    f.walkPlant = Math.abs(Math.cos(f.walkCycle));
+    const strideNow = Math.sin(f.walkCycle);
+    const plantNow = Math.abs(Math.cos(f.walkCycle));
+    const plantSide = strideNow >= 0 ? 1 : -1;
+    f.walkStrideSmooth = (f.walkStrideSmooth ?? 0) + (strideNow - (f.walkStrideSmooth ?? 0)) * 0.45;
+    f.walkPlant = plantNow;
+    if (plantNow > 0.88 && f.footPlantCooldown <= 0 && f.footPlantSide !== plantSide) {
+      f.footPlantSide = plantSide;
+      f.footPlantPulse = 8;
+      f.footPlantCooldown = 8;
+      f.stepPulse = Math.max(f.stepPulse ?? 0, 6);
+    }
   } else {
     f.walkWeight = (f.walkWeight ?? 0) * 0.86;
     f.walkPlant = (f.walkPlant ?? 0) * 0.72;
+    f.walkStrideSmooth = (f.walkStrideSmooth ?? 0) * 0.72;
   }
 
   if (f.grounded && f.hurt <= 0 && !f.attack && Math.abs(f.vx) > 1.25) {
@@ -1437,14 +1486,27 @@ function updateProjectiles() {
 function keepApart(a, b) {
   const overlap = a.w - Math.abs(a.x - b.x);
   if (overlap > 0 && Math.abs(a.y - b.y) < fighterScale(120)) {
-    const push = overlap / 2;
+    const pressure = clamp(overlap / fighterScale(44), 0, 1);
+    const push = Math.min(overlap / 2, fighterScale(7 + pressure * 9));
     if (a.x < b.x) {
       a.x -= push;
       b.x += push;
+      if (a.vx > 0) a.vx *= 1 - pressure * 0.28;
+      if (b.vx < 0) b.vx *= 1 - pressure * 0.28;
+      a.rangeSide = 1;
+      b.rangeSide = -1;
     } else {
       a.x += push;
       b.x -= push;
+      if (a.vx < 0) a.vx *= 1 - pressure * 0.28;
+      if (b.vx > 0) b.vx *= 1 - pressure * 0.28;
+      a.rangeSide = -1;
+      b.rangeSide = 1;
     }
+    a.rangePressure = Math.max(a.rangePressure ?? 0, pressure);
+    b.rangePressure = Math.max(b.rangePressure ?? 0, pressure);
+    a.bracePulse = Math.max(a.bracePulse ?? 0, Math.round(6 + pressure * 9));
+    b.bracePulse = Math.max(b.bracePulse ?? 0, Math.round(6 + pressure * 9));
     a.x = clamp(a.x, FIGHTER_EDGE_PAD, W - FIGHTER_EDGE_PAD);
     b.x = clamp(b.x, FIGHTER_EDGE_PAD, W - FIGHTER_EDGE_PAD);
   }
@@ -3366,6 +3428,17 @@ function fighterTransitionMotion(f, walking) {
     motion.scaleY *= 1 - stepPulse * 0.007;
   }
 
+  const braceT = clamp(Math.max(f.rangePressure ?? 0, (f.bracePulse ?? 0) / 14), 0, 1);
+  if (braceT > 0.02 && f.grounded && f.hurt <= 0 && !f.attack) {
+    const side = f.rangeSide || dir;
+    const plantT = clamp((f.footPlantPulse ?? 0) / 8, 0, 1);
+    motion.x -= side * braceT * (0.8 + plantT * 0.6);
+    motion.y += braceT * 1.25;
+    motion.rotation -= side * braceT * 0.012;
+    motion.scaleX *= 1 + braceT * 0.014;
+    motion.scaleY *= 1 - braceT * 0.018;
+  }
+
   if (f.attack) {
     const a = f.attack;
     const phase = attackPhase(a);
@@ -3536,6 +3609,19 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     ctx.fill();
     ctx.restore();
   }
+
+  const footPlant = clamp((f.footPlantPulse ?? 0) / 8, 0, 1);
+  if (f.grounded && footPlant > 0.04) {
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    const side = f.footPlantSide || 1;
+    const footX = baseX + side * (24 + Math.abs(stride) * 10) * FIGHTER_SCALE * (f.dir || 1);
+    ctx.fillStyle = `rgba(42, 25, 13, ${0.12 * footPlant})`;
+    ctx.beginPath();
+    ctx.ellipse(footX, FLOOR + 8, 23 + footPlant * 8, 4.5 + footPlant, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawMovementPoseFX(f, crouch, walking, stride) {
@@ -3543,7 +3629,8 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1);
   const air = !f.grounded ? clamp((FLOOR - f.y) / 155, 0, 1) : 0;
   const plant = walking ? clamp(f.walkPlant ?? 0, 0, 1) : 0;
-  if (jump <= 0.03 && landing <= 0.03 && air <= 0.03 && plant <= 0.08) return;
+  const footPlant = clamp((f.footPlantPulse ?? 0) / 8, 0, 1);
+  if (jump <= 0.03 && landing <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03) return;
 
   const localCrouch = crouch * 0.18;
   const trim = f.trim ?? "#fff1bd";
@@ -3585,6 +3672,15 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
     ctx.stroke();
   }
 
+  if (footPlant > 0.03) {
+    const side = (f.footPlantSide || 1) * 30;
+    ctx.strokeStyle = `rgba(255, 226, 145, ${0.16 * footPlant})`;
+    ctx.lineWidth = 1.8 + footPlant * 1.4;
+    ctx.beginPath();
+    ctx.ellipse(side, 4 + localCrouch, 20 + footPlant * 9, 4.5 + footPlant * 2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   if (plant > 0.08) {
     ctx.fillStyle = `rgba(255, 235, 176, ${0.045 * plant})`;
     const footX = stride >= 0 ? 24 : -24;
@@ -3600,10 +3696,12 @@ function drawFighter(f) {
   const t = performance.now() / 1000;
   const walking = Math.abs(f.vx) > 0.5 && f.grounded && f.hurt <= 0 && !f.attack;
   const walkCycle = f.walkCycle ?? t * 14;
-  const stride = walking ? Math.sin(walkCycle) : 0;
+  const stride = walking ? (f.walkStrideSmooth ?? Math.sin(walkCycle)) : 0;
   const plant = walking ? clamp(f.walkPlant ?? Math.abs(Math.cos(walkCycle)), 0, 1) : 0;
+  const footPlant = clamp((f.footPlantPulse ?? 0) / 8, 0, 1);
+  const rangeBrace = clamp(Math.max(f.rangePressure ?? 0, (f.bracePulse ?? 0) / 14), 0, 1);
   const transition = fighterTransitionMotion(f, walking);
-  const bob = walking ? plant * 2.35 - Math.max(0, Math.sin(walkCycle * 2)) * 0.55 : Math.sin(t * 9) * (f.grounded ? 1.3 : 0);
+  const bob = walking ? plant * 1.55 + footPlant * 0.7 - Math.max(0, Math.sin(walkCycle * 2)) * 0.8 + rangeBrace * 0.45 : Math.sin(t * 9) * (f.grounded ? 1.3 : 0);
   const effectiveHurt = winner ? Math.max(0, (f.hurt ?? 0) - resultFrame * 0.9) : (f.hurt ?? 0);
   const effectiveImpact = winner ? Math.max(0, (f.impactPulse ?? 0) - resultFrame * 0.86) : (f.impactPulse ?? 0);
   const hurtShift = effectiveHurt > 0 ? Math.sin((effectiveHurt + resultFrame) * 1.4) * 4 : 0;
@@ -4986,6 +5084,40 @@ function getPose(f, stride) {
     },
   };
 
+  const walkingPose = f.grounded && f.hurt <= 0 && !f.attack && Math.abs(f.vx) > 0.45;
+  if (walkingPose) {
+    const weight = clamp(f.walkWeight ?? 0, 0, 1.25);
+    const plant = clamp(f.walkPlant ?? 0, 0, 1);
+    const lift = (1 - plant * 0.35) * weight;
+    const frontLift = Math.max(0, -stride) * lift;
+    const backLift = Math.max(0, stride) * lift;
+    const moveLocal = Math.sign(f.vx) === f.dir ? 1 : -1;
+    base.torsoTilt += moveLocal * stride * 0.018 * weight;
+    base.frontLeg.knee.x += moveLocal * frontLift * 4 * spec.stance;
+    base.frontLeg.knee.y -= frontLift * 5;
+    base.frontLeg.foot.x += moveLocal * frontLift * 6 * spec.stance;
+    base.frontLeg.foot.y -= frontLift * 8.5;
+    base.backLeg.knee.x -= moveLocal * backLift * 3.5 * spec.stance;
+    base.backLeg.knee.y -= backLift * 4.5;
+    base.backLeg.foot.x -= moveLocal * backLift * 5.5 * spec.stance;
+    base.backLeg.foot.y -= backLift * 7.5;
+    base.frontLeg.plant = clamp(plant + Math.max(0, stride) * 0.3, 0, 1);
+    base.backLeg.plant = clamp(plant + Math.max(0, -stride) * 0.3, 0, 1);
+    base.frontLeg.lift = frontLift;
+    base.backLeg.lift = backLift;
+  }
+
+  const braceT = clamp(Math.max(f.rangePressure ?? 0, (f.bracePulse ?? 0) / 14), 0, 1);
+  if (braceT > 0.02 && f.grounded && f.hurt <= 0 && !f.attack) {
+    base.torsoTilt -= (f.rangeSide || f.dir || 1) * braceT * 0.026;
+    base.frontLeg.knee.y += braceT * 5;
+    base.backLeg.knee.y += braceT * 5;
+    base.frontLeg.foot.x += 8 * braceT * spec.stance;
+    base.backLeg.foot.x -= 10 * braceT * spec.stance;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, braceT);
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, braceT * 0.82);
+  }
+
   if (f.blocking) {
     base.frontArm = {
       shoulder: { x: 26, y: shoulderY },
@@ -6057,7 +6189,10 @@ function drawLeg(f, leg, front) {
 
   ctx.save();
   ctx.translate(leg.foot.x, leg.foot.y);
-  ctx.rotate((leg.foot.x - leg.knee.x) * 0.012);
+  const plant = clamp(leg.plant ?? 0, 0, 1);
+  const lift = clamp(leg.lift ?? 0, 0, 1);
+  ctx.rotate((leg.foot.x - leg.knee.x) * 0.012 * (1 - plant * 0.5) - lift * 0.08);
+  ctx.scale(1 + plant * 0.045, 1 - plant * 0.04 + lift * 0.025);
   const footGrad = ctx.createLinearGradient(-15, -9, 27 * spec.foot, 7);
   footGrad.addColorStop(0, darken(outfit.shoe, 26));
   footGrad.addColorStop(0.38, outfit.shoe);
