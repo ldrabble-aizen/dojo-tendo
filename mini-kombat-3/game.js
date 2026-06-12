@@ -43,6 +43,7 @@ const touchInput = {
   grab: false,
 };
 const projectiles = [];
+const MAX_PARTICLES = 280;
 const faces = {
   p1: loadImage("assets/fighter-1-face.png"),
   p2: loadImage("assets/fighter-2-face.png"),
@@ -52,12 +53,12 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=52"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=52"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=53"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=53"),
 };
 const unifiedSpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-unified.svg?v=52"),
-  p2: loadImage("assets/sprite-akane-unified.svg?v=52"),
+  p1: loadImage("assets/sprite-pchan-unified.svg?v=53"),
+  p2: loadImage("assets/sprite-akane-unified.svg?v=53"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -1328,6 +1329,7 @@ function landHit(attacker, target, damage, projectile = false) {
   impactGlints(impactX, impactY, impactColor, blocked, heavyImpact);
   contactFlashBurst(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   cinematicImpact(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
+  premiumImpactFX(impactX, impactY, target, impactColor, impactDir, blocked, heavyImpact, counter, projectile);
   floorDust(target.x, target.y + 3, blocked ? 4 : heavyImpact ? 10 : 7);
 }
 
@@ -1523,6 +1525,109 @@ function cinematicImpact(x, y, color, dir, blocked, heavyImpact, counter) {
   }
 }
 
+function premiumImpactFX(x, y, target, color, dir, blocked, heavyImpact, counter, projectile) {
+  const strength = blocked ? 0.55 : counter ? 1.42 : projectile ? 1.24 : heavyImpact ? 1.12 : 0.88;
+  const baseAngle = dir > 0 ? 0 : Math.PI;
+  const rippleLife = blocked ? 12 : counter ? 18 : heavyImpact ? 16 : 14;
+  particles.push({
+    x: x - dir * 3,
+    y,
+    vx: 0,
+    vy: 0,
+    angle: baseAngle,
+    life: rippleLife,
+    maxLife: rippleLife,
+    size: 28 + strength * 16,
+    growth: 1.9 + strength * 0.72,
+    color,
+    kind: "airRipple",
+  });
+
+  if (blocked) {
+    particles.push({
+      x: x - dir * 8,
+      y,
+      vx: dir * 0.18,
+      vy: 0,
+      angle: baseAngle,
+      life: 15,
+      maxLife: 15,
+      size: 34,
+      color: "#bdeaff",
+      kind: "guardPlate",
+    });
+  }
+
+  const needleCount = blocked ? 3 : counter ? 10 : heavyImpact || projectile ? 8 : 5;
+  const spread = blocked ? 0.36 : counter ? 0.86 : heavyImpact ? 0.72 : 0.58;
+  for (let i = 0; i < needleCount; i += 1) {
+    const lane = needleCount === 1 ? 0 : i / (needleCount - 1) - 0.5;
+    const angle = baseAngle + lane * spread + (Math.random() - 0.5) * 0.1;
+    const speed = blocked ? 0.32 : heavyImpact ? 0.92 : 0.68;
+    particles.push({
+      x: x - Math.cos(angle) * 10,
+      y: y + lane * (blocked ? 22 : 32),
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.26,
+      angle,
+      length: (blocked ? 26 : heavyImpact ? 72 : 54) * (0.82 + Math.random() * 0.38),
+      life: blocked ? 9 + Math.random() * 5 : 12 + Math.random() * 7,
+      maxLife: blocked ? 11 : 16,
+      size: blocked ? 2.2 : heavyImpact ? 4.4 : 3.2,
+      color,
+      kind: "impactNeedle",
+    });
+  }
+
+  if (!blocked) {
+    const floorY = Math.min(FLOOR + 4, target.y + 4);
+    const shockLife = heavyImpact || counter || projectile ? 22 : 17;
+    particles.push({
+      x: target.x - dir * 8,
+      y: floorY,
+      vx: dir * 0.45,
+      vy: 0,
+      angle: dir > 0 ? 0 : Math.PI,
+      life: shockLife,
+      maxLife: shockLife,
+      size: heavyImpact || counter ? 52 : 38,
+      growth: heavyImpact || counter ? 2.4 : 1.9,
+      color: "rgba(226, 197, 135, 0.72)",
+      kind: "floorShock",
+    });
+
+    const ribbonCount = heavyImpact || projectile ? 8 : 5;
+    for (let i = 0; i < ribbonCount; i += 1) {
+      particles.push({
+        x: target.x + (Math.random() - 0.5) * 38,
+        y: floorY + Math.random() * 3,
+        vx: -dir * (0.45 + Math.random() * 1.1),
+        vy: -0.24 - Math.random() * 0.44,
+        angle: (Math.random() - 0.5) * 0.12,
+        life: 18 + Math.random() * 10,
+        maxLife: 24,
+        size: 10 + Math.random() * 13,
+        color: "rgba(214, 182, 120, 0.48)",
+        kind: "dustRibbon",
+      });
+    }
+  }
+
+  particles.push({
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    angle: baseAngle,
+    life: blocked ? 6 : heavyImpact || counter ? 9 : 7,
+    maxLife: blocked ? 6 : heavyImpact || counter ? 9 : 7,
+    size: blocked ? 30 : heavyImpact || counter ? 58 : 44,
+    color,
+    strength,
+    kind: "impactBloom",
+  });
+}
+
 function coldWaterSplash(x, y, dir) {
   for (let i = 0; i < 18; i += 1) {
     const angle = -Math.PI * 0.78 + (i / 17) * Math.PI * 0.62;
@@ -1574,10 +1679,27 @@ function updateParticles() {
   particles = particles.filter((p) => {
     p.x += p.vx ?? 0;
     p.y += p.vy ?? 0;
-    if (!["slash", "ring", "impactCore", "impactLine", "contactFlash", "recoilArc"].includes(p.kind)) p.vy = (p.vy ?? 0) + 0.13;
+    if (
+      ![
+        "slash",
+        "ring",
+        "impactCore",
+        "impactLine",
+        "contactFlash",
+        "recoilArc",
+        "airRipple",
+        "impactNeedle",
+        "guardPlate",
+        "floorShock",
+        "impactBloom",
+      ].includes(p.kind)
+    ) {
+      p.vy = (p.vy ?? 0) + 0.13;
+    }
     p.life -= 1;
     return p.life > 0;
   });
+  if (particles.length > MAX_PARTICLES) particles.splice(0, particles.length - MAX_PARTICLES);
 }
 
 function addText(x, y, text, color) {
@@ -5281,6 +5403,113 @@ function drawParticles() {
       ctx.moveTo(-length * 0.18, 0);
       ctx.lineTo(length * 0.62, 0);
       ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === "impactNeedle") {
+      const progress = 1 - p.life / (p.maxLife ?? 14);
+      const length = p.length * (1 - progress * 0.32);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle ?? 0);
+      ctx.globalCompositeOperation = "screen";
+      ctx.lineCap = "round";
+      ctx.strokeStyle = colorWithAlpha(p.color, 0.24 * alpha);
+      ctx.lineWidth = p.size * 3.1;
+      ctx.beginPath();
+      ctx.moveTo(-length * 0.18, 0);
+      ctx.lineTo(length * 0.82, 0);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.58 * alpha})`;
+      ctx.lineWidth = Math.max(1.1, p.size * 0.48);
+      ctx.beginPath();
+      ctx.moveTo(-length * 0.06, 0);
+      ctx.lineTo(length, 0);
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === "airRipple") {
+      const progress = 1 - p.life / (p.maxLife ?? 14);
+      const radius = p.size + progress * (p.growth ?? 2) * 24;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle ?? 0);
+      ctx.globalCompositeOperation = "screen";
+      ctx.strokeStyle = colorWithAlpha(p.color, 0.28 * alpha);
+      ctx.lineWidth = Math.max(1.2, 4.5 * (1 - progress));
+      ctx.beginPath();
+      ctx.ellipse(0, 0, radius * 1.32, radius * 0.34, 0, 0.18, Math.PI * 1.82);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.2 * alpha})`;
+      ctx.lineWidth = Math.max(0.8, 2.2 * (1 - progress));
+      ctx.beginPath();
+      ctx.ellipse(0, 0, radius * 0.92, radius * 0.22, 0, -0.1, Math.PI * 1.55);
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === "guardPlate") {
+      const progress = 1 - p.life / (p.maxLife ?? 15);
+      const size = p.size * (1 + progress * 0.34);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle ?? 0);
+      ctx.globalCompositeOperation = "screen";
+      const shield = ctx.createLinearGradient(-size, -size, size, size);
+      shield.addColorStop(0, "rgba(255,255,255,0)");
+      shield.addColorStop(0.44, colorWithAlpha(p.color, 0.28 * alpha));
+      shield.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = shield;
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.58, -size * 0.78);
+      ctx.lineTo(size * 0.2, -size * 0.5);
+      ctx.lineTo(size * 0.56, 0);
+      ctx.lineTo(size * 0.2, size * 0.5);
+      ctx.lineTo(-size * 0.58, size * 0.78);
+      ctx.lineTo(-size * 0.38, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = `rgba(236, 251, 255, ${0.58 * alpha})`;
+      ctx.lineWidth = Math.max(1.2, 3.8 * (1 - progress));
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === "floorShock") {
+      const progress = 1 - p.life / (p.maxLife ?? 18);
+      const width = p.size + progress * (p.growth ?? 2) * 38;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle ?? 0);
+      ctx.globalCompositeOperation = "screen";
+      ctx.strokeStyle = colorWithAlpha(p.color, 0.32 * alpha);
+      ctx.lineWidth = Math.max(1.4, 5.5 * (1 - progress));
+      ctx.beginPath();
+      ctx.ellipse(0, 0, width * 1.05, 8 + progress * 7, 0, Math.PI * 0.05, Math.PI * 0.95);
+      ctx.stroke();
+      ctx.fillStyle = colorWithAlpha(p.color, 0.08 * alpha);
+      ctx.beginPath();
+      ctx.ellipse(0, -2, width * 0.86, 5 + progress * 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (p.kind === "dustRibbon") {
+      const progress = 1 - p.life / (p.maxLife ?? 24);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle ?? 0);
+      ctx.fillStyle = colorWithAlpha(p.color, 0.72 * alpha);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, p.size * (1.2 + progress * 1.6), p.size * (0.24 + progress * 0.18), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (p.kind === "impactBloom") {
+      const progress = 1 - p.life / (p.maxLife ?? 8);
+      const radius = p.size * (1 + progress * 0.92);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle ?? 0);
+      ctx.globalCompositeOperation = "screen";
+      const bloom = ctx.createRadialGradient(0, 0, 1, 0, 0, radius);
+      bloom.addColorStop(0, `rgba(255,255,255,${0.32 * alpha})`);
+      bloom.addColorStop(0.26, colorWithAlpha(p.color, 0.23 * alpha));
+      bloom.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = bloom;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, radius * 1.38, radius * 0.82, 0, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     } else if (p.kind === "ring") {
       const progress = 1 - p.life / (p.maxLife ?? 20);
