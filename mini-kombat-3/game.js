@@ -549,6 +549,8 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     contactFlash: 0,
     damagePulse: 0,
     damageLevel: 0,
+    hitZone: "torso",
+    hitZonePulse: 0,
     koFall: 0,
     koFallDir: dir,
     koFallStrength: 0,
@@ -721,6 +723,8 @@ function resetRound() {
     contactFlash: 0,
     damagePulse: 0,
     damageLevel: 0,
+    hitZone: "torso",
+    hitZonePulse: 0,
     koFall: 0,
     koFallDir: 1,
     koFallStrength: 0,
@@ -766,6 +770,8 @@ function resetRound() {
     contactFlash: 0,
     damagePulse: 0,
     damageLevel: 0,
+    hitZone: "torso",
+    hitZonePulse: 0,
     koFall: 0,
     koFallDir: -1,
     koFallStrength: 0,
@@ -1301,6 +1307,7 @@ function updateFighter(f, opponent) {
   if (f.contactFlash > 0) f.contactFlash -= 1;
   if (f.impactPulse > 0) f.impactPulse -= 1;
   if (f.damagePulse > 0) f.damagePulse -= 1;
+  if (f.hitZonePulse > 0) f.hitZonePulse -= 1;
   if (f.victoryPulse > 0) f.victoryPulse -= 1;
   if (f.guardImpact > 0) f.guardImpact -= 1;
   if (f.staggerPulse > 0) f.staggerPulse -= 1;
@@ -1466,6 +1473,83 @@ function attackBox(f) {
   };
 }
 
+function hitZoneFor(attacker, target, projectileInfo, attackType) {
+  if (attackType === "sweep") return "legs";
+  if (attackType === "grab") return "torso";
+
+  let hitY = null;
+  if (projectileInfo) {
+    hitY = projectileInfo.y;
+  } else if (attacker) {
+    const box = attackBox(attacker);
+    if (box) hitY = box.y + box.h * 0.5;
+  }
+
+  if (!Number.isFinite(hitY)) {
+    if (attackType === "punch" || attackType === "airPunch" || projectileInfo) return "head";
+    if (attackType === "kick" || attackType === "airKick") return "torso";
+    return "torso";
+  }
+
+  const box = bodyBox(target);
+  const ratio = clamp((hitY - box.y) / Math.max(1, box.h), 0, 1);
+  if (ratio < 0.34) return "head";
+  if (ratio < 0.7) return "torso";
+  return "legs";
+}
+
+function hitZoneReaction(zone, blocked, projectile, heavyImpact, finishingHit) {
+  if (blocked) {
+    return {
+      yOffset: 108,
+      hurtBonus: 0,
+      lift: 0.45,
+      vx: 3.1,
+      vy: -1.35,
+      damageBonus: 0,
+      pulse: 10,
+      dust: 4,
+    };
+  }
+
+  if (zone === "head") {
+    return {
+      yOffset: projectile ? 120 : 124,
+      hurtBonus: finishingHit ? 4 : 5,
+      lift: finishingHit ? 2.25 : projectile ? 1.72 : 1.62,
+      vx: finishingHit ? 8.8 : projectile ? 6.2 : heavyImpact ? 7.25 : 6.15,
+      vy: finishingHit ? -5.7 : projectile ? -3.75 : heavyImpact ? -4.85 : -4.2,
+      damageBonus: 0.18,
+      pulse: finishingHit ? 34 : 26,
+      dust: heavyImpact || projectile ? 9 : 6,
+    };
+  }
+
+  if (zone === "legs") {
+    return {
+      yOffset: 48,
+      hurtBonus: heavyImpact ? 4 : 2,
+      lift: finishingHit ? 1.1 : projectile ? 0.9 : 0.62,
+      vx: finishingHit ? 8.6 : heavyImpact ? 7.6 : 6.25,
+      vy: finishingHit ? -4.3 : heavyImpact ? -2.7 : -2.2,
+      damageBonus: 0.1,
+      pulse: finishingHit ? 32 : 24,
+      dust: heavyImpact ? 13 : 10,
+    };
+  }
+
+  return {
+    yOffset: projectile ? 108 : heavyImpact ? 90 : 96,
+    hurtBonus: heavyImpact || projectile ? 2 : 0,
+    lift: finishingHit ? 2.1 : projectile ? 1.35 : heavyImpact ? 1.48 : 1,
+    vx: finishingHit ? 8.4 : projectile ? 5.8 : heavyImpact ? 7 : 5.9,
+    vy: finishingHit ? -5.4 : projectile ? -3.45 : heavyImpact ? -4.45 : -3.75,
+    damageBonus: 0,
+    pulse: finishingHit ? 34 : heavyImpact || projectile ? 24 : 18,
+    dust: heavyImpact ? 10 : 7,
+  };
+}
+
 function landHit(attacker, target, damage, projectile = false, projectileInfo = null) {
   const unblockable = attacker?.attack?.type === "grab";
   const counter = attacker?.counterWindow > 0;
@@ -1480,17 +1564,21 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   const nextHealth = clamp(target.health - finalDamage, 0, 100);
   const finishingHit = !blocked && previousHealth > 0 && nextHealth <= 0;
   const cinematicHit = !blocked && (finishingHit || counter || projectile || attackType === "kick" || attackType === "airKick" || attackType === "grab");
+  const hitZone = blocked ? "guard" : hitZoneFor(attacker, target, projectileInfo, attackType);
+  const zone = hitZoneReaction(hitZone, blocked, projectile, heavyImpact, finishingHit);
 
   target.health = nextHealth;
-  target.hurt = finishingHit ? 38 : blocked ? 9 : attacker?.attack?.type === "grab" ? 30 : projectile ? 21 : 24;
+  target.hurt = finishingHit ? 38 + zone.hurtBonus : blocked ? 9 : attacker?.attack?.type === "grab" ? 30 : projectile ? 21 + zone.hurtBonus : 24 + zone.hurtBonus;
   target.hitFlash = blocked ? 8 : projectile ? 20 : heavyImpact ? 17 : 14;
   target.contactFlash = blocked ? 7 : heavyImpact ? 14 : 11;
   target.impactPulse = finishingHit ? 24 : blocked ? 8 : Math.round(13 + impactStrength * 5);
   target.impactDir = impactDir;
-  target.impactLift = finishingHit ? 2.1 : blocked ? 0.45 : projectile ? 1.35 : heavyImpact ? 1.48 : 1;
+  target.impactLift = zone.lift;
   target.impactStrength = impactStrength;
-  target.damagePulse = blocked ? Math.max(target.damagePulse ?? 0, 8) : finishingHit ? 34 : Math.max(target.damagePulse ?? 0, heavyImpact || projectile || counter ? 24 : 18);
-  target.damageLevel = blocked ? 0.35 : finishingHit ? 1.65 : counter ? 1.45 : projectile ? 1.22 : heavyImpact ? 1.08 : 0.82;
+  target.hitZone = hitZone;
+  target.hitZonePulse = Math.max(target.hitZonePulse ?? 0, zone.pulse);
+  target.damagePulse = blocked ? Math.max(target.damagePulse ?? 0, 8) : finishingHit ? 34 : Math.max(target.damagePulse ?? 0, heavyImpact || projectile || counter ? 24 : zone.pulse);
+  target.damageLevel = blocked ? 0.35 : finishingHit ? 1.65 : counter ? 1.45 : projectile ? 1.22 + zone.damageBonus : heavyImpact ? 1.08 + zone.damageBonus : 0.82 + zone.damageBonus;
   if (finishingHit) {
     target.koFall = Math.max(target.koFall ?? 0, 86);
     target.koFallDir = impactDir;
@@ -1500,8 +1588,9 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   if (!blocked && target.health < 32) {
     target.staggerPulse = Math.max(target.staggerPulse ?? 0, heavyImpact || projectile ? 18 : 13);
   }
-  target.vx = impactDir * (blocked ? 3.1 : finishingHit ? 8.4 : projectile ? 5.8 : heavyImpact ? 7 : 5.9);
-  target.vy = target.grounded ? (blocked ? -1.35 : finishingHit ? -5.4 : projectile ? -3.45 : heavyImpact ? -4.45 : -3.75) : target.vy;
+  if (hitZone === "legs") target.crouch = Math.max(target.crouch ?? 0, heavyImpact ? 0.56 : 0.38);
+  target.vx = impactDir * zone.vx;
+  target.vy = target.grounded ? zone.vy : target.vy;
   if (attacker) {
     attacker.energy = clamp(attacker.energy + (blocked ? 3 : 8), 0, 100);
     attacker.impactPulse = Math.max(attacker.impactPulse ?? 0, blocked ? 3 : heavyImpact ? 5 : 4);
@@ -1518,12 +1607,12 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   playSound(blocked ? "block" : "hit");
   addText(
     target.x,
-    target.y - 154,
-    blocked ? "BLOCK" : counter ? "COUNTER" : unblockable ? "GRAB" : projectile ? "SPECIAL" : "HIT",
+    target.y - (hitZone === "legs" ? 78 : hitZone === "head" ? 166 : 154),
+    blocked ? "BLOCK" : counter ? "COUNTER" : unblockable ? "GRAB" : projectile ? "SPECIAL" : hitZone === "head" ? "HEAD" : hitZone === "legs" ? "LOW" : "HIT",
     blocked ? "#bdeaff" : counter ? "#fff1bd" : "#ffd44d",
   );
-  const impactX = target.x - target.dir * 26;
-  const impactY = target.y - (projectile ? 116 : blocked ? 108 : heavyImpact ? 88 : 96);
+  const impactX = target.x - target.dir * (hitZone === "legs" ? 18 : hitZone === "head" ? 30 : 26);
+  const impactY = target.y - zone.yOffset;
   triggerCameraImpact(impactDir, blocked, heavyImpact, counter, impactStrength);
   if (cinematicHit) {
     const cinematicStrength = finishingHit ? 1.62 : counter ? 1.42 : projectile ? 1.28 : 1.04;
@@ -1531,7 +1620,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   }
   burst(
     target.x - target.dir * 22,
-    target.y - (heavyImpact ? 92 : 102),
+    impactY,
     blocked ? "#bdeaff" : projectile ? "#fff0a6" : "#ffd44d",
     blocked ? 8 : projectile ? 20 : heavyImpact ? 16 : 14,
   );
@@ -1544,7 +1633,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   );
   impactShockwave(
     impactX - target.dir * 2,
-    target.y - (projectile ? 116 : heavyImpact ? 90 : 100),
+    impactY,
     impactColor,
     blocked,
     heavyImpact,
@@ -1554,7 +1643,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   cinematicImpact(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   premiumImpactFX(impactX, impactY, target, impactColor, impactDir, blocked, heavyImpact, counter, projectile);
   if (cinematicHit) cinematicSpecialImpactFX(impactX, impactY, target, attacker, projectileInfo, impactColor, impactDir, finishingHit, projectile, counter);
-  floorDust(target.x, target.y + 3, blocked ? 4 : heavyImpact ? 10 : 7);
+  floorDust(target.x, target.y + 3, blocked ? 4 : zone.dust);
 }
 
 function triggerCameraImpact(dir, blocked, heavyImpact, counter, strength) {
@@ -3350,13 +3439,18 @@ function fighterTransitionMotion(f, walking) {
     const strength = clamp(f.impactStrength ?? 0.8, 0.35, 1.45);
     const effectiveContact = winner ? Math.max(0, (f.contactFlash ?? 0) - resultFrame * 0.9) : (f.contactFlash ?? 0);
     const contactT = clamp(effectiveContact / 14, 0, 1);
+    const zonePulse = winner ? Math.max(0, (f.hitZonePulse ?? 0) - resultFrame * 0.78) : (f.hitZonePulse ?? 0);
+    const zoneT = clamp(zonePulse / 26, 0, 1);
+    const headHit = f.hitZone === "head" ? zoneT : 0;
+    const bodyHit = f.hitZone === "torso" ? zoneT : 0;
+    const legHit = f.hitZone === "legs" ? zoneT : 0;
     const shakePulse = Math.sin((roundFrame + resultFrame) * 1.75) * hurtT;
     const impactDir = f.impactDir ?? dir;
-    motion.x += impactDir * (impactT * (2.4 + strength * 3.1) + hurtT * (0.8 + strength * 0.9)) + shakePulse * 0.9;
-    motion.y += Math.sin(effectiveHurt * 0.82) * hurtT * 0.8 - impactT * (0.35 + strength * 0.45) + contactT * 0.8;
-    motion.rotation += impactDir * (impactT * (0.016 + strength * 0.023) + hurtT * 0.012) + shakePulse * 0.005;
-    motion.scaleX *= 1 + impactT * (0.008 + strength * 0.012) + contactT * 0.006;
-    motion.scaleY *= 1 - impactT * (0.004 + strength * 0.006) + contactT * 0.004;
+    motion.x += impactDir * (impactT * (2.4 + strength * 3.1) + hurtT * (0.8 + strength * 0.9) + headHit * 2.4 + bodyHit * 1.2 + legHit * 1.7) + shakePulse * 0.9;
+    motion.y += Math.sin(effectiveHurt * 0.82) * hurtT * 0.8 - impactT * (0.35 + strength * 0.45) + contactT * 0.8 - headHit * 1.3 + legHit * 2.4;
+    motion.rotation += impactDir * (impactT * (0.016 + strength * 0.023) + hurtT * 0.012 + headHit * 0.046 + bodyHit * 0.022 - legHit * 0.024) + shakePulse * 0.005;
+    motion.scaleX *= 1 + impactT * (0.008 + strength * 0.012) + contactT * 0.006 + legHit * 0.028 + bodyHit * 0.012;
+    motion.scaleY *= 1 - impactT * (0.004 + strength * 0.006) + contactT * 0.004 - legHit * 0.035 - bodyHit * 0.008 + headHit * 0.008;
   }
 
   const lowHealth = f.health < 30 && f.hurt <= 0 && !winner ? clamp((30 - f.health) / 30, 0, 1) : 0;
@@ -4437,17 +4531,21 @@ function drawPigBandana(crouch) {
 
 function drawHurtRim(f, crouch) {
   const alpha = clamp(f.hurt / 18, 0, 1);
+  const zone = f.hitZone ?? "torso";
+  const centerY = zone === "head" ? -136 + crouch : zone === "legs" ? -44 + crouch : -96 + crouch;
+  const radiusX = zone === "head" ? 45 : zone === "legs" ? 54 : 56;
+  const radiusY = zone === "head" ? 42 : zone === "legs" ? 42 : 92;
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.strokeStyle = `rgba(255, 239, 179, ${0.34 * alpha})`;
   ctx.lineWidth = 5;
   ctx.beginPath();
-  ctx.ellipse(0, -103 + crouch, 56, 92, -0.05, 0, Math.PI * 2);
+  ctx.ellipse(0, centerY, radiusX, radiusY, -0.05, 0, Math.PI * 2);
   ctx.stroke();
   ctx.strokeStyle = `rgba(255, 78, 64, ${0.22 * alpha})`;
   ctx.lineWidth = 8;
   ctx.beginPath();
-  ctx.ellipse(0, -93 + crouch, 48, 82, 0.08, 0, Math.PI * 2);
+  ctx.ellipse(0, centerY + (zone === "legs" ? 2 : 6), radiusX * 0.86, radiusY * 0.88, 0.08, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }
@@ -4461,6 +4559,12 @@ function drawDamageReactionFX(f, crouch) {
 
   const localDir = (f.impactDir ?? f.dir) === f.dir ? 1 : -1;
   const shake = Math.sin((roundFrame + resultFrame) * 1.55) * damage;
+  const zone = f.hitZone ?? "torso";
+  const centerY = zone === "head" ? -136 + crouch : zone === "legs" ? -46 + crouch : -98 + crouch;
+  const glowRx = zone === "head" ? 48 : zone === "legs" ? 62 : 58;
+  const glowRy = zone === "head" ? 48 : zone === "legs" ? 44 : 92;
+  const slashTop = zone === "head" ? -158 : zone === "legs" ? -62 : -138;
+  const slashGap = zone === "legs" ? 18 : 33;
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
@@ -4468,20 +4572,20 @@ function drawDamageReactionFX(f, crouch) {
   ctx.lineJoin = "round";
 
   if (damage > 0.03) {
-    const glow = ctx.createRadialGradient(localDir * 16, -104 + crouch, 5, localDir * 10, -96 + crouch, 94 + level * 14);
+    const glow = ctx.createRadialGradient(localDir * 16, centerY, 5, localDir * 10, centerY, 88 + level * 14);
     glow.addColorStop(0, `rgba(255, 247, 212, ${0.18 * damage})`);
     glow.addColorStop(0.42, `rgba(255, 84, 66, ${0.12 * damage * level})`);
     glow.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.ellipse(localDir * 8, -102 + crouch, 58 + level * 10, 92 + level * 8, -localDir * 0.08, 0, Math.PI * 2);
+    ctx.ellipse(localDir * 8, centerY, glowRx + level * 10, glowRy + level * 8, -localDir * 0.08, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.strokeStyle = `rgba(255, 248, 206, ${0.36 * damage})`;
     ctx.lineWidth = 2.2 + level * 1.8;
     for (let i = 0; i < 3; i += 1) {
       const lane = i - 1;
-      const y = -138 + crouch + lane * 33 + shake * 5;
+      const y = slashTop + crouch + lane * slashGap + shake * 5;
       ctx.beginPath();
       ctx.moveTo(localDir * (-44 - damage * 8), y - lane * 6);
       ctx.lineTo(localDir * (-18 + damage * 18), y + 13);
@@ -4493,8 +4597,8 @@ function drawDamageReactionFX(f, crouch) {
     ctx.strokeStyle = `rgba(255, 83, 64, ${0.16 * damage * level})`;
     ctx.lineWidth = 6 + level * 2.5;
     ctx.beginPath();
-    ctx.moveTo(localDir * -34, -126 + crouch);
-    ctx.quadraticCurveTo(localDir * 8, -104 + crouch + shake * 8, localDir * 34, -78 + crouch);
+    ctx.moveTo(localDir * -34, centerY - glowRy * 0.28);
+    ctx.quadraticCurveTo(localDir * 8, centerY + shake * 8, localDir * 34, centerY + glowRy * 0.28);
     ctx.stroke();
   }
 
@@ -4955,6 +5059,38 @@ function getPose(f, stride) {
       base.backArm.hand = { x: 46 - windup * 12 + activePulse * 35, y: -107 + crouch - windup * 4 - activePulse * 6 };
       base.frontLeg.foot.x += 7 * activePulse - 3 * windup;
       base.backLeg.foot.x -= 7 * activePulse + 3 * windup;
+    }
+  }
+
+  if (f.hurt > 0 && !winner) {
+    const zoneT = clamp((f.hitZonePulse ?? 0) / 26, 0, 1);
+    const hitDir = f.impactDir ?? f.dir;
+    if (f.hitZone === "head") {
+      base.torsoTilt -= 0.18 * zoneT;
+      base.frontArm.elbow = { x: 34 * spec.stance, y: -145 + crouch - zoneT * 8 };
+      base.frontArm.hand = { x: 42 * spec.stance, y: -163 + crouch - zoneT * 9 };
+      base.backArm.elbow = { x: -18 * spec.stance, y: -139 + crouch - zoneT * 7 };
+      base.backArm.hand = { x: -4 * spec.stance, y: -160 + crouch - zoneT * 8 };
+      base.frontLeg.knee.x += hitDir * zoneT * 5;
+      base.backLeg.foot.x -= hitDir * zoneT * 9;
+    } else if (f.hitZone === "legs") {
+      base.torsoTilt += 0.15 * zoneT;
+      base.frontLeg.knee = { x: (25 + stride * 10 + 16 * zoneT) * spec.stance, y: -22 + crouch + zoneT * 14 };
+      base.frontLeg.foot = { x: (32 + stride * 14 + 10 * zoneT) * spec.stance, y: -1 };
+      base.backLeg.knee = { x: (-26 - stride * 8 - 12 * zoneT) * spec.stance, y: -23 + crouch + zoneT * 18 };
+      base.backLeg.foot = { x: (-36 - stride * 12 - 18 * zoneT) * spec.stance, y: 0 };
+      base.frontArm.elbow.y += zoneT * 12;
+      base.frontArm.hand.y += zoneT * 18;
+      base.backArm.elbow.y += zoneT * 9;
+      base.backArm.hand.y += zoneT * 15;
+    } else {
+      base.torsoTilt += 0.1 * zoneT;
+      base.frontArm.elbow = { x: 34 * spec.stance, y: -104 + crouch + zoneT * 5 };
+      base.frontArm.hand = { x: 41 * spec.stance, y: -85 + crouch + zoneT * 9 };
+      base.backArm.elbow = { x: -22 * spec.stance, y: -111 + crouch + zoneT * 4 };
+      base.backArm.hand = { x: -14 * spec.stance, y: -88 + crouch + zoneT * 8 };
+      base.frontLeg.foot.x += 8 * zoneT * spec.stance;
+      base.backLeg.foot.x -= 10 * zoneT * spec.stance;
     }
   }
 
