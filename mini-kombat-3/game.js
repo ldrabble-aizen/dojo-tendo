@@ -551,6 +551,12 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     damageLevel: 0,
     hitZone: "torso",
     hitZonePulse: 0,
+    reactionPulse: 0,
+    reactionMax: 1,
+    reactionZone: "torso",
+    reactionKind: "light",
+    reactionDir: dir,
+    reactionStrength: 0,
     koFall: 0,
     koFallDir: dir,
     koFallStrength: 0,
@@ -743,6 +749,12 @@ function resetRound() {
     damageLevel: 0,
     hitZone: "torso",
     hitZonePulse: 0,
+    reactionPulse: 0,
+    reactionMax: 1,
+    reactionZone: "torso",
+    reactionKind: "light",
+    reactionDir: 1,
+    reactionStrength: 0,
     koFall: 0,
     koFallDir: 1,
     koFallStrength: 0,
@@ -808,6 +820,12 @@ function resetRound() {
     damageLevel: 0,
     hitZone: "torso",
     hitZonePulse: 0,
+    reactionPulse: 0,
+    reactionMax: 1,
+    reactionZone: "torso",
+    reactionKind: "light",
+    reactionDir: -1,
+    reactionStrength: 0,
     koFall: 0,
     koFallDir: -1,
     koFallStrength: 0,
@@ -1384,6 +1402,7 @@ function updateFighter(f, opponent) {
   if (f.impactPulse > 0) f.impactPulse -= 1;
   if (f.damagePulse > 0) f.damagePulse -= 1;
   if (f.hitZonePulse > 0) f.hitZonePulse -= 1;
+  if (f.reactionPulse > 0) f.reactionPulse -= 1;
   if (f.victoryPulse > 0) f.victoryPulse -= 1;
   if (f.guardImpact > 0) f.guardImpact -= 1;
   if (f.guardEntryPulse > 0) f.guardEntryPulse -= 1;
@@ -1699,6 +1718,26 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   target.hitZonePulse = Math.max(target.hitZonePulse ?? 0, zone.pulse);
   target.damagePulse = blocked ? Math.max(target.damagePulse ?? 0, 8) : finishingHit ? 34 : Math.max(target.damagePulse ?? 0, heavyImpact || projectile || counter ? 24 : zone.pulse);
   target.damageLevel = blocked ? 0.35 : finishingHit ? 1.65 : counter ? 1.45 : projectile ? 1.22 + zone.damageBonus : heavyImpact ? 1.08 + zone.damageBonus : 0.82 + zone.damageBonus;
+  const reactionKind = blocked
+    ? "guard"
+    : finishingHit
+      ? "finish"
+      : counter
+        ? "counter"
+        : projectile
+          ? "blast"
+          : attackType === "sweep"
+            ? "low"
+            : heavyImpact
+              ? "heavy"
+              : "light";
+  const reactionMax = blocked ? 12 : finishingHit ? 34 : counter || projectile ? 27 : heavyImpact ? 23 : 18;
+  target.reactionPulse = Math.max(target.reactionPulse ?? 0, reactionMax);
+  target.reactionMax = Math.max(target.reactionMax ?? 1, reactionMax);
+  target.reactionZone = hitZone;
+  target.reactionKind = reactionKind;
+  target.reactionDir = impactDir;
+  target.reactionStrength = blocked ? 0.38 : finishingHit ? 1.72 : counter ? 1.45 : projectile ? 1.28 : impactStrength;
   if (finishingHit) {
     target.koFall = Math.max(target.koFall ?? 0, 86);
     target.koFallDir = impactDir;
@@ -3454,6 +3493,43 @@ function localizedImpactProfile(f) {
   };
 }
 
+function impactReactionProfile(f) {
+  const rawPulse = winner ? Math.max(0, (f.reactionPulse ?? 0) - resultFrame * 0.82) : (f.reactionPulse ?? 0);
+  const max = Math.max(1, f.reactionMax ?? 1);
+  const t = clamp(rawPulse / max, 0, 1);
+  const zone = f.reactionZone || f.hitZone || "torso";
+  const kind = f.reactionKind || "light";
+  const strength = clamp(f.reactionStrength ?? f.impactStrength ?? 0.82, 0.35, 1.85);
+  if (t <= 0.01) {
+    return {
+      zone,
+      kind,
+      t: 0,
+      snap: 0,
+      rebound: 0,
+      shake: 0,
+      localDir: 1,
+      worldDir: f.impactDir ?? f.dir ?? 1,
+      strength: 0,
+    };
+  }
+
+  const worldDir = f.reactionDir || f.impactDir || f.dir || 1;
+  const localDir = worldDir === f.dir ? 1 : -1;
+  const reboundClock = 1 - t;
+  return {
+    zone,
+    kind,
+    t,
+    snap: smoothStep01(t) * strength,
+    rebound: Math.sin(reboundClock * Math.PI) * strength,
+    shake: Math.sin((roundFrame + resultFrame) * 2.55) * t * strength,
+    localDir,
+    worldDir,
+    strength,
+  };
+}
+
 function isAttackPoseState(state) {
   return state === "punch" || state === "kick" || state === "sweep" || state === "special" || state === "grab";
 }
@@ -3808,6 +3884,38 @@ function fighterTransitionMotion(f, walking) {
     motion.rotation += impactDir * (impactT * (0.016 + strength * 0.023) + hurtT * 0.012 + headHit * 0.046 + bodyHit * 0.022 - legHit * 0.024) + shakePulse * 0.005;
     motion.scaleX *= 1 + impactT * (0.008 + strength * 0.012) + contactT * 0.006 + legHit * 0.028 + bodyHit * 0.012;
     motion.scaleY *= 1 - impactT * (0.004 + strength * 0.006) + contactT * 0.004 - legHit * 0.035 - bodyHit * 0.008 + headHit * 0.008;
+  }
+
+  const reaction = impactReactionProfile(f);
+  if (reaction.t > 0.035 && reaction.kind !== "guard") {
+    const snap = reaction.snap;
+    const rebound = reaction.rebound;
+    const worldDir = reaction.worldDir || dir;
+    const kindBoost = reaction.kind === "finish" ? 1.3 : reaction.kind === "counter" || reaction.kind === "blast" ? 1.14 : reaction.kind === "heavy" ? 1.05 : 0.86;
+    const zone = reaction.zone === "head" || reaction.zone === "legs" ? reaction.zone : "torso";
+
+    if (zone === "head") {
+      motion.x += worldDir * (snap * 4.2 + rebound * 2.2) * kindBoost;
+      motion.y -= (snap * 1.8 + rebound * 0.55) * kindBoost;
+      motion.rotation += worldDir * (snap * 0.052 + rebound * 0.027) * kindBoost;
+      motion.scaleX *= 1 + snap * 0.012;
+      motion.scaleY *= 1 - snap * 0.01;
+      motion.afterimage = Math.max(motion.afterimage, reaction.t * 0.07 * kindBoost);
+    } else if (zone === "legs") {
+      motion.x += worldDir * (snap * 2.7 + rebound * 1.9) * kindBoost;
+      motion.y += (snap * 3.2 + rebound * 0.9) * kindBoost;
+      motion.rotation -= worldDir * (snap * 0.04 + rebound * 0.022) * kindBoost;
+      motion.scaleX *= 1 + snap * 0.022;
+      motion.scaleY *= 1 - snap * 0.036;
+      motion.afterimage = Math.max(motion.afterimage, reaction.t * 0.055 * kindBoost);
+    } else {
+      motion.x += worldDir * (snap * 3.4 + rebound * 1.7) * kindBoost;
+      motion.y += (snap * 1.35 - rebound * 0.35) * kindBoost;
+      motion.rotation += worldDir * (snap * 0.033 + rebound * 0.018) * kindBoost;
+      motion.scaleX *= 1 + snap * 0.026;
+      motion.scaleY *= 1 - snap * 0.025;
+      motion.afterimage = Math.max(motion.afterimage, reaction.t * 0.06 * kindBoost);
+    }
   }
 
   const lowHealth = f.health < 30 && f.hurt <= 0 && !winner ? clamp((30 - f.health) / 30, 0, 1) : 0;
@@ -4233,6 +4341,12 @@ function rasterBodyFrameIndex(f, frameName, walking) {
   }
 
   if (frameName === "hurt") {
+    const reaction = impactReactionProfile(f);
+    if (reaction.t > 0.05) {
+      if (reaction.zone === "head") return frames[0];
+      if (reaction.zone === "legs") return frames[1] ?? frames[0];
+      return reaction.kind === "heavy" || reaction.kind === "counter" || reaction.kind === "blast" ? frames[1] ?? frames[0] : frames[0];
+    }
     return frames[Math.floor(f.hurt / 5) % frames.length] ?? frames[0];
   }
 
@@ -4426,6 +4540,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
     drawSpriteHeadActingWarp(f, crouch, walking ? stride : 0);
     drawSpriteAttackFrameWarp(f, unifiedSheet, frameX, crouch);
     drawSpriteImpactWarp(f, unifiedSheet, frameX, crouch);
+    drawSpriteReactionPoseWarp(f, unifiedSheet, frameX, crouch);
     drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
     drawSpriteExtremityDetails(f, crouch, frameName, walking ? stride : 0);
     drawFighterStageLighting(f, crouch);
@@ -4461,6 +4576,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   drawSpritePoseTransitionBlend(f, sheet, frameIndex, crouch);
   drawSpriteAttackFrameWarp(f, sheet, frameX, crouch);
   drawSpriteImpactWarp(f, sheet, frameX, crouch);
+  drawSpriteReactionPoseWarp(f, sheet, frameX, crouch);
   drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
   drawSpriteContactOcclusion(f, crouch, frameName, walking ? stride : 0);
   drawSpriteExtremityDetails(f, crouch, frameName, walking ? stride : 0);
@@ -4919,9 +5035,10 @@ function drawSpriteAttackFrameWarp(f, image, frameX, crouch) {
 function drawSpriteImpactWarp(f, image, frameX, crouch) {
   const impact = localizedImpactProfile(f);
   if (impact.t <= 0.035 || f.hitZone === "guard") return;
+  const reaction = impactReactionProfile(f);
 
   const zones = {
-    head: { srcY: 38, h: 104, yBoost: -5, xKick: 8.2, scaleX: 0.042, scaleY: -0.026, rot: 0.07 },
+    head: { srcY: 116, h: 66, yBoost: -5, xKick: 7.4, scaleX: 0.036, scaleY: -0.02, rot: 0.052 },
     torso: { srcY: 146, h: 76, yBoost: -2, xKick: 6.2, scaleX: 0.032, scaleY: -0.034, rot: 0.035 },
     legs: { srcY: 202, h: 90, yBoost: 3, xKick: 5.2, scaleX: 0.045, scaleY: -0.048, rot: -0.045 },
   };
@@ -4929,10 +5046,11 @@ function drawSpriteImpactWarp(f, image, frameX, crouch) {
   const pad = 14;
   const localY = -BODY_SPRITE_ANCHOR_Y + zone.srcY + crouch * 0.18;
   const centerY = localY + zone.h * 0.5 + zone.yBoost;
-  const kick = -impact.localDir * zone.xKick * impact.snap + impact.shake * 2.2;
-  const squashX = 1 + zone.scaleX * impact.snap;
-  const squashY = 1 + zone.scaleY * impact.snap;
-  const rotation = -impact.localDir * zone.rot * impact.rebound;
+  const reactionBoost = reaction.zone === impact.zone ? reaction.snap * 0.36 + reaction.rebound * 0.14 : 0;
+  const kick = -impact.localDir * zone.xKick * (impact.snap + reactionBoost) + (impact.shake + reaction.shake * 0.45) * 2.2;
+  const squashX = 1 + zone.scaleX * (impact.snap + reactionBoost);
+  const squashY = 1 + zone.scaleY * (impact.snap + reactionBoost);
+  const rotation = -impact.localDir * zone.rot * (impact.rebound + reactionBoost * 0.65);
 
   ctx.save();
   ctx.beginPath();
@@ -4971,6 +5089,82 @@ function drawSpriteImpactWarp(f, image, frameX, crouch) {
     ctx.quadraticCurveTo(impact.localDir * -8, y - 12 * impact.rebound, impact.localDir * (46 + impact.snap * 12), y + lane * 4);
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+function drawSpriteReactionPoseWarp(f, image, frameX, crouch) {
+  const reaction = impactReactionProfile(f);
+  if (reaction.t <= 0.04 || reaction.kind === "guard" || !image?.complete || !image.naturalWidth) return;
+
+  const zone = reaction.zone === "head" || reaction.zone === "legs" ? reaction.zone : "torso";
+  const kindBoost = reaction.kind === "finish" ? 1.26 : reaction.kind === "counter" || reaction.kind === "blast" ? 1.14 : reaction.kind === "heavy" ? 1.06 : 0.88;
+  const force = clamp((reaction.snap * 0.72 + reaction.rebound * 0.34) * kindBoost, 0, 1.45);
+  if (force <= 0.025) return;
+
+  const localCrouch = crouch * 0.18;
+  const dir = reaction.localDir || 1;
+  const alpha = clamp(0.12 + reaction.t * 0.24, 0.08, 0.38);
+  const sliceSets = {
+    head: [
+      { srcY: 132, h: 44, tx: -dir * 11.5, ty: -3.2, rot: -dir * 0.055, sx: 1.022, sy: 0.982, a: 0.86 },
+      { srcY: 164, h: 62, tx: -dir * 6.2, ty: -0.6, rot: -dir * 0.025, sx: 1.014, sy: 0.99, a: 0.62 },
+      { srcY: 222, h: 66, tx: dir * 1.4, ty: 1.2, rot: dir * 0.012, sx: 1.006, sy: 0.996, a: 0.42 },
+    ],
+    torso: [
+      { srcY: 120, h: 54, tx: -dir * 5.4, ty: 0.4, rot: -dir * 0.018, sx: 1.016, sy: 0.992, a: 0.52 },
+      { srcY: 154, h: 72, tx: -dir * 10.8, ty: 2.2, rot: -dir * 0.038, sx: 1.038, sy: 0.958, a: 0.9 },
+      { srcY: 218, h: 72, tx: -dir * 3.8, ty: 1.6, rot: dir * 0.014, sx: 1.016, sy: 0.982, a: 0.58 },
+    ],
+    legs: [
+      { srcY: 128, h: 56, tx: -dir * 2.6, ty: 1.2, rot: dir * 0.012, sx: 1.006, sy: 0.992, a: 0.42 },
+      { srcY: 176, h: 60, tx: -dir * 5.4, ty: 5.2, rot: dir * 0.026, sx: 1.018, sy: 0.962, a: 0.64 },
+      { srcY: 224, h: 70, tx: -dir * 10.8, ty: 7.2, rot: dir * 0.056, sx: 1.032, sy: 0.92, a: 0.92 },
+    ],
+  };
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  for (const slice of sliceSets[zone]) {
+    const localY = -BODY_SPRITE_ANCHOR_Y + slice.srcY + localCrouch;
+    const centerY = localY + slice.h * 0.5;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-BODY_SPRITE_ANCHOR_X - 20, localY - 6, BODY_SPRITE_FRAME_W + 40, slice.h + 12);
+    ctx.clip();
+    ctx.globalAlpha = alpha * slice.a;
+    ctx.translate(slice.tx * force + reaction.shake * 1.4, centerY + slice.ty * force + reaction.shake * 0.7);
+    ctx.rotate(slice.rot * force);
+    ctx.scale(1 + (slice.sx - 1) * force, 1 + (slice.sy - 1) * force);
+    ctx.translate(0, -centerY);
+    ctx.drawImage(
+      image,
+      frameX,
+      0,
+      BODY_SPRITE_FRAME_W,
+      BODY_SPRITE_FRAME_H,
+      -BODY_SPRITE_ANCHOR_X,
+      -BODY_SPRITE_ANCHOR_Y + localCrouch,
+      BODY_SPRITE_FRAME_W,
+      BODY_SPRITE_FRAME_H
+    );
+    ctx.restore();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = clamp(0.08 + reaction.t * 0.16, 0.06, 0.24);
+  ctx.strokeStyle = reaction.kind === "blast" ? "rgba(156, 229, 255, 0.95)" : "rgba(255, 239, 174, 0.9)";
+  ctx.lineWidth = 1.6 + force * 1.2;
+  ctx.lineCap = "round";
+  const y1 = zone === "head" ? -150 : zone === "legs" ? -62 : -122;
+  const y2 = zone === "head" ? -104 : zone === "legs" ? -26 : -78;
+  ctx.beginPath();
+  ctx.moveTo(-dir * (48 + force * 6), y1 + localCrouch + reaction.shake * 2);
+  ctx.quadraticCurveTo(-dir * 12, (y1 + y2) * 0.5 + localCrouch - force * 8, dir * (42 + force * 7), y2 + localCrouch);
+  ctx.moveTo(-dir * (36 + force * 4), y2 + localCrouch + 10);
+  ctx.quadraticCurveTo(-dir * 5, y2 + localCrouch + 2 - force * 5, dir * (30 + force * 5), y2 + localCrouch + 15);
+  ctx.stroke();
   ctx.restore();
 }
 
