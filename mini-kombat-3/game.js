@@ -1002,6 +1002,7 @@ function startAttack(f, type) {
     reach: grab ? 48 : sweep ? 88 : heavy ? 84 : 58,
     height: grab ? 70 : sweep ? 34 : heavy ? 70 : 50,
     hit: false,
+    whoosh: false,
   };
   f.blocking = false;
   f.cooldown = grab ? 28 : sweep ? 25 : heavy ? 24 : 13;
@@ -1025,6 +1026,7 @@ function startSpecial(f) {
     reach: 0,
     height: 0,
     hit: true,
+    whoosh: false,
   };
   if (f.profileId === "p1") {
     f.pigMorph = 72;
@@ -1229,6 +1231,10 @@ function updateFighter(f, opponent) {
 
   if (f.attack) {
     f.attack.frame += 1;
+    if (!f.attack.whoosh && f.attack.frame >= f.attack.activeStart) {
+      attackWhoosh(f);
+      f.attack.whoosh = true;
+    }
     if (f.attack.type === "special" && f.attack.frame === f.attack.activeStart) throwSpecial(f);
 
     const box = attackBox(f);
@@ -1442,6 +1448,53 @@ function contactFlashBurst(x, y, color, dir, blocked, heavyImpact, counter) {
       strength,
       kind: "hitShard",
     });
+  }
+}
+
+function attackWhoosh(f) {
+  if (!f.attack) return;
+  const spec = attackVisualSpec(f.attack.type);
+  const dir = f.dir || 1;
+  const x = f.x + dir * fighterScale(spec.trailReach * 0.42);
+  const y = f.y + fighterScale(spec.trailY);
+  const angle = dir > 0 ? 0 : Math.PI;
+  const size = spec.sweep ? 34 : spec.kick ? 38 : spec.special ? 43 : spec.grab ? 31 : 28;
+  const life = spec.heavy || spec.grab ? 13 : 10;
+
+  particles.push({
+    x,
+    y,
+    vx: dir * 0.36,
+    vy: 0,
+    angle,
+    life,
+    maxLife: life,
+    size,
+    growth: spec.heavy ? 1.65 : 1.35,
+    color: spec.color,
+    kind: "airRipple",
+  });
+
+  const count = spec.sweep ? 5 : spec.kick ? 6 : spec.special ? 7 : spec.grab ? 4 : 4;
+  for (let i = 0; i < count; i += 1) {
+    const lane = count === 1 ? 0 : i / (count - 1) - 0.5;
+    particles.push({
+      x: x - dir * fighterScale(10 + Math.random() * 12),
+      y: y + fighterScale(lane * spec.trailHeight * 1.15),
+      vx: dir * (0.38 + Math.random() * 0.45),
+      vy: lane * 0.16,
+      angle: angle + lane * (spec.sweep ? 0.26 : spec.kick ? 0.34 : 0.22),
+      length: fighterScale((spec.sweep ? 60 : spec.kick ? 72 : spec.special ? 66 : 48) * (0.86 + Math.random() * 0.25)),
+      life: life + Math.random() * 5,
+      maxLife: life + 4,
+      size: spec.kick || spec.sweep ? 3.8 : spec.special ? 3.5 : 2.7,
+      color: spec.core,
+      kind: "impactNeedle",
+    });
+  }
+
+  if (f.grounded) {
+    movementDust(f.x - dir * fighterScale(spec.sweep ? 18 : 28), FLOOR + 5, -dir, spec.heavy ? 0.9 : 0.62, spec.sweep ? 4 : spec.heavy ? 3 : 2);
   }
 }
 
@@ -1673,6 +1726,33 @@ function premiumImpactFX(x, y, target, color, dir, blocked, heavyImpact, counter
     strength,
     kind: "impactBloom",
   });
+}
+
+function attackVisualSpec(type = "") {
+  const punch = type === "punch" || type === "airPunch";
+  const kick = type === "kick" || type === "airKick";
+  const sweep = type === "sweep";
+  const grab = type === "grab";
+  const special = type === "special";
+  return {
+    punch,
+    kick,
+    sweep,
+    grab,
+    special,
+    heavy: kick || sweep || special,
+    color: special ? "#fff1bd" : kick || sweep ? "#ffe87a" : grab ? "#ffd7a8" : "#9be7ff",
+    core: special ? "#8fe2ff" : kick || sweep ? "#fff6bf" : grab ? "#fff0d0" : "#e8fbff",
+    trailY: sweep ? -38 : kick ? -84 : special ? -118 : grab ? -112 : -126,
+    trailReach: sweep ? 142 : kick ? 132 : special ? 104 : grab ? 94 : 98,
+    trailHeight: sweep ? 20 : kick ? 30 : special ? 44 : grab ? 26 : 22,
+    windupPull: sweep ? 9.5 : kick ? 8.4 : special ? 7.2 : grab ? 7.6 : 8.8,
+    snapDrive: sweep ? 13.2 : kick ? 15.4 : special ? 10.8 : grab ? 11.2 : 12.6,
+    followDrag: sweep ? 2.2 : kick ? 2.9 : special ? 2.5 : grab ? 2.6 : 2.3,
+    bodyLift: sweep ? -2.8 : kick ? 3.8 : special ? 1.6 : grab ? 0.8 : 1.2,
+    rotation: sweep ? 0.082 : kick ? -0.066 : special ? -0.052 : grab ? 0.058 : 0.064,
+    echo: special ? 0.18 : kick || sweep ? 0.3 : grab ? 0.18 : 0.24,
+  };
 }
 
 function coldWaterSplash(x, y, dir) {
@@ -2074,14 +2154,17 @@ function drawFloorContactLight() {
 function drawDynamicFighterShadow(f) {
   const lift = clamp(FLOOR - f.y, 0, 170);
   const air = lift / 170;
-  const attack = f.attack ? attackProgress(f.attack) : 0;
+  const phase = attackPhase(f.attack);
+  const attack = phase.power;
+  const spec = attackVisualSpec(f.attack?.type);
   const speed = clamp(Math.abs(f.vx) / 7, 0, 1);
   const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1);
   const step = clamp((f.stepPulse ?? 0) / 7, 0, 1);
-  const width = (74 * (1 - air * 0.4) + attack * 10 + speed * 6 + landing * 24 + step * 7) * FIGHTER_SCALE;
-  const height = (17 * (1 - air * 0.45) + landing * 5 + step * 1.4) * FIGHTER_SCALE;
-  const alpha = ((f.hurt > 0 ? 0.32 : 0.22) + landing * 0.08 + step * 0.025) * (1 - air * 0.55);
-  const offset = clamp(f.vx * -2.2, -16, 16);
+  const heavySpread = spec.heavy || spec.grab ? 1 : 0;
+  const width = (74 * (1 - air * 0.4) + attack * (12 + heavySpread * 17) + speed * 6 + landing * 24 + step * 7) * FIGHTER_SCALE;
+  const height = (17 * (1 - air * 0.45) + attack * (spec.sweep ? 5 : heavySpread ? 2.8 : 1.6) + landing * 5 + step * 1.4) * FIGHTER_SCALE;
+  const alpha = ((f.hurt > 0 ? 0.32 : 0.22) + attack * 0.06 + landing * 0.08 + step * 0.025) * (1 - air * 0.55);
+  const offset = clamp(f.vx * -2.2 - (f.dir || 1) * phase.snap * (spec.heavy ? 9 : 5), -22, 22);
 
   ctx.fillStyle = `rgba(10, 12, 11, ${alpha})`;
   ctx.beginPath();
@@ -2854,6 +2937,9 @@ function fighterTransitionMotion(f, walking) {
     const strike = phase.strike;
     const recovery = phase.recovery;
     const settle = phase.settle;
+    const snap = phase.snap;
+    const follow = phase.followThrough;
+    const spec = attackVisualSpec(a.type);
     const isKick = a.type === "kick" || a.type === "airKick";
     const isSweep = a.type === "sweep";
     const isSpecial = a.type === "special";
@@ -2862,12 +2948,29 @@ function fighterTransitionMotion(f, walking) {
     const brace = isKick ? 4.8 : isSweep ? 3.2 : isSpecial ? 3.7 : isGrab ? 4.1 : 5.3;
     const returnDrag = isKick ? 1.6 : isSweep ? 1.2 : 1.8;
 
-    motion.x += dir * (strike * reach - windup * brace - recovery * returnDrag);
-    motion.y += windup * (isSweep ? 3.2 : isKick ? 1.8 : 1.4) - strike * (isKick ? 3.4 : isSweep ? -3.1 : 1.3) + recovery * 0.9;
-    motion.rotation += dir * (-windup * (isKick ? 0.046 : 0.052) + strike * (isKick ? -0.046 : isSweep ? 0.064 : 0.052) - recovery * 0.018);
-    motion.scaleX *= 1 - windup * 0.018 + strike * (isKick ? 0.026 : 0.021) - settle * 0.006;
-    motion.scaleY *= 1 + windup * 0.018 - strike * (isSweep ? 0.019 : 0.01) + settle * 0.004;
-    motion.afterimage = (isSpecial ? 0.28 : isGrab ? 0.1 : 0.22) * strike + windup * 0.025;
+    motion.x += dir * (
+      strike * reach -
+      windup * (brace + spec.windupPull * 0.34) +
+      snap * spec.snapDrive * 0.62 -
+      recovery * (returnDrag + spec.followDrag) -
+      follow * spec.followDrag * 0.72
+    );
+    motion.y +=
+      windup * (isSweep ? 3.8 : isKick ? 2.1 : 1.7) -
+      strike * (isKick ? 3.6 : isSweep ? -3.3 : 1.5) -
+      snap * spec.bodyLift * 0.42 +
+      recovery * 1.05 +
+      follow * (isSweep ? 1.6 : 0.7);
+    motion.rotation += dir * (
+      -windup * (isKick ? 0.058 : isSweep ? 0.044 : 0.06) +
+      strike * spec.rotation +
+      snap * spec.rotation * 0.68 -
+      recovery * 0.024 -
+      follow * 0.018
+    );
+    motion.scaleX *= 1 - windup * 0.026 + strike * (isKick ? 0.035 : 0.028) + snap * 0.034 - settle * 0.006;
+    motion.scaleY *= 1 + windup * 0.026 - strike * (isSweep ? 0.026 : 0.014) - snap * 0.016 + settle * 0.004;
+    motion.afterimage = (isSpecial ? 0.34 : isGrab ? 0.16 : spec.echo) * strike + snap * 0.16 + windup * 0.035 + follow * 0.06;
   }
 
   if (f.blocking && !winner) {
@@ -3080,10 +3183,12 @@ function drawFighter(f) {
   drawFighterRimLight(f, crouch);
   drawMovementPoseFX(f, crouch, walking, stride);
   if (f.attack) drawAttackBodyGlow(f, crouch);
+  if (f.attack) drawAttackKineticFX(f, crouch, "back");
   if (f.energy >= 45 && f.hurt <= 0) drawEnergyAura(f.trim, crouch);
   drawSpriteUnderlay(f, pose, crouch);
 
   if (drawRasterBodySprite(f, crouch, walking ? stride : 0, walking, transition)) {
+    if (f.attack) drawAttackKineticFX(f, crouch, "front");
     if (f.blocking) drawGuard(f.trim, crouch, f);
     if (f.hitFlash > 0) drawHitFlash(f, crouch);
     if (f.hurt > 0) drawHurtRim(f, crouch);
@@ -3115,6 +3220,7 @@ function drawFighter(f) {
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
   drawHead(f, crouch, walking ? stride : 0);
+  if (f.attack) drawAttackKineticFX(f, crouch, "front");
   drawFighterStageLighting(f, crouch);
 
   if (f.blocking) drawGuard(f.trim, crouch, f);
@@ -3315,25 +3421,29 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   const frameX = frameIndex * BODY_SPRITE_FRAME_W;
   if (unifiedSheet?.complete && unifiedSheet.naturalWidth) {
     if ((transition?.afterimage ?? 0) > 0.035) {
-      const ghostAlpha = clamp(transition.afterimage, 0, 0.24);
-      const ghostOffset = -10 - transition.afterimage * 22;
-      ctx.save();
-      ctx.globalCompositeOperation = "screen";
-      ctx.globalAlpha = ghostAlpha;
-      ctx.shadowColor = colorWithAlpha(f.trim, 0.32);
-      ctx.shadowBlur = 8;
-      ctx.drawImage(
-        unifiedSheet,
-        frameX,
-        0,
-        BODY_SPRITE_FRAME_W,
-        BODY_SPRITE_FRAME_H,
-        -BODY_SPRITE_ANCHOR_X + ghostOffset,
-        -BODY_SPRITE_ANCHOR_Y + crouch * 0.18 + 1.5,
-        BODY_SPRITE_FRAME_W,
-        BODY_SPRITE_FRAME_H
-      );
-      ctx.restore();
+      const phase = attackPhase(f.attack);
+      const echoCount = f.attack && (phase.snap > 0.05 || phase.strike > 0.35) ? 2 : 1;
+      for (let i = echoCount; i >= 1; i -= 1) {
+        const ghostAlpha = clamp(transition.afterimage * (i === 1 ? 1 : 0.56), 0, 0.24);
+        const ghostOffset = -9 - transition.afterimage * (18 + i * 18) - i * 4;
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = ghostAlpha;
+        ctx.shadowColor = colorWithAlpha(f.trim, 0.32);
+        ctx.shadowBlur = 8 + i * 2;
+        ctx.drawImage(
+          unifiedSheet,
+          frameX,
+          0,
+          BODY_SPRITE_FRAME_W,
+          BODY_SPRITE_FRAME_H,
+          -BODY_SPRITE_ANCHOR_X + ghostOffset,
+          -BODY_SPRITE_ANCHOR_Y + crouch * 0.18 + 1.5 + i * 0.8,
+          BODY_SPRITE_FRAME_W,
+          BODY_SPRITE_FRAME_H
+        );
+        ctx.restore();
+      }
     }
 
     ctx.save();
@@ -3663,6 +3773,101 @@ function drawAttackBodyGlow(f, crouch) {
     }
   }
   ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawAttackKineticFX(f, crouch, layer = "front") {
+  if (!f.attack) return;
+  const phase = attackPhase(f.attack);
+  const spec = attackVisualSpec(f.attack.type);
+  const prep = phase.anticipation;
+  const strike = Math.max(phase.strike, phase.snap * 0.9);
+  const recover = Math.max(phase.recovery * 0.72, phase.followThrough);
+  const action = layer === "back" ? Math.max(prep, strike * 0.35) : Math.max(strike, recover * 0.62);
+  if (action < 0.035) return;
+
+  const yOffset = crouch * 0.18;
+  const baseY = spec.trailY + yOffset;
+  const reach = spec.trailReach + phase.snap * (spec.heavy ? 18 : 12);
+  const height = spec.trailHeight;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  if (layer === "back") {
+    if (prep > 0.04) {
+      ctx.strokeStyle = colorWithAlpha(spec.color, 0.08 + prep * 0.16);
+      ctx.lineWidth = 2.4 + prep * (spec.heavy ? 4.2 : 3);
+      ctx.beginPath();
+      ctx.moveTo(-44 - prep * 18, baseY + height * 0.34);
+      ctx.bezierCurveTo(-18, baseY - height * 1.25, 24 + prep * 24, baseY - height * 1.15, 50 + prep * 18, baseY - height * 0.08);
+      ctx.stroke();
+
+      ctx.fillStyle = colorWithAlpha(spec.color, 0.035 + prep * 0.055);
+      ctx.beginPath();
+      ctx.ellipse(-18 - prep * 12, -94 + yOffset, 62 + prep * 18, 108 + prep * 10, -0.08, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (strike > 0.05) {
+      const pressure = Math.max(strike, phase.snap);
+      ctx.fillStyle = `rgba(255, 231, 166, ${0.045 + pressure * 0.07})`;
+      ctx.beginPath();
+      ctx.ellipse(12 + pressure * 18, -4 + yOffset, 46 + pressure * 34, 7 + pressure * 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (strike > 0.04) {
+    const coreX = 25 + reach * (spec.sweep ? 0.46 : spec.kick ? 0.52 : 0.44);
+    const coreY = baseY + (spec.sweep ? 3 : spec.kick ? 2 : 0);
+    const glow = ctx.createRadialGradient(coreX, coreY, 2, coreX, coreY, reach * 0.52);
+    glow.addColorStop(0, `rgba(255,255,255,${0.12 + strike * 0.22})`);
+    glow.addColorStop(0.34, colorWithAlpha(spec.color, 0.1 + strike * 0.2));
+    glow.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(coreX, coreY, reach * (spec.sweep ? 0.58 : 0.5), height * (spec.kick ? 1.25 : spec.special ? 1.45 : 1), spec.sweep ? 0.02 : -0.09, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = colorWithAlpha(spec.core, 0.28 + strike * 0.46);
+    ctx.lineWidth = (spec.kick || spec.sweep ? 6.5 : 5) + phase.snap * 2.5;
+    ctx.beginPath();
+    ctx.moveTo(12 - prep * 10, baseY + height * 0.35);
+    ctx.bezierCurveTo(
+      reach * 0.28,
+      baseY - height * (spec.sweep ? 0.34 : spec.kick ? 1.35 : 1),
+      reach * 0.72,
+      baseY - height * (spec.sweep ? 0.16 : 0.62),
+      reach,
+      baseY + height * (spec.sweep ? 0.1 : 0.04)
+    );
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(255,255,255,${0.18 + strike * 0.28})`;
+    ctx.lineWidth = Math.max(1.6, 2.4 + phase.snap * 1.4);
+    for (let i = 0; i < 3; i += 1) {
+      const lane = i - 1;
+      ctx.beginPath();
+      ctx.moveTo(22 + lane * 7, baseY + lane * height * 0.34);
+      ctx.quadraticCurveTo(reach * 0.48, baseY - height * (0.62 + lane * 0.08), reach * (0.86 + lane * 0.02), baseY + lane * height * 0.26);
+      ctx.stroke();
+    }
+  }
+
+  if (recover > 0.05) {
+    ctx.strokeStyle = colorWithAlpha(spec.color, 0.08 + recover * 0.16);
+    ctx.lineWidth = 2 + recover * 2.2;
+    ctx.beginPath();
+    ctx.moveTo(reach * 0.72, baseY + height * 0.24);
+    ctx.quadraticCurveTo(32 - recover * 18, baseY + height * 1.1, -22 - recover * 12, baseY + height * 0.22);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -4006,22 +4211,26 @@ function drawSpeedLines(f, box) {
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   const outfit = outfitSpec(f);
-  const isSweep = f.attack.type === "sweep";
-  ctx.strokeStyle = isSweep ? "rgba(255, 232, 122, 0.38)" : "rgba(255, 247, 214, 0.3)";
-  ctx.lineWidth = isSweep ? 4 : 3;
+  const phase = attackPhase(f.attack);
+  const spec = attackVisualSpec(f.attack?.type);
+  const isSweep = spec.sweep;
+  const snap = Math.max(phase.snap, phase.strike * 0.55);
+  ctx.strokeStyle = isSweep ? "rgba(255, 232, 122, 0.42)" : `rgba(255, 247, 214, ${0.28 + snap * 0.14})`;
+  ctx.lineWidth = (isSweep ? 4 : 3) + snap * 1.2;
   ctx.lineCap = "round";
   const origin = f.dir > 0 ? box.x - 22 : box.x + box.w + 22;
   const target = f.dir > 0 ? box.x + box.w * 0.72 : box.x + box.w * 0.28;
-  for (let i = 0; i < 7; i += 1) {
-    const y = box.y + 6 + i * (box.h / 7);
+  const lineCount = spec.heavy ? 9 : 7;
+  for (let i = 0; i < lineCount; i += 1) {
+    const y = box.y + 6 + i * (box.h / lineCount);
     ctx.beginPath();
-    ctx.moveTo(origin, y + Math.sin(roundFrame * 0.4 + i) * 3);
-    ctx.lineTo(target, y - 6 + Math.cos(i) * 5);
+    ctx.moveTo(origin - f.dir * snap * 10, y + Math.sin(roundFrame * 0.4 + i) * 3);
+    ctx.lineTo(target + f.dir * snap * 18, y - 6 + Math.cos(i) * 5);
     ctx.stroke();
   }
   ctx.strokeStyle = outfit.accent;
-  ctx.globalAlpha = 0.32;
-  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.3 + snap * 0.16;
+  ctx.lineWidth = 2 + snap * 0.8;
   for (let i = 0; i < 3; i += 1) {
     const y = box.y + box.h * (0.25 + i * 0.22);
     ctx.beginPath();
@@ -4034,9 +4243,10 @@ function drawSpeedLines(f, box) {
 }
 
 function drawAttackArc(f, box) {
-  const isKick = f.attack.type === "kick" || f.attack.type === "airKick" || f.attack.type === "sweep";
   const phase = attackPhase(f.attack);
-  const progress = Math.max(phase.strike, phase.anticipation * 0.35, phase.recovery * 0.22);
+  const spec = attackVisualSpec(f.attack?.type);
+  const isKick = spec.kick || spec.sweep;
+  const progress = Math.max(phase.strike, phase.snap * 0.9, phase.anticipation * 0.35, phase.followThrough * 0.28, phase.recovery * 0.22);
   const outfit = outfitSpec(f);
   const x = f.dir > 0 ? box.x + box.w * 0.28 : box.x + box.w * 0.72;
   const y = box.y + box.h * 0.45;
@@ -4044,33 +4254,40 @@ function drawAttackArc(f, box) {
   ctx.globalCompositeOperation = "screen";
   ctx.translate(x, y);
   ctx.scale(f.dir * FIGHTER_SCALE, FIGHTER_SCALE);
-  ctx.rotate(isKick ? -0.16 : -0.06);
+  ctx.rotate(spec.sweep ? 0.02 : isKick ? -0.16 : -0.06);
 
-  const glow = ctx.createRadialGradient(24, 0, 4, 24, 0, isKick ? 96 : 74);
-  glow.addColorStop(0, isKick ? "rgba(255, 231, 122, 0.34)" : "rgba(155, 231, 255, 0.34)");
-  glow.addColorStop(0.42, colorWithAlpha(outfit.accent, 0.18));
+  const glow = ctx.createRadialGradient(24, 0, 4, 24, 0, isKick ? 106 : 82);
+  glow.addColorStop(0, spec.heavy ? "rgba(255, 231, 122, 0.38)" : "rgba(155, 231, 255, 0.36)");
+  glow.addColorStop(0.38, colorWithAlpha(outfit.accent, 0.18 + phase.snap * 0.08));
   glow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(22, 0, isKick ? 92 : 72, isKick ? 26 : 19, 0, 0, Math.PI * 2);
+  ctx.ellipse(22 + phase.snap * 8, 0, isKick ? 100 : 78, isKick ? 29 : 21, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = colorWithAlpha(outfit.accent, 0.78);
   ctx.globalAlpha = 0.2 + phase.anticipation * 0.08 + phase.strike * 0.36 + phase.recovery * 0.12;
-  ctx.lineWidth = (isKick ? 12 : 9) + phase.strike * 2.2;
+  ctx.lineWidth = (isKick ? 12 : 9) + phase.strike * 2.2 + phase.snap * 2.4;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(-12 - phase.anticipation * 12, 13 + phase.anticipation * 5);
-  ctx.quadraticCurveTo(32, -34 - phase.strike * 8, isKick ? 134 + phase.strike * 18 : 96 + phase.strike * 14, -10);
+  ctx.quadraticCurveTo(32, -34 - phase.strike * 8 - phase.snap * 8, isKick ? 134 + phase.strike * 18 + phase.snap * 18 : 96 + phase.strike * 14 + phase.snap * 12, -10);
   ctx.stroke();
 
-  ctx.strokeStyle = isKick ? "#ffe87a" : "#9be7ff";
-  ctx.globalAlpha = 0.24 + phase.strike * 0.42 + phase.recovery * 0.1;
+  ctx.strokeStyle = spec.color;
+  ctx.globalAlpha = 0.24 + phase.strike * 0.42 + phase.snap * 0.22 + phase.recovery * 0.1;
   ctx.lineWidth = (isKick ? 7 : 5) + phase.strike * 1.4;
   ctx.beginPath();
   ctx.moveTo(-10 - phase.anticipation * 10, 8 + phase.anticipation * 4);
-  ctx.quadraticCurveTo(34, -28 - phase.strike * 8, isKick ? 126 + phase.strike * 16 : 88 + phase.strike * 12, -8);
+  ctx.quadraticCurveTo(34, -28 - phase.strike * 8 - phase.snap * 6, isKick ? 126 + phase.strike * 16 + phase.snap * 16 : 88 + phase.strike * 12 + phase.snap * 10, -8);
   ctx.stroke();
+
+  if (phase.snap > 0.05) {
+    ctx.fillStyle = `rgba(255,255,255,${0.18 + phase.snap * 0.28})`;
+    ctx.beginPath();
+    ctx.ellipse(isKick ? 118 : 82, -9, 16 + phase.snap * 12, 5 + phase.snap * 3, -0.08, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.globalAlpha = 1;
   ctx.restore();
 }
@@ -4087,6 +4304,11 @@ function attackPhase(attack) {
       strike: 0,
       recovery: 0,
       settle: 0,
+      snap: 0,
+      followThrough: 0,
+      windupT: 0,
+      strikeT: 0,
+      recoveryT: 0,
       power: 0,
     };
   }
@@ -4102,13 +4324,24 @@ function attackPhase(attack) {
   const strike = attack.frame >= attack.activeStart && attack.frame <= attack.activeEnd ? Math.sin(strikeT * Math.PI) : 0;
   const recovery = attack.frame > attack.activeEnd ? Math.sin(recoveryT * Math.PI) : 0;
   const settle = attack.frame > attack.activeEnd ? smoothStep01(recoveryT) : 0;
+  const snap = attack.frame >= attack.activeStart && attack.frame <= attack.activeStart + 4
+    ? 1 - clamp((attack.frame - attack.activeStart) / 4, 0, 1)
+    : 0;
+  const followThrough = attack.frame > attack.activeEnd && attack.frame <= attack.activeEnd + 5
+    ? Math.sin(clamp((attack.frame - attack.activeEnd) / 5, 0, 1) * Math.PI)
+    : 0;
 
   return {
     anticipation,
     strike,
     recovery,
     settle,
-    power: Math.max(strike, anticipation * 0.34, recovery * 0.18),
+    snap,
+    followThrough,
+    windupT,
+    strikeT,
+    recoveryT,
+    power: Math.max(strike, snap * 0.9, anticipation * 0.38, followThrough * 0.3, recovery * 0.18),
   };
 }
 
