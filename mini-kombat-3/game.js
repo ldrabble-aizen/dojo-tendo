@@ -577,10 +577,14 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     walkCycle: 0,
     walkWeight: 0,
     walkPlant: 0,
+    walkSwing: 0,
     walkStrideSmooth: 0,
-    footPlantSide: 1,
+    footPlantSide: dir,
     footPlantPulse: 0,
     footPlantCooldown: 0,
+    walkAnchorSide: dir,
+    walkAnchorPulse: 0,
+    walkPushPulse: 0,
     rangePressure: 0,
     rangeSide: dir,
     bracePulse: 0,
@@ -775,10 +779,14 @@ function resetRound() {
     walkCycle: 0,
     walkWeight: 0,
     walkPlant: 0,
+    walkSwing: 0,
     walkStrideSmooth: 0,
     footPlantSide: 1,
     footPlantPulse: 0,
     footPlantCooldown: 0,
+    walkAnchorSide: 1,
+    walkAnchorPulse: 0,
+    walkPushPulse: 0,
     rangePressure: 0,
     rangeSide: 1,
     bracePulse: 0,
@@ -846,10 +854,14 @@ function resetRound() {
     walkCycle: 0,
     walkWeight: 0,
     walkPlant: 0,
+    walkSwing: 0,
     walkStrideSmooth: 0,
     footPlantSide: -1,
     footPlantPulse: 0,
     footPlantCooldown: 0,
+    walkAnchorSide: -1,
+    walkAnchorPulse: 0,
+    walkPushPulse: 0,
     rangePressure: 0,
     rangeSide: -1,
     bracePulse: 0,
@@ -1418,6 +1430,8 @@ function updateFighter(f, opponent) {
   if (f.stepCooldown > 0) f.stepCooldown -= 1;
   if (f.footPlantPulse > 0) f.footPlantPulse -= 1;
   if (f.footPlantCooldown > 0) f.footPlantCooldown -= 1;
+  if (f.walkAnchorPulse > 0) f.walkAnchorPulse = Math.max(0, f.walkAnchorPulse - 1);
+  if (f.walkPushPulse > 0) f.walkPushPulse = Math.max(0, f.walkPushPulse - 1);
   if (f.bracePulse > 0) f.bracePulse -= 1;
   if (f.pigMorph > 0) f.pigMorph -= 1;
   f.guardPulse = f.blocking ? Math.min(18, (f.guardPulse ?? 0) + 1) : (f.guardPulse ?? 0) * 0.72;
@@ -1479,23 +1493,32 @@ function updateFighter(f, opponent) {
   const walkingNow = f.grounded && f.hurt <= 0 && !f.attack && Math.abs(f.vx) > 0.35;
   if (walkingNow) {
     const cycleDir = Math.sign(f.vx) || f.dir;
-    f.walkCycle = (f.walkCycle ?? 0) + cycleDir * (0.2 + walkSpeed * 0.18);
-    f.walkWeight = (f.walkWeight ?? 0) + (walkSpeed - (f.walkWeight ?? 0)) * 0.18;
+    f.walkCycle = (f.walkCycle ?? 0) + cycleDir * (0.16 + walkSpeed * 0.16);
+    f.walkWeight = (f.walkWeight ?? 0) + (walkSpeed - (f.walkWeight ?? 0)) * 0.2;
     const strideNow = Math.sin(f.walkCycle);
-    const plantNow = Math.abs(Math.cos(f.walkCycle));
+    const plantRaw = Math.abs(Math.cos(f.walkCycle));
+    const plantNow = smoothStep01(plantRaw);
+    const swingNow = Math.abs(strideNow);
     const plantSide = strideNow >= 0 ? 1 : -1;
     f.walkStrideSmooth = (f.walkStrideSmooth ?? 0) + (strideNow - (f.walkStrideSmooth ?? 0)) * 0.45;
     f.walkPlant = plantNow;
+    f.walkSwing = (f.walkSwing ?? 0) + (swingNow - (f.walkSwing ?? 0)) * 0.36;
     if (plantNow > 0.88 && f.footPlantCooldown <= 0 && f.footPlantSide !== plantSide) {
       f.footPlantSide = plantSide;
-      f.footPlantPulse = 8;
-      f.footPlantCooldown = 8;
-      f.stepPulse = Math.max(f.stepPulse ?? 0, 6);
+      f.walkAnchorSide = plantSide;
+      f.footPlantPulse = 10;
+      f.footPlantCooldown = 9;
+      f.walkAnchorPulse = 12;
+      f.walkPushPulse = 9;
+      f.stepPulse = Math.max(f.stepPulse ?? 0, 7);
     }
   } else {
     f.walkWeight = (f.walkWeight ?? 0) * 0.86;
     f.walkPlant = (f.walkPlant ?? 0) * 0.72;
+    f.walkSwing = (f.walkSwing ?? 0) * 0.72;
     f.walkStrideSmooth = (f.walkStrideSmooth ?? 0) * 0.72;
+    f.walkAnchorPulse = (f.walkAnchorPulse ?? 0) * 0.75;
+    f.walkPushPulse = (f.walkPushPulse ?? 0) * 0.75;
   }
 
   if (f.grounded && f.hurt <= 0 && !f.attack && Math.abs(f.vx) > 1.25) {
@@ -3629,13 +3652,21 @@ function fighterTransitionMotion(f, walking) {
     const moveDir = Math.sign(f.vx) || dir;
     const retreat = moveDir !== dir;
     const step = Math.sin(cycle);
-    const footPlant = Math.abs(Math.cos(cycle));
+    const footPlant = clamp(f.walkPlant ?? Math.abs(Math.cos(cycle)), 0, 1);
+    const swing = clamp(f.walkSwing ?? Math.abs(step), 0, 1);
+    const anchor = clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1);
+    const pushPulse = clamp((f.walkPushPulse ?? 0) / 9, 0, 1);
+    const plantedWorldSide = (f.walkAnchorSide || f.footPlantSide || 1) * dir;
     const push = Math.max(0, Math.sin(cycle * 2)) * weight;
-    motion.x += step * (0.28 + weight * 0.78) - moveDir * footPlant * (0.25 + weight * 0.24);
-    motion.y += footPlant * (0.28 + weight * 0.95) - push * 0.38;
-    motion.rotation += moveDir * (0.01 + weight * 0.02) * (retreat ? -0.64 : 1) + step * 0.004 * weight;
-    motion.scaleX *= 1 + footPlant * 0.007 + weight * 0.004;
-    motion.scaleY *= 1 - footPlant * 0.005 + push * 0.003;
+    motion.x +=
+      step * (0.18 + weight * 0.5) -
+      moveDir * footPlant * (0.32 + weight * 0.34) -
+      plantedWorldSide * anchor * 0.52 +
+      moveDir * pushPulse * 0.42;
+    motion.y += footPlant * (0.48 + weight * 1.08) + anchor * 0.62 - swing * (0.18 + weight * 0.28) - push * 0.35 - pushPulse * 0.28;
+    motion.rotation += moveDir * (0.009 + weight * 0.018) * (retreat ? -0.64 : 1) + step * 0.004 * weight - plantedWorldSide * anchor * 0.005;
+    motion.scaleX *= 1 + anchor * 0.014 + footPlant * 0.009 + weight * 0.003;
+    motion.scaleY *= 1 - anchor * 0.017 - footPlant * 0.006 + swing * 0.004 + push * 0.003;
     if (retreat) {
       motion.x -= dir * 0.7 * weight;
       motion.y += 0.35 * weight;
@@ -3673,7 +3704,7 @@ function fighterTransitionMotion(f, walking) {
 
   const stepPulse = clamp((f.stepPulse ?? 0) / 7, 0, 1);
   if (stepPulse > 0 && walking) {
-    motion.y += stepPulse * 1.05;
+    motion.y += stepPulse * 0.86;
     motion.scaleX *= 1 + stepPulse * 0.008;
     motion.scaleY *= 1 - stepPulse * 0.007;
   }
@@ -3973,9 +4004,11 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const crouchSpread = f.blocking ? 8 : 0;
   const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1);
   const step = clamp((f.stepPulse ?? 0) / 7, 0, 1);
-  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 32 + step * 8 + plant * 10) * FIGHTER_SCALE * (1 - air * 0.38);
-  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 4.8 + step * 1.4 + plant * 0.8) * FIGHTER_SCALE * (1 - air * 0.48);
-  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.09 + step * 0.025 + plant * 0.018, 0.08, 0.46);
+  const anchor = walking ? clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1) : 0;
+  const push = walking ? clamp((f.walkPushPulse ?? 0) / 9, 0, 1) : 0;
+  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 32 + step * 8 + plant * 10 + anchor * 12 + push * 7) * FIGHTER_SCALE * (1 - air * 0.38);
+  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 4.8 + step * 1.4 + plant * 0.8 + anchor * 1.8) * FIGHTER_SCALE * (1 - air * 0.48);
+  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.09 + step * 0.025 + plant * 0.018 + anchor * 0.04, 0.08, 0.49);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -4013,16 +4046,25 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     ctx.restore();
   }
 
-  const footPlant = clamp((f.footPlantPulse ?? 0) / 8, 0, 1);
+  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.75);
   if (f.grounded && footPlant > 0.04) {
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
-    const side = f.footPlantSide || 1;
-    const footX = baseX + side * (24 + Math.abs(stride) * 10) * FIGHTER_SCALE * (f.dir || 1);
+    const side = f.walkAnchorSide || f.footPlantSide || 1;
+    const footX = baseX + side * (26 + Math.abs(stride) * 12) * FIGHTER_SCALE * (f.dir || 1);
     ctx.fillStyle = `rgba(42, 25, 13, ${0.12 * footPlant})`;
     ctx.beginPath();
-    ctx.ellipse(footX, FLOOR + 8, 23 + footPlant * 8, 4.5 + footPlant, 0, 0, Math.PI * 2);
+    ctx.ellipse(footX, FLOOR + 8, 24 + footPlant * 10, 4.8 + footPlant * 1.3, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = `rgba(255, 228, 156, ${0.1 * footPlant})`;
+    ctx.lineWidth = 1.2 + footPlant;
+    ctx.beginPath();
+    ctx.ellipse(footX, FLOOR + 6, 17 + footPlant * 8, 3.2 + footPlant, 0, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 }
@@ -4032,8 +4074,10 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1);
   const air = !f.grounded ? clamp((FLOOR - f.y) / 155, 0, 1) : 0;
   const plant = walking ? clamp(f.walkPlant ?? 0, 0, 1) : 0;
-  const footPlant = clamp((f.footPlantPulse ?? 0) / 8, 0, 1);
-  if (jump <= 0.03 && landing <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03) return;
+  const anchor = walking ? clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1) : 0;
+  const push = walking ? clamp((f.walkPushPulse ?? 0) / 9, 0, 1) : 0;
+  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.78);
+  if (jump <= 0.03 && landing <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03) return;
 
   const localCrouch = crouch * 0.18;
   const trim = f.trim ?? "#fff1bd";
@@ -4076,12 +4120,21 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   }
 
   if (footPlant > 0.03) {
-    const side = (f.footPlantSide || 1) * 30;
+    const side = (f.walkAnchorSide || f.footPlantSide || 1) * 30;
     ctx.strokeStyle = `rgba(255, 226, 145, ${0.16 * footPlant})`;
     ctx.lineWidth = 1.8 + footPlant * 1.4;
     ctx.beginPath();
     ctx.ellipse(side, 4 + localCrouch, 20 + footPlant * 9, 4.5 + footPlant * 2, 0, 0, Math.PI * 2);
     ctx.stroke();
+
+    if (Math.abs(f.vx) > 0.6) {
+      ctx.strokeStyle = `rgba(255, 236, 184, ${0.1 * footPlant})`;
+      ctx.lineWidth = 1.3 + footPlant;
+      ctx.beginPath();
+      ctx.moveTo(side - Math.sign(f.vx) * 7, 4 + localCrouch);
+      ctx.quadraticCurveTo(side - Math.sign(f.vx) * 17, 7 + localCrouch, side - Math.sign(f.vx) * (27 + push * 8), 6 + localCrouch);
+      ctx.stroke();
+    }
   }
 
   if (plant > 0.08) {
@@ -4102,9 +4155,13 @@ function drawFighter(f) {
   const stride = walking ? (f.walkStrideSmooth ?? Math.sin(walkCycle)) : 0;
   const plant = walking ? clamp(f.walkPlant ?? Math.abs(Math.cos(walkCycle)), 0, 1) : 0;
   const footPlant = clamp((f.footPlantPulse ?? 0) / 8, 0, 1);
+  const anchorPulse = walking ? clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1) : 0;
+  const pushPulse = walking ? clamp((f.walkPushPulse ?? 0) / 9, 0, 1) : 0;
   const rangeBrace = clamp(Math.max(f.rangePressure ?? 0, (f.bracePulse ?? 0) / 14), 0, 1);
   const transition = fighterTransitionMotion(f, walking);
-  const bob = walking ? plant * 1.55 + footPlant * 0.7 - Math.max(0, Math.sin(walkCycle * 2)) * 0.8 + rangeBrace * 0.45 : Math.sin(t * 9) * (f.grounded ? 1.3 : 0);
+  const bob = walking
+    ? plant * 1.22 + footPlant * 0.5 + anchorPulse * 0.42 - Math.max(0, Math.sin(walkCycle * 2)) * 0.9 - pushPulse * 0.32 + rangeBrace * 0.45
+    : Math.sin(t * 9) * (f.grounded ? 1.3 : 0);
   const effectiveHurt = winner ? Math.max(0, (f.hurt ?? 0) - resultFrame * 0.9) : (f.hurt ?? 0);
   const effectiveImpact = winner ? Math.max(0, (f.impactPulse ?? 0) - resultFrame * 0.86) : (f.impactPulse ?? 0);
   const hurtShift = effectiveHurt > 0 ? Math.sin((effectiveHurt + resultFrame) * 1.4) * 4 : 0;
@@ -4822,7 +4879,7 @@ function drawSpriteExtremityDetails(f, crouch, frameName, stride) {
   const trim = f.trim ?? "#fff1bd";
 
   const hands = spriteHandDetailPose(frameName, action, guard, hurt, localCrouch);
-  const feet = spriteFootDetailPose(frameName, action, walk, localCrouch);
+  const feet = spriteFootDetailPose(frameName, action, walk, localCrouch, f);
 
   for (const foot of feet) drawSpriteFootDetail(foot, shoe, trim);
   for (const hand of hands) drawSpriteHandDetail(hand, skin, trim);
@@ -4854,7 +4911,7 @@ function spriteHandDetailPose(frameName, action, guard, hurt, localCrouch) {
   ];
 }
 
-function spriteFootDetailPose(frameName, action, walk, localCrouch) {
+function spriteFootDetailPose(frameName, action, walk, localCrouch, f = null) {
   if (frameName === "kick") {
     return [
       { x: -49 - action * 8, y: -2 + localCrouch, w: 34, h: 10, angle: -0.14, plant: 0.95, sole: 1 },
@@ -4868,9 +4925,37 @@ function spriteFootDetailPose(frameName, action, walk, localCrouch) {
     ];
   }
   if (frameName === "walk") {
+    const anchor = clamp((f?.walkAnchorPulse ?? 0) / 12, 0, 1);
+    const push = clamp((f?.walkPushPulse ?? 0) / 9, 0, 1);
+    const swing = clamp(f?.walkSwing ?? Math.abs(walk), 0, 1);
+    const anchorSide = f?.walkAnchorSide ?? (walk >= 0 ? 1 : -1);
+    const leftPress = anchorSide < 0 ? anchor : 0;
+    const rightPress = anchorSide > 0 ? anchor : 0;
+    const leftSwing = anchorSide > 0 ? swing : 0;
+    const rightSwing = anchorSide < 0 ? swing : 0;
     return [
-      { x: -48 - walk * 4, y: -2 + localCrouch - Math.max(0, walk) * 6, w: 34, h: 10, angle: -0.12 + walk * 0.05, plant: clamp(0.65 - walk * 0.22, 0.25, 1), sole: 0.9 },
-      { x: 48 + walk * 4, y: -2 + localCrouch + Math.min(0, walk) * 6, w: 34, h: 10, angle: 0.12 + walk * 0.05, plant: clamp(0.65 + walk * 0.22, 0.25, 1), sole: 0.9 },
+      {
+        x: -49 - walk * 6 - leftPress * 3.5,
+        y: -2 + localCrouch - Math.max(0, walk) * 7 - leftSwing * 3 + leftPress * 1.2,
+        w: 34 + leftPress * 5,
+        h: 10 - leftPress * 1.1 + leftSwing * 0.9,
+        angle: -0.12 + walk * 0.055 - leftPress * 0.035,
+        plant: clamp(0.58 - walk * 0.22 + leftPress * 0.38 - leftSwing * 0.12, 0.18, 1),
+        sole: 0.9 + leftPress * 0.16,
+        press: leftPress,
+        push,
+      },
+      {
+        x: 49 + walk * 6 + rightPress * 3.5,
+        y: -2 + localCrouch + Math.min(0, walk) * 7 - rightSwing * 3 + rightPress * 1.2,
+        w: 34 + rightPress * 5,
+        h: 10 - rightPress * 1.1 + rightSwing * 0.9,
+        angle: 0.12 + walk * 0.055 + rightPress * 0.035,
+        plant: clamp(0.58 + walk * 0.22 + rightPress * 0.38 - rightSwing * 0.12, 0.18, 1),
+        sole: 0.9 + rightPress * 0.16,
+        press: rightPress,
+        push,
+      },
     ];
   }
   if (frameName === "defeat") {
@@ -4936,12 +5021,13 @@ function drawSpriteHandDetail(hand, skin, trim) {
 }
 
 function drawSpriteFootDetail(foot, shoe, trim) {
+  const press = clamp(foot.press ?? 0, 0, 1);
   if (foot.plant > 0.24 && foot.y > -16) {
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
-    ctx.fillStyle = `rgba(20, 12, 8, ${0.08 + foot.plant * 0.12})`;
+    ctx.fillStyle = `rgba(20, 12, 8, ${0.08 + foot.plant * 0.12 + press * 0.05})`;
     ctx.beginPath();
-    ctx.ellipse(foot.x, foot.y + 8, foot.w * (0.54 + foot.plant * 0.16), 4.6, foot.angle, 0, Math.PI * 2);
+    ctx.ellipse(foot.x, foot.y + 8 + press * 0.8, foot.w * (0.54 + foot.plant * 0.16 + press * 0.08), 4.6 + press * 0.8, foot.angle, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -4951,11 +5037,11 @@ function drawSpriteFootDetail(foot, shoe, trim) {
   ctx.rotate(foot.angle);
   ctx.globalCompositeOperation = "multiply";
   ctx.strokeStyle = "rgba(22, 13, 10, 0.38)";
-  ctx.lineWidth = 1.7;
+  ctx.lineWidth = 1.7 + press * 0.7;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(-foot.w * 0.47, foot.h * 0.18);
-  ctx.quadraticCurveTo(-foot.w * 0.04, foot.h * (0.62 + foot.sole * 0.1), foot.w * 0.48, foot.h * 0.16);
+  ctx.moveTo(-foot.w * 0.47, foot.h * (0.18 + press * 0.08));
+  ctx.quadraticCurveTo(-foot.w * 0.04, foot.h * (0.62 + foot.sole * 0.1 + press * 0.08), foot.w * 0.48, foot.h * (0.16 + press * 0.08));
   ctx.stroke();
 
   ctx.strokeStyle = "rgba(22, 13, 10, 0.28)";
@@ -4973,12 +5059,12 @@ function drawSpriteFootDetail(foot, shoe, trim) {
   ctx.translate(foot.x, foot.y);
   ctx.rotate(foot.angle);
   ctx.globalCompositeOperation = "screen";
-  ctx.strokeStyle = colorWithAlpha(lighten(shoe, 28), 0.16);
+  ctx.strokeStyle = colorWithAlpha(lighten(shoe, 28), 0.16 + press * 0.04);
   ctx.lineWidth = 1.35;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(-foot.w * 0.35, -foot.h * 0.35);
-  ctx.quadraticCurveTo(foot.w * 0.08, -foot.h * 0.62, foot.w * 0.36, -foot.h * 0.25);
+  ctx.moveTo(-foot.w * 0.35, -foot.h * (0.35 - press * 0.03));
+  ctx.quadraticCurveTo(foot.w * 0.08, -foot.h * (0.62 - press * 0.05), foot.w * 0.36, -foot.h * (0.25 - press * 0.03));
   ctx.stroke();
   ctx.strokeStyle = colorWithAlpha(trim, foot.plant > 0.5 ? 0.1 : 0.16);
   ctx.lineWidth = 1.2;
@@ -6717,11 +6803,16 @@ function getPose(f, stride) {
   if (walkingPose) {
     const weight = clamp(f.walkWeight ?? 0, 0, 1.25);
     const plant = clamp(f.walkPlant ?? 0, 0, 1);
+    const anchor = clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1);
+    const push = clamp((f.walkPushPulse ?? 0) / 9, 0, 1);
+    const anchorSide = f.walkAnchorSide || f.footPlantSide || 1;
+    const frontAnchor = anchorSide > 0 ? anchor : 0;
+    const backAnchor = anchorSide < 0 ? anchor : 0;
     const lift = (1 - plant * 0.35) * weight;
-    const frontLift = Math.max(0, -stride) * lift;
-    const backLift = Math.max(0, stride) * lift;
+    const frontLift = Math.max(0, -stride) * lift * (1 + backAnchor * 0.28);
+    const backLift = Math.max(0, stride) * lift * (1 + frontAnchor * 0.28);
     const moveLocal = Math.sign(f.vx) === f.dir ? 1 : -1;
-    base.torsoTilt += moveLocal * stride * 0.018 * weight;
+    base.torsoTilt += moveLocal * stride * 0.018 * weight - moveLocal * push * 0.012 + (backAnchor - frontAnchor) * 0.008;
     base.frontLeg.knee.x += moveLocal * frontLift * 4 * spec.stance;
     base.frontLeg.knee.y -= frontLift * 5;
     base.frontLeg.foot.x += moveLocal * frontLift * 6 * spec.stance;
@@ -6730,8 +6821,14 @@ function getPose(f, stride) {
     base.backLeg.knee.y -= backLift * 4.5;
     base.backLeg.foot.x -= moveLocal * backLift * 5.5 * spec.stance;
     base.backLeg.foot.y -= backLift * 7.5;
-    base.frontLeg.plant = clamp(plant + Math.max(0, stride) * 0.3, 0, 1);
-    base.backLeg.plant = clamp(plant + Math.max(0, -stride) * 0.3, 0, 1);
+    base.frontLeg.knee.y += frontAnchor * 3.4;
+    base.frontLeg.foot.y += frontAnchor * 1.2;
+    base.frontLeg.foot.x += moveLocal * frontAnchor * 3.2 * spec.stance;
+    base.backLeg.knee.y += backAnchor * 3.4;
+    base.backLeg.foot.y += backAnchor * 1.2;
+    base.backLeg.foot.x -= moveLocal * backAnchor * 3.2 * spec.stance;
+    base.frontLeg.plant = clamp(plant + Math.max(0, stride) * 0.3 + frontAnchor * 0.28, 0, 1);
+    base.backLeg.plant = clamp(plant + Math.max(0, -stride) * 0.3 + backAnchor * 0.28, 0, 1);
     base.frontLeg.lift = frontLift;
     base.backLeg.lift = backLift;
   }
