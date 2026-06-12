@@ -70,7 +70,7 @@ const fighters = {
       shoulderCap: 1.08,
       motion: "power",
     },
-    extras: "none",
+    extras: "pchan",
   },
   akane: {
     title: "Akane body sprite sheet v2",
@@ -148,6 +148,49 @@ function lerpPoint(a, b, t) {
 
 function segmentPath(a, d, sw, ew) {
   return limbPath(a, lerpPoint(a, d, 0.34), lerpPoint(a, d, 0.74), d, sw, ew);
+}
+
+function segmentAngle(a, d) {
+  return Math.atan2(d.y - a.y, d.x - a.x) * 180 / Math.PI;
+}
+
+function jointPatch(point, color, rx, ry, angle, front = false) {
+  return `<g transform="rotate(${angle} ${point.x} ${point.y})">
+    <ellipse cx="${point.x}" cy="${point.y}" rx="${rx}" ry="${ry}" fill="${color}" class="softJoint"/>
+    <ellipse cx="${point.x - rx * 0.1}" cy="${point.y - ry * 0.18}" rx="${rx * 0.58}" ry="${ry * 0.36}" fill="url(#jointLight)" opacity="${front ? ".42" : ".28"}"/>
+    <path d="M ${point.x - rx * 0.66} ${point.y + ry * 0.18} Q ${point.x} ${point.y + ry * 0.56} ${point.x + rx * 0.66} ${point.y + ry * 0.12}" class="jointShade"/>
+  </g>`;
+}
+
+function bodyPaintLayers(fighter, cx, shoulder, chest, waist, hip, torsoTop, torsoBottom, torsoPath) {
+  const slim = fighter.bodyClass === "slim";
+  const chestY = torsoTop + (slim ? 44 : 48);
+  const midY = torsoTop + (slim ? 78 : 84);
+  const hemY = torsoBottom - 9;
+  const centerW = Math.max(9, waist * (slim ? 0.42 : 0.5));
+  const pchanPanels = fighter.extras === "pchan"
+    ? `<path d="M ${cx - shoulder + 15} ${torsoTop + 26} C ${cx - chest * 0.42} ${torsoTop + 50} ${cx - waist * 0.5} ${torsoBottom - 33} ${cx - centerW} ${hemY}" class="wideTrim"/>
+       <path d="M ${cx + shoulder - 15} ${torsoTop + 26} C ${cx + chest * 0.42} ${torsoTop + 50} ${cx + waist * 0.5} ${torsoBottom - 33} ${cx + centerW} ${hemY}" class="wideTrim"/>
+       <path d="M ${cx - chest * 0.34} ${torsoTop + 42} C ${cx - 5} ${midY - 8} ${cx - 6} ${torsoBottom - 35} ${cx - 3} ${hemY - 2}" class="bluePanelHi"/>
+       <path d="M ${cx + chest * 0.3} ${torsoTop + 42} C ${cx + 12} ${midY + 1} ${cx + 8} ${torsoBottom - 31} ${cx + 5} ${hemY - 1}" class="panelShadow"/>`
+    : "";
+  const akanePanels = fighter.extras === "sash"
+    ? `<path d="M ${cx - chest * 0.78} ${chestY} C ${cx - chest * 0.36} ${chestY + 12} ${cx - waist * 0.32} ${midY + 17} ${cx - waist * 0.64} ${torsoBottom - 23}" class="clothEdge"/>
+       <path d="M ${cx + chest * 0.78} ${chestY} C ${cx + chest * 0.36} ${chestY + 12} ${cx + waist * 0.32} ${midY + 17} ${cx + waist * 0.64} ${torsoBottom - 23}" class="clothEdge"/>
+       <path d="M ${cx - waist - 5} ${torsoBottom - 49} C ${cx - waist * 0.28} ${torsoBottom - 38} ${cx + waist * 0.34} ${torsoBottom - 38} ${cx + waist + 5} ${torsoBottom - 49}" class="waistShadow"/>
+       <ellipse cx="${cx}" cy="${chestY + 9}" rx="${chest * 0.54}" ry="13" fill="url(#bodyWarm)" opacity=".18"/>`
+    : "";
+
+  return `
+    <path d="${torsoPath}" fill="url(#sideRim)" opacity=".5"/>
+    <path d="M ${cx - shoulder + 8} ${torsoTop + 25} C ${cx - chest - 2} ${midY - 4} ${cx - waist - 4} ${torsoBottom - 27} ${cx - hip + 4} ${torsoBottom - 2}" class="panelShadow"/>
+    <path d="M ${cx + shoulder - 8} ${torsoTop + 25} C ${cx + chest + 2} ${midY - 2} ${cx + waist + 3} ${torsoBottom - 26} ${cx + hip - 4} ${torsoBottom - 2}" class="panelShadow"/>
+    <path d="M ${cx - chest * 0.54} ${chestY} C ${cx - chest * 0.18} ${chestY + 14} ${cx - waist * 0.26} ${torsoBottom - 34} ${cx - waist * 0.12} ${torsoBottom - 15}" class="softFold"/>
+    <path d="M ${cx + chest * 0.52} ${chestY + 2} C ${cx + chest * 0.18} ${chestY + 17} ${cx + waist * 0.24} ${torsoBottom - 34} ${cx + waist * 0.1} ${torsoBottom - 15}" class="softFoldDark"/>
+    <path d="M ${cx - waist * 0.72} ${torsoBottom - 21} Q ${cx} ${torsoBottom - 7} ${cx + waist * 0.72} ${torsoBottom - 21}" class="clothEdge"/>
+    ${pchanPanels}
+    ${akanePanels}
+  `;
 }
 
 function styleArmPoint(point, b, kind, armIndex, pointIndex) {
@@ -462,13 +505,17 @@ function drawFrame(fighter, frame, index) {
     const ankleWidth = (legIndex === 0 ? 5.8 : 6.4) * calfScale;
     const thighPath = segmentPath(leg[0], leg[1], thighStart, kneeWidth);
     const shinPath = limbPath(leg[1], lerpPoint(leg[1], leg[2], 0.38), leg[2], leg[3], calfStart, ankleWidth);
+    const kneeAngle = segmentAngle(leg[0], leg[2]);
     return `<path d="${thighPath}" fill="${color}" class="limbEdge"/>
     <path d="${shinPath}" fill="${color}" class="limbEdge"/>
     <path d="${thighPath}" fill="url(#limbSheen)" opacity="${legIndex === 0 ? ".2" : ".3"}"/>
     <path d="${shinPath}" fill="url(#limbShade)" opacity="${legIndex === 0 ? ".28" : ".2"}"/>
-    <ellipse cx="${leg[1].x}" cy="${leg[1].y}" rx="${7.2 * thighScale}" ry="${5.2 * thighScale}" fill="${color}" class="jointEdge"/>
+    <path d="${thighPath}" fill="url(#limbRim)" opacity="${legIndex === 0 ? ".18" : ".26"}"/>
+    <path d="${shinPath}" fill="url(#limbRim)" opacity="${legIndex === 0 ? ".14" : ".22"}"/>
+    ${jointPatch(leg[1], color, 7.4 * thighScale, 5.1 * thighScale, kneeAngle, legIndex === 1)}
     <path d="M ${leg[0].x - 4} ${leg[0].y + 14} C ${leg[1].x - 3} ${leg[1].y - 7} ${leg[1].x + 2} ${leg[1].y + 3} ${leg[2].x + 2} ${leg[2].y - 5}" class="limbHi"/>
     <path d="M ${leg[1].x - 2} ${leg[1].y + 7} C ${leg[2].x - 5} ${leg[2].y + 8} ${leg[3].x - 7} ${leg[3].y - 8} ${leg[3].x - 5} ${leg[3].y - 1}" class="clothCrease"/>
+    <path d="M ${leg[0].x + 2} ${leg[0].y + 16} C ${leg[1].x + 6} ${leg[1].y + 4} ${leg[2].x + 5} ${leg[2].y + 7} ${leg[3].x + 3} ${leg[3].y - 7}" class="legPlane"/>
     ${foot(leg[3], fighter, legIndex === 0 ? -1 : 1)}`;
   }).join("");
 
@@ -484,13 +531,17 @@ function drawFrame(fighter, frame, index) {
     const wristWidth = (front ? 5.2 : 4.8) * forearmScale;
     const upperPath = segmentPath(arm[0], arm[1], upperStart, elbowWidth);
     const forearmPath = limbPath(arm[1], lerpPoint(arm[1], arm[2], 0.42), arm[2], arm[3], forearmStart, wristWidth);
+    const elbowAngle = segmentAngle(arm[0], arm[2]);
     return `<path d="${upperPath}" fill="${color}" class="limbEdge"/>
     <path d="${forearmPath}" fill="${color}" class="limbEdge"/>
     <path d="${upperPath}" fill="url(#limbSheen)" opacity="${front ? ".32" : ".2"}"/>
     <path d="${forearmPath}" fill="url(#limbShade)" opacity="${front ? ".18" : ".27"}"/>
-    <ellipse cx="${arm[1].x}" cy="${arm[1].y}" rx="${6.2 * upperScale}" ry="${4.8 * upperScale}" fill="${color}" class="jointEdge"/>
+    <path d="${upperPath}" fill="url(#limbRim)" opacity="${front ? ".24" : ".15"}"/>
+    <path d="${forearmPath}" fill="url(#limbRim)" opacity="${front ? ".22" : ".12"}"/>
+    ${jointPatch(arm[1], color, 6.1 * upperScale, 4.5 * upperScale, elbowAngle, front)}
     <path d="M ${arm[0].x - (front ? -2 : 2)} ${arm[0].y + 8} C ${arm[1].x} ${arm[1].y - 4} ${arm[2].x} ${arm[2].y - 3} ${arm[3].x} ${arm[3].y - 5}" class="limbHi"/>
     <path d="M ${arm[1].x - 2} ${arm[1].y + 7} C ${arm[2].x - 4} ${arm[2].y + 6} ${arm[3].x - 5} ${arm[3].y - 5} ${arm[3].x - 4} ${arm[3].y + 1}" class="clothCrease"/>
+    <path d="M ${arm[0].x + (front ? 4 : -4)} ${arm[0].y + 8} C ${arm[1].x + (front ? 5 : -5)} ${arm[1].y + 3} ${arm[2].x + (front ? 5 : -5)} ${arm[2].y + 4} ${arm[3].x + (front ? 3 : -3)} ${arm[3].y - 4}" class="armPlane"/>
     ${hand(arm[3], fighter, front ? 1 : 0.94)}`;
   };
 
@@ -532,6 +583,7 @@ function drawFrame(fighter, frame, index) {
       <path d="${torsoPath}" fill="url(#jacket)" class="bodyEdge"/>
       <path d="${torsoPath}" fill="url(#bodySheen)" opacity=".72"/>
       <path d="${torsoPath}" fill="url(#torsoShade)" opacity=".5"/>
+      ${bodyPaintLayers(fighter, cx, shoulder, chest, waist, hip, torsoTop, torsoBottom, torsoPath)}
       ${shoulderCaps}
       ${folds}
       ${belt}
@@ -575,6 +627,26 @@ function makeSheet(fighter) {
       <stop stop-color="#000000" stop-opacity=".18" offset=".66"/>
       <stop stop-color="#000000" stop-opacity=".3" offset="1"/>
     </linearGradient>
+    <linearGradient id="limbRim" x1="40" y1="90" x2="180" y2="260" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity=".24" offset="0"/>
+      <stop stop-color="#ffffff" stop-opacity=".06" offset=".36"/>
+      <stop stop-color="#000000" stop-opacity=".18" offset="1"/>
+    </linearGradient>
+    <linearGradient id="sideRim" x1="52" y1="72" x2="150" y2="192" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity=".24" offset="0"/>
+      <stop stop-color="#ffffff" stop-opacity=".02" offset=".45"/>
+      <stop stop-color="#000000" stop-opacity=".28" offset="1"/>
+    </linearGradient>
+    <radialGradient id="jointLight" cx="34%" cy="24%" r="70%">
+      <stop stop-color="#ffffff" stop-opacity=".54" offset="0"/>
+      <stop stop-color="#ffffff" stop-opacity=".08" offset=".55"/>
+      <stop stop-color="#000000" stop-opacity=".18" offset="1"/>
+    </radialGradient>
+    <radialGradient id="bodyWarm" cx="45%" cy="30%" r="82%">
+      <stop stop-color="#ffffff" stop-opacity=".28" offset="0"/>
+      <stop stop-color="${fighter.trim[0]}" stop-opacity=".12" offset=".52"/>
+      <stop stop-color="#000000" stop-opacity=".18" offset="1"/>
+    </radialGradient>
     <linearGradient id="hipShade" x1="70" y1="164" x2="140" y2="205" gradientUnits="userSpaceOnUse">
       <stop stop-color="#ffffff" stop-opacity=".08" offset="0"/>
       <stop stop-color="#000000" stop-opacity=".2" offset="1"/>
@@ -585,14 +657,24 @@ function makeSheet(fighter) {
     .bodyEdge, .limbEdge, .beltEdge { stroke: ${fighter.edge}; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
     .limbEdge { stroke-width: 2.5; }
     .jointEdge { stroke: ${fighter.edge}; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+    .softJoint { stroke: ${fighter.edge}; stroke-width: 1.45; stroke-linejoin: round; stroke-linecap: round; opacity: .92; }
     .skinEdge { stroke: #4c2a1e; stroke-width: 2; }
     .shoeEdge { stroke: #3d2813; stroke-width: 2; }
     .fold { fill: none; stroke: ${fighter.light}; stroke-width: 2.2; stroke-linecap: round; opacity: .34; }
     .darkFold { fill: none; stroke: ${fighter.dark}; stroke-width: 2.2; stroke-linecap: round; opacity: .32; }
     .trimLine { fill: none; stroke: url(#trim); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+    .wideTrim { fill: none; stroke: url(#trim); stroke-width: 6.5; stroke-linecap: round; stroke-linejoin: round; opacity: .95; }
     .limbHi { fill: none; stroke: ${fighter.light}; stroke-width: 1.55; stroke-linecap: round; opacity: .22; }
+    .armPlane, .legPlane { fill: none; stroke: ${fighter.dark}; stroke-width: 1.15; stroke-linecap: round; opacity: .22; }
     .clothCrease { fill: none; stroke: ${fighter.light}; stroke-width: 1.25; stroke-linecap: round; opacity: .22; }
+    .clothEdge { fill: none; stroke: ${fighter.light}; stroke-width: 1.65; stroke-linecap: round; opacity: .24; }
     .shadowCrease { fill: none; stroke: ${fighter.dark}; stroke-width: 1.35; stroke-linecap: round; opacity: .28; }
+    .panelShadow { fill: none; stroke: ${fighter.dark}; stroke-width: 2.4; stroke-linecap: round; opacity: .28; }
+    .bluePanelHi { fill: none; stroke: ${fighter.light}; stroke-width: 2.2; stroke-linecap: round; opacity: .26; }
+    .softFold { fill: none; stroke: ${fighter.light}; stroke-width: 1.5; stroke-linecap: round; opacity: .24; }
+    .softFoldDark { fill: none; stroke: ${fighter.dark}; stroke-width: 1.5; stroke-linecap: round; opacity: .26; }
+    .jointShade { fill: none; stroke: ${fighter.dark}; stroke-width: 1.15; stroke-linecap: round; opacity: .32; }
+    .waistShadow { fill: none; stroke: ${fighter.dark}; stroke-width: 2.4; stroke-linecap: round; opacity: .26; }
     .waistShape { fill: none; stroke: url(#trim); stroke-width: 2.6; stroke-linecap: round; opacity: .5; }
     .knuckle { fill: none; stroke: #5b3022; stroke-width: 1.5; stroke-linecap: round; opacity: .5; }
     .fingerLine { fill: none; stroke: #5b3022; stroke-width: 1.1; stroke-linecap: round; opacity: .38; }

@@ -52,12 +52,12 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=43"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=43"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=44"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=44"),
 };
 const unifiedSpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-unified.svg?v=43"),
-  p2: loadImage("assets/sprite-akane-unified.svg?v=43"),
+  p1: loadImage("assets/sprite-pchan-unified.svg?v=44"),
+  p2: loadImage("assets/sprite-akane-unified.svg?v=44"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
