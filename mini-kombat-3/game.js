@@ -52,8 +52,8 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=38"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=38"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=39"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=39"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -126,10 +126,10 @@ const BODY_SPRITE_FRAME_H = 300;
 const BODY_SPRITE_ANCHOR_X = 105;
 const BODY_SPRITE_ANCHOR_Y = 286;
 const BODY_SPRITE_FRAMES = {
-  idle: [0, 1],
-  walk: [2, 3],
-  punch: [4, 5, 6],
-  kick: [7, 8, 9],
+  idle: [0, 22, 1],
+  walk: [2, 21, 3, 21],
+  punch: [4, 17, 5, 18, 6],
+  kick: [19, 7, 8, 20, 9],
   block: [10],
   hurt: [11, 12],
   special: [13],
@@ -2435,14 +2435,18 @@ function rasterBodyFrameIndex(f, frameName, walking) {
   if (f.attack && (frameName === "punch" || frameName === "kick")) {
     const t = clamp(f.attack.frame / Math.max(1, f.attack.duration), 0, 0.999);
     if (frameName === "punch") {
-      if (t < 0.28) return frames[0];
-      if (t < 0.7) return frames[1];
-      return frames[2];
+      if (t < 0.18) return frames[0];
+      if (t < 0.38) return frames[1];
+      if (t < 0.62) return frames[2];
+      if (t < 0.82) return frames[3];
+      return frames[4];
     }
     if (frameName === "kick") {
-      if (t < 0.34) return frames[0];
-      if (t < 0.72) return frames[1];
-      return frames[2];
+      if (t < 0.16) return frames[0];
+      if (t < 0.34) return frames[1];
+      if (t < 0.62) return frames[2];
+      if (t < 0.82) return frames[3];
+      return frames[4];
     }
     return frames[Math.floor(t * frames.length)] ?? frames[frames.length - 1];
   }
@@ -2468,11 +2472,11 @@ function rasterHeadPose(f, frameName, frameIndex) {
   if (frameName === "walk") {
     pose.y = -43;
   } else if (frameName === "punch") {
-    pose.x = frameIndex === 4 ? -2 : frameIndex === 5 ? 2 : 0;
-    pose.y = frameIndex === 5 ? -45 : frameIndex === 4 ? -42 : -43;
+    pose.x = frameIndex === 4 ? -2 : frameIndex === 17 ? -1 : frameIndex === 5 ? 2 : frameIndex === 18 ? 3 : 0;
+    pose.y = frameIndex === 5 || frameIndex === 18 ? -45 : frameIndex === 4 ? -42 : -43;
   } else if (frameName === "kick") {
-    pose.x = frameIndex === 7 ? -2 : frameIndex === 8 ? -3 : 0;
-    pose.y = frameIndex === 8 ? -44 : -42;
+    pose.x = frameIndex === 19 ? 1 : frameIndex === 7 ? -1 : frameIndex === 8 ? -3 : frameIndex === 20 ? -4 : 0;
+    pose.y = frameIndex === 8 || frameIndex === 20 ? -44 : frameIndex === 19 ? -43 : -42;
   } else if (frameName === "block") {
     pose.y = -40;
     pose.scale = 0.72;
@@ -3861,9 +3865,9 @@ function drawPchanHeadBandana(f, x, y, headW, headH) {
   const tailLift = Math.cos(roundFrame * 0.1 + f.x * 0.01) * 1.2 - action * 2.8;
   const bandLeft = x + headW * 0.26;
   const bandRight = x + headW * 0.76;
-  const bandTop = y - headH * 0.025;
+  const bandTop = y - headH * 0.025 + 2.6;
   const knotX = x + headW * 0.72;
-  const knotY = y + headH * 0.055;
+  const knotY = y + headH * 0.055 + 2.2;
 
   ctx.fillStyle = "rgba(0,0,0,0.26)";
   ctx.beginPath();
