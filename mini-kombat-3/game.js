@@ -52,8 +52,12 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=40"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=40"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=43"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=43"),
+};
+const unifiedSpriteSheets = {
+  p1: loadImage("assets/sprite-pchan-unified.svg?v=43"),
+  p2: loadImage("assets/sprite-akane-unified.svg?v=43"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -2503,11 +2507,37 @@ function rasterHeadPose(f, frameName, frameIndex) {
 
 function drawRasterBodySprite(f, crouch, stride, walking) {
   const sheet = bodySpriteSheets[f.profileId];
-  if (!sheet?.complete || !sheet.naturalWidth) return false;
+  const unifiedSheet = unifiedSpriteSheets[f.profileId];
 
   const frameName = rasterBodyFrameFor(f, walking);
   const frameIndex = rasterBodyFrameIndex(f, frameName, walking);
   const frameX = frameIndex * BODY_SPRITE_FRAME_W;
+  if (unifiedSheet?.complete && unifiedSheet.naturalWidth) {
+    ctx.save();
+    ctx.shadowColor = "rgba(10, 8, 7, 0.5)";
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 2;
+    ctx.drawImage(
+      unifiedSheet,
+      frameX,
+      0,
+      BODY_SPRITE_FRAME_W,
+      BODY_SPRITE_FRAME_H,
+      -BODY_SPRITE_ANCHOR_X,
+      -BODY_SPRITE_ANCHOR_Y + crouch * 0.18,
+      BODY_SPRITE_FRAME_W,
+      BODY_SPRITE_FRAME_H
+    );
+    ctx.restore();
+
+    drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
+    drawFighterStageLighting(f, crouch);
+    drawSpriteCinematicFinish(f, crouch, frameName);
+    return true;
+  }
+
+  if (!sheet?.complete || !sheet.naturalWidth) return false;
+
   const headPose = rasterHeadPose(f, frameName, frameIndex);
   const headCrouch =
     crouch +
