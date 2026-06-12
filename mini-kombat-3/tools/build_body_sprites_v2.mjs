@@ -45,15 +45,23 @@ const fighters = {
     dark: "#101f36",
     light: "#e7f6ff",
     build: {
-      shoulder: 42,
-      chest: 34,
-      waist: 24,
-      hip: 31,
-      neck: 17,
-      arm: 1.0,
-      leg: 1.0,
+      shoulder: 46,
+      chest: 39,
+      waist: 25,
+      hip: 34,
+      neck: 18,
+      arm: 1.04,
+      leg: 1.03,
+      upperArm: 1.14,
+      forearm: 0.98,
+      thigh: 1.12,
+      calf: 0.98,
       hand: 1.04,
-      foot: 1.04,
+      foot: 1.08,
+      stance: 1.06,
+      legLength: 1.01,
+      shoulderInset: 9,
+      shoulderCap: 1.08,
     },
     extras: "none",
   },
@@ -70,15 +78,23 @@ const fighters = {
     dark: "#4c111a",
     light: "#ffe7df",
     build: {
-      shoulder: 32,
-      chest: 27,
-      waist: 18,
-      hip: 28,
-      neck: 14,
-      arm: 0.82,
-      leg: 0.88,
-      hand: 0.86,
-      foot: 0.88,
+      shoulder: 31,
+      chest: 25,
+      waist: 16,
+      hip: 30,
+      neck: 12,
+      arm: 0.78,
+      leg: 0.91,
+      upperArm: 0.76,
+      forearm: 0.68,
+      thigh: 0.84,
+      calf: 0.72,
+      hand: 0.78,
+      foot: 0.86,
+      stance: 0.96,
+      legLength: 1.03,
+      shoulderInset: 6,
+      shoulderCap: 0.78,
     },
     extras: "sash",
   },
@@ -113,6 +129,17 @@ function limbPath(a, b, c, d, sw, ew) {
   const nx = -dy / len;
   const ny = dx / len;
   return `M ${a.x + nx * sw} ${a.y + ny * sw} C ${b.x + nx * sw} ${b.y + ny * sw} ${c.x + nx * ew} ${c.y + ny * ew} ${d.x + nx * ew} ${d.y + ny * ew} L ${d.x - nx * ew} ${d.y - ny * ew} C ${c.x - nx * ew} ${c.y - ny * ew} ${b.x - nx * sw} ${b.y - ny * sw} ${a.x - nx * sw} ${a.y - ny * sw} Z`;
+}
+
+function lerpPoint(a, b, t) {
+  return {
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+  };
+}
+
+function segmentPath(a, d, sw, ew) {
+  return limbPath(a, lerpPoint(a, d, 0.34), lerpPoint(a, d, 0.74), d, sw, ew);
 }
 
 function armPose(kind, b) {
@@ -176,7 +203,15 @@ function armPose(kind, b) {
       [{ x: 135, y: 176 }, { x: 151, y: 197 }, { x: 154, y: 222 }, { x: 139, y: 240 }],
     ],
   };
-  return (poses[kind] ?? poses.ready).map((arm) => arm.map((p) => ({ x: p.x, y: p.y, w: l })));
+  const shoulderInset = b.shoulderInset ?? 8;
+  const targetShoulders = [105 - (b.shoulder - shoulderInset), 105 + (b.shoulder - shoulderInset)];
+  return (poses[kind] ?? poses.ready).map((arm, armIndex) => {
+    const delta = targetShoulders[armIndex] - arm[0].x;
+    return arm.map((p, pointIndex) => {
+      const influence = [1, 0.66, 0.34, 0.16][pointIndex] ?? 0.16;
+      return { x: p.x + delta * influence, y: p.y, w: l };
+    });
+  });
 }
 
 function legPose(kind, b) {
@@ -236,7 +271,22 @@ function legPose(kind, b) {
       [{ x: 124, y: 204 }, { x: 147, y: 219 }, { x: 170, y: 242 }, { x: 191, y: 276 }],
     ],
   };
-  return (poses[kind] ?? poses.stanceA).map((leg) => leg.map((p) => ({ x: p.x, y: p.y, w: l })));
+  const stance = b.stance ?? 1;
+  const legLength = b.legLength ?? 1;
+  const targetHips = [105 - b.hip * 0.62, 105 + b.hip * 0.62];
+  return (poses[kind] ?? poses.stanceA).map((leg, legIndex) => {
+    const delta = targetHips[legIndex] - leg[0].x;
+    return leg.map((p, pointIndex) => {
+      const hipInfluence = [1, 0.76, 0.5, 0.32][pointIndex] ?? 0.32;
+      const baseX = p.x + delta * hipInfluence;
+      const spread = pointIndex === 0 ? 1 : stance;
+      return {
+        x: 105 + (baseX - 105) * spread,
+        y: pointIndex === 0 ? p.y : p.y + (p.y - hipY) * (legLength - 1),
+        w: l,
+      };
+    });
+  });
 }
 
 function hand(point, fighter, scale = 1) {
@@ -272,10 +322,18 @@ function drawFrame(fighter, frame, index) {
 
   const legSvg = legs.map((leg, legIndex) => {
     const color = legIndex === 0 ? "url(#pantsDark)" : "url(#pants)";
-    const sw = (legIndex === 0 ? 10 : 11) * b.leg;
-    const ew = (legIndex === 0 ? 7 : 8) * b.leg;
-    return `<path d="${limbPath(leg[0], leg[1], leg[2], leg[3], sw, ew)}" fill="${color}" class="limbEdge"/>
-    <ellipse cx="${leg[1].x}" cy="${leg[1].y}" rx="${7 * b.leg}" ry="${5 * b.leg}" fill="${legIndex === 0 ? "url(#pantsDark)" : "url(#pants)"}" class="limbEdge"/>
+    const thighScale = b.thigh ?? b.leg;
+    const calfScale = b.calf ?? b.leg;
+    const thighStart = (legIndex === 0 ? 12 : 13) * thighScale;
+    const kneeWidth = (legIndex === 0 ? 8.8 : 9.6) * thighScale;
+    const calfStart = (legIndex === 0 ? 8.4 : 9.1) * calfScale;
+    const ankleWidth = (legIndex === 0 ? 5.8 : 6.4) * calfScale;
+    const thighPath = segmentPath(leg[0], leg[1], thighStart, kneeWidth);
+    const shinPath = limbPath(leg[1], lerpPoint(leg[1], leg[2], 0.38), leg[2], leg[3], calfStart, ankleWidth);
+    return `<path d="${thighPath}" fill="${color}" class="limbEdge"/>
+    <path d="${shinPath}" fill="${color}" class="limbEdge"/>
+    <ellipse cx="${leg[1].x}" cy="${leg[1].y}" rx="${7.2 * thighScale}" ry="${5.2 * thighScale}" fill="${color}" class="jointEdge"/>
+    <path d="M ${leg[0].x - 4} ${leg[0].y + 14} C ${leg[1].x - 3} ${leg[1].y - 7} ${leg[1].x + 2} ${leg[1].y + 3} ${leg[2].x + 2} ${leg[2].y - 5}" class="limbHi"/>
     ${foot(leg[3], fighter, legIndex === 0 ? -1 : 1)}`;
   }).join("");
 
@@ -283,10 +341,18 @@ function drawFrame(fighter, frame, index) {
   const frontArm = arms[1];
   const armSvg = (arm, front) => {
     const color = front ? "url(#trim)" : "url(#sleeveDark)";
-    const sw = (front ? 9 : 8) * b.arm;
-    const ew = (front ? 6.5 : 6) * b.arm;
-    return `<path d="${limbPath(arm[0], arm[1], arm[2], arm[3], sw, ew)}" fill="${color}" class="limbEdge"/>
-    <ellipse cx="${arm[1].x}" cy="${arm[1].y}" rx="${6 * b.arm}" ry="${4.8 * b.arm}" fill="${color}" class="limbEdge"/>
+    const upperScale = b.upperArm ?? b.arm;
+    const forearmScale = b.forearm ?? b.arm;
+    const upperStart = (front ? 9.6 : 8.8) * upperScale;
+    const elbowWidth = (front ? 6.8 : 6.2) * upperScale;
+    const forearmStart = (front ? 7.4 : 6.8) * forearmScale;
+    const wristWidth = (front ? 5.2 : 4.8) * forearmScale;
+    const upperPath = segmentPath(arm[0], arm[1], upperStart, elbowWidth);
+    const forearmPath = limbPath(arm[1], lerpPoint(arm[1], arm[2], 0.42), arm[2], arm[3], forearmStart, wristWidth);
+    return `<path d="${upperPath}" fill="${color}" class="limbEdge"/>
+    <path d="${forearmPath}" fill="${color}" class="limbEdge"/>
+    <ellipse cx="${arm[1].x}" cy="${arm[1].y}" rx="${6.2 * upperScale}" ry="${4.8 * upperScale}" fill="${color}" class="jointEdge"/>
+    <path d="M ${arm[0].x - (front ? -2 : 2)} ${arm[0].y + 8} C ${arm[1].x} ${arm[1].y - 4} ${arm[2].x} ${arm[2].y - 3} ${arm[3].x} ${arm[3].y - 5}" class="limbHi"/>
     ${hand(arm[3], fighter, front ? 1 : 0.94)}`;
   };
 
@@ -299,6 +365,9 @@ function drawFrame(fighter, frame, index) {
   const hipPlate = `M ${cx - hip - 2} ${hipY - 11} Q ${cx} ${hipY - 1} ${cx + hip + 2} ${hipY - 11} L ${cx + hip - 4} ${hipY + 14} Q ${cx} ${hipY + 22} ${cx - hip + 4} ${hipY + 14} Z`;
   const neck = `<path d="M ${cx - b.neck * 0.52} ${neckY} C ${cx - b.neck * 0.6} ${neckY + 11} ${cx - b.neck * 0.46} ${neckY + 22} ${cx} ${neckY + 25} C ${cx + b.neck * 0.46} ${neckY + 22} ${cx + b.neck * 0.6} ${neckY + 11} ${cx + b.neck * 0.52} ${neckY} Z" fill="url(#skin)" class="skinEdge"/>
   <ellipse cx="${cx}" cy="${neckY + 25}" rx="${b.neck * 0.78}" ry="6" fill="#21130f" opacity=".22"/>`;
+  const cap = b.shoulderCap ?? 1;
+  const shoulderCaps = `<ellipse cx="${cx - shoulder + 9}" cy="${torsoTop + 24}" rx="${11 * cap}" ry="${9 * cap}" transform="rotate(-18 ${cx - shoulder + 9} ${torsoTop + 24})" fill="url(#jacketDark)" class="jointEdge"/>
+  <ellipse cx="${cx + shoulder - 9}" cy="${torsoTop + 24}" rx="${12 * cap}" ry="${9.5 * cap}" transform="rotate(18 ${cx + shoulder - 9} ${torsoTop + 24})" fill="url(#jacket)" class="jointEdge"/>`;
 
   const folds = `<path d="M ${cx - shoulder + 11} ${torsoTop + 23} L ${cx - 4} ${torsoBottom - 21} L ${cx + waist - 4} ${torsoTop + 28}" class="trimLine"/>
   <path d="M ${cx - waist * 0.7} ${torsoTop + 27} C ${cx - waist * 0.32} ${torsoTop + 58} ${cx - waist * 0.3} ${torsoBottom - 14} ${cx - waist * 0.18} ${torsoBottom - 2}" class="fold"/>
@@ -321,6 +390,7 @@ function drawFrame(fighter, frame, index) {
       ${armSvg(backArm, false)}
       <path d="${torsoPath}" fill="url(#jacket)" class="bodyEdge"/>
       <path d="${torsoPath}" fill="url(#bodySheen)" opacity=".72"/>
+      ${shoulderCaps}
       ${folds}
       ${belt}
       ${neck}
@@ -353,11 +423,13 @@ function makeSheet(fighter) {
   const css = `<style>
     .bodyEdge, .limbEdge, .beltEdge { stroke: ${fighter.edge}; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
     .limbEdge { stroke-width: 2.5; }
+    .jointEdge { stroke: ${fighter.edge}; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
     .skinEdge { stroke: #4c2a1e; stroke-width: 2; }
     .shoeEdge { stroke: #3d2813; stroke-width: 2; }
     .fold { fill: none; stroke: ${fighter.light}; stroke-width: 2.2; stroke-linecap: round; opacity: .34; }
     .darkFold { fill: none; stroke: ${fighter.dark}; stroke-width: 2.2; stroke-linecap: round; opacity: .32; }
     .trimLine { fill: none; stroke: url(#trim); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+    .limbHi { fill: none; stroke: ${fighter.light}; stroke-width: 1.55; stroke-linecap: round; opacity: .22; }
     .waistShape { fill: none; stroke: url(#trim); stroke-width: 2.6; stroke-linecap: round; opacity: .5; }
     .knuckle { fill: none; stroke: #5b3022; stroke-width: 1.5; stroke-linecap: round; opacity: .5; }
     .sole { fill: none; stroke: #14110d; stroke-width: 2; stroke-linecap: round; opacity: .46; }
