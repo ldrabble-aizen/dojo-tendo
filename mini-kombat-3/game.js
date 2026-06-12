@@ -52,12 +52,12 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=49"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=49"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=50"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=50"),
 };
 const unifiedSpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-unified.svg?v=49"),
-  p2: loadImage("assets/sprite-akane-unified.svg?v=49"),
+  p1: loadImage("assets/sprite-pchan-unified.svg?v=50"),
+  p2: loadImage("assets/sprite-akane-unified.svg?v=50"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -540,6 +540,12 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     impactLift: 0,
     impactStrength: 0,
     contactFlash: 0,
+    jumpPulse: 0,
+    landingPulse: 0,
+    stepPulse: 0,
+    stepCooldown: 0,
+    airFrames: 0,
+    moveIntent: 0,
     wins: 0,
     ai: {
       left: false,
@@ -692,6 +698,12 @@ function resetRound() {
     impactLift: 0,
     impactStrength: 0,
     contactFlash: 0,
+    jumpPulse: 0,
+    landingPulse: 0,
+    stepPulse: 0,
+    stepCooldown: 0,
+    airFrames: 0,
+    moveIntent: 0,
     blocking: false,
     grounded: true,
     specialCooldown: 0,
@@ -717,6 +729,12 @@ function resetRound() {
     impactLift: 0,
     impactStrength: 0,
     contactFlash: 0,
+    jumpPulse: 0,
+    landingPulse: 0,
+    stepPulse: 0,
+    stepCooldown: 0,
+    airFrames: 0,
+    moveIntent: 0,
     blocking: false,
     grounded: true,
     specialCooldown: 0,
@@ -1093,25 +1111,36 @@ function updateFighter(f, opponent) {
   const wantBlock = input.block && f.grounded && !f.attack && !wantSpecial;
   const move = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   const speed = wantBlock ? 1.2 : 3.35;
+  const wasGrounded = f.grounded;
 
+  f.moveIntent = move;
   f.blocking = wantBlock;
   f.crouch += ((wantBlock ? 1 : 0) - f.crouch) * 0.18;
   if (f.counterWindow > 0) f.counterWindow -= 1;
   if (f.hitFlash > 0) f.hitFlash -= 1;
   if (f.contactFlash > 0) f.contactFlash -= 1;
   if (f.impactPulse > 0) f.impactPulse -= 1;
+  if (f.jumpPulse > 0) f.jumpPulse -= 1;
+  if (f.landingPulse > 0) f.landingPulse -= 1;
+  if (f.stepPulse > 0) f.stepPulse -= 1;
+  if (f.stepCooldown > 0) f.stepCooldown -= 1;
   if (f.pigMorph > 0) f.pigMorph -= 1;
 
   if (f.hurt > 0) {
     f.hurt -= 1;
     f.vx *= 0.88;
   } else {
-    f.vx += (move * speed - f.vx) * 0.4;
+    const airControl = f.grounded ? 1 : 0.82;
+    const acceleration = f.grounded ? 0.4 : 0.16;
+    f.vx += (move * speed * airControl - f.vx) * acceleration;
   }
 
   if (input.jump && f.grounded && !wantBlock && f.hurt <= 0) {
     f.vy = -13.1;
     f.grounded = false;
+    f.jumpPulse = 12;
+    f.landingPulse = 0;
+    movementDust(f.x - f.dir * fighterScale(8), FLOOR + 4, -f.dir, 0.9, 5);
     playSound("jump");
   }
 
@@ -1123,15 +1152,32 @@ function updateFighter(f, opponent) {
 
   f.x += f.vx;
   f.y += f.vy;
+  const landingSpeed = f.vy;
   f.vy += GRAVITY;
 
   if (f.y >= FLOOR) {
     f.y = FLOOR;
     f.vy = 0;
+    f.airFrames = 0;
+    if (!wasGrounded && landingSpeed > 2.1) {
+      f.landingPulse = Math.min(16, 7 + landingSpeed * 0.56);
+      f.stepPulse = Math.max(f.stepPulse, 6);
+      movementDust(f.x, FLOOR + 5, f.vx >= 0 ? -1 : 1, clamp(landingSpeed / 8, 0.65, 1.45), landingSpeed > 7 ? 10 : 7);
+    }
     f.grounded = true;
+  } else {
+    f.airFrames += 1;
   }
 
   f.x = clamp(f.x, FIGHTER_EDGE_PAD, W - FIGHTER_EDGE_PAD);
+  if (f.grounded && f.hurt <= 0 && !f.attack && Math.abs(f.vx) > 1.25) {
+    const cadence = Math.max(5, Math.round(12 - Math.abs(f.vx) * 1.6));
+    if (f.stepCooldown <= 0) {
+      f.stepCooldown = cadence;
+      f.stepPulse = 7;
+      movementDust(f.x - Math.sign(f.vx) * fighterScale(22), FLOOR + 4, -Math.sign(f.vx), clamp(Math.abs(f.vx) / 3.5, 0.5, 1), 3);
+    }
+  }
   if (f.cooldown > 0) f.cooldown -= 1;
   if (f.specialCooldown > 0) f.specialCooldown -= 1;
   if (f.healthLag > f.health) f.healthLag += (f.health - f.healthLag) * 0.055;
@@ -1509,6 +1555,21 @@ function floorDust(x, y, count) {
   }
 }
 
+function movementDust(x, y, dir, strength = 1, count = 3) {
+  for (let i = 0; i < count; i += 1) {
+    particles.push({
+      x: x + (Math.random() - 0.5) * 18,
+      y: y + Math.random() * 3,
+      vx: dir * (0.35 + Math.random() * 1.1) * strength + (Math.random() - 0.5) * 0.45,
+      vy: -0.2 - Math.random() * 0.8 * strength,
+      life: 12 + Math.random() * 9,
+      size: (2.6 + Math.random() * 4.4) * strength,
+      color: "rgba(219, 194, 138, 0.46)",
+      kind: "dust",
+    });
+  }
+}
+
 function updateParticles() {
   particles = particles.filter((p) => {
     p.x += p.vx ?? 0;
@@ -1814,9 +1875,11 @@ function drawDynamicFighterShadow(f) {
   const air = lift / 170;
   const attack = f.attack ? attackProgress(f.attack) : 0;
   const speed = clamp(Math.abs(f.vx) / 7, 0, 1);
-  const width = (74 * (1 - air * 0.4) + attack * 10 + speed * 6) * FIGHTER_SCALE;
-  const height = 17 * (1 - air * 0.45) * FIGHTER_SCALE;
-  const alpha = (f.hurt > 0 ? 0.32 : 0.22) * (1 - air * 0.55);
+  const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1);
+  const step = clamp((f.stepPulse ?? 0) / 7, 0, 1);
+  const width = (74 * (1 - air * 0.4) + attack * 10 + speed * 6 + landing * 24 + step * 7) * FIGHTER_SCALE;
+  const height = (17 * (1 - air * 0.45) + landing * 5 + step * 1.4) * FIGHTER_SCALE;
+  const alpha = ((f.hurt > 0 ? 0.32 : 0.22) + landing * 0.08 + step * 0.025) * (1 - air * 0.55);
   const offset = clamp(f.vx * -2.2, -16, 16);
 
   ctx.fillStyle = `rgba(10, 12, 11, ${alpha})`;
@@ -2321,9 +2384,54 @@ function fighterTransitionMotion(f, walking) {
   const dir = f.dir || 1;
 
   if (walking) {
-    const walk = Math.sin(roundFrame * 0.34);
-    motion.x += walk * 0.35;
-    motion.y += Math.abs(walk) * 0.35;
+    const speed = clamp(Math.abs(f.vx) / 3.35, 0, 1.25);
+    const moveDir = Math.sign(f.vx) || dir;
+    const retreat = moveDir !== dir;
+    const step = Math.sin(roundFrame * (0.22 + speed * 0.16));
+    const footPlant = Math.abs(step);
+    motion.x += step * (0.35 + speed * 0.75) - moveDir * footPlant * 0.3;
+    motion.y += footPlant * (0.3 + speed * 0.85);
+    motion.rotation += moveDir * (0.012 + speed * 0.018) * (retreat ? -0.55 : 1);
+    motion.scaleX *= 1 + footPlant * 0.006 + speed * 0.003;
+    motion.scaleY *= 1 - footPlant * 0.004;
+    if (retreat) {
+      motion.x -= dir * 0.7 * speed;
+      motion.y += 0.35 * speed;
+      motion.rotation -= dir * 0.012 * speed;
+    }
+  }
+
+  if (!f.grounded && f.hurt <= 0) {
+    const rise = clamp(-f.vy / 13, 0, 1);
+    const fall = clamp(f.vy / 13, 0, 1);
+    const airLean = clamp((f.vx ?? 0) * 0.008, -0.035, 0.035);
+    motion.y -= rise * 1.4;
+    motion.rotation += airLean + dir * (rise * -0.012 + fall * 0.018);
+    motion.scaleX *= 1 - rise * 0.012 + fall * 0.008;
+    motion.scaleY *= 1 + rise * 0.028 - fall * 0.012;
+  }
+
+  const jumpT = clamp((f.jumpPulse ?? 0) / 12, 0, 1);
+  if (jumpT > 0) {
+    motion.y -= jumpT * 1.8;
+    motion.scaleX *= 1 - jumpT * 0.015;
+    motion.scaleY *= 1 + jumpT * 0.035;
+  }
+
+  const landingT = clamp((f.landingPulse ?? 0) / 16, 0, 1);
+  if (landingT > 0) {
+    const settle = smoothStep01(landingT);
+    motion.y += settle * 4.2;
+    motion.rotation += (f.vx >= 0 ? 1 : -1) * settle * 0.012;
+    motion.scaleX *= 1 + settle * 0.035;
+    motion.scaleY *= 1 - settle * 0.038;
+  }
+
+  const stepPulse = clamp((f.stepPulse ?? 0) / 7, 0, 1);
+  if (stepPulse > 0 && walking) {
+    motion.y += stepPulse * 0.9;
+    motion.scaleX *= 1 + stepPulse * 0.006;
+    motion.scaleY *= 1 - stepPulse * 0.005;
   }
 
   if (f.attack) {
@@ -2390,9 +2498,11 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const air = clamp((FLOOR - f.y) / 132, 0, 1);
   const walkSpread = walking ? Math.abs(stride) * 10 : 0;
   const crouchSpread = f.blocking ? 8 : 0;
-  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16) * FIGHTER_SCALE * (1 - air * 0.38);
-  const height = (8.5 + spec.stance * 2.4 + impactEase * 2) * FIGHTER_SCALE * (1 - air * 0.48);
-  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06, 0.08, 0.38);
+  const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1);
+  const step = clamp((f.stepPulse ?? 0) / 7, 0, 1);
+  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 28 + step * 8) * FIGHTER_SCALE * (1 - air * 0.38);
+  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 4 + step * 1.4) * FIGHTER_SCALE * (1 - air * 0.48);
+  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.08 + step * 0.025, 0.08, 0.44);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -2648,7 +2758,8 @@ function rasterBodyFrameIndex(f, frameName, walking) {
   }
 
   if (frameName === "walk" || walking) {
-    return frames[Math.floor(roundFrame / 8) % frames.length] ?? frames[0];
+    const cadence = Math.max(5, Math.round(11 - Math.abs(f.vx) * 1.45));
+    return frames[Math.floor(roundFrame / cadence) % frames.length] ?? frames[0];
   }
 
   return frames[Math.floor(roundFrame / 34) % frames.length] ?? frames[0];
