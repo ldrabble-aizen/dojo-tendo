@@ -546,6 +546,12 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     pigMorph: 0,
     specialCooldown: 0,
     counterWindow: 0,
+    comboCount: 0,
+    comboTimer: 0,
+    comboDamage: 0,
+    comboPulse: 0,
+    comboTargetId: "",
+    comboWindow: 0,
     hitFlash: 0,
     impactPulse: 0,
     impactDir: dir,
@@ -808,6 +814,12 @@ function resetRound() {
     grounded: true,
     specialCooldown: 0,
     counterWindow: 0,
+    comboCount: 0,
+    comboTimer: 0,
+    comboDamage: 0,
+    comboPulse: 0,
+    comboTargetId: "",
+    comboWindow: 0,
   });
 
   Object.assign(fighters[1], {
@@ -883,6 +895,12 @@ function resetRound() {
     grounded: true,
     specialCooldown: 0,
     counterWindow: 0,
+    comboCount: 0,
+    comboTimer: 0,
+    comboDamage: 0,
+    comboPulse: 0,
+    comboTargetId: "",
+    comboWindow: 0,
   });
 
   particles = [];
@@ -1116,7 +1134,8 @@ function updateAI(f, opponent) {
 }
 
 function startAttack(f, type) {
-  if (f.cooldown > 0 || f.attack || f.hurt > 16 || (f.blocking && type !== "sweep")) return;
+  const comboReady = (f.comboWindow ?? 0) > 0 && (f.cooldown ?? 0) <= 8;
+  if ((f.cooldown > 0 && !comboReady) || f.attack || f.hurt > 16 || (f.blocking && type !== "sweep")) return;
 
   const heavy = type === "kick" || type === "airKick";
   const sweep = type === "sweep";
@@ -1134,6 +1153,7 @@ function startAttack(f, type) {
     hit: false,
     whoosh: false,
   };
+  if (comboReady) f.cooldown = 0;
   f.blocking = false;
   f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, grab ? 11 : sweep ? 10 : heavy ? 11 : 8);
   f.guardExitPulse = Math.max(f.guardExitPulse ?? 0, (f.guardPulse ?? 0) > 2 ? 8 : 0);
@@ -1426,6 +1446,16 @@ function updateFighter(f, opponent) {
   if (!wantBlock && wasBlocking) f.guardExitPulse = Math.max(f.guardExitPulse ?? 0, 10);
   f.crouch += ((wantBlock ? 1 : 0) - f.crouch) * 0.18;
   if (f.counterWindow > 0) f.counterWindow -= 1;
+  if (f.comboWindow > 0) f.comboWindow -= 1;
+  if (f.comboPulse > 0) f.comboPulse -= 1;
+  if (f.comboTimer > 0) {
+    f.comboTimer -= 1;
+    if (f.comboTimer <= 0) {
+      f.comboCount = 0;
+      f.comboDamage = 0;
+      f.comboTargetId = "";
+    }
+  }
   if (f.hitFlash > 0) f.hitFlash -= 1;
   if (f.contactFlash > 0) f.contactFlash -= 1;
   if (f.impactPulse > 0) f.impactPulse -= 1;
@@ -1851,6 +1881,58 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
   return profile;
 }
 
+function comboTierLabel(count) {
+  if (count >= 7) return "DOJO RUSH";
+  if (count >= 5) return "FURY";
+  if (count >= 3) return "CHAIN";
+  return "COMBO";
+}
+
+function comboTierColor(count) {
+  if (count >= 7) return "#fff1bd";
+  if (count >= 5) return "#ffcf5d";
+  if (count >= 3) return "#7ef0cf";
+  return "#ffd44d";
+}
+
+function registerComboHit(attacker, target, damage, { blocked, projectile, heavyImpact, counter, hitZone }) {
+  if (!attacker || blocked || !target) return;
+
+  const sameTarget = attacker.comboTargetId === target.id && (attacker.comboTimer ?? 0) > 0;
+  attacker.comboCount = sameTarget ? (attacker.comboCount ?? 0) + 1 : 1;
+  attacker.comboDamage = sameTarget ? (attacker.comboDamage ?? 0) + damage : damage;
+  attacker.comboTargetId = target.id;
+  attacker.comboTimer = Math.max(attacker.comboTimer ?? 0, heavyImpact || projectile || counter ? 112 : 96);
+  attacker.comboPulse = Math.max(attacker.comboPulse ?? 0, 22);
+  attacker.comboWindow = Math.max(attacker.comboWindow ?? 0, heavyImpact || projectile || counter ? 32 : 24);
+
+  if (attacker.attack && !projectile) {
+    const finishSoon = attacker.comboCount >= 3 ? 7 : 9;
+    attacker.attack.duration = Math.min(attacker.attack.duration, attacker.attack.frame + finishSoon);
+    attacker.cooldown = Math.min(attacker.cooldown ?? 0, attacker.comboCount >= 3 ? 5 : 7);
+  }
+
+  if (attacker.comboCount >= 2) {
+    const color = comboTierColor(attacker.comboCount);
+    const label = `${attacker.comboCount} HIT ${comboTierLabel(attacker.comboCount)}`;
+    addText(
+      target.x,
+      target.y - (hitZone === "legs" ? 104 : hitZone === "head" ? 184 : 164),
+      label,
+      color,
+    );
+    if (attacker.comboCount === 3 || attacker.comboCount === 5 || attacker.comboCount === 7) {
+      triggerCinematicHit(attacker.dir || 1, color, 0.42 + Math.min(attacker.comboCount, 8) * 0.045, 7, {
+        zoom: 0.01 + Math.min(attacker.comboCount, 8) * 0.0015,
+        pan: 3.4 + Math.min(attacker.comboCount, 8) * 0.25,
+        lift: 1.1,
+        roll: 0.001,
+        band: 0.42 + Math.min(attacker.comboCount, 8) * 0.035,
+      });
+    }
+  }
+}
+
 function landHit(attacker, target, damage, projectile = false, projectileInfo = null) {
   const unblockable = attacker?.attack?.type === "grab";
   const counter = attacker?.counterWindow > 0;
@@ -1927,6 +2009,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   shake = Math.max(shake, cinematic.shake);
   hitStopFrames = Math.max(hitStopFrames, cinematic.hitStop);
   playSound(blocked ? "block" : "hit");
+  registerComboHit(attacker, target, finalDamage, { blocked, projectile, heavyImpact, counter, hitZone });
   addText(
     target.x,
     target.y - (hitZone === "legs" ? 78 : hitZone === "head" ? 166 : 154),
@@ -2660,6 +2743,7 @@ function draw() {
   ctx.restore();
 
   drawHud();
+  drawComboCounters();
   drawCountdown();
   drawKOBanner();
   drawCinematicHitOverlay();
@@ -3316,6 +3400,94 @@ function drawHud() {
   ctx.fillStyle = "rgba(255, 244, 205, 0.9)";
   ctx.fillText(matchOver ? "MATCH" : `ROUND ${toRoman(roundNumber)}`, cx, y + 65);
   ctx.restore();
+}
+
+function drawComboCounters() {
+  for (let i = 0; i < fighters.length; i += 1) {
+    const f = fighters[i];
+    const count = Math.floor(f.comboCount ?? 0);
+    const timer = f.comboTimer ?? 0;
+    if (count < 2 || timer <= 0) continue;
+
+    const reverse = i === 1;
+    const compact = W < 760;
+    const panelW = compact ? 138 : 166 + Math.min(count, 8) * 3;
+    const panelH = compact ? 50 : 58;
+    const x = reverse ? -panelW : 0;
+    const y = compact ? 90 : 104;
+    const anchorX = reverse ? W - 32 : 32;
+    const alpha = clamp(timer / 20, 0, 1);
+    const pulse = clamp((f.comboPulse ?? 0) / 22, 0, 1);
+    const scale = 1 + pulse * 0.055;
+    const color = comboTierColor(count);
+    const progress = clamp(timer / 112, 0, 1);
+    const labelX = reverse ? -16 : 16;
+    const barX = reverse ? x + 15 : 15;
+    const barW = panelW - 30;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(anchorX + (reverse ? -pulse * 3 : pulse * 3), y);
+    ctx.scale(scale, scale);
+
+    const panel = ctx.createLinearGradient(x, 0, x + panelW, panelH);
+    panel.addColorStop(0, colorWithAlpha(color, 0.32));
+    panel.addColorStop(0.36, "rgba(32, 18, 15, 0.88)");
+    panel.addColorStop(1, reverse ? "rgba(22, 52, 43, 0.86)" : "rgba(62, 26, 16, 0.86)");
+
+    ctx.shadowColor = colorWithAlpha(color, 0.42 + pulse * 0.22);
+    ctx.shadowBlur = 14 + pulse * 10;
+    ctx.fillStyle = panel;
+    ctx.beginPath();
+    ctx.roundRect(x, 0, panelW, panelH, 8);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = colorWithAlpha(color, 0.88);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(x + 2, 2, panelW - 4, panelH - 4, 7);
+    ctx.stroke();
+
+    ctx.globalCompositeOperation = "screen";
+    ctx.fillStyle = colorWithAlpha(color, 0.18 + pulse * 0.16);
+    ctx.beginPath();
+    ctx.moveTo(reverse ? x + panelW - 8 : x + 8, 5);
+    ctx.lineTo(reverse ? x + panelW - 50 : x + 50, 5);
+    ctx.lineTo(reverse ? x + panelW - 86 : x + 86, panelH - 7);
+    ctx.lineTo(reverse ? x + panelW - 45 : x + 45, panelH - 7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+
+    ctx.textAlign = reverse ? "right" : "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.shadowBlur = 5;
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(42, 14, 6, 0.86)";
+    ctx.fillStyle = "#fff1bd";
+    ctx.font = `900 ${compact ? 22 : 26}px system-ui, sans-serif`;
+    ctx.strokeText(`${count} HIT`, labelX, compact ? 28 : 31);
+    ctx.fillText(`${count} HIT`, labelX, compact ? 28 : 31);
+
+    ctx.shadowBlur = 3;
+    ctx.fillStyle = color;
+    ctx.font = `900 ${compact ? 10 : 12}px system-ui, sans-serif`;
+    ctx.fillText(`${comboTierLabel(count)} · ${Math.round(f.comboDamage ?? 0)} DMG`, labelX, compact ? 43 : 49);
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
+    ctx.beginPath();
+    ctx.roundRect(barX, panelH - 8, barW, 3, 2);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(reverse ? barX + barW * (1 - progress) : barX, panelH - 8, barW * progress, 3, 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
 }
 
 function drawHudPanel(x, y, width, f, reverse) {
