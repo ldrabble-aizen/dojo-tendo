@@ -126,6 +126,11 @@ let cinematicHitMax = 1;
 let cinematicHitDir = 1;
 let cinematicHitColor = "#fff1bd";
 let cinematicHitStrength = 0;
+let cinematicHitZoom = 0.022;
+let cinematicHitPan = 6.4;
+let cinematicHitLift = 2.6;
+let cinematicHitRoll = 0;
+let cinematicHitBand = 1;
 
 const SPECIAL_STYLES = {
   p1: { shape: "wave", core: "#fff1bd", rim: "#5bd7ff", trail: "#47b5ff" },
@@ -901,6 +906,11 @@ function resetRound() {
   cinematicHitDir = 1;
   cinematicHitColor = "#fff1bd";
   cinematicHitStrength = 0;
+  cinematicHitZoom = 0.022;
+  cinematicHitPan = 6.4;
+  cinematicHitLift = 2.6;
+  cinematicHitRoll = 0;
+  cinematicHitBand = 1;
   koFreeze = 0;
   roundFrame = 0;
   resultFrame = 0;
@@ -1292,7 +1302,14 @@ function updateCameraImpactPulse() {
   if (cameraImpactPulse > 0) cameraImpactPulse -= 1;
   else cameraImpactStrength = 0;
   if (cinematicHitPulse > 0) cinematicHitPulse -= 1;
-  else cinematicHitStrength = 0;
+  else {
+    cinematicHitStrength = 0;
+    cinematicHitZoom = 0.022;
+    cinematicHitPan = 6.4;
+    cinematicHitLift = 2.6;
+    cinematicHitRoll = 0;
+    cinematicHitBand = 1;
+  }
 }
 
 function update() {
@@ -1712,6 +1729,128 @@ function hitZoneReaction(zone, blocked, projectile, heavyImpact, finishingHit) {
   };
 }
 
+function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, finishingHit, attackType, hitZone, impactStrength }) {
+  const sweep = attackType === "sweep";
+  const grab = attackType === "grab";
+  const kick = attackType === "kick" || attackType === "airKick";
+  const head = hitZone === "head";
+  const low = hitZone === "legs" || sweep;
+
+  if (blocked) {
+    return {
+      flash: 3,
+      shake: 4,
+      hitStop: 2,
+      cameraPulse: 7,
+      cameraStrength: 0.48,
+      cinematic: true,
+      specialFx: false,
+      cinematicPulse: 6,
+      cinematicStrength: 0.34,
+      zoom: 0.01,
+      pan: 3.2,
+      lift: 0.7,
+      roll: 0,
+      band: 0.44,
+    };
+  }
+
+  const profile = {
+    flash: 5,
+    shake: 6,
+    hitStop: 3,
+    cameraPulse: 9,
+    cameraStrength: impactStrength,
+    cinematic: true,
+    specialFx: false,
+    cinematicPulse: 7,
+    cinematicStrength: 0.52,
+    zoom: 0.014,
+    pan: 4.4,
+    lift: 1.2,
+    roll: 0.0015,
+    band: 0.58,
+  };
+
+  if (heavyImpact || kick || sweep || grab) {
+    profile.flash = 9;
+    profile.shake = 9;
+    profile.hitStop = 5;
+    profile.cameraPulse = 12;
+    profile.cameraStrength = Math.max(1.04, impactStrength);
+    profile.cinematicPulse = 11;
+    profile.cinematicStrength = grab ? 1.12 : sweep ? 1.02 : 1.04;
+    profile.zoom = grab ? 0.034 : sweep ? 0.028 : 0.032;
+    profile.pan = grab ? 8.6 : 7.6;
+    profile.lift = sweep || low ? 1.5 : 3.2;
+    profile.roll = sweep ? -0.004 : 0.005;
+    profile.band = 0.92;
+    profile.specialFx = true;
+  }
+
+  if (projectile) {
+    profile.flash = 11;
+    profile.shake = 10;
+    profile.hitStop = 7;
+    profile.cameraPulse = 15;
+    profile.cameraStrength = Math.max(1.22, impactStrength);
+    profile.cinematicPulse = 15;
+    profile.cinematicStrength = 1.28;
+    profile.zoom = 0.038;
+    profile.pan = 9.6;
+    profile.lift = 3.4;
+    profile.roll = 0.006;
+    profile.band = 1.08;
+    profile.specialFx = true;
+  }
+
+  if (counter) {
+    profile.flash = 12;
+    profile.shake = 12;
+    profile.hitStop = 7;
+    profile.cameraPulse = 15;
+    profile.cameraStrength = 1.34;
+    profile.cinematicPulse = 16;
+    profile.cinematicStrength = 1.42;
+    profile.zoom = 0.044;
+    profile.pan = 11.2;
+    profile.lift = 4.2;
+    profile.roll = 0.008;
+    profile.band = 1.18;
+    profile.specialFx = true;
+  }
+
+  if (finishingHit) {
+    profile.flash = 14;
+    profile.shake = 15;
+    profile.hitStop = 9;
+    profile.cameraPulse = 18;
+    profile.cameraStrength = 1.62;
+    profile.cinematicPulse = 20;
+    profile.cinematicStrength = 1.68;
+    profile.zoom = 0.056;
+    profile.pan = 13.8;
+    profile.lift = 5.2;
+    profile.roll = 0.011;
+    profile.band = 1.32;
+    profile.specialFx = true;
+  }
+
+  if (head) {
+    profile.flash += 1;
+    profile.shake += 1;
+    profile.zoom += 0.006;
+    profile.lift += 0.8;
+    profile.roll += 0.002;
+  } else if (low) {
+    profile.pan += 1.1;
+    profile.lift -= 0.5;
+    profile.roll -= 0.002;
+  }
+
+  return profile;
+}
+
 function landHit(attacker, target, damage, projectile = false, projectileInfo = null) {
   const unblockable = attacker?.attack?.type === "grab";
   const counter = attacker?.counterWindow > 0;
@@ -1725,9 +1864,10 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   const previousHealth = target.health;
   const nextHealth = clamp(target.health - finalDamage, 0, 100);
   const finishingHit = !blocked && previousHealth > 0 && nextHealth <= 0;
-  const cinematicHit = !blocked && (finishingHit || counter || projectile || attackType === "kick" || attackType === "airKick" || attackType === "grab");
   const hitZone = blocked ? "guard" : hitZoneFor(attacker, target, projectileInfo, attackType);
   const zone = hitZoneReaction(hitZone, blocked, projectile, heavyImpact, finishingHit);
+  const cinematic = impactCinematicProfile({ blocked, heavyImpact, counter, projectile, finishingHit, attackType, hitZone, impactStrength });
+  const cinematicHit = cinematic.specialFx;
 
   target.health = nextHealth;
   target.hurt = finishingHit ? 38 + zone.hurtBonus : blocked ? 9 : attacker?.attack?.type === "grab" ? 30 : projectile ? 21 + zone.hurtBonus : 24 + zone.hurtBonus;
@@ -1783,9 +1923,9 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   }
   if (blocked) target.counterWindow = 34;
   if (counter && attacker) attacker.counterWindow = 0;
-  flash = blocked ? 2 : Math.max(flash, finishingHit ? 12 : projectile || counter ? 10 : heavyImpact ? 8 : 5);
-  shake = blocked ? Math.max(shake, 3) : Math.max(shake, finishingHit ? 13 : projectile || counter ? 10 : heavyImpact ? 8 : 6);
-  hitStopFrames = blocked ? Math.max(hitStopFrames, 2) : Math.max(hitStopFrames, finishingHit ? 8 : counter ? 7 : projectile ? 7 : heavyImpact ? 5 : 3);
+  flash = Math.max(flash, cinematic.flash);
+  shake = Math.max(shake, cinematic.shake);
+  hitStopFrames = Math.max(hitStopFrames, cinematic.hitStop);
   playSound(blocked ? "block" : "hit");
   addText(
     target.x,
@@ -1795,10 +1935,9 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   );
   const impactX = target.x - target.dir * (hitZone === "legs" ? 18 : hitZone === "head" ? 30 : 26);
   const impactY = target.y - zone.yOffset;
-  triggerCameraImpact(impactDir, blocked, heavyImpact, counter, impactStrength);
-  if (cinematicHit) {
-    const cinematicStrength = finishingHit ? 1.62 : counter ? 1.42 : projectile ? 1.28 : 1.04;
-    triggerCinematicHit(impactDir, impactColor, cinematicStrength, finishingHit ? 18 : projectile || counter ? 15 : 11);
+  triggerCameraImpact(impactDir, blocked, heavyImpact, counter, impactStrength, cinematic);
+  if (cinematic.cinematic) {
+    triggerCinematicHit(impactDir, impactColor, cinematic.cinematicStrength, cinematic.cinematicPulse, cinematic);
   }
   burst(
     target.x - target.dir * 22,
@@ -1837,23 +1976,28 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   }
 }
 
-function triggerCameraImpact(dir, blocked, heavyImpact, counter, strength) {
-  const pulse = blocked ? 6 : counter ? 14 : heavyImpact ? 12 : 9;
+function triggerCameraImpact(dir, blocked, heavyImpact, counter, strength, profile = null) {
+  const pulse = profile?.cameraPulse ?? (blocked ? 6 : counter ? 14 : heavyImpact ? 12 : 9);
   if (pulse < cameraImpactPulse) return;
 
   cameraImpactPulse = pulse;
   cameraImpactMax = pulse;
   cameraImpactDir = dir || 1;
-  cameraImpactStrength = blocked ? 0.45 : counter ? 1.28 : strength;
+  cameraImpactStrength = profile?.cameraStrength ?? (blocked ? 0.45 : counter ? 1.28 : strength);
 }
 
-function triggerCinematicHit(dir, color, strength = 1, pulse = 12) {
+function triggerCinematicHit(dir, color, strength = 1, pulse = 12, profile = null) {
   if (pulse < cinematicHitPulse) return;
   cinematicHitPulse = pulse;
   cinematicHitMax = pulse;
   cinematicHitDir = dir || 1;
   cinematicHitColor = color || "#fff1bd";
   cinematicHitStrength = strength;
+  cinematicHitZoom = profile?.zoom ?? 0.022;
+  cinematicHitPan = profile?.pan ?? 6.4;
+  cinematicHitLift = profile?.lift ?? 2.6;
+  cinematicHitRoll = profile?.roll ?? 0;
+  cinematicHitBand = profile?.band ?? 1;
 }
 
 function contactFlashBurst(x, y, color, dir, blocked, heavyImpact, counter) {
@@ -2486,13 +2630,15 @@ function applyCamera() {
   const impactEase = impactT * impactT * cameraImpactStrength;
   const cinematicT = cinematicHitPulse > 0 ? clamp(cinematicHitPulse / Math.max(1, cinematicHitMax), 0, 1) : 0;
   const cinematicEase = cinematicT * cinematicT * cinematicHitStrength;
-  const impactZoom = impactEase * (mobileView ? 0.012 : 0.028) + cinematicEase * (mobileView ? 0.01 : 0.022);
-  const impactPan = cameraImpactDir * impactEase * (mobileView ? 4.5 : 8.5) + cinematicHitDir * cinematicEase * (mobileView ? 3.2 : 6.4);
-  const impactLift = -impactEase * (mobileView ? 1.8 : 3.8) - cinematicEase * (mobileView ? 1.1 : 2.6);
+  const impactZoom = impactEase * (mobileView ? 0.012 : 0.028) + cinematicEase * (mobileView ? cinematicHitZoom * 0.52 : cinematicHitZoom);
+  const impactPan = cameraImpactDir * impactEase * (mobileView ? 4.5 : 8.5) + cinematicHitDir * cinematicEase * (mobileView ? cinematicHitPan * 0.56 : cinematicHitPan);
+  const impactLift = -impactEase * (mobileView ? 1.8 : 3.8) - cinematicEase * (mobileView ? cinematicHitLift * 0.52 : cinematicHitLift);
+  const cinematicRoll = cinematicHitDir * cinematicEase * (mobileView ? cinematicHitRoll * 0.5 : cinematicHitRoll);
   const drawZoom = cameraZoom + impactZoom;
   const drawPan = clamp(cameraPan + impactPan, -cameraPanLimit(drawZoom, mobileView), cameraPanLimit(drawZoom, mobileView));
 
   ctx.translate(W / 2 + drawPan, H / 2 + cameraLift + impactLift);
+  ctx.rotate(cinematicRoll);
   ctx.scale(drawZoom, drawZoom);
   ctx.translate(-W / 2, -H / 2);
 }
@@ -2529,17 +2675,18 @@ function drawCinematicHitOverlay() {
   if (cinematicHitPulse <= 0 || cinematicHitStrength <= 0) return;
   const t = clamp(cinematicHitPulse / Math.max(1, cinematicHitMax), 0, 1);
   const ease = t * t * cinematicHitStrength;
-  const bandAlpha = Math.min(0.1, ease * 0.075);
-  const flareAlpha = Math.min(0.18, ease * 0.14);
-  const shift = cinematicHitDir * ease * 18;
+  const bandAlpha = Math.min(0.14, ease * 0.075 * cinematicHitBand);
+  const flareAlpha = Math.min(0.22, ease * 0.14 * cinematicHitBand);
+  const bandHeight = 24 + cinematicHitBand * 11;
+  const shift = cinematicHitDir * ease * (12 + cinematicHitPan);
 
   ctx.save();
   ctx.fillStyle = `rgba(6, 3, 2, ${bandAlpha})`;
-  ctx.fillRect(0, 0, W, 34);
-  ctx.fillRect(0, H - 34, W, 34);
+  ctx.fillRect(0, 0, W, bandHeight);
+  ctx.fillRect(0, H - bandHeight, W, bandHeight);
 
   ctx.globalCompositeOperation = "screen";
-  const flare = ctx.createRadialGradient(W / 2 + shift, H / 2 - 30, 10, W / 2 + shift, H / 2 - 30, 410);
+  const flare = ctx.createRadialGradient(W / 2 + shift, H / 2 - 30 - cinematicHitLift * 4, 10, W / 2 + shift, H / 2 - 30, 410 + cinematicHitBand * 36);
   flare.addColorStop(0, colorWithAlpha(cinematicHitColor, flareAlpha));
   flare.addColorStop(0.26, colorWithAlpha(cinematicHitColor, flareAlpha * 0.42));
   flare.addColorStop(1, "rgba(255,255,255,0)");
@@ -2547,7 +2694,7 @@ function drawCinematicHitOverlay() {
   ctx.fillRect(0, 0, W, H);
 
   ctx.strokeStyle = colorWithAlpha(cinematicHitColor, Math.min(0.28, ease * 0.22));
-  ctx.lineWidth = 2.2 + ease * 2.4;
+  ctx.lineWidth = 2.2 + ease * (2.2 + cinematicHitBand);
   ctx.beginPath();
   ctx.moveTo(W * 0.18 + shift, 38);
   ctx.lineTo(W * 0.82 + shift, 22);
