@@ -579,6 +579,11 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     staggerPulse: 0,
     attackEntryPulse: 0,
     attackRecoverPulse: 0,
+    attackChainPulse: 0,
+    attackChainMax: 1,
+    attackChainFrom: "",
+    attackChainTo: "",
+    lastAttackType: "",
     hurtRecoverPulse: 0,
     moveTurnPulse: 0,
     jumpPulse: 0,
@@ -781,6 +786,11 @@ function resetRound() {
     staggerPulse: 0,
     attackEntryPulse: 0,
     attackRecoverPulse: 0,
+    attackChainPulse: 0,
+    attackChainMax: 1,
+    attackChainFrom: "",
+    attackChainTo: "",
+    lastAttackType: "",
     hurtRecoverPulse: 0,
     moveTurnPulse: 0,
     jumpPulse: 0,
@@ -862,6 +872,11 @@ function resetRound() {
     staggerPulse: 0,
     attackEntryPulse: 0,
     attackRecoverPulse: 0,
+    attackChainPulse: 0,
+    attackChainMax: 1,
+    attackChainFrom: "",
+    attackChainTo: "",
+    lastAttackType: "",
     hurtRecoverPulse: 0,
     moveTurnPulse: 0,
     jumpPulse: 0,
@@ -1141,6 +1156,8 @@ function startAttack(f, type) {
   const sweep = type === "sweep";
   const grab = type === "grab";
   const air = type === "airPunch" || type === "airKick";
+  const flowReady = comboReady || (f.attackRecoverPulse ?? 0) > 2 || (f.comboTimer ?? 0) > 0;
+  const chainMax = comboReady ? 14 : flowReady ? 10 : 1;
   f.attack = {
     type,
     frame: 0,
@@ -1155,7 +1172,11 @@ function startAttack(f, type) {
   };
   if (comboReady) f.cooldown = 0;
   f.blocking = false;
-  f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, grab ? 11 : sweep ? 10 : heavy ? 11 : 8);
+  f.attackChainFrom = flowReady ? (f.lastAttackType || f.attackChainTo || "") : "";
+  f.attackChainTo = type;
+  f.attackChainMax = flowReady ? chainMax : 1;
+  f.attackChainPulse = flowReady ? chainMax : 0;
+  f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, Math.round((grab ? 11 : sweep ? 10 : heavy ? 11 : 8) * (flowReady ? 0.58 : 1)));
   f.guardExitPulse = Math.max(f.guardExitPulse ?? 0, (f.guardPulse ?? 0) > 2 ? 8 : 0);
   f.cooldown = grab ? 28 : sweep ? 25 : heavy ? 24 : 13;
   playSound(heavy || sweep ? "kick" : "punch");
@@ -1164,9 +1185,14 @@ function startAttack(f, type) {
 function startSpecial(f) {
   if (f.energy < 45 || f.specialCooldown > 0 || f.attack || f.hurt > 16) return;
 
+  const flowReady = (f.attackRecoverPulse ?? 0) > 2 || (f.comboTimer ?? 0) > 0;
   f.energy -= 45;
   f.blocking = false;
-  f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, 14);
+  f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, flowReady ? 8 : 14);
+  f.attackChainFrom = flowReady ? (f.lastAttackType || f.attackChainTo || "") : "";
+  f.attackChainTo = "special";
+  f.attackChainMax = flowReady ? 12 : 1;
+  f.attackChainPulse = flowReady ? 12 : 0;
   f.guardExitPulse = Math.max(f.guardExitPulse ?? 0, (f.guardPulse ?? 0) > 2 ? 8 : 0);
   f.specialCooldown = 66;
   f.cooldown = 28;
@@ -1469,6 +1495,7 @@ function updateFighter(f, opponent) {
   if (f.staggerPulse > 0) f.staggerPulse -= 1;
   if (f.attackEntryPulse > 0) f.attackEntryPulse -= 1;
   if (f.attackRecoverPulse > 0) f.attackRecoverPulse -= 1;
+  if (f.attackChainPulse > 0) f.attackChainPulse -= 1;
   if (f.hurtRecoverPulse > 0) f.hurtRecoverPulse -= 1;
   if (f.moveTurnPulse > 0) f.moveTurnPulse -= 1;
   if (f.jumpPulse > 0) f.jumpPulse -= 1;
@@ -1600,6 +1627,8 @@ function updateFighter(f, opponent) {
       const endedType = f.attack.type;
       const endedHeavy = endedType === "kick" || endedType === "airKick" || endedType === "sweep" || endedType === "grab";
       f.attackRecoverPulse = Math.max(f.attackRecoverPulse ?? 0, endedType === "special" ? 16 : endedHeavy ? 12 : 9);
+      f.lastAttackType = endedType;
+      f.attackChainFrom = endedType;
       f.attack = null;
     }
   }
@@ -4243,6 +4272,18 @@ function fighterTransitionMotion(f, walking) {
     motion.scaleX *= 1 - mass.crush * 0.014 + weightDrive * 0.026 + mass.follow * 0.007;
     motion.scaleY *= 1 + mass.crush * 0.018 - weightDrive * 0.016 - mass.plant * 0.007;
     motion.afterimage = Math.max(motion.afterimage, mass.drive * (isSpecial ? 0.34 : isKick ? 0.18 : 0.12) + mass.snap * 0.14);
+
+    const chain = attackChainProfile(f, a.type);
+    if (chain.active > 0.025) {
+      const familyTurn = chain.fromKick && chain.toPunch ? 1 : chain.fromPunch && chain.toKick ? -1 : 0;
+      const chainWeight = chain.active * (chain.sameFamily ? 0.68 : 1);
+      motion.x -= dir * chainWeight * (chain.special ? 0.9 : 0.62);
+      motion.y += chain.handoff * (chain.toKick ? 0.82 : 0.48);
+      motion.rotation += dir * (familyTurn * chain.handoff * 0.015 - chainWeight * 0.006);
+      motion.scaleX *= 1 + chain.handoff * 0.006;
+      motion.scaleY *= 1 - chain.handoff * 0.007;
+      motion.afterimage = Math.max(motion.afterimage, chain.handoff * (chain.combo > 0.05 ? 0.095 : 0.055));
+    }
 
     motion.x += dir * frameProfile.bodyX;
     motion.y += frameProfile.bodyY;
@@ -7080,8 +7121,14 @@ function attackPhase(attack) {
     1
   );
   const recoveryT = clamp((attack.frame - attack.activeEnd) / Math.max(1, attack.duration - attack.activeEnd), 0, 1);
-  const anticipation = attack.frame < attack.activeStart ? Math.sin(windupT * Math.PI) : 0;
-  const strike = attack.frame >= attack.activeStart && attack.frame <= attack.activeEnd ? Math.sin(strikeT * Math.PI) : 0;
+  const windupCarry = attack.frame >= attack.activeStart && attack.frame <= attack.activeStart + 4
+    ? (1 - clamp((attack.frame - attack.activeStart) / 4, 0, 1)) * 0.34
+    : 0;
+  const strikeCarry = attack.frame > attack.activeEnd && attack.frame <= attack.activeEnd + 5
+    ? (1 - clamp((attack.frame - attack.activeEnd) / 5, 0, 1)) * 0.28
+    : 0;
+  const anticipation = attack.frame < attack.activeStart ? Math.sin(windupT * Math.PI) : windupCarry;
+  const strike = attack.frame >= attack.activeStart && attack.frame <= attack.activeEnd ? Math.sin(strikeT * Math.PI) : strikeCarry;
   const recovery = attack.frame > attack.activeEnd ? Math.sin(recoveryT * Math.PI) : 0;
   const settle = attack.frame > attack.activeEnd ? smoothStep01(recoveryT) : 0;
   const snap = attack.frame >= attack.activeStart && attack.frame <= attack.activeStart + 4
@@ -7158,6 +7205,35 @@ function attackMassProfile(f) {
     crush,
     typeWeight,
     footSide,
+  };
+}
+
+function attackChainProfile(f, currentType = "") {
+  const max = Math.max(1, f?.attackChainMax ?? 1);
+  const raw = clamp((f?.attackChainPulse ?? 0) / max, 0, 1);
+  const active = f?.attack ? smoothStep01(raw) : 0;
+  const handoff = f?.attack ? Math.sin((1 - raw) * Math.PI) : 0;
+  const combo = clamp((f?.comboPulse ?? 0) / 22, 0, 1);
+  const from = f?.attackChainFrom || f?.lastAttackType || "";
+  const to = currentType || f?.attackChainTo || "";
+  const fromKick = from === "kick" || from === "airKick" || from === "sweep";
+  const toKick = to === "kick" || to === "airKick" || to === "sweep";
+  const fromPunch = from === "punch" || from === "airPunch" || from === "grab";
+  const toPunch = to === "punch" || to === "airPunch" || to === "grab";
+  const special = from === "special" || to === "special";
+
+  return {
+    active: clamp(active + combo * 0.12, 0, 1.2),
+    handoff: clamp(handoff + combo * 0.1, 0, 1.15),
+    combo,
+    from,
+    to,
+    fromKick,
+    toKick,
+    fromPunch,
+    toPunch,
+    special,
+    sameFamily: (fromKick && toKick) || (fromPunch && toPunch) || from === to,
   };
 }
 
@@ -7575,6 +7651,60 @@ function getPose(f, stride) {
       base.backArm.hand.y -= lift * 8;
       base.frontLeg.foot.x += lift * 5 * spec.stance;
       base.backLeg.foot.x -= lift * 7 * spec.stance;
+    }
+  }
+
+  const chain = attackChainProfile(f, attackType);
+  if (f.attack && chain.active > 0.025) {
+    const flow = chain.active;
+    const handoff = chain.handoff;
+    const comboSnap = chain.combo;
+    const turn = chain.fromKick && chain.toPunch ? 1 : chain.fromPunch && chain.toKick ? -1 : 0;
+
+    base.torsoTilt += turn * handoff * 0.022 - flow * (chain.toKick ? 0.012 : 0.006) + comboSnap * 0.01;
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, flow * 0.86);
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, handoff * 0.44);
+    base.backLeg.knee.y += flow * 3.2;
+    base.backLeg.foot.x -= (5.5 * flow + 3.5 * handoff) * spec.stance;
+    base.frontLeg.knee.y += handoff * 1.8;
+
+    if (chain.fromPunch && !chain.toPunch) {
+      base.frontArm.elbow.x -= (4.5 * flow + 3 * handoff) * spec.stance;
+      base.frontArm.elbow.y += 3.5 * flow;
+      base.frontArm.hand.x -= (7 * flow + 3 * handoff) * spec.stance;
+      base.frontArm.hand.y += 5.5 * flow;
+      base.backArm.hand.x -= 3.5 * flow * spec.stance;
+    }
+
+    if (chain.fromKick && !chain.toKick) {
+      base.frontLeg.knee.x -= (6.5 * flow + 4 * handoff) * spec.stance;
+      base.frontLeg.knee.y += 4.2 * flow;
+      base.frontLeg.foot.x -= (10 * flow + 5 * handoff) * spec.stance;
+      base.frontLeg.foot.y += 2.4 * flow;
+      base.frontArm.hand.y -= 3.5 * handoff;
+      base.backArm.hand.y -= 2.8 * handoff;
+    }
+
+    if (chain.toPunch) {
+      base.frontArm.elbow.x -= 3.2 * flow * spec.stance;
+      base.frontArm.elbow.y -= 2.2 * handoff;
+      base.frontArm.hand.x -= 4.8 * flow * spec.stance;
+      base.frontArm.hand.y -= 2.6 * handoff;
+      base.backArm.elbow.y -= 2.6 * flow;
+      base.backArm.hand.y -= 3.2 * flow;
+    } else if (chain.toKick) {
+      base.frontArm.elbow.x -= 4.4 * handoff * spec.stance;
+      base.frontArm.hand.x -= 6.8 * handoff * spec.stance;
+      base.backArm.elbow.x -= 5.2 * handoff * spec.stance;
+      base.backArm.hand.x -= 7.2 * handoff * spec.stance;
+      base.backArm.hand.y -= 4.2 * handoff;
+    }
+
+    if (chain.special) {
+      base.frontArm.hand.y -= 4.5 * handoff;
+      base.backArm.hand.y -= 5.5 * handoff;
+      base.frontLeg.foot.x += 3.5 * comboSnap * spec.stance;
+      base.backLeg.foot.x -= 4.5 * comboSnap * spec.stance;
     }
   }
 
