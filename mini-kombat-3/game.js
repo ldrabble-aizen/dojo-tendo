@@ -5441,6 +5441,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
     drawSpriteReactionPoseWarp(f, unifiedSheet, frameX, crouch);
     drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
     drawSpriteExtremityDetails(f, crouch, frameName, walking ? stride : 0);
+    drawSpriteSecondaryMotion(f, crouch, frameName, walking ? stride : 0);
     drawFighterStageLighting(f, crouch);
     drawSpriteCinematicFinish(f, crouch, frameName);
     return true;
@@ -5480,6 +5481,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   drawSpriteContactOcclusion(f, crouch, frameName, walking ? stride : 0);
   drawSpriteGuardPoseOverlay(f, crouch, frameName);
   drawSpriteExtremityDetails(f, crouch, frameName, walking ? stride : 0);
+  drawSpriteSecondaryMotion(f, crouch, frameName, walking ? stride : 0);
 
   ctx.save();
   ctx.translate(headPose.x, 0);
@@ -6397,10 +6399,310 @@ function drawSpriteReactionPoseWarp(f, image, frameX, crouch) {
   ctx.restore();
 }
 
+function secondaryMotionProfile(f, stride = 0) {
+  const impact = localizedImpactProfile(f);
+  const phase = attackPhase(f.attack);
+  const type = f.attack?.type ?? "";
+  const dir = f.dir || 1;
+  const localSpeed = (f.vx ?? 0) * dir;
+  const speed = clamp(Math.abs(f.vx ?? 0) / 4.1, 0, 1.25);
+  const attackDrive = f.attack ? Math.max(phase.strike, phase.snap * 1.05, phase.followThrough * 0.56) : 0;
+  const attackPrep = f.attack ? phase.anticipation : 0;
+  const special = type === "special" ? Math.max(phase.anticipation * 0.7, phase.strike, phase.snap) : 0;
+  const guard = f.blocking ? clamp((f.guardPulse ?? 0) / 18, 0, 1) : 0;
+  const guardHit = clamp((f.guardImpact ?? 0) / 16, 0, 1);
+  const hurt = clamp((f.hurt ?? 0) / 24, 0, 1);
+  const air = f.grounded ? 0 : 1;
+  const land = clamp((f.landingPulse ?? 0) / 16, 0, 1);
+  const hit = impact.t > 0.035 && f.hitZone !== "guard" ? Math.max(impact.snap, impact.rebound * 0.78) : 0;
+  const wave = Math.sin(roundFrame * (0.108 + speed * 0.026) + f.x * 0.014 + stride * 0.85);
+  const afterWave = Math.sin(roundFrame * 0.205 + f.x * 0.009 + attackDrive * 1.7);
+  const flutter = clamp(
+    0.12 +
+      speed * 0.58 +
+      attackPrep * 0.34 +
+      attackDrive * 0.92 +
+      special * 0.42 +
+      hit * 0.9 +
+      guardHit * 0.58 +
+      air * 0.28 +
+      land * 0.48 +
+      hurt * 0.22,
+    0,
+    1.95
+  );
+
+  const x = clamp(
+    -localSpeed * 2.15 -
+      attackDrive * 5.6 +
+      attackPrep * 2.15 -
+      special * 1.4 -
+      impact.localDir * hit * 4.8 +
+      guard * 1.2 +
+      wave * (1.2 + flutter * 1.15),
+    -13.5,
+    13.5
+  );
+  const y = clamp(-attackDrive * 2.4 - special * 1.2 - air * 2 + hit * 1.5 + guardHit * 1.3 + afterWave * (0.9 + flutter * 0.7), -8.5, 8.5);
+  const whip = clamp(wave * flutter + afterWave * 0.48 + impact.localDir * hit * 0.95 - attackDrive * 0.38, -2.2, 2.2);
+
+  return {
+    x,
+    y,
+    wave,
+    afterWave,
+    whip,
+    flutter,
+    speed,
+    attackDrive,
+    attackPrep,
+    special,
+    guardHit,
+    hurt,
+    land,
+    hit,
+  };
+}
+
+function traceSecondaryRibbon(points) {
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  if (points.length === 2) {
+    ctx.lineTo(points[1].x, points[1].y);
+    return;
+  }
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const midX = (points[i].x + points[i + 1].x) * 0.5;
+    const midY = (points[i].y + points[i + 1].y) * 0.5;
+    ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+  }
+  const last = points[points.length - 1];
+  ctx.lineTo(last.x, last.y);
+}
+
+function strokeSecondaryRibbon(points, color, width, alpha = 1) {
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = colorWithAlpha(darken(color, 34), 0.62);
+  ctx.lineWidth = width + 3;
+  traceSecondaryRibbon(points);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(color, 0.92);
+  ctx.lineWidth = width;
+  traceSecondaryRibbon(points);
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(lighten(color, 32), 0.2);
+  ctx.lineWidth = Math.max(1.1, width * 0.28);
+  traceSecondaryRibbon(points);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawSpriteSecondaryMotion(f, crouch, frameName, stride) {
+  const motion = secondaryMotionProfile(f, stride);
+  const active = Math.max(motion.flutter, Math.abs(motion.x) / 10, Math.abs(stride) * 0.4);
+  if (active <= 0.1 && frameName !== "idle") return;
+
+  const outfit = outfitSpec(f) ?? {};
+  const spec = bodySpec(f);
+  const localCrouch = crouch * 0.18;
+  const jacket = outfit.jacket ?? f.color ?? "#497ac4";
+  const belt = outfit.belt ?? f.trim ?? "#fff1bd";
+  const sleeve = outfit.sleeve ?? f.trim ?? "#fff1bd";
+  const accent = outfit.accent ?? f.trim ?? "#fff1bd";
+  const shoulder = spec.shoulder ?? 40;
+  const hip = (spec.hip ?? 36) * (spec.belly ? 1.08 : 1);
+  const waistY = -59 + localCrouch;
+  const hemY = -43 + localCrouch;
+  const alpha = clamp(0.22 + active * 0.25, 0.18, 0.58);
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = colorWithAlpha(jacket, 0.52);
+  ctx.strokeStyle = colorWithAlpha(darken(jacket, 24), 0.38);
+  ctx.lineWidth = 1.4;
+
+  for (const side of [-1, 1]) {
+    const rootX = side * (hip - 9);
+    const tipX = side * (hip + 4 + motion.flutter * 2.4) + motion.x * (0.34 + side * 0.03) + side * motion.whip * 1.6;
+    const tipY = hemY + 7 + motion.y * 0.35 + motion.wave * side * 1.6 + motion.flutter * 1.2;
+    ctx.beginPath();
+    ctx.moveTo(rootX, hemY - 8);
+    ctx.quadraticCurveTo(side * (hip + 6) + motion.x * 0.15, hemY + 2 + motion.afterWave * 1.2, tipX, tipY);
+    ctx.quadraticCurveTo(side * (hip - 3) + motion.x * 0.12, hemY + 5, rootX - side * 7, hemY - 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const beltLag = clamp(motion.x * 0.52 + motion.whip * 3.2, -12, 12);
+  strokeSecondaryRibbon(
+    [
+      { x: -4, y: waistY - 2 },
+      { x: -16 + beltLag * 0.25, y: waistY + 10 + motion.y * 0.16 },
+      { x: -24 + beltLag * 0.72, y: waistY + 25 + motion.y * 0.52 + motion.wave * 1.8 },
+    ],
+    belt,
+    5.4,
+    clamp(0.45 + active * 0.24, 0.42, 0.78)
+  );
+  strokeSecondaryRibbon(
+    [
+      { x: 6, y: waistY - 2 },
+      { x: 18 + beltLag * 0.28, y: waistY + 8 - motion.y * 0.08 },
+      { x: 30 + beltLag * 0.65, y: waistY + 20 + motion.afterWave * 2.2 },
+    ],
+    belt,
+    4.6,
+    clamp(0.36 + active * 0.2, 0.34, 0.68)
+  );
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = clamp(0.11 + active * 0.12, 0.08, 0.3);
+  ctx.strokeStyle = colorWithAlpha(accent, 0.82);
+  ctx.lineWidth = 1.4 + motion.flutter * 0.5;
+  ctx.beginPath();
+  ctx.moveTo(-shoulder + 13, -135 + localCrouch);
+  ctx.bezierCurveTo(-shoulder + 3 + motion.x * 0.12, -112 + localCrouch, -hip + 10 + motion.x * 0.24, -77 + localCrouch, -hip + 14 + motion.x * 0.46, hemY + 2);
+  ctx.moveTo(shoulder - 13, -135 + localCrouch);
+  ctx.bezierCurveTo(shoulder - 3 + motion.x * 0.12, -112 + localCrouch, hip - 10 + motion.x * 0.24, -77 + localCrouch, hip - 14 + motion.x * 0.46, hemY + 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(sleeve, 0.54);
+  ctx.lineWidth = 1.8 + motion.guardHit * 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-shoulder + 8, -129 + localCrouch);
+  ctx.quadraticCurveTo(-shoulder - 8 + motion.x * 0.22, -115 + localCrouch + motion.wave * 1.8, -shoulder + 5 + motion.x * 0.3, -98 + localCrouch);
+  ctx.moveTo(shoulder - 8, -129 + localCrouch);
+  ctx.quadraticCurveTo(shoulder + 8 + motion.x * 0.22, -115 + localCrouch - motion.wave * 1.8, shoulder - 5 + motion.x * 0.3, -98 + localCrouch);
+  ctx.stroke();
+  ctx.restore();
+
+  if (f.profileId === "p1") drawPchanSpriteBandanaSecondary(motion, localCrouch);
+  if (f.profileId === "p2") drawAkaneSpriteHairSecondary(motion, localCrouch);
+}
+
+function drawPchanSpriteBandanaSecondary(motion, localCrouch) {
+  const yellow = "#f7dc63";
+  const knotX = 30;
+  const knotY = -230 + localCrouch + motion.y * 0.1;
+  const tailX = clamp(motion.x * 0.95 + motion.whip * 6.4, -18, 24);
+  const tailY = motion.y * 0.45 + motion.wave * 2.1 - motion.attackDrive * 2.2;
+  const alpha = clamp(0.44 + motion.flutter * 0.16, 0.38, 0.74);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  ctx.beginPath();
+  ctx.ellipse(knotX + 5, knotY + 5, 8, 5, -0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  strokeSecondaryRibbon(
+    [
+      { x: knotX, y: knotY },
+      { x: knotX + 16 + tailX * 0.38, y: knotY - 6 + tailY * 0.58 },
+      { x: knotX + 36 + tailX, y: knotY + 1 + tailY },
+    ],
+    yellow,
+    7.4,
+    alpha
+  );
+  strokeSecondaryRibbon(
+    [
+      { x: knotX - 1, y: knotY + 6 },
+      { x: knotX + 10 + tailX * 0.22, y: knotY + 16 + tailY * 0.46 },
+      { x: knotX + 15 + tailX * 0.52, y: knotY + 31 + tailY * 0.78 },
+    ],
+    yellow,
+    6.4,
+    clamp(alpha * 0.88, 0.32, 0.64)
+  );
+
+  ctx.save();
+  ctx.fillStyle = "#151515";
+  ctx.globalAlpha = clamp(alpha + 0.12, 0.45, 0.84);
+  for (const spot of [
+    [knotX + 18 + tailX * 0.35, knotY - 4 + tailY * 0.55, 3.2, 6.4, -0.48],
+    [knotX + 31 + tailX * 0.78, knotY + tailY * 0.92, 3.2, 6.2, 0.54],
+    [knotX + 9 + tailX * 0.3, knotY + 20 + tailY * 0.62, 2.8, 5.6, -0.24],
+  ]) {
+    ctx.save();
+    ctx.translate(spot[0], spot[1]);
+    ctx.rotate(spot[4]);
+    ctx.beginPath();
+    ctx.roundRect(-spot[2] / 2, -spot[3] / 2, spot[2], spot[3], 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawAkaneSpriteHairSecondary(motion, localCrouch) {
+  const hair = "#211417";
+  const roots = [
+    { side: -1, rootX: -35, rootY: -232, lowY: -166, length: 1.05 },
+    { side: 1, rootX: 35, rootY: -231, lowY: -166, length: 0.96 },
+    { side: -1, rootX: -18, rootY: -244, lowY: -204, length: 0.72 },
+    { side: 1, rootX: 18, rootY: -244, lowY: -205, length: 0.68 },
+  ];
+  const alpha = clamp(0.22 + motion.flutter * 0.18, 0.18, 0.48);
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.globalCompositeOperation = "multiply";
+  ctx.strokeStyle = colorWithAlpha(hair, 0.62);
+  ctx.lineWidth = 3.4;
+  for (const lock of roots) {
+    const sway = motion.x * (0.28 + lock.length * 0.12) + motion.whip * lock.side * 2.2 + motion.wave * lock.side * 2.4;
+    const rootY = lock.rootY + localCrouch;
+    const lowY = lock.lowY + localCrouch + motion.y * 0.28 + motion.afterWave * lock.length * 1.2;
+    ctx.globalAlpha = alpha * lock.length;
+    ctx.beginPath();
+    ctx.moveTo(lock.rootX, rootY);
+    ctx.bezierCurveTo(
+      lock.rootX + lock.side * (8 + motion.flutter * 2.2) + sway * 0.4,
+      rootY + 18,
+      lock.rootX + lock.side * (11 + motion.flutter * 3.4) + sway,
+      lowY - 20,
+      lock.rootX + lock.side * (4 + motion.flutter * 2.6) + sway * 0.82,
+      lowY
+    );
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = clamp(0.05 + motion.flutter * 0.045, 0.04, 0.13);
+  ctx.strokeStyle = "rgba(255, 236, 215, 0.8)";
+  ctx.lineWidth = 1.2;
+  for (const side of [-1, 1]) {
+    const sway = motion.x * 0.22 + motion.wave * side * 1.6;
+    ctx.beginPath();
+    ctx.moveTo(side * 29, -223 + localCrouch);
+    ctx.bezierCurveTo(side * 35 + sway, -202 + localCrouch, side * 32 + sway * 0.7, -179 + localCrouch, side * 28 + sway * 0.5, -164 + localCrouch);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawSpritePremiumDetails(f, crouch, frameName, stride) {
   const outfit = outfitSpec(f) ?? {};
   const breath = Math.sin(roundFrame * 0.055 + f.x * 0.012);
   const action = f.attack ? attackProgress(f.attack) : 0;
+  const cloth = secondaryMotionProfile(f, stride);
   const localCrouch = crouch * 0.18;
   const torsoY = -152 + localCrouch + breath * 0.8;
   const waistY = -86 + localCrouch;
@@ -6412,22 +6714,23 @@ function drawSpritePremiumDetails(f, crouch, frameName, stride) {
   ctx.lineJoin = "round";
   ctx.globalCompositeOperation = "screen";
 
-  const edgeGlow = 0.14 + Math.abs(breath) * 0.04 + action * 0.08;
+  const edgeGlow = 0.14 + Math.abs(breath) * 0.04 + action * 0.08 + cloth.flutter * 0.025;
   ctx.strokeStyle = colorWithAlpha(accent, edgeGlow);
   ctx.lineWidth = 2.1;
   ctx.beginPath();
   ctx.moveTo(-31, torsoY - 5);
-  ctx.bezierCurveTo(-24, torsoY + 17, -20, waistY - 11, -23, waistY + 8);
+  ctx.bezierCurveTo(-24 + cloth.x * 0.06, torsoY + 17, -20 + cloth.x * 0.14, waistY - 11, -23 + cloth.x * 0.26, waistY + 8);
   ctx.moveTo(31, torsoY - 5);
-  ctx.bezierCurveTo(24, torsoY + 17, 20, waistY - 11, 23, waistY + 8);
+  ctx.bezierCurveTo(24 + cloth.x * 0.06, torsoY + 17, 20 + cloth.x * 0.14, waistY - 11, 23 + cloth.x * 0.26, waistY + 8);
   ctx.stroke();
 
   ctx.strokeStyle = "rgba(255,255,255,0.13)";
   ctx.lineWidth = 1.4;
   for (const x of [-14, 0, 14]) {
     ctx.beginPath();
+    const drift = cloth.x * (0.05 + Math.abs(x) * 0.004) + cloth.wave * cloth.flutter * 0.4;
     ctx.moveTo(x, torsoY - 13 + Math.sin(roundFrame * 0.045 + x) * 1.2);
-    ctx.bezierCurveTo(x - 3, torsoY + 14, x + 2, waistY - 14, x - 1, waistY + 4);
+    ctx.bezierCurveTo(x - 3 + drift, torsoY + 14, x + 2 + drift * 1.4, waistY - 14, x - 1 + drift * 1.8, waistY + 4);
     ctx.stroke();
   }
 
@@ -6436,36 +6739,36 @@ function drawSpritePremiumDetails(f, crouch, frameName, stride) {
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(-28, torsoY - 1);
-    ctx.lineTo(-7, waistY + 3);
+    ctx.lineTo(-7 + cloth.x * 0.22, waistY + 3 + cloth.y * 0.08);
     ctx.moveTo(26, torsoY + 1);
-    ctx.lineTo(9, waistY + 4);
+    ctx.lineTo(9 + cloth.x * 0.22, waistY + 4 + cloth.y * 0.08);
     ctx.stroke();
 
     ctx.strokeStyle = colorWithAlpha("#7fc8ff", 0.18 + Math.abs(stride) * 0.05);
     ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.moveTo(-38, -126 + localCrouch);
-    ctx.quadraticCurveTo(-48, -105 + localCrouch, -39, -84 + localCrouch);
+    ctx.quadraticCurveTo(-48 + cloth.x * 0.15, -105 + localCrouch + cloth.wave * 0.8, -39 + cloth.x * 0.22, -84 + localCrouch);
     ctx.moveTo(38, -126 + localCrouch);
-    ctx.quadraticCurveTo(48, -105 + localCrouch, 39, -84 + localCrouch);
+    ctx.quadraticCurveTo(48 + cloth.x * 0.15, -105 + localCrouch - cloth.wave * 0.8, 39 + cloth.x * 0.22, -84 + localCrouch);
     ctx.stroke();
   } else if (f.profileId === "p2") {
     ctx.strokeStyle = colorWithAlpha("#bfffe9", 0.2 + action * 0.1);
     ctx.lineWidth = 2.2;
     ctx.beginPath();
     ctx.moveTo(-24, torsoY - 2);
-    ctx.quadraticCurveTo(-9, torsoY + 20, -4, waistY + 1);
+    ctx.quadraticCurveTo(-9 + cloth.x * 0.1, torsoY + 20, -4 + cloth.x * 0.24, waistY + 1 + cloth.y * 0.08);
     ctx.moveTo(24, torsoY - 2);
-    ctx.quadraticCurveTo(9, torsoY + 20, 4, waistY + 1);
+    ctx.quadraticCurveTo(9 + cloth.x * 0.1, torsoY + 20, 4 + cloth.x * 0.24, waistY + 1 + cloth.y * 0.08);
     ctx.stroke();
 
     ctx.strokeStyle = colorWithAlpha(trim, 0.18 + Math.abs(stride) * 0.04);
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(-30, -128 + localCrouch);
-    ctx.bezierCurveTo(-34, -108 + localCrouch, -27, -92 + localCrouch, -30, -73 + localCrouch);
+    ctx.bezierCurveTo(-34 + cloth.x * 0.12, -108 + localCrouch, -27 + cloth.x * 0.22, -92 + localCrouch, -30 + cloth.x * 0.34, -73 + localCrouch);
     ctx.moveTo(30, -128 + localCrouch);
-    ctx.bezierCurveTo(34, -108 + localCrouch, 27, -92 + localCrouch, 30, -73 + localCrouch);
+    ctx.bezierCurveTo(34 + cloth.x * 0.12, -108 + localCrouch, 27 + cloth.x * 0.22, -92 + localCrouch, 30 + cloth.x * 0.34, -73 + localCrouch);
     ctx.stroke();
   }
 
@@ -8929,7 +9232,12 @@ function drawHeadBackSilhouette(f, x, y, headW, headH, maskMode) {
 
   const skin = f.skin ?? "#f2b891";
   const hair = f.profileId === "p2" ? "#211417" : "#3b2f28";
-  const sway = Math.sin(roundFrame * 0.075 + f.x * 0.011) * 1.6 + clamp((f.vx ?? 0) * 0.22, -1.8, 1.8);
+  const secondary = secondaryMotionProfile(f, 0);
+  const sway =
+    Math.sin(roundFrame * 0.075 + f.x * 0.011) * 1.6 +
+    clamp((f.vx ?? 0) * 0.22, -1.8, 1.8) +
+    secondary.x * 0.18 +
+    secondary.wave * secondary.flutter * 0.72;
 
   if (f.profileId !== "p2") {
     ctx.save();
@@ -9115,7 +9423,12 @@ function drawHeadIntegrationPass(f, x, y, headW, headH, maskMode) {
 }
 
 function drawAkaneHairWisps(f, x, y, headW, headH) {
-  const sway = Math.sin(roundFrame * 0.09 + f.x * 0.018) * 2 + clamp((f.vx ?? 0) * 0.34, -2.4, 2.4);
+  const secondary = secondaryMotionProfile(f, 0);
+  const sway =
+    Math.sin(roundFrame * 0.09 + f.x * 0.018) * 2 +
+    clamp((f.vx ?? 0) * 0.34, -2.4, 2.4) +
+    secondary.x * 0.42 +
+    secondary.wave * secondary.flutter * 1.1;
   const hurt = f.hurt > 0 ? Math.sin(f.hurt * 0.7) * 1.5 : 0;
   const leftX = x + headW * 0.18;
   const rightX = x + headW * 0.82;
@@ -9127,12 +9440,12 @@ function drawAkaneHairWisps(f, x, y, headW, headH) {
   ctx.lineJoin = "round";
   ctx.globalCompositeOperation = "multiply";
   ctx.strokeStyle = "rgba(36, 18, 22, 0.24)";
-  ctx.lineWidth = 2.4;
+  ctx.lineWidth = 2.4 + secondary.flutter * 0.45;
   ctx.beginPath();
   ctx.moveTo(leftX + sway * 0.25, topY);
-  ctx.bezierCurveTo(leftX - 9 + sway, topY + 18, leftX - 10 + sway * 0.5, lowY - 10, leftX + 2 + hurt, lowY);
+  ctx.bezierCurveTo(leftX - 9 + sway, topY + 18, leftX - 10 + sway * 0.5, lowY - 10 + secondary.y * 0.35, leftX + 2 + hurt + sway * 0.12, lowY + secondary.y * 0.2);
   ctx.moveTo(rightX + sway * 0.22, topY + 2);
-  ctx.bezierCurveTo(rightX + 8 + sway, topY + 19, rightX + 8 + sway * 0.4, lowY - 12, rightX - 1 - hurt, lowY - 1);
+  ctx.bezierCurveTo(rightX + 8 + sway, topY + 19, rightX + 8 + sway * 0.4, lowY - 12 + secondary.y * 0.35, rightX - 1 - hurt + sway * 0.12, lowY - 1 + secondary.y * 0.2);
   ctx.stroke();
 
   ctx.globalCompositeOperation = "screen";
@@ -9140,9 +9453,9 @@ function drawAkaneHairWisps(f, x, y, headW, headH) {
   ctx.lineWidth = 1.3;
   ctx.beginPath();
   ctx.moveTo(leftX + 2, topY + 5);
-  ctx.bezierCurveTo(leftX - 4 + sway * 0.5, topY + 24, leftX - 3, lowY - 14, leftX + 4, lowY - 4);
+  ctx.bezierCurveTo(leftX - 4 + sway * 0.5, topY + 24, leftX - 3 + sway * 0.18, lowY - 14, leftX + 4 + sway * 0.1, lowY - 4);
   ctx.moveTo(rightX - 2, topY + 6);
-  ctx.bezierCurveTo(rightX + 4 + sway * 0.5, topY + 24, rightX + 3, lowY - 16, rightX - 4, lowY - 4);
+  ctx.bezierCurveTo(rightX + 4 + sway * 0.5, topY + 24, rightX + 3 + sway * 0.18, lowY - 16, rightX - 4 + sway * 0.1, lowY - 4);
   ctx.stroke();
   ctx.restore();
 }
@@ -9155,16 +9468,19 @@ function drawPchanHeadBandana(f, x, y, headW, headH) {
   const shadow = "#b77d19";
   const mark = "#151515";
   const acting = headActingProfile(f, 0);
+  const secondary = secondaryMotionProfile(f, 0);
   const action = f.attack ? Math.max(attackProgress(f.attack), acting.bandanaFlutter * 0.55) : acting.bandanaFlutter * 0.25;
   const flutter =
     Math.sin(roundFrame * (0.13 + acting.bandanaFlutter * 0.035) + f.x * 0.018) * (2 + acting.bandanaFlutter * 2.2) +
     clamp((f.vx ?? 0) * 0.48, -3.5, 3.5) -
-    f.dir * acting.rotation * 18;
+    f.dir * acting.rotation * 18 +
+    secondary.x * 0.62 +
+    secondary.whip * 2.4;
   const hurtFlick = f.hurt > 0 ? Math.sin(f.hurt * 0.85) * (2.2 + acting.bandanaFlutter * 1.2) : 0;
-  const tailLift = Math.cos(roundFrame * 0.1 + f.x * 0.01) * 1.2 - action * 2.8 + acting.bandanaLift;
+  const tailLift = Math.cos(roundFrame * 0.1 + f.x * 0.01) * 1.2 - action * 2.8 + acting.bandanaLift + secondary.y * 0.35;
   const bandLeft = x + headW * 0.26;
   const bandRight = x + headW * 0.76;
-  const bandTop = y - headH * 0.025 + 2.2 - clamp(acting.focus * 0.85, 0, 1.2);
+  const bandTop = y - headH * 0.025 + 1.8 - clamp(acting.focus * 0.85, 0, 1.2) - secondary.attackDrive * 0.4;
   const knotX = x + headW * 0.72 + clamp(acting.x * 0.08, -1.1, 1.1);
   const knotY = y + headH * 0.055 + 1.9 + clamp(acting.y * 0.06, -0.9, 0.9);
 
@@ -9196,7 +9512,7 @@ function drawPchanHeadBandana(f, x, y, headW, headH) {
   ctx.quadraticCurveTo(
     knotX + 16 + flutter,
     knotY - 4 + tailLift,
-    knotX + 25 + flutter * (1.35 + acting.bandanaFlutter * 0.08),
+    knotX + 25 + flutter * (1.35 + acting.bandanaFlutter * 0.08 + secondary.flutter * 0.035),
     knotY + 4 + tailLift + hurtFlick
   );
   ctx.quadraticCurveTo(knotX + 16 + flutter * 0.6, knotY + 10 + tailLift + action * 1.5, knotX + 5, knotY + 7);
