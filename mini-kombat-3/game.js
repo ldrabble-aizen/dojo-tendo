@@ -11413,7 +11413,9 @@ function renderFighterSelect() {
 function renderVersusPanel(roundLabel) {
   fighterSelect.innerHTML = "";
   fighterSelect.classList.add("versus-panel");
-  fighterSelect.append(makeVersusCard(fighters[0], "Rival"));
+  const leftRole = tournamentActive ? "Rival" : cpuEnabled ? "CPU" : "Jugador 1";
+  const rightRole = tournamentActive ? "Jugador" : "Jugador 2";
+  fighterSelect.append(makeVersusCard(fighters[0], leftRole));
 
   const center = document.createElement("div");
   center.className = "versus-panel-center";
@@ -11425,7 +11427,7 @@ function renderVersusPanel(roundLabel) {
   center.append(mark);
   fighterSelect.append(center);
 
-  fighterSelect.append(makeVersusCard(fighters[1], "Jugador"));
+  fighterSelect.append(makeVersusCard(fighters[1], rightRole));
 }
 
 function makeVersusCard(fighter, role) {
@@ -11446,6 +11448,10 @@ function makeVersusCard(fighter, role) {
   const caption = document.createElement("span");
   caption.textContent = role;
   card.append(caption);
+
+  const trait = document.createElement("em");
+  trait.textContent = fighterTrait(fighter);
+  card.append(trait);
   return card;
 }
 
@@ -11522,6 +11528,7 @@ function makeSelectColumn(side, title, selectedId) {
 }
 
 function fighterTrait(profile) {
+  const key = profile.profileId ?? profile.id;
   return {
     p1: "Potencia pesada",
     p2: "Tecnica veloz",
@@ -11529,7 +11536,7 @@ function fighterTrait(profile) {
     p4: "Reflejos",
     p5: "Alcance largo",
     p6: "Defensa solida",
-  }[profile.id] ?? "Equilibrio";
+  }[key] ?? "Equilibrio";
 }
 
 function makeMenuStats(profile) {

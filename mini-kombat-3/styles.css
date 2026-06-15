@@ -1082,6 +1082,17 @@ canvas {
   text-transform: uppercase;
 }
 
+.versus-card em {
+  margin-top: 8px;
+  padding: 5px 9px;
+  color: color-mix(in srgb, var(--fighter-trim) 82%, #fff7d6);
+  border-left: 3px solid var(--fighter-trim);
+  background: rgba(0, 0, 0, 0.24);
+  font: 900 10px/1 system-ui, sans-serif;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.78);
+}
+
 .versus-panel-center {
   display: grid;
   justify-items: center;
@@ -1405,6 +1416,12 @@ canvas {
     margin-top: 4px;
   }
 
+  .versus-card em {
+    margin-top: 4px;
+    padding: 4px 7px;
+    font-size: 8px;
+  }
+
   .versus-panel-center {
     gap: 5px;
   }
@@ -1481,10 +1498,10 @@ canvas {
   }
 
   .overlay[data-screen="home"] {
-    grid-template-rows: minmax(0, 1fr) 34px;
+    grid-template-rows: minmax(0, 1fr) 30px;
     align-content: stretch;
     gap: 3px;
-    padding: 38px 8px 6px;
+    padding: 36px 7px 5px;
     overflow: hidden;
   }
 
@@ -1500,9 +1517,9 @@ canvas {
   .fighter-select {
     grid-template-columns: minmax(0, 1fr) 50px minmax(0, 1fr);
     align-items: stretch;
-    width: min(900px, calc(100% - 12px));
+    width: min(920px, calc(100% - 10px));
     height: 100%;
-    gap: 4px;
+    gap: 5px;
     min-height: 0;
   }
 
@@ -1552,6 +1569,10 @@ canvas {
     font-size: 8px;
   }
 
+  .fighter-showcase-trait {
+    display: none;
+  }
+
   .fighter-showcase-stats {
     display: none;
   }
@@ -1597,9 +1618,94 @@ canvas {
   #online-menu,
   .overlay[data-screen="home"] #start {
     min-width: 104px;
-    min-height: 30px;
+    min-height: 28px;
     font-size: 11px;
     box-shadow: 0 5px 0 #130908;
+  }
+
+  .overlay[data-screen="versus"] {
+    grid-template-rows: minmax(0, 1fr) 32px;
+    align-content: stretch;
+    justify-items: center;
+    gap: 5px;
+    padding: 38px 8px 7px;
+    overflow: hidden;
+  }
+
+  .overlay[data-screen="versus"] h1,
+  .overlay[data-screen="versus"] .overlay-copy {
+    display: none;
+  }
+
+  .overlay[data-screen="versus"] .versus-panel {
+    grid-template-columns: minmax(0, 1fr) 58px minmax(0, 1fr);
+    align-items: stretch;
+    width: min(840px, calc(100% - 8px));
+    height: 100%;
+    gap: 7px;
+    min-height: 0;
+  }
+
+  .overlay[data-screen="versus"] .versus-card {
+    grid-template-columns: 70px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    align-content: center;
+    align-items: center;
+    justify-items: start;
+    column-gap: 9px;
+    min-height: 0;
+    height: 100%;
+    padding: 8px;
+  }
+
+  .overlay[data-screen="versus"] .versus-card img {
+    grid-row: 1 / 4;
+    width: 66px;
+    height: 66px;
+  }
+
+  .overlay[data-screen="versus"] .versus-card strong {
+    max-width: 100%;
+    margin-top: 0;
+    overflow: hidden;
+    font-size: clamp(22px, 4.8vw, 34px);
+    line-height: 0.9;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .overlay[data-screen="versus"] .versus-card span {
+    margin-top: 4px;
+    font-size: 9px;
+  }
+
+  .overlay[data-screen="versus"] .versus-card em {
+    margin-top: 4px;
+    padding: 3px 6px;
+    font-size: 8px;
+  }
+
+  .overlay[data-screen="versus"] .versus-panel-center {
+    align-self: center;
+    gap: 5px;
+  }
+
+  .overlay[data-screen="versus"] .versus-panel-center span {
+    padding: 4px 6px;
+    font-size: 9px;
+  }
+
+  .overlay[data-screen="versus"] .versus-panel-center strong {
+    width: 52px;
+    height: 52px;
+    font-size: 22px;
+  }
+
+  .overlay[data-screen="versus"] #start {
+    min-width: 126px;
+    min-height: 30px;
+    font-size: 13px;
+    box-shadow: 0 5px 0 #9b651b;
   }
 
   .mobile-controls {
