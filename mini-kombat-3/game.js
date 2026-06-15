@@ -5216,47 +5216,119 @@ function rasterBodyFrameFor(f, walking) {
   return "idle";
 }
 
-function stagedAttackFrameIndex(f, frames) {
-  if (!f.attack) return frames[0];
-  const phase = attackPhase(f.attack);
+function attackFrameTimeline(f, frameName, frames) {
+  if (!f.attack) return null;
+  const start = clamp(f.attack.activeStart / Math.max(1, f.attack.duration), 0, 1);
+  const end = clamp(f.attack.activeEnd / Math.max(1, f.attack.duration), start, 1);
+  const strikeSplit = start + (end - start) * 0.56;
+  const recoverySplit = end + (1 - end) * 0.48;
 
-  if (f.attack.frame < f.attack.activeStart) {
-    return phase.windupT < 0.42 ? frames[0] : frames[1] ?? frames[0];
+  if (frameName === "punch" || frameName === "kick") {
+    return [
+      { frame: frames[0], end: start * 0.42 },
+      { frame: frames[1] ?? frames[0], end: start },
+      { frame: frames[2] ?? frames[1] ?? frames[0], end: strikeSplit },
+      { frame: frames[3] ?? frames[2] ?? frames[0], end: recoverySplit },
+      { frame: frames[4] ?? frames[frames.length - 1], end: 1 },
+    ];
   }
 
-  if (f.attack.frame <= f.attack.activeEnd) {
-    return phase.strikeT < 0.56 || phase.snap > 0.18
-      ? frames[2] ?? frames[1] ?? frames[0]
-      : frames[3] ?? frames[2] ?? frames[0];
+  if (frameName === "sweep") {
+    return [
+      { frame: 19, end: start * 0.55 },
+      { frame: 16, end },
+      { frame: 20, end: end + (1 - end) * 0.5 },
+      { frame: 9, end: 1 },
+    ];
   }
 
-  return phase.recoveryT < 0.48
-    ? frames[3] ?? frames[2] ?? frames[0]
-    : frames[4] ?? frames[frames.length - 1];
+  if (frameName === "special") {
+    return [
+      { frame: 4, end: start * 0.42 },
+      { frame: 13, end: start },
+      { frame: f.profileId === "p2" ? 5 : 13, end },
+      { frame: 18, end: end + (1 - end) * 0.52 },
+      { frame: 13, end: 1 },
+    ];
+  }
+
+  return null;
+}
+
+function frameFromTimeline(f, timeline) {
+  const t = clamp(f.attack.frame / Math.max(1, f.attack.duration), 0, 0.999);
+  return (timeline.find((item) => t < item.end) ?? timeline[timeline.length - 1])?.frame;
+}
+
+function frameBlendFromTimeline(f, timeline, currentFrameIndex) {
+  const t = clamp(f.attack.frame / Math.max(1, f.attack.duration), 0, 0.999);
+  const blendWidth = 0.075;
+
+  for (let i = 0; i < timeline.length - 1; i += 1) {
+    const boundary = timeline[i].end;
+    const distance = t - boundary;
+    if (Math.abs(distance) > blendWidth) continue;
+
+    const neighborFrame = distance < 0 ? timeline[i + 1].frame : timeline[i].frame;
+    if (neighborFrame === currentFrameIndex) return null;
+
+    const strength = 1 - Math.abs(distance) / blendWidth;
+    return {
+      frameIndex: neighborFrame,
+      alpha: clamp(0.035 + strength * 0.115, 0.035, 0.15),
+      offsetX: (distance < 0 ? 1 : -1) * strength * 2.2,
+      offsetY: Math.sin(strength * Math.PI) * -0.8,
+    };
+  }
+
+  return null;
+}
+
+function rasterBodyFrameBlend(f, frameName, currentFrameIndex, walking) {
+  const frames = BODY_SPRITE_FRAMES[frameName] ?? BODY_SPRITE_FRAMES.idle;
+
+  if (f.attack) {
+    const timeline = attackFrameTimeline(f, frameName, frames);
+    if (!timeline) return null;
+    return frameBlendFromTimeline(f, timeline, currentFrameIndex);
+  }
+
+  if (frameName === "walk" || walking) {
+    const cycle = f.walkCycle ?? roundFrame * 0.2;
+    const normalized = ((cycle / (Math.PI * 2)) % 1 + 1) % 1;
+    const position = normalized * frames.length;
+    const index = Math.floor(position) % frames.length;
+    const local = position - index;
+    const blendWidth = 0.18;
+    const neighborIndex = local > 1 - blendWidth
+      ? (index + 1) % frames.length
+      : local < blendWidth ? (index - 1 + frames.length) % frames.length : -1;
+    if (neighborIndex < 0) return null;
+    const neighborFrame = frames[neighborIndex];
+    if (neighborFrame === currentFrameIndex) return null;
+    const strength = local > 1 - blendWidth
+      ? (local - (1 - blendWidth)) / blendWidth
+      : (blendWidth - local) / blendWidth;
+    return {
+      frameIndex: neighborFrame,
+      alpha: clamp(strength * 0.08, 0.015, 0.08),
+      offsetX: (neighborIndex > index ? 1 : -1) * strength * 1.4,
+      offsetY: 0,
+    };
+  }
+
+  return null;
 }
 
 function rasterBodyFrameIndex(f, frameName, walking) {
   const frames = BODY_SPRITE_FRAMES[frameName] ?? BODY_SPRITE_FRAMES.idle;
 
-  if (f.attack && frameName === "sweep") {
-    const phase = attackPhase(f.attack);
-    if (f.attack.frame < f.attack.activeStart) return phase.windupT < 0.55 ? 19 : 16;
-    if (f.attack.frame <= f.attack.activeEnd) return 16;
-    return phase.recoveryT < 0.5 ? 20 : 9;
-  }
-
-  if (f.attack && frameName === "special") {
-    const phase = attackPhase(f.attack);
-    if (f.attack.frame < f.attack.activeStart) return phase.windupT < 0.42 ? 4 : 13;
-    if (f.attack.frame <= f.attack.activeEnd) return f.profileId === "p2" ? 5 : 13;
-    return phase.recoveryT < 0.52 ? 18 : 13;
+  if (f.attack) {
+    const timeline = attackFrameTimeline(f, frameName, frames);
+    if (timeline) return frameFromTimeline(f, timeline);
   }
 
   if (frames.length === 1) return frames[0];
-
-  if (f.attack && (frameName === "punch" || frameName === "kick")) {
-    return stagedAttackFrameIndex(f, frames);
-  }
 
   if (frameName === "hurt") {
     const reaction = impactReactionProfile(f);
@@ -5349,6 +5421,33 @@ function drawSpritePoseTransitionBlend(f, image, currentFrameIndex, crouch) {
     ctx.stroke();
     ctx.restore();
   }
+}
+
+function drawSpriteFrameBlend(f, image, frameName, currentFrameIndex, crouch, walking, avoidHead = false) {
+  const blend = rasterBodyFrameBlend(f, frameName, currentFrameIndex, walking);
+  if (!blend || blend.alpha <= 0.01 || !image?.complete || !image.naturalWidth) return;
+
+  const clipTop = -BODY_SPRITE_ANCHOR_Y + (avoidHead ? 96 : 28) + crouch * 0.18;
+  const clipHeight = BODY_SPRITE_FRAME_H - (avoidHead ? 82 : 18);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-BODY_SPRITE_ANCHOR_X - 18, clipTop, BODY_SPRITE_FRAME_W + 36, clipHeight);
+  ctx.clip();
+  ctx.globalAlpha = blend.alpha;
+  ctx.translate(blend.offsetX, blend.offsetY);
+  ctx.drawImage(
+    image,
+    blend.frameIndex * BODY_SPRITE_FRAME_W,
+    0,
+    BODY_SPRITE_FRAME_W,
+    BODY_SPRITE_FRAME_H,
+    -BODY_SPRITE_ANCHOR_X,
+    -BODY_SPRITE_ANCHOR_Y + crouch * 0.18,
+    BODY_SPRITE_FRAME_W,
+    BODY_SPRITE_FRAME_H
+  );
+  ctx.restore();
 }
 
 function rasterHeadPose(f, frameName, frameIndex) {
@@ -5453,6 +5552,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
     );
     ctx.restore();
 
+    drawSpriteFrameBlend(f, unifiedSheet, frameName, frameIndex, crouch, walking, true);
     drawSpritePoseTransitionBlend(f, unifiedSheet, frameIndex, crouch);
     drawSpriteContactOcclusion(f, crouch, frameName, walking ? stride : 0);
     drawSpriteLayeredContactShadows(f, crouch, frameName, walking ? stride : 0);
@@ -5495,6 +5595,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   );
   ctx.restore();
 
+  drawSpriteFrameBlend(f, sheet, frameName, frameIndex, crouch, walking, false);
   drawSpritePoseTransitionBlend(f, sheet, frameIndex, crouch);
   drawSpriteAttackFrameWarp(f, sheet, frameX, crouch);
   drawSpriteAttackSilhouetteExtension(f, crouch, frameName);
