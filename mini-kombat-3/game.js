@@ -1,5 +1,6 @@
 const canvas = document.querySelector("#game");
 let ctx = canvas.getContext("2d");
+const gameShell = document.querySelector(".game-shell");
 const overlay = document.querySelector("#overlay");
 const startButton = document.querySelector("#start");
 const restartButton = document.querySelector("#restart");
@@ -1150,6 +1151,7 @@ function resetRound() {
   paused = false;
   running = true;
   overlay.classList.add("hidden");
+  syncShellState();
 }
 
 function clearRoundTimers() {
@@ -1199,6 +1201,7 @@ function showHomeOverlay() {
   renderFighterSelect();
   fighterSelect.classList.remove("hidden");
   overlay.classList.remove("hidden");
+  syncShellState();
 }
 
 function showVersusOverlay(startKind = "match") {
@@ -1215,6 +1218,7 @@ function showVersusOverlay(startKind = "match") {
   startButton.textContent = "COMENZAR";
   fighterSelect.classList.remove("hidden");
   overlay.classList.remove("hidden");
+  syncShellState();
   playSound("vs");
 }
 
@@ -1269,11 +1273,13 @@ function showPauseOverlay() {
   startButton.textContent = "SEGUIR";
   fighterSelect.classList.add("hidden");
   overlay.classList.remove("hidden");
+  syncShellState();
 }
 
 function resumeGame() {
   paused = false;
   overlay.classList.add("hidden");
+  syncShellState();
 }
 
 function inputFor(f) {
@@ -3805,15 +3811,26 @@ function drawVignette() {
   ctx.fillRect(0, 0, W, H);
 }
 
-function drawHud() {
-  drawHudPanel(22, 16, 390, fighters[0], false);
-  drawHudPanel(W - 412, 16, 390, fighters[1], true);
+function compactHudMode() {
+  return window.innerWidth <= 920 || window.innerHeight <= 520 || window.matchMedia?.("(pointer: coarse)")?.matches;
+}
 
+function drawHud() {
+  const compact = compactHudMode();
+  const panelY = compact ? 12 : 16;
+  const panelW = compact ? 332 : 390;
+  const sideInset = compact ? 18 : 22;
+  drawHudPanel(sideInset, panelY, panelW, fighters[0], false, compact);
+  drawHudPanel(W - sideInset - panelW, panelY, panelW, fighters[1], true, compact);
+  drawHudCenter(compact);
+}
+
+function drawHudCenter(compact = false) {
   const cx = W / 2;
-  const x = cx - 54;
-  const y = 18;
-  const width = 108;
-  const height = 68;
+  const width = compact ? 76 : 108;
+  const height = compact ? 48 : 68;
+  const x = cx - width / 2;
+  const y = compact ? 13 : 18;
   const centerPanel = ctx.createLinearGradient(x, y, x + width, y + height);
   centerPanel.addColorStop(0, "rgba(99, 34, 21, 0.96)");
   centerPanel.addColorStop(0.42, "rgba(20, 13, 12, 0.96)");
@@ -3840,12 +3857,12 @@ function drawHud() {
   ctx.stroke();
 
   ctx.fillStyle = "rgba(255,255,255,0.1)";
-  ctx.fillRect(x + 12, y + 11, width - 24, 6);
+  ctx.fillRect(x + 12, y + 11, width - 24, compact ? 4 : 6);
   ctx.fillStyle = "rgba(255, 205, 85, 0.14)";
   ctx.beginPath();
-  ctx.moveTo(cx - 44, y + height - 9);
+  ctx.moveTo(cx - (compact ? 30 : 44), y + height - 9);
   ctx.lineTo(cx, y + 10);
-  ctx.lineTo(cx + 44, y + height - 9);
+  ctx.lineTo(cx + (compact ? 30 : 44), y + height - 9);
   ctx.closePath();
   ctx.fill();
 
@@ -3854,12 +3871,12 @@ function drawHud() {
   ctx.shadowBlur = 8;
   ctx.shadowOffsetY = 2;
   ctx.fillStyle = "#fff1bd";
-  ctx.font = "900 34px system-ui, sans-serif";
+  ctx.font = `900 ${compact ? 25 : 34}px system-ui, sans-serif`;
   ctx.textAlign = "center";
-  ctx.fillText(winner ? "KO" : "VS", cx, y + 45);
-  ctx.font = "900 13px system-ui, sans-serif";
+  ctx.fillText(winner ? "KO" : "VS", cx, y + (compact ? 31 : 45));
+  ctx.font = `900 ${compact ? 9 : 13}px system-ui, sans-serif`;
   ctx.fillStyle = "rgba(255, 244, 205, 0.9)";
-  ctx.fillText(matchOver ? "MATCH" : `ROUND ${toRoman(roundNumber)}`, cx, y + 65);
+  ctx.fillText(matchOver ? "MATCH" : `R${toRoman(roundNumber)}`, cx, y + (compact ? 44 : 65));
   ctx.restore();
 }
 
@@ -3871,12 +3888,12 @@ function drawComboCounters() {
     if (count < 2 || timer <= 0) continue;
 
     const reverse = i === 1;
-    const compact = W < 760;
+    const compact = compactHudMode();
     const panelW = compact ? 138 : 166 + Math.min(count, 8) * 3;
     const panelH = compact ? 50 : 58;
     const x = reverse ? -panelW : 0;
-    const y = compact ? 90 : 104;
-    const anchorX = reverse ? W - 32 : 32;
+    const y = compact ? 74 : 104;
+    const anchorX = reverse ? W - (compact ? 22 : 32) : compact ? 22 : 32;
     const alpha = clamp(timer / 20, 0, 1);
     const pulse = clamp((f.comboPulse ?? 0) / 22, 0, 1);
     const scale = 1 + pulse * 0.055;
@@ -3951,8 +3968,9 @@ function drawComboCounters() {
   }
 }
 
-function drawHudPanel(x, y, width, f, reverse) {
-  const height = 76;
+function drawHudPanel(x, y, width, f, reverse, compact = false) {
+  const height = compact ? 56 : 76;
+  const corner = compact ? 7 : 8;
   const panel = ctx.createLinearGradient(x, y, x + width, y + height);
   panel.addColorStop(0, reverse ? "rgba(23, 50, 42, 0.88)" : "rgba(64, 38, 18, 0.88)");
   panel.addColorStop(0.44, "rgba(15, 14, 14, 0.88)");
@@ -3964,13 +3982,13 @@ function drawHudPanel(x, y, width, f, reverse) {
   ctx.shadowOffsetY = 5;
   ctx.fillStyle = panel;
   ctx.beginPath();
-  ctx.roundRect(x, y, width, height, 8);
+  ctx.roundRect(x, y, width, height, corner);
   ctx.fill();
   ctx.restore();
 
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(x, y, width, height, 8);
+  ctx.roundRect(x, y, width, height, corner);
   ctx.clip();
   ctx.fillStyle = colorWithAlpha(f.trim, 0.12);
   ctx.beginPath();
@@ -3991,10 +4009,11 @@ function drawHudPanel(x, y, width, f, reverse) {
   ctx.fillRect(x + 8, y + 8, width - 16, 7);
   ctx.strokeStyle = "rgba(255,255,255,0.04)";
   ctx.lineWidth = 1;
-  for (let i = 0; i < 5; i += 1) {
+  const detailLines = compact ? 3 : 5;
+  for (let i = 0; i < detailLines; i += 1) {
     ctx.beginPath();
-    ctx.moveTo(x + 12, y + 22 + i * 10);
-    ctx.lineTo(x + width - 12, y + 22 + i * 10);
+    ctx.moveTo(x + 12, y + 19 + i * (compact ? 9 : 10));
+    ctx.lineTo(x + width - 12, y + 19 + i * (compact ? 9 : 10));
     ctx.stroke();
   }
   ctx.restore();
@@ -4003,7 +4022,7 @@ function drawHudPanel(x, y, width, f, reverse) {
   if (dangerPulse > 0) {
     ctx.fillStyle = `rgba(255, 40, 30, ${dangerPulse})`;
     ctx.beginPath();
-    ctx.roundRect(x, y, width, height, 8);
+    ctx.roundRect(x, y, width, height, corner);
     ctx.fill();
   }
 
@@ -4018,39 +4037,48 @@ function drawHudPanel(x, y, width, f, reverse) {
   ctx.roundRect(x + 10, y + 10, width - 20, height - 20, 5);
   ctx.stroke();
 
-  const portraitX = reverse ? x + width - 64 : x + 12;
-  drawHudPortrait(portraitX, y + 12, f, reverse);
+  const portraitSize = compact ? 38 : 52;
+  const portraitInset = compact ? 9 : 12;
+  const portraitX = reverse ? x + width - portraitSize - portraitInset : x + portraitInset;
+  drawHudPortrait(portraitX, y + (compact ? 9 : 12), f, reverse, portraitSize);
 
-  const barX = reverse ? x + 28 : x + 78;
-  const nameX = reverse ? x + width - 78 : x + 78;
+  const infoOffset = compact ? 56 : 78;
+  const barX = reverse ? x + 18 : x + infoOffset;
+  const nameX = reverse ? x + width - infoOffset : x + infoOffset;
   const align = reverse ? "right" : "left";
+  const healthW = compact ? width - 106 : 284;
+  const healthY = y + (compact ? 20 : 26);
+  const energyW = compact ? Math.min(132, healthW) : 186;
+  const energyX = compact
+    ? reverse ? barX + healthW - energyW : barX
+    : reverse ? x + width - 264 : x + 78;
 
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.72)";
   ctx.shadowBlur = 4;
   ctx.shadowOffsetY = 2;
   ctx.strokeStyle = "rgba(35, 16, 12, 0.78)";
-  ctx.lineWidth = 3;
-  ctx.font = "900 14px system-ui, sans-serif";
+  ctx.lineWidth = compact ? 2 : 3;
+  ctx.font = `900 ${compact ? 11 : 14}px system-ui, sans-serif`;
   ctx.textAlign = align;
-  ctx.strokeText(f.name.toUpperCase(), nameX, y + 20);
+  ctx.strokeText(f.name.toUpperCase(), nameX, y + (compact ? 16 : 20));
   ctx.fillStyle = "rgba(255, 247, 214, 0.95)";
-  ctx.fillText(f.name.toUpperCase(), nameX, y + 20);
+  ctx.fillText(f.name.toUpperCase(), nameX, y + (compact ? 16 : 20));
   ctx.restore();
 
-  drawHealth(barX, y + 26, 284, f, reverse);
-  drawEnergy(reverse ? x + width - 264 : x + 78, y + 60, 186, f, reverse);
-  drawWins(reverse ? x + 48 : x + width - 70, y + 58, f, reverse);
+  drawHealth(barX, healthY, healthW, f, reverse, compact ? 21 : 28);
+  drawEnergy(energyX, y + (compact ? 43 : 60), energyW, f, reverse, compact ? 9 : 12);
+  drawWins(reverse ? x + 38 : x + width - 58, y + (compact ? 39 : 58), f, reverse, compact);
 }
 
-function drawHudPortrait(x, y, f, reverse) {
-  const size = 52;
-  const glow = ctx.createRadialGradient(x + size / 2, y + size / 2, 8, x + size / 2, y + size / 2, 42);
+function drawHudPortrait(x, y, f, reverse, size = 52) {
+  const glowRadius = size * 0.8;
+  const glow = ctx.createRadialGradient(x + size / 2, y + size / 2, size * 0.16, x + size / 2, y + size / 2, glowRadius);
   glow.addColorStop(0, colorWithAlpha(f.trim, 0.34));
   glow.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(x + size / 2, y + size / 2, 42, 0, Math.PI * 2);
+  ctx.arc(x + size / 2, y + size / 2, glowRadius, 0, Math.PI * 2);
   ctx.fill();
 
   const frame = ctx.createLinearGradient(x, y, x + size, y + size);
@@ -4071,7 +4099,7 @@ function drawHudPortrait(x, y, f, reverse) {
     ctx.beginPath();
     ctx.roundRect(x + 5, y + 5, size - 10, size - 10, 5);
     ctx.clip();
-    ctx.drawImage(f.face, x - 3, y - 5, 58, 58);
+    ctx.drawImage(f.face, x - size * 0.06, y - size * 0.1, size * 1.12, size * 1.12);
     const shade = ctx.createLinearGradient(x, y, x, y + size);
     shade.addColorStop(0, "rgba(255,255,255,0.18)");
     shade.addColorStop(0.48, "rgba(255,255,255,0)");
@@ -4086,20 +4114,23 @@ function drawHudPortrait(x, y, f, reverse) {
   ctx.roundRect(x + 4, y + 4, size - 8, size - 8, 5);
   ctx.stroke();
 
+  const badge = Math.max(8, Math.round(size * 0.42));
+  const badgeRadius = badge / 2;
+  const badgeX = reverse ? x + badgeRadius + 1 : x + size - badgeRadius - 1;
+  const badgeY = y + size - badgeRadius - 1;
   ctx.fillStyle = colorWithAlpha(f.trim, 0.92);
   ctx.beginPath();
-  ctx.arc(reverse ? x + 8 : x + size - 8, y + size - 8, 11, 0, Math.PI * 2);
+  ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = "#19120f";
-  ctx.font = "900 12px system-ui, sans-serif";
+  ctx.font = `900 ${Math.max(8, Math.round(size * 0.23))}px system-ui, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(f.mark ?? "", reverse ? x + 8 : x + size - 8, y + size - 8);
+  ctx.fillText(f.mark ?? "", badgeX, badgeY + 0.5);
   ctx.textBaseline = "alphabetic";
 }
 
-function drawHealth(x, y, width, f, reverse) {
-  const height = 28;
+function drawHealth(x, y, width, f, reverse, height = 28) {
   const innerX = x + 5;
   const innerY = y + 5;
   const innerW = width - 10;
@@ -4177,8 +4208,7 @@ function drawHealth(x, y, width, f, reverse) {
   ctx.stroke();
 }
 
-function drawEnergy(x, y, width, f, reverse) {
-  const height = 12;
+function drawEnergy(x, y, width, f, reverse, height = 12) {
   const ready = f.energy >= 45;
   const pulse = 0.16 + Math.sin(roundFrame * 0.12) * 0.06;
   if (ready) {
@@ -4231,16 +4261,19 @@ function drawEnergy(x, y, width, f, reverse) {
   ctx.stroke();
 }
 
-function drawWins(x, y, f, reverse) {
+function drawWins(x, y, f, reverse, compact = false) {
+  const gap = compact ? 14 : 18;
+  const glowRadius = compact ? 8 : 11;
+  const pointRadius = compact ? 5.5 : 7;
   for (let i = 0; i < 2; i += 1) {
-    const px = reverse ? x - i * 18 : x + i * 18;
+    const px = reverse ? x - i * gap : x + i * gap;
     const won = i < f.wins;
     if (won) {
       ctx.save();
       ctx.globalCompositeOperation = "screen";
       ctx.fillStyle = "rgba(255, 226, 101, 0.26)";
       ctx.beginPath();
-      ctx.arc(px, y + 6, 11, 0, Math.PI * 2);
+      ctx.arc(px, y + 6, glowRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -4249,7 +4282,7 @@ function drawWins(x, y, f, reverse) {
     medallion.addColorStop(1, won ? "#c47a23" : "rgba(27, 18, 15, 0.82)");
     ctx.fillStyle = medallion;
     ctx.beginPath();
-    ctx.arc(px, y + 6, 7, 0, Math.PI * 2);
+    ctx.arc(px, y + 6, pointRadius, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = won ? "rgba(255, 244, 194, 0.9)" : "rgba(255, 231, 168, 0.26)";
     ctx.lineWidth = 1;
@@ -11276,10 +11309,11 @@ function showWinner() {
     overlayCopy.textContent = matchOver
       ? `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Revancha disponible.`
       : `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Prepara el siguiente round.`;
-    startButton.textContent = matchOver ? "REVANCHA" : "SIGUIENTE ROUND";
+  startButton.textContent = matchOver ? "REVANCHA" : "SIGUIENTE ROUND";
   }
   fighterSelect.classList.add("hidden");
   overlay.classList.remove("hidden");
+  syncShellState();
 }
 
 function loop(timestamp = 0) {
@@ -11361,6 +11395,11 @@ function colorParts(color) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function syncShellState() {
+  const fighting = running && !paused && !winner && overlay.classList.contains("hidden");
+  gameShell.classList.toggle("is-fighting", fighting);
 }
 
 function setCpuMode(enabled) {
@@ -11638,6 +11677,7 @@ function showHelpOverlay() {
   startButton.textContent = paused ? "SEGUIR" : "LISTO";
   fighterSelect.classList.add("hidden");
   overlay.classList.remove("hidden");
+  syncShellState();
 }
 
 function showOnlineOverlay() {
@@ -11655,6 +11695,7 @@ function showOnlineOverlay() {
   fighterSelect.append(status);
   startButton.textContent = paused ? "SEGUIR" : "VOLVER";
   overlay.classList.remove("hidden");
+  syncShellState();
   onlineButton.setAttribute("aria-pressed", "true");
   onlineMenuButton.setAttribute("aria-pressed", "true");
 }

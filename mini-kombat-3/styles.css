@@ -311,6 +311,18 @@ canvas {
   pointer-events: none;
   gap: 12px;
   z-index: 6;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.game-shell.is-fighting .topbar {
+  opacity: 0.18;
+  transform: translateY(-6px);
+}
+
+.game-shell.is-fighting .topbar:hover,
+.game-shell.is-fighting .topbar:focus-within {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .fighter-label {
@@ -1489,6 +1501,12 @@ canvas {
 
   .topbar-actions {
     transform: scale(0.72);
+  }
+
+  .game-shell.is-fighting .topbar {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-24px);
   }
 
   .overlay {
