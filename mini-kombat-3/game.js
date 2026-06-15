@@ -3054,6 +3054,29 @@ function attackVisualSpec(type = "") {
   };
 }
 
+function attackReadabilityProfile(f) {
+  const attack = f?.attack;
+  const phase = attackPhase(attack);
+  const spec = attackVisualSpec(attack?.type);
+  const motion = characterMotion(f);
+  const snap = clamp(Math.max(phase.snap, phase.strike * 0.72), 0, 1.16);
+  const active = clamp(Math.max(phase.strike, phase.snap * 1.04, phase.followThrough * 0.42), 0, 1.18);
+  const wind = clamp(phase.anticipation, 0, 1);
+  const clarity = clamp(active * 0.76 + snap * 0.42 + wind * 0.12, 0, 1.32);
+  const profile = f?.profileId === "p1" ? 1.08 : f?.profileId === "p2" ? 0.96 : 1;
+  return {
+    spec,
+    active,
+    snap,
+    wind,
+    clarity,
+    profile,
+    reach: (spec.kick || spec.sweep ? 1.08 : spec.special ? 1.02 : 0.92) * motion.reach,
+    lift: motion.lift,
+    heavyLine: clamp((spec.heavy ? 1.1 : 0.82) * profile, 0.72, 1.24),
+  };
+}
+
 function coldWaterSplash(x, y, dir) {
   const count = fxCount(18, 8);
   for (let i = 0; i < count; i += 1) {
@@ -6791,6 +6814,7 @@ function drawSpriteAttackFrameWarp(f, image, frameX, crouch) {
   if (!f.attack || f.hurt > 0) return;
   const frame = attackFrameProfile(f);
   if (frame.bandT <= 0.04) return;
+  const readability = attackReadabilityProfile(f);
 
   const zones = {
     arms: { srcY: 74, h: 120, pad: 18, lineY: -132 },
@@ -6800,7 +6824,7 @@ function drawSpriteAttackFrameWarp(f, image, frameX, crouch) {
   const zone = zones[frame.band] ?? zones.torso;
   const localY = -BODY_SPRITE_ANCHOR_Y + zone.srcY + crouch * 0.18;
   const centerY = localY + zone.h * 0.5;
-  const alpha = clamp(0.12 + frame.bandT * 0.2, 0.1, 0.34);
+  const alpha = clamp(0.07 + frame.bandT * 0.13 + readability.snap * 0.035, 0.06, 0.24);
 
   ctx.save();
   ctx.beginPath();
@@ -6827,9 +6851,9 @@ function drawSpriteAttackFrameWarp(f, image, frameX, crouch) {
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  ctx.globalAlpha = clamp(0.1 + frame.arcFan * 0.22, 0.08, 0.36);
+  ctx.globalAlpha = clamp(0.1 + frame.arcFan * 0.2 + readability.clarity * 0.06, 0.08, 0.4);
   ctx.strokeStyle = colorWithAlpha(f.trim, 0.62);
-  ctx.lineWidth = 1.5 + frame.arcFan * 2.2;
+  ctx.lineWidth = 1.5 + frame.arcFan * 2 + readability.snap * 1.2;
   ctx.lineCap = "round";
   const lineBaseY = zone.lineY + crouch * 0.18;
   for (let i = 0; i < 3; i += 1) {
@@ -6851,6 +6875,7 @@ function drawSpriteAttackSilhouetteExtension(f, crouch, frameName) {
   if (!f.attack || f.hurt > 0) return;
   const type = f.attack.type;
   const phase = attackPhase(f.attack);
+  const read = attackReadabilityProfile(f);
   const strike = Math.max(phase.strike, phase.snap * 0.95);
   const follow = phase.followThrough * 0.45;
   const power = clamp(Math.max(strike, follow), 0, 1.2);
@@ -6870,6 +6895,7 @@ function drawSpriteAttackSilhouetteExtension(f, crouch, frameName) {
   const trim = f.trim ?? "#fff1bd";
   const localCrouch = crouch * 0.18;
   const alpha = clamp(0.2 + power * 0.42, 0.16, 0.58);
+  const clarity = read.clarity;
 
   ctx.save();
   ctx.globalCompositeOperation = "source-over";
@@ -6888,7 +6914,14 @@ function drawSpriteAttackSilhouetteExtension(f, crouch, frameName) {
     const fistX = 112 + power * (special ? 20 : 28) + reach;
     const fistY = -130 + localCrouch - power * (special ? 9 : 5);
 
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = clamp(alpha + clarity * 0.06, 0.18, 0.64);
+    ctx.strokeStyle = "rgba(20, 11, 8, 0.34)";
+    ctx.lineWidth = 24 - power * 1.4;
+    ctx.beginPath();
+    ctx.moveTo(shoulderX - 2, shoulderY + 4);
+    ctx.quadraticCurveTo(elbowX - 20, elbowY + 8, fistX - 14, fistY + 6);
+    ctx.stroke();
+
     ctx.strokeStyle = darken(sleeve, 10);
     ctx.lineWidth = 18 - power * 1.5;
     ctx.beginPath();
@@ -6915,6 +6948,28 @@ function drawSpriteAttackSilhouetteExtension(f, crouch, frameName) {
     ctx.ellipse(fistX + 1, fistY, 13 + power * 4, 9 + power * 1.6, -0.08, 0, Math.PI * 2);
     ctx.fill();
 
+    ctx.strokeStyle = "rgba(42, 20, 13, 0.58)";
+    ctx.lineWidth = 2.2 + clarity * 0.8;
+    ctx.beginPath();
+    ctx.ellipse(fistX + 1, fistY, 13 + power * 4, 9 + power * 1.6, -0.08, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = colorWithAlpha(trim, 0.78);
+    ctx.lineWidth = 2 + clarity * 0.9;
+    ctx.beginPath();
+    ctx.moveTo(fistX - 20, fistY - 8);
+    ctx.quadraticCurveTo(fistX - 4, fistY - 13 - clarity * 3, fistX + 12, fistY - 7);
+    ctx.stroke();
+
+    if (!special) {
+      ctx.fillStyle = `rgba(255,255,255,${0.08 + clarity * 0.12})`;
+      for (let i = 0; i < 3; i += 1) {
+        ctx.beginPath();
+        ctx.ellipse(fistX - 6 + i * 7, fistY - 4 + (i === 1 ? -1 : 0), 2.4 + clarity * 0.8, 1.4 + clarity * 0.4, -0.12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
     ctx.shadowBlur = 0;
     ctx.globalCompositeOperation = "screen";
     ctx.globalAlpha = clamp(0.16 + power * 0.2, 0.12, 0.34);
@@ -6933,6 +6988,21 @@ function drawSpriteAttackSilhouetteExtension(f, crouch, frameName) {
       ctx.quadraticCurveTo(111 + power * 18, fistY + lane * (12 - power * 4), fistX + 36, fistY + lane * 6);
       ctx.stroke();
     }
+
+    if (special) {
+      const burst = clamp(power * 0.7 + phase.snap * 0.45, 0, 1.1);
+      ctx.globalAlpha = clamp(0.12 + burst * 0.28, 0.12, 0.42);
+      ctx.strokeStyle = colorWithAlpha(f.specialStyle?.rim ?? trim, 0.95);
+      ctx.lineWidth = 2.2 + burst * 1.8;
+      ctx.beginPath();
+      ctx.ellipse(fistX + 9, fistY - 1, 24 + burst * 9, 11 + burst * 4, -0.08, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(fistX - 8, fistY - 18);
+      ctx.lineTo(fistX + 23 + burst * 7, fistY - 2);
+      ctx.lineTo(fistX - 6, fistY + 15);
+      ctx.stroke();
+    }
     ctx.restore();
     return;
   }
@@ -6946,7 +7016,14 @@ function drawSpriteAttackSilhouetteExtension(f, crouch, frameName) {
     const footX = sweep ? 117 + power * 34 : 120 + power * 38;
     const footY = sweep ? -17 + localCrouch + power * 2 : groundY;
 
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = clamp(alpha + clarity * 0.06, 0.18, 0.64);
+    ctx.strokeStyle = "rgba(20, 11, 8, 0.34)";
+    ctx.lineWidth = sweep ? 25 : 26;
+    ctx.beginPath();
+    ctx.moveTo(hipX - 1, hipY + 5);
+    ctx.quadraticCurveTo(kneeX - 25, kneeY + (sweep ? -3 : 13), footX - 20, footY + (sweep ? 4 : 8));
+    ctx.stroke();
+
     ctx.strokeStyle = darken(pants, 12);
     ctx.lineWidth = sweep ? 18 : 19;
     ctx.beginPath();
@@ -6965,6 +7042,19 @@ function drawSpriteAttackSilhouetteExtension(f, crouch, frameName) {
     ctx.beginPath();
     ctx.ellipse(footX, footY, sweep ? 26 + power * 10 : 24 + power * 8, sweep ? 8 + power * 1.8 : 9 + power * 1.8, sweep ? -0.02 : -0.16, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.strokeStyle = "rgba(32, 16, 11, 0.58)";
+    ctx.lineWidth = 2.4 + clarity * 0.8;
+    ctx.beginPath();
+    ctx.ellipse(footX, footY, sweep ? 26 + power * 10 : 24 + power * 8, sweep ? 8 + power * 1.8 : 9 + power * 1.8, sweep ? -0.02 : -0.16, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = colorWithAlpha(trim, 0.78);
+    ctx.lineWidth = 2 + clarity;
+    ctx.beginPath();
+    ctx.moveTo(footX - 21, footY - (sweep ? 6 : 8));
+    ctx.quadraticCurveTo(footX + 2, footY - (sweep ? 12 : 15), footX + 24 + clarity * 6, footY - (sweep ? 4 : 8));
+    ctx.stroke();
 
     ctx.shadowBlur = 0;
     ctx.globalCompositeOperation = "screen";
@@ -7746,6 +7836,7 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
   const trailColor = signature?.trail ?? spec.color;
   const coreColor = signature?.core ?? spec.core;
   const rimColor = signature?.rim ?? spec.color;
+  const read = attackReadabilityProfile(f);
   const prep = phase.anticipation;
   const strike = Math.max(phase.strike, phase.snap * 0.9);
   const recover = Math.max(phase.recovery * 0.72, phase.followThrough);
@@ -7834,6 +7925,56 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.ellipse(coreX, coreY, reach * (spec.sweep ? 0.58 : 0.5), height * (spec.kick ? 1.25 : spec.special ? 1.45 : 1), spec.sweep ? 0.02 : -0.09, 0, Math.PI * 2);
+    ctx.fill();
+
+    const clarity = read.clarity;
+    const terminalX = spec.sweep ? reach * 1.03 : spec.kick ? reach * 0.96 : spec.special ? reach * 0.9 : reach * 0.86;
+    const terminalY = spec.sweep ? baseY + height * 0.08 : spec.kick ? baseY - height * 0.08 : spec.special ? baseY - height * 0.12 : baseY - height * 0.16;
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.globalAlpha = clamp(0.06 + clarity * 0.1, 0.05, 0.18);
+    ctx.strokeStyle = "rgba(16, 8, 6, 0.92)";
+    ctx.lineWidth = (spec.kick || spec.sweep ? 11 : 8) * read.heavyLine;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    if (spec.sweep) {
+      ctx.moveTo(-18, baseY + height * 0.48);
+      ctx.quadraticCurveTo(reach * 0.45, baseY - height * 0.5, terminalX, terminalY + 3);
+    } else if (spec.kick) {
+      ctx.moveTo(4, baseY + height * 0.48);
+      ctx.quadraticCurveTo(reach * 0.45, baseY - height * 1.42, terminalX, terminalY + 5);
+    } else if (spec.special) {
+      ctx.moveTo(0, baseY + height * 0.12);
+      ctx.bezierCurveTo(reach * 0.26, baseY - height * 1.38, reach * 0.67, baseY + height * 0.32, terminalX, terminalY);
+    } else {
+      ctx.moveTo(4, baseY + height * 0.2);
+      ctx.quadraticCurveTo(reach * 0.42, baseY - height * 0.9, terminalX, terminalY);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = colorWithAlpha(rimColor, 0.34 + clarity * 0.26);
+    ctx.lineWidth = (spec.kick || spec.sweep ? 3.6 : 2.8) + clarity * 1.4;
+    ctx.beginPath();
+    if (spec.sweep) {
+      ctx.moveTo(-18, baseY + height * 0.36);
+      ctx.quadraticCurveTo(reach * 0.42, baseY - height * 0.72, terminalX + clarity * 10, terminalY);
+    } else if (spec.kick) {
+      ctx.moveTo(12, baseY + height * 0.42);
+      ctx.quadraticCurveTo(reach * 0.5, baseY - height * 1.5, terminalX + clarity * 8, terminalY);
+    } else if (spec.special) {
+      ctx.moveTo(2, baseY + height * 0.04);
+      ctx.bezierCurveTo(reach * 0.28, baseY - height * 1.5, reach * 0.7, baseY + height * 0.22, terminalX + clarity * 8, terminalY);
+    } else {
+      ctx.moveTo(8, baseY + height * 0.16);
+      ctx.quadraticCurveTo(reach * 0.46, baseY - height * 1.02, terminalX + clarity * 6, terminalY);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = colorWithAlpha(coreColor, 0.16 + clarity * 0.14);
+    ctx.beginPath();
+    ctx.ellipse(terminalX + clarity * 8, terminalY, spec.kick || spec.sweep ? 15 + clarity * 7 : 12 + clarity * 5, spec.kick || spec.sweep ? 4 + clarity * 2 : 3.6 + clarity * 1.8, spec.sweep ? 0 : -0.08, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.strokeStyle = colorWithAlpha(coreColor, 0.28 + strike * 0.46);
@@ -8504,6 +8645,7 @@ function drawAttackArc(f, box) {
   const phase = attackPhase(f.attack);
   const spec = attackVisualSpec(f.attack?.type);
   const motion = characterMotion(f);
+  const read = attackReadabilityProfile(f);
   const isKick = spec.kick || spec.sweep;
   const progress = Math.max(phase.strike, phase.snap * 0.9, phase.anticipation * 0.35, phase.followThrough * 0.28, phase.recovery * 0.22);
   const outfit = outfitSpec(f);
@@ -8515,7 +8657,7 @@ function drawAttackArc(f, box) {
   ctx.scale(f.dir * FIGHTER_SCALE, FIGHTER_SCALE);
   ctx.rotate((spec.sweep ? 0.02 : isKick ? -0.16 : -0.06) * motion.rotation);
 
-  const arcReach = isKick ? 106 * motion.reach : 82 * motion.reach;
+  const arcReach = (isKick ? 106 : spec.special ? 96 : 82) * motion.reach * (0.96 + read.clarity * 0.06);
   const arcHeight = isKick ? 29 * motion.lift : 21 * motion.lift;
   const glow = ctx.createRadialGradient(24, 0, 4, 24, 0, arcReach);
   glow.addColorStop(
@@ -8532,7 +8674,7 @@ function drawAttackArc(f, box) {
   ctx.fill();
 
   ctx.strokeStyle = colorWithAlpha(outfit.accent, 0.78);
-  ctx.globalAlpha = (0.2 + phase.anticipation * 0.08 + phase.strike * 0.36 + phase.recovery * 0.12)
+  ctx.globalAlpha = (0.18 + phase.anticipation * 0.06 + phase.strike * 0.34 + phase.recovery * 0.1)
     * clamp(0.9 + motion.afterimage * 0.12, 0.85, 1.18);
   ctx.lineWidth = ((isKick ? 12 : 9) + phase.strike * 2.2 + phase.snap * 2.4) * (f.profileId === "p1" ? 1.16 : 0.88);
   ctx.lineCap = "round";
@@ -8564,6 +8706,23 @@ function drawAttackArc(f, box) {
     ctx.beginPath();
     ctx.ellipse(isKick ? 118 : 82, -9, 16 + phase.snap * 12, 5 + phase.snap * 3, -0.08, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  const pointAlpha = clamp(phase.strike * 0.28 + phase.snap * 0.3 + phase.followThrough * 0.1, 0, 0.5);
+  if (pointAlpha > 0.05) {
+    const tipX = isKick ? 126 + phase.snap * 18 : spec.special ? 108 + phase.snap * 16 : 88 + phase.snap * 12;
+    const tipY = isKick ? -11 : spec.special ? -16 : -10;
+    ctx.globalAlpha = pointAlpha;
+    ctx.fillStyle = colorWithAlpha(spec.core, 0.95);
+    ctx.beginPath();
+    ctx.ellipse(tipX, tipY, isKick ? 18 + read.clarity * 8 : 13 + read.clarity * 5, isKick ? 5.6 + read.clarity * 2 : 4.2 + read.clarity * 1.5, -0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = colorWithAlpha("#ffffff", 0.6);
+    ctx.lineWidth = 1.6 + read.clarity * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(tipX - 12, tipY - 5);
+    ctx.lineTo(tipX + 12 + read.clarity * 6, tipY - 2);
+    ctx.stroke();
   }
   ctx.globalAlpha = 1;
   ctx.restore();
