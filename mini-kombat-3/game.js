@@ -557,11 +557,17 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     impactDir: dir,
     impactLift: 0,
     impactStrength: 0,
+    impactFlavor: "light",
     contactFlash: 0,
     damagePulse: 0,
     damageLevel: 0,
     hitZone: "torso",
     hitZonePulse: 0,
+    faceImpactPulse: 0,
+    faceImpactMax: 1,
+    faceImpactZone: "torso",
+    faceImpactDir: dir,
+    faceImpactStrength: 0,
     reactionPulse: 0,
     reactionMax: 1,
     reactionZone: "torso",
@@ -764,11 +770,17 @@ function resetRound() {
     impactDir: 1,
     impactLift: 0,
     impactStrength: 0,
+    impactFlavor: "light",
     contactFlash: 0,
     damagePulse: 0,
     damageLevel: 0,
     hitZone: "torso",
     hitZonePulse: 0,
+    faceImpactPulse: 0,
+    faceImpactMax: 1,
+    faceImpactZone: "torso",
+    faceImpactDir: 1,
+    faceImpactStrength: 0,
     reactionPulse: 0,
     reactionMax: 1,
     reactionZone: "torso",
@@ -850,11 +862,17 @@ function resetRound() {
     impactDir: -1,
     impactLift: 0,
     impactStrength: 0,
+    impactFlavor: "light",
     contactFlash: 0,
     damagePulse: 0,
     damageLevel: 0,
     hitZone: "torso",
     hitZonePulse: 0,
+    faceImpactPulse: 0,
+    faceImpactMax: 1,
+    faceImpactZone: "torso",
+    faceImpactDir: -1,
+    faceImpactStrength: 0,
     reactionPulse: 0,
     reactionMax: 1,
     reactionZone: "torso",
@@ -1487,6 +1505,7 @@ function updateFighter(f, opponent) {
   if (f.impactPulse > 0) f.impactPulse -= 1;
   if (f.damagePulse > 0) f.damagePulse -= 1;
   if (f.hitZonePulse > 0) f.hitZonePulse -= 1;
+  if (f.faceImpactPulse > 0) f.faceImpactPulse -= 1;
   if (f.reactionPulse > 0) f.reactionPulse -= 1;
   if (f.victoryPulse > 0) f.victoryPulse -= 1;
   if (f.guardImpact > 0) f.guardImpact -= 1;
@@ -1910,6 +1929,56 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
   return profile;
 }
 
+function impactVisualProfile({ attackType = "", hitZone = "torso", blocked = false, projectile = false, counter = false, finishingHit = false }) {
+  const spec = attackVisualSpec(attackType);
+  const flavor =
+    blocked ? "guard" :
+    projectile || spec.special ? "special" :
+    spec.sweep ? "sweep" :
+    spec.kick ? "kick" :
+    spec.grab ? "grab" :
+    "punch";
+  const head = hitZone === "head";
+  const legs = hitZone === "legs";
+  const baseColor =
+    flavor === "guard" ? "#bdeaff" :
+    counter ? "#fff1bd" :
+    flavor === "special" ? "#8fe2ff" :
+    flavor === "kick" || flavor === "sweep" ? "#ffe87a" :
+    flavor === "grab" ? "#ffd7a8" :
+    "#9be7ff";
+  const core =
+    flavor === "special" ? "#fff1bd" :
+    flavor === "kick" || flavor === "sweep" ? "#fff6bf" :
+    flavor === "grab" ? "#fff0d0" :
+    "#e8fbff";
+  const strength =
+    (flavor === "guard" ? 0.88 : flavor === "special" ? 1.18 : flavor === "kick" ? 1.12 : flavor === "sweep" ? 1.16 : flavor === "grab" ? 1.08 : 1) *
+    (counter ? 1.12 : 1) *
+    (finishingHit ? 1.16 : 1);
+
+  return {
+    flavor,
+    color: baseColor,
+    core,
+    accent: flavor === "special" ? "#7ef0cf" : flavor === "punch" ? "#d8fbff" : "#ffd44d",
+    strength,
+    warp: (head ? 1.18 : legs ? 1.14 : 1) * (flavor === "special" ? 1.22 : flavor === "sweep" ? 1.18 : flavor === "kick" ? 1.14 : 1),
+    facePulse: blocked ? 7 : head ? 22 : flavor === "special" || counter ? 20 : flavor === "kick" || flavor === "sweep" ? 17 : 14,
+    faceStrength: blocked ? 0.22 : head ? 1.28 : flavor === "special" || counter ? 1.05 : flavor === "kick" || flavor === "sweep" ? 0.86 : 0.68,
+    particleScale: flavor === "special" || counter ? 1.22 : flavor === "kick" || flavor === "sweep" ? 1.12 : 1,
+  };
+}
+
+function impactFlavorWarp(flavor = "light") {
+  if (flavor === "special") return { warp: 1.22, kick: 1.18, highlight: "#8fe2ff" };
+  if (flavor === "sweep") return { warp: 1.18, kick: 1.12, highlight: "#ffe87a" };
+  if (flavor === "kick") return { warp: 1.14, kick: 1.16, highlight: "#fff6bf" };
+  if (flavor === "grab") return { warp: 1.08, kick: 0.94, highlight: "#ffd7a8" };
+  if (flavor === "guard") return { warp: 0.72, kick: 0.62, highlight: "#bdeaff" };
+  return { warp: 1, kick: 1, highlight: "#fff1bd" };
+}
+
 function comboTierLabel(count) {
   if (count >= 7) return "DOJO RUSH";
   if (count >= 5) return "FURY";
@@ -1970,12 +2039,13 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   const heavyImpact = projectile || attackType === "kick" || attackType === "airKick" || attackType === "sweep" || attackType === "grab";
   const finalDamage = blocked ? Math.ceil(damage * 0.28) : damage + (counter ? 4 : 0);
   const impactDir = attacker?.dir ?? target.dir * -1;
-  const impactColor = blocked ? "#bdeaff" : projectile ? "#fff0a6" : counter ? "#fff1bd" : "#ffd44d";
-  const impactStrength = blocked ? 0.42 : counter ? 1.35 : projectile ? 1.18 : heavyImpact ? 1.08 : 0.78;
   const previousHealth = target.health;
   const nextHealth = clamp(target.health - finalDamage, 0, 100);
   const finishingHit = !blocked && previousHealth > 0 && nextHealth <= 0;
   const hitZone = blocked ? "guard" : hitZoneFor(attacker, target, projectileInfo, attackType);
+  const visual = impactVisualProfile({ attackType, hitZone, blocked, projectile, counter, finishingHit });
+  const impactColor = visual.color;
+  const impactStrength = (blocked ? 0.42 : counter ? 1.35 : projectile ? 1.18 : heavyImpact ? 1.08 : 0.78) * visual.strength;
   const zone = hitZoneReaction(hitZone, blocked, projectile, heavyImpact, finishingHit);
   const cinematic = impactCinematicProfile({ blocked, heavyImpact, counter, projectile, finishingHit, attackType, hitZone, impactStrength });
   const cinematicHit = cinematic.specialFx;
@@ -1988,8 +2058,14 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   target.impactDir = impactDir;
   target.impactLift = zone.lift;
   target.impactStrength = impactStrength;
+  target.impactFlavor = visual.flavor;
   target.hitZone = hitZone;
   target.hitZonePulse = Math.max(target.hitZonePulse ?? 0, zone.pulse);
+  target.faceImpactPulse = Math.max(target.faceImpactPulse ?? 0, visual.facePulse);
+  target.faceImpactMax = Math.max(target.faceImpactMax ?? 1, visual.facePulse);
+  target.faceImpactZone = hitZone;
+  target.faceImpactDir = impactDir;
+  target.faceImpactStrength = visual.faceStrength;
   target.damagePulse = blocked ? Math.max(target.damagePulse ?? 0, 8) : finishingHit ? 34 : Math.max(target.damagePulse ?? 0, heavyImpact || projectile || counter ? 24 : zone.pulse);
   target.damageLevel = blocked ? 0.35 : finishingHit ? 1.65 : counter ? 1.45 : projectile ? 1.22 + zone.damageBonus : heavyImpact ? 1.08 + zone.damageBonus : 0.82 + zone.damageBonus;
   const reactionKind = blocked
@@ -2054,7 +2130,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   burst(
     target.x - target.dir * 22,
     impactY,
-    blocked ? "#bdeaff" : projectile ? "#fff0a6" : "#ffd44d",
+    blocked ? "#bdeaff" : visual.core,
     blocked ? 8 : projectile ? 20 : heavyImpact ? 16 : 14,
   );
   impactBurst(
@@ -2075,6 +2151,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   contactFlashBurst(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   cinematicImpact(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   premiumImpactFX(impactX, impactY, target, impactColor, impactDir, blocked, heavyImpact, counter, projectile);
+  typedImpactFX(impactX, impactY, target, visual, impactDir, hitZone, blocked, counter);
   if (cinematicHit) cinematicSpecialImpactFX(impactX, impactY, target, attacker, projectileInfo, impactColor, impactDir, finishingHit, projectile, counter);
   floorDust(target.x, target.y + 3, blocked ? 4 : zone.dust);
   if (!blocked && target.grounded) {
@@ -2442,6 +2519,154 @@ function premiumImpactFX(x, y, target, color, dir, blocked, heavyImpact, counter
     strength,
     kind: "impactBloom",
   });
+}
+
+function typedImpactFX(x, y, target, visual, dir, hitZone, blocked, counter) {
+  const flavor = visual?.flavor ?? "punch";
+  const color = visual?.color ?? "#ffd44d";
+  const core = visual?.core ?? "#fff1bd";
+  const accent = visual?.accent ?? color;
+  const scale = visual?.particleScale ?? 1;
+  const baseAngle = dir > 0 ? 0 : Math.PI;
+
+  if (blocked || flavor === "guard") {
+    particles.push({
+      x: x - dir * 12,
+      y,
+      vx: dir * 0.12,
+      vy: 0,
+      angle: baseAngle,
+      life: 13,
+      maxLife: 13,
+      size: 40,
+      color: "#bdeaff",
+      kind: "guardPlate",
+    });
+    return;
+  }
+
+  if (flavor === "punch") {
+    for (let i = 0; i < 4; i += 1) {
+      const lane = i / 3 - 0.5;
+      particles.push({
+        x: x - dir * 8,
+        y: y + lane * 26,
+        vx: dir * (0.7 + Math.random() * 0.55),
+        vy: lane * 0.24,
+        angle: baseAngle + lane * 0.46,
+        length: fighterScale((42 + Math.random() * 28) * scale),
+        life: 12 + Math.random() * 5,
+        maxLife: 16,
+        size: 2.8 + Math.random() * 1.2,
+        color: i % 2 ? core : color,
+        kind: "impactNeedle",
+      });
+    }
+    particles.push({ x, y, vx: 0, vy: 0, angle: baseAngle, life: 8, maxLife: 8, size: 34 * scale, color: core, kind: "impactCore" });
+    return;
+  }
+
+  if (flavor === "kick") {
+    particles.push({
+      x: x - dir * 10,
+      y,
+      vx: dir * 0.6,
+      vy: -0.08,
+      angle: baseAngle + (dir > 0 ? -0.16 : 0.16),
+      life: 15,
+      maxLife: 15,
+      size: 92 * scale,
+      color,
+      strength: 1.1,
+      kind: "recoilArc",
+    });
+    for (let i = 0; i < 5; i += 1) {
+      const lane = i / 4 - 0.5;
+      particles.push({
+        x: x - dir * 16,
+        y: y + lane * 34,
+        vx: dir * (0.9 + Math.random() * 0.7),
+        vy: lane * 0.42 - 0.18,
+        angle: baseAngle + lane * 0.7,
+        length: fighterScale((58 + Math.random() * 34) * scale),
+        life: 13 + Math.random() * 7,
+        maxLife: 18,
+        size: 3.4 + Math.random() * 1.4,
+        color: i % 2 ? core : accent,
+        kind: "impactNeedle",
+      });
+    }
+    return;
+  }
+
+  if (flavor === "sweep") {
+    const floorY = Math.min(FLOOR + 4, target.y + 5);
+    particles.push({
+      x: target.x - dir * 12,
+      y: floorY,
+      vx: dir * 0.55,
+      vy: 0,
+      angle: baseAngle,
+      life: 22,
+      maxLife: 22,
+      size: 62 * scale,
+      growth: 2.55,
+      color: "rgba(226, 197, 135, 0.78)",
+      kind: "floorShock",
+    });
+    for (let i = 0; i < 6; i += 1) {
+      particles.push({
+        x: target.x + (Math.random() - 0.5) * 54,
+        y: floorY + Math.random() * 4,
+        vx: -dir * (0.5 + Math.random() * 1.4),
+        vy: -0.18 - Math.random() * 0.5,
+        angle: (Math.random() - 0.5) * 0.14,
+        life: 18 + Math.random() * 10,
+        maxLife: 25,
+        size: 9 + Math.random() * 15,
+        color: "rgba(214, 182, 120, 0.52)",
+        kind: "dustRibbon",
+      });
+    }
+    particles.push({ x, y: y + 8, vx: 0, vy: 0, life: 16, maxLife: 16, size: 28 * scale, growth: 2.1, color, kind: "ring" });
+    return;
+  }
+
+  if (flavor === "grab") {
+    particles.push({ x, y, vx: 0, vy: 0, angle: baseAngle, life: 12, maxLife: 12, size: 50 * scale, color, strength: 1.05, kind: "impactBloom" });
+    particles.push({ x: x + dir * 4, y, vx: 0, vy: 0, angle: baseAngle, life: 15, maxLife: 15, size: 32 * scale, growth: 2.2, color: core, kind: "airRipple" });
+    for (let i = 0; i < 4; i += 1) {
+      const angle = baseAngle + (i / 3 - 0.5) * 0.58;
+      particles.push({
+        x: x - dir * 6,
+        y: y + (i / 3 - 0.5) * 28,
+        vx: Math.cos(angle) * 0.8,
+        vy: Math.sin(angle) * 0.26,
+        angle,
+        life: 13 + Math.random() * 5,
+        maxLife: 17,
+        size: 8 + Math.random() * 4,
+        color: i % 2 ? core : color,
+        kind: "hitShard",
+      });
+    }
+    return;
+  }
+
+  particles.push({
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    angle: baseAngle,
+    life: counter ? 20 : 17,
+    maxLife: counter ? 20 : 17,
+    size: (counter ? 70 : 58) * scale,
+    color: counter ? "#fff1bd" : color,
+    strength: counter ? 1.34 : 1.14,
+    kind: "impactBloom",
+  });
+  particles.push({ x: x - dir * 8, y, vx: 0, vy: 0, angle: baseAngle, life: 18, maxLife: 18, size: 40 * scale, growth: 2.7, color: core, kind: "ring" });
 }
 
 function cinematicSpecialImpactFX(x, y, target, attacker, projectileInfo, color, dir, finishingHit, projectile, counter) {
@@ -5937,14 +6162,16 @@ function drawSpriteImpactWarp(f, image, frameX, crouch) {
     legs: { srcY: 202, h: 90, yBoost: 3, xKick: 5.2, scaleX: 0.045, scaleY: -0.048, rot: -0.045 },
   };
   const zone = zones[impact.zone] ?? zones.torso;
+  const flavor = impactFlavorWarp(f.impactFlavor);
   const pad = 14;
   const localY = -BODY_SPRITE_ANCHOR_Y + zone.srcY + crouch * 0.18;
   const centerY = localY + zone.h * 0.5 + zone.yBoost;
   const reactionBoost = reaction.zone === impact.zone ? reaction.snap * 0.36 + reaction.rebound * 0.14 : 0;
-  const kick = -impact.localDir * zone.xKick * (impact.snap + reactionBoost) + (impact.shake + reaction.shake * 0.45) * 2.2;
-  const squashX = 1 + zone.scaleX * (impact.snap + reactionBoost);
-  const squashY = 1 + zone.scaleY * (impact.snap + reactionBoost);
-  const rotation = -impact.localDir * zone.rot * (impact.rebound + reactionBoost * 0.65);
+  const warpAmount = (impact.snap + reactionBoost) * flavor.warp;
+  const kick = -impact.localDir * zone.xKick * warpAmount * flavor.kick + (impact.shake + reaction.shake * 0.45) * 2.2;
+  const squashX = 1 + zone.scaleX * warpAmount;
+  const squashY = 1 + zone.scaleY * warpAmount;
+  const rotation = -impact.localDir * zone.rot * (impact.rebound * flavor.warp + reactionBoost * 0.65);
 
   ctx.save();
   ctx.beginPath();
@@ -5972,7 +6199,7 @@ function drawSpriteImpactWarp(f, image, frameX, crouch) {
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.globalAlpha = clamp(0.12 + impact.t * 0.18, 0.08, 0.34);
-  ctx.strokeStyle = impact.zone === "legs" ? "rgba(255, 232, 142, 0.9)" : "rgba(255, 246, 207, 0.9)";
+  ctx.strokeStyle = colorWithAlpha(flavor.highlight, impact.zone === "legs" ? 0.9 : 0.86);
   ctx.lineWidth = 1.8 + impact.snap * 1.4;
   ctx.lineCap = "round";
   for (let i = 0; i < 3; i += 1) {
@@ -6739,6 +6966,7 @@ function drawDamageReactionFX(f, crouch) {
   const glowRy = zone === "head" ? 48 : zone === "legs" ? 44 : 92;
   const slashTop = zone === "head" ? -158 : zone === "legs" ? -62 : -138;
   const slashGap = zone === "legs" ? 18 : 33;
+  const flavor = impactFlavorWarp(f.impactFlavor);
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
@@ -6748,14 +6976,14 @@ function drawDamageReactionFX(f, crouch) {
   if (damage > 0.03) {
     const glow = ctx.createRadialGradient(localDir * 16, centerY, 5, localDir * 10, centerY, 88 + level * 14);
     glow.addColorStop(0, `rgba(255, 247, 212, ${0.18 * damage})`);
-    glow.addColorStop(0.42, `rgba(255, 84, 66, ${0.12 * damage * level})`);
+    glow.addColorStop(0.42, colorWithAlpha(flavor.highlight, 0.13 * damage * level));
     glow.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.ellipse(localDir * 8, centerY, glowRx + level * 10, glowRy + level * 8, -localDir * 0.08, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = `rgba(255, 248, 206, ${0.36 * damage})`;
+    ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.36 * damage);
     ctx.lineWidth = 2.2 + level * 1.8;
     for (let i = 0; i < 3; i += 1) {
       const lane = i - 1;
@@ -6768,7 +6996,7 @@ function drawDamageReactionFX(f, crouch) {
       ctx.stroke();
     }
 
-    ctx.strokeStyle = `rgba(255, 83, 64, ${0.16 * damage * level})`;
+    ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.16 * damage * level);
     ctx.lineWidth = 6 + level * 2.5;
     ctx.beginPath();
     ctx.moveTo(localDir * -34, centerY - glowRy * 0.28);
@@ -6778,7 +7006,7 @@ function drawDamageReactionFX(f, crouch) {
     if (localizedImpact.t > 0.04) {
       const compression = localizedImpact.snap;
       const impactCenterX = -localizedImpact.localDir * (zone === "head" ? 18 : zone === "legs" ? 12 : 15);
-      ctx.strokeStyle = `rgba(255, 246, 206, ${0.2 * damage + compression * 0.12})`;
+      ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.2 * damage + compression * 0.12);
       ctx.lineWidth = 1.5 + compression * 1.9;
       for (let i = 0; i < 3; i += 1) {
         const ring = i / 2;
@@ -6795,7 +7023,7 @@ function drawDamageReactionFX(f, crouch) {
         ctx.stroke();
       }
 
-      ctx.strokeStyle = `rgba(255, 93, 66, ${0.12 * level + compression * 0.08})`;
+      ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.12 * level + compression * 0.08);
       ctx.lineWidth = 4 + compression * 2.5;
       ctx.beginPath();
       ctx.moveTo(impactCenterX - localizedImpact.localDir * (glowRx * 0.35), centerY - glowRy * 0.18);
@@ -6875,30 +7103,33 @@ function drawHitFlash(f, crouch) {
   const alpha = clamp(f.hitFlash / 16, 0, 1);
   const contact = clamp((f.contactFlash ?? 0) / 14, 0, 1);
   const strength = clamp(f.impactStrength ?? 0.8, 0.45, 1.45);
+  const zone = f.hitZone ?? "torso";
+  const centerY = zone === "head" ? -138 + crouch : zone === "legs" ? -48 + crouch : -102 + crouch;
+  const flavor = impactFlavorWarp(f.impactFlavor);
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  const glow = ctx.createRadialGradient(0, -102 + crouch, 8, 0, -102 + crouch, 78);
+  const glow = ctx.createRadialGradient(0, centerY, 8, 0, centerY, zone === "legs" ? 62 : 78);
   glow.addColorStop(0, `rgba(255, 248, 206, ${0.28 * alpha})`);
-  glow.addColorStop(0.48, `rgba(255, 201, 69, ${0.18 * alpha})`);
+  glow.addColorStop(0.48, colorWithAlpha(flavor.highlight, 0.2 * alpha));
   glow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(0, -103 + crouch, 58, 86, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, centerY, zone === "legs" ? 64 : 58, zone === "head" ? 52 : zone === "legs" ? 46 : 86, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = `rgba(255, 248, 206, ${0.54 * alpha})`;
+  ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.54 * alpha);
   ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(-34, -128 + crouch);
-  ctx.lineTo(30, -76 + crouch);
-  ctx.moveTo(22, -134 + crouch);
-  ctx.lineTo(-26, -66 + crouch);
+  ctx.moveTo(-34, centerY - 26);
+  ctx.lineTo(30, centerY + 26);
+  ctx.moveTo(22, centerY - 32);
+  ctx.lineTo(-26, centerY + 36);
   ctx.stroke();
 
   if (contact > 0) {
     const dir = f.impactDir ?? f.dir;
     const localDir = dir === f.dir ? 1 : -1;
-    ctx.translate(localDir * 18, -104 + crouch);
+    ctx.translate(localDir * 18, centerY);
     ctx.rotate(localDir * -0.12);
     ctx.strokeStyle = `rgba(255, 255, 255, ${0.48 * contact})`;
     ctx.lineWidth = 4.5 * strength;
@@ -6910,7 +7141,7 @@ function drawHitFlash(f, crouch) {
     ctx.lineTo(20, -14);
     ctx.stroke();
 
-    ctx.strokeStyle = colorWithAlpha(f.trim, 0.28 * contact);
+    ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.3 * contact);
     ctx.lineWidth = 9 * strength;
     ctx.beginPath();
     ctx.moveTo(-34, 0);
@@ -7370,17 +7601,24 @@ function headActingProfile(f, stride = 0) {
   const specialFocus = type === "special" ? Math.max(phase.anticipation * 0.8, phase.strike, phase.snap) : 0;
   const kickFocus = type === "kick" || type === "airKick" || type === "sweep" ? attackDrive : 0;
   const hurtSquint = clamp((f.hurt ?? 0) / 26, 0, 1);
-  const effort = clamp(attackPrep * 0.5 + attackDrive * 0.85 + specialFocus * 0.25 + guardHit * 0.55 + headHit * 0.8, 0, 1.8);
+  const faceImpactMax = Math.max(1, f.faceImpactMax ?? 1);
+  const faceImpactT = clamp((f.faceImpactPulse ?? 0) / faceImpactMax, 0, 1);
+  const faceImpact = smoothStep01(faceImpactT) * clamp(f.faceImpactStrength ?? 0, 0, 1.45);
+  const faceImpactDir = (f.faceImpactDir ?? f.impactDir ?? dir) === dir ? 1 : -1;
+  const faceHead = (f.faceImpactZone ?? localizedImpact.zone) === "head";
+  const effort = clamp(attackPrep * 0.5 + attackDrive * 0.85 + specialFocus * 0.25 + guardHit * 0.55 + headHit * 0.8 + faceImpact * 0.68, 0, 1.9);
 
   return {
     x:
       -localizedImpact.localDir * headHit * 5.6 +
+      -faceImpactDir * faceImpact * (faceHead ? 5.2 : 2.4) +
       localizedImpact.shake * 0.8 -
       dir * attackPrep * 2.2 +
       dir * attackDrive * (type === "special" ? 2.2 : 1.35) +
       walkSway * 1.1,
     y:
       -headHit * 2.2 +
+      -faceImpact * (faceHead ? 1.4 : 0.45) +
       (localizedImpact.zone === "legs" ? localizedImpact.rebound * 1.2 : 0) -
       specialFocus * 1.6 +
       kickFocus * 0.85 +
@@ -7388,6 +7626,7 @@ function headActingProfile(f, stride = 0) {
     rotation:
       (stride * 0.018) -
       localizedImpact.localDir * headHit * 0.075 +
+      -faceImpactDir * faceImpact * (faceHead ? 0.052 : 0.022) +
       localizedImpact.shake * 0.012 -
       dir * attackPrep * 0.025 +
       dir * attackDrive * (type === "special" ? 0.052 : type === "sweep" ? 0.04 : type === "kick" || type === "airKick" ? 0.034 : 0.024) -
@@ -7395,10 +7634,11 @@ function headActingProfile(f, stride = 0) {
       dir * guardHit * 0.045 +
       walkSway * 0.01,
     scaleX: 1 + headHit * 0.024 + attackDrive * 0.006,
-    scaleY: 1 - headHit * 0.018 - attackDrive * 0.004 + guardHit * 0.006,
+    scaleY: 1 - headHit * 0.018 - attackDrive * 0.004 + guardHit * 0.006 - faceImpact * 0.01,
     focus: clamp(effort + hurtSquint * 0.4, 0, 1.45),
-    squint: clamp(hurtSquint * 0.75 + attackDrive * 0.42 + guardHit * 0.55, 0, 1.2),
-    cheek: clamp(attackDrive * 0.45 + headHit * 0.8 + guardHit * 0.45, 0, 1.1),
+    squint: clamp(hurtSquint * 0.75 + attackDrive * 0.42 + guardHit * 0.55 + faceImpact * (faceHead ? 0.78 : 0.38), 0, 1.25),
+    cheek: clamp(attackDrive * 0.45 + headHit * 0.8 + guardHit * 0.45 + faceImpact * 0.62, 0, 1.18),
+    grimace: clamp(faceImpact * (faceHead ? 1.1 : 0.68) + hurtSquint * 0.28, 0, 1.24),
     bandanaFlutter: clamp(speed * 0.45 + attackDrive * 0.95 + specialFocus * 0.85 + guardHit * 0.55 + headHit * 0.9, 0, 1.8),
     bandanaLift: -attackDrive * 2.8 - specialFocus * 3.2 + headHit * 1.4 + guardHit * 1.8,
   };
@@ -8676,7 +8916,8 @@ function drawFaceActingPass(f, clipX, clipY, clipW, clipH, acting, maskMode) {
   const focus = clamp(acting.focus ?? 0, 0, 1.45);
   const squint = clamp(acting.squint ?? 0, 0, 1.2);
   const cheek = clamp(acting.cheek ?? 0, 0, 1.1);
-  if (focus <= 0.03 && squint <= 0.03 && cheek <= 0.03) return;
+  const grimace = clamp(acting.grimace ?? 0, 0, 1.24);
+  if (focus <= 0.03 && squint <= 0.03 && cheek <= 0.03 && grimace <= 0.03) return;
 
   const eyeY = clipY + clipH * 0.38;
   const mouthY = clipY + clipH * 0.76;
@@ -8684,20 +8925,20 @@ function drawFaceActingPass(f, clipX, clipY, clipW, clipH, acting, maskMode) {
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
-  ctx.fillStyle = `rgba(31, 16, 14, ${0.06 + squint * 0.1})`;
+  ctx.fillStyle = `rgba(31, 16, 14, ${0.06 + squint * 0.1 + grimace * 0.035})`;
   ctx.beginPath();
   ctx.ellipse(clipX + clipW * 0.35 + lean * 4, eyeY, clipW * (0.18 + squint * 0.03), clipH * (0.055 + squint * 0.02), -0.08 + lean * 0.08, 0, Math.PI * 2);
   ctx.ellipse(clipX + clipW * 0.66 + lean * 4, eyeY + 1, clipW * (0.18 + squint * 0.03), clipH * (0.055 + squint * 0.02), 0.08 + lean * 0.08, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = `rgba(32, 15, 13, ${0.07 + focus * 0.1})`;
+  ctx.strokeStyle = `rgba(32, 15, 13, ${0.07 + focus * 0.1 + grimace * 0.04})`;
   ctx.lineWidth = 1.4 + focus * 0.8;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(clipX + clipW * 0.22, eyeY - clipH * (0.15 + focus * 0.035));
-  ctx.quadraticCurveTo(clipX + clipW * 0.35, eyeY - clipH * (0.2 + focus * 0.04), clipX + clipW * 0.48, eyeY - clipH * 0.13);
+  ctx.moveTo(clipX + clipW * 0.22, eyeY - clipH * (0.15 + focus * 0.035 + grimace * 0.018));
+  ctx.quadraticCurveTo(clipX + clipW * 0.35, eyeY - clipH * (0.2 + focus * 0.04 + grimace * 0.018), clipX + clipW * 0.48, eyeY - clipH * (0.13 - grimace * 0.006));
   ctx.moveTo(clipX + clipW * 0.54, eyeY - clipH * 0.13);
-  ctx.quadraticCurveTo(clipX + clipW * 0.69, eyeY - clipH * (0.2 + focus * 0.04), clipX + clipW * 0.83, eyeY - clipH * (0.14 + focus * 0.035));
+  ctx.quadraticCurveTo(clipX + clipW * 0.69, eyeY - clipH * (0.2 + focus * 0.04 + grimace * 0.018), clipX + clipW * 0.83, eyeY - clipH * (0.14 + focus * 0.035 + grimace * 0.018));
   ctx.stroke();
   ctx.restore();
 
@@ -8709,12 +8950,22 @@ function drawFaceActingPass(f, clipX, clipY, clipW, clipH, acting, maskMode) {
   ctx.ellipse(clipX + clipW * 0.69 - lean * 4, clipY + clipH * 0.62, clipW * 0.17, clipH * 0.09, 0.18, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = `rgba(255, 248, 218, ${0.055 + focus * 0.07})`;
-  ctx.lineWidth = 1.2 + focus * 0.45;
+  ctx.strokeStyle = `rgba(255, 248, 218, ${0.055 + focus * 0.07 + grimace * 0.04})`;
+  ctx.lineWidth = 1.2 + focus * 0.45 + grimace * 0.4;
   ctx.beginPath();
-  ctx.moveTo(clipX + clipW * 0.3, mouthY + cheek * 1.3);
-  ctx.quadraticCurveTo(clipX + clipW * 0.5, mouthY + clipH * (0.04 + cheek * 0.02), clipX + clipW * 0.72, mouthY + cheek * 1.1);
+  ctx.moveTo(clipX + clipW * 0.3, mouthY + cheek * 1.3 - grimace * 1.3);
+  ctx.quadraticCurveTo(clipX + clipW * 0.5, mouthY + clipH * (0.04 + cheek * 0.02 + grimace * 0.035), clipX + clipW * 0.72, mouthY + cheek * 1.1 - grimace * 1.1);
   ctx.stroke();
+
+  if (grimace > 0.05) {
+    ctx.globalCompositeOperation = "multiply";
+    ctx.strokeStyle = `rgba(35, 15, 12, ${0.06 + grimace * 0.11})`;
+    ctx.lineWidth = 1 + grimace * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(clipX + clipW * 0.34, mouthY + clipH * (0.012 + grimace * 0.02));
+    ctx.lineTo(clipX + clipW * 0.66, mouthY + clipH * (0.012 + grimace * 0.018));
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
