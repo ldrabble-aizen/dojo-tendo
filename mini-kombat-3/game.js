@@ -558,6 +558,12 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     impactLift: 0,
     impactStrength: 0,
     impactFlavor: "light",
+    dynamicLightPulse: 0,
+    dynamicLightMax: 1,
+    dynamicLightColor: "#fff1bd",
+    dynamicLightZone: "torso",
+    dynamicLightDir: dir,
+    dynamicLightStrength: 0,
     contactFlash: 0,
     damagePulse: 0,
     damageLevel: 0,
@@ -771,6 +777,12 @@ function resetRound() {
     impactLift: 0,
     impactStrength: 0,
     impactFlavor: "light",
+    dynamicLightPulse: 0,
+    dynamicLightMax: 1,
+    dynamicLightColor: "#fff1bd",
+    dynamicLightZone: "torso",
+    dynamicLightDir: 1,
+    dynamicLightStrength: 0,
     contactFlash: 0,
     damagePulse: 0,
     damageLevel: 0,
@@ -863,6 +875,12 @@ function resetRound() {
     impactLift: 0,
     impactStrength: 0,
     impactFlavor: "light",
+    dynamicLightPulse: 0,
+    dynamicLightMax: 1,
+    dynamicLightColor: "#fff1bd",
+    dynamicLightZone: "torso",
+    dynamicLightDir: -1,
+    dynamicLightStrength: 0,
     contactFlash: 0,
     damagePulse: 0,
     damageLevel: 0,
@@ -1226,6 +1244,7 @@ function startSpecial(f) {
     hit: true,
     whoosh: false,
   };
+  triggerDynamicLight(f, f.specialStyle?.rim ?? "#fff1bd", "torso", f.dir, 1.08, 24);
   if (f.profileId === "p1") {
     f.pigMorph = 72;
     coldWaterSplash(f.x, f.y - fighterScale(118), f.dir);
@@ -1503,6 +1522,7 @@ function updateFighter(f, opponent) {
   if (f.hitFlash > 0) f.hitFlash -= 1;
   if (f.contactFlash > 0) f.contactFlash -= 1;
   if (f.impactPulse > 0) f.impactPulse -= 1;
+  if (f.dynamicLightPulse > 0) f.dynamicLightPulse -= 1;
   if (f.damagePulse > 0) f.damagePulse -= 1;
   if (f.hitZonePulse > 0) f.hitZonePulse -= 1;
   if (f.faceImpactPulse > 0) f.faceImpactPulse -= 1;
@@ -1979,6 +1999,21 @@ function impactFlavorWarp(flavor = "light") {
   return { warp: 1, kick: 1, highlight: "#fff1bd" };
 }
 
+function triggerDynamicLight(f, color, zone = "torso", dir = null, strength = 1, pulse = 16) {
+  if (!f) return;
+  const safePulse = Math.max(1, Math.round(pulse));
+  const currentPower = ((f.dynamicLightPulse ?? 0) / Math.max(1, f.dynamicLightMax ?? 1)) * (f.dynamicLightStrength ?? 0);
+  const nextPower = strength * Math.max(0.35, safePulse / 18);
+  if (nextPower >= currentPower * 0.82) {
+    f.dynamicLightColor = color;
+    f.dynamicLightZone = zone;
+    f.dynamicLightDir = dir ?? f.dir ?? 1;
+    f.dynamicLightStrength = strength;
+  }
+  f.dynamicLightMax = Math.max(f.dynamicLightMax ?? 1, safePulse);
+  f.dynamicLightPulse = Math.max(f.dynamicLightPulse ?? 0, safePulse);
+}
+
 function comboTierLabel(count) {
   if (count >= 7) return "DOJO RUSH";
   if (count >= 5) return "FURY";
@@ -2059,6 +2094,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   target.impactLift = zone.lift;
   target.impactStrength = impactStrength;
   target.impactFlavor = visual.flavor;
+  triggerDynamicLight(target, impactColor, hitZone, impactDir, blocked ? 0.56 : counter ? 1.26 : projectile ? 1.16 : heavyImpact ? 1.08 : 0.88, blocked ? 12 : counter || projectile ? 22 : heavyImpact ? 19 : 15);
   target.hitZone = hitZone;
   target.hitZonePulse = Math.max(target.hitZonePulse ?? 0, zone.pulse);
   target.faceImpactPulse = Math.max(target.faceImpactPulse ?? 0, visual.facePulse);
@@ -2106,6 +2142,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
     attacker.impactDir = impactDir;
     attacker.impactLift = 0.22;
     attacker.impactStrength = Math.max(attacker.impactStrength ?? 0, blocked ? 0.25 : 0.4);
+    triggerDynamicLight(attacker, visual.core, "torso", impactDir, blocked ? 0.22 : 0.38, blocked ? 7 : 10);
     attacker.vx -= impactDir * (blocked ? 0.35 : 0.18);
   }
   if (blocked) target.counterWindow = 34;
@@ -4912,6 +4949,7 @@ function drawFighter(f) {
   const pigForm = f.profileId === "p1" && f.pigMorph > 10 && f.pigMorph < 66;
   if (pigForm) {
     drawPchanPigForm(f, crouch);
+    drawDynamicFighterLighting(f, crouch);
     if (f.hitFlash > 0) drawHitFlash(f, crouch);
     drawDamageReactionFX(f, crouch);
     if (winner) drawResultPoseEffect(f, crouch);
@@ -5037,6 +5075,7 @@ function drawFighterStageLighting(f, crouch) {
   ctx.beginPath();
   ctx.ellipse(33, -98 + crouch, 28, 108, 0.05, 0, Math.PI * 2);
   ctx.fill();
+  drawDynamicFighterLighting(f, crouch);
   ctx.restore();
 
   ctx.save();
@@ -5045,6 +5084,75 @@ function drawFighterStageLighting(f, crouch) {
   ctx.beginPath();
   ctx.ellipse(14, -82 + crouch, 58, 98, 0.05, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+function dynamicLightProfile(f) {
+  const raw = clamp((f.dynamicLightPulse ?? 0) / Math.max(1, f.dynamicLightMax ?? 1), 0, 1);
+  const hitLight = smoothStep01(raw) * clamp(f.dynamicLightStrength ?? 0, 0, 1.5);
+  const guard = clamp((f.guardImpact ?? 0) / 16, 0, 1);
+  const specialPhase = f.attack?.type === "special" ? attackPhase(f.attack) : null;
+  const special = specialPhase ? Math.max(specialPhase.anticipation * 0.7, specialPhase.strike, specialPhase.snap) : 0;
+  let active = hitLight;
+  let color = f.dynamicLightColor ?? "#fff1bd";
+  let zone = f.dynamicLightZone ?? "torso";
+  let dir = f.dynamicLightDir ?? f.impactDir ?? f.dir ?? 1;
+
+  if (guard * 0.82 > active) {
+    active = guard * 0.82;
+    color = "#bdeaff";
+    zone = "guard";
+    dir = f.dir ?? 1;
+  }
+
+  if (special * 0.92 > active) {
+    active = special * 0.92;
+    color = f.specialStyle?.rim ?? "#fff1bd";
+    zone = "torso";
+    dir = f.dir ?? 1;
+  }
+
+  return { active: clamp(active, 0, 1.45), color, zone, dir };
+}
+
+function drawDynamicFighterLighting(f, crouch) {
+  const light = dynamicLightProfile(f);
+  if (light.active <= 0.035) return;
+  const localDir = light.dir === (f.dir ?? 1) ? 1 : -1;
+  const zone = light.zone === "guard" ? "torso" : light.zone;
+  const centerY = zone === "head" ? -136 + crouch : zone === "legs" ? -48 + crouch : -104 + crouch;
+  const radiusX = zone === "head" ? 54 : zone === "legs" ? 68 : 66;
+  const radiusY = zone === "head" ? 50 : zone === "legs" ? 48 : 116;
+  const sideX = localDir * (zone === "head" ? 20 : 28);
+  const alpha = clamp(light.active, 0, 1.3);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  const glow = ctx.createRadialGradient(sideX, centerY, 4, sideX * 0.45, centerY, 96 + alpha * 38);
+  glow.addColorStop(0, `rgba(255,255,255,${0.2 * alpha})`);
+  glow.addColorStop(0.26, colorWithAlpha(light.color, 0.28 * alpha));
+  glow.addColorStop(0.7, colorWithAlpha(light.color, 0.08 * alpha));
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(sideX * 0.18, centerY, radiusX + alpha * 16, radiusY + alpha * 10, -localDir * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = colorWithAlpha(light.color, 0.18 * alpha);
+  ctx.lineWidth = 4 + alpha * 3.2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(localDir * -28, centerY - radiusY * 0.58);
+  ctx.quadraticCurveTo(localDir * 18, centerY - radiusY * 0.05, localDir * 32, centerY + radiusY * 0.52);
+  ctx.stroke();
+
+  if (zone === "head" || light.active > 0.58) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.08 * alpha})`;
+    ctx.lineWidth = 1.5 + alpha;
+    ctx.beginPath();
+    ctx.ellipse(localDir * 8, -142 + crouch, 34 + alpha * 10, 31 + alpha * 6, -localDir * 0.08, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
