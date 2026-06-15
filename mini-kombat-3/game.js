@@ -172,6 +172,85 @@ function attackTiming(type) {
   return ATTACK_TIMINGS[type] ?? ATTACK_TIMINGS.punch;
 }
 
+const CHARACTER_MOTION = {
+  default: {
+    force: 1,
+    load: 1,
+    drive: 1,
+    recover: 1,
+    plant: 1,
+    brace: 1,
+    lift: 1,
+    crush: 1,
+    reach: 1,
+    rotation: 1,
+    stretchX: 1,
+    stretchY: 1,
+    afterimage: 1,
+    arcFan: 1,
+    headDrive: 1,
+    headPrep: 1,
+    headRecover: 1,
+    headSway: 1,
+    walkWeight: 1,
+    walkLift: 1,
+    walkPush: 1,
+    accessory: 1,
+  },
+  p1: {
+    force: 1.14,
+    load: 1.14,
+    drive: 1.12,
+    recover: 0.86,
+    plant: 1.24,
+    brace: 1.18,
+    lift: 0.72,
+    crush: 1.22,
+    reach: 1.08,
+    rotation: 0.82,
+    stretchX: 1.08,
+    stretchY: 0.9,
+    afterimage: 0.74,
+    arcFan: 0.86,
+    headDrive: 0.78,
+    headPrep: 0.82,
+    headRecover: 0.82,
+    headSway: 0.72,
+    walkWeight: 1.1,
+    walkLift: 0.72,
+    walkPush: 1.22,
+    accessory: 0.95,
+  },
+  p2: {
+    force: 0.94,
+    load: 0.9,
+    drive: 0.96,
+    recover: 1.18,
+    plant: 0.78,
+    brace: 0.82,
+    lift: 1.24,
+    crush: 0.74,
+    reach: 1.14,
+    rotation: 1.25,
+    stretchX: 1.16,
+    stretchY: 1.08,
+    afterimage: 1.28,
+    arcFan: 1.24,
+    headDrive: 1.22,
+    headPrep: 1.18,
+    headRecover: 1.16,
+    headSway: 1.34,
+    walkWeight: 0.9,
+    walkLift: 1.28,
+    walkPush: 0.88,
+    accessory: 1.34,
+  },
+};
+
+function characterMotion(f) {
+  return CHARACTER_MOTION[f?.profileId] ?? CHARACTER_MOTION.default;
+}
+
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
@@ -7351,6 +7430,7 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
   if (!f.attack) return;
   const phase = attackPhase(f.attack);
   const spec = attackVisualSpec(f.attack.type);
+  const motion = characterMotion(f);
   const signature = spec.special ? fighterSignatureStyle(f) : null;
   const trailColor = signature?.trail ?? spec.color;
   const coreColor = signature?.core ?? spec.core;
@@ -7358,13 +7438,14 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
   const prep = phase.anticipation;
   const strike = Math.max(phase.strike, phase.snap * 0.9);
   const recover = Math.max(phase.recovery * 0.72, phase.followThrough);
-  const action = layer === "back" ? Math.max(prep, strike * 0.35) : Math.max(strike, recover * 0.62);
+  const action = (layer === "back" ? Math.max(prep, strike * 0.35) : Math.max(strike, recover * 0.62))
+    * clamp(0.9 + motion.afterimage * 0.1, 0.86, 1.14);
   if (action < 0.035) return;
 
   const yOffset = crouch * 0.18;
   const baseY = spec.trailY + yOffset;
-  const reach = spec.trailReach + phase.snap * (spec.heavy ? 18 : 12);
-  const height = spec.trailHeight;
+  const reach = (spec.trailReach + phase.snap * (spec.heavy ? 18 : 12)) * motion.reach;
+  const height = spec.trailHeight * motion.lift;
   const frame = attackFrameProfile(f);
 
   ctx.save();
@@ -8038,6 +8119,7 @@ function drawSpeedLines(f, box) {
 function drawAttackArc(f, box) {
   const phase = attackPhase(f.attack);
   const spec = attackVisualSpec(f.attack?.type);
+  const motion = characterMotion(f);
   const isKick = spec.kick || spec.sweep;
   const progress = Math.max(phase.strike, phase.snap * 0.9, phase.anticipation * 0.35, phase.followThrough * 0.28, phase.recovery * 0.22);
   const outfit = outfitSpec(f);
@@ -8047,32 +8129,50 @@ function drawAttackArc(f, box) {
   ctx.globalCompositeOperation = "screen";
   ctx.translate(x, y);
   ctx.scale(f.dir * FIGHTER_SCALE, FIGHTER_SCALE);
-  ctx.rotate(spec.sweep ? 0.02 : isKick ? -0.16 : -0.06);
+  ctx.rotate((spec.sweep ? 0.02 : isKick ? -0.16 : -0.06) * motion.rotation);
 
-  const glow = ctx.createRadialGradient(24, 0, 4, 24, 0, isKick ? 106 : 82);
-  glow.addColorStop(0, spec.heavy ? "rgba(255, 231, 122, 0.38)" : "rgba(155, 231, 255, 0.36)");
+  const arcReach = isKick ? 106 * motion.reach : 82 * motion.reach;
+  const arcHeight = isKick ? 29 * motion.lift : 21 * motion.lift;
+  const glow = ctx.createRadialGradient(24, 0, 4, 24, 0, arcReach);
+  glow.addColorStop(
+    0,
+    spec.heavy
+      ? `rgba(255, 231, 122, ${0.34 + motion.force * 0.04})`
+      : `rgba(155, 231, 255, ${0.28 + motion.afterimage * 0.08})`
+  );
   glow.addColorStop(0.38, colorWithAlpha(outfit.accent, 0.18 + phase.snap * 0.08));
   glow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(22 + phase.snap * 8, 0, isKick ? 100 : 78, isKick ? 29 : 21, 0, 0, Math.PI * 2);
+  ctx.ellipse(22 + phase.snap * 8, 0, isKick ? 100 * motion.reach : 78 * motion.reach, arcHeight, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = colorWithAlpha(outfit.accent, 0.78);
-  ctx.globalAlpha = 0.2 + phase.anticipation * 0.08 + phase.strike * 0.36 + phase.recovery * 0.12;
-  ctx.lineWidth = (isKick ? 12 : 9) + phase.strike * 2.2 + phase.snap * 2.4;
+  ctx.globalAlpha = (0.2 + phase.anticipation * 0.08 + phase.strike * 0.36 + phase.recovery * 0.12)
+    * clamp(0.9 + motion.afterimage * 0.12, 0.85, 1.18);
+  ctx.lineWidth = ((isKick ? 12 : 9) + phase.strike * 2.2 + phase.snap * 2.4) * (f.profileId === "p1" ? 1.16 : 0.88);
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(-12 - phase.anticipation * 12, 13 + phase.anticipation * 5);
-  ctx.quadraticCurveTo(32, -34 - phase.strike * 8 - phase.snap * 8, isKick ? 134 + phase.strike * 18 + phase.snap * 18 : 96 + phase.strike * 14 + phase.snap * 12, -10);
+  ctx.quadraticCurveTo(
+    32,
+    (-34 - phase.strike * 8 - phase.snap * 8) * motion.lift,
+    isKick ? 134 * motion.reach + phase.strike * 18 + phase.snap * 18 : 96 * motion.reach + phase.strike * 14 + phase.snap * 12,
+    -10 * motion.lift
+  );
   ctx.stroke();
 
   ctx.strokeStyle = spec.color;
   ctx.globalAlpha = 0.24 + phase.strike * 0.42 + phase.snap * 0.22 + phase.recovery * 0.1;
-  ctx.lineWidth = (isKick ? 7 : 5) + phase.strike * 1.4;
+  ctx.lineWidth = ((isKick ? 7 : 5) + phase.strike * 1.4) * (f.profileId === "p1" ? 1.12 : 0.88);
   ctx.beginPath();
   ctx.moveTo(-10 - phase.anticipation * 10, 8 + phase.anticipation * 4);
-  ctx.quadraticCurveTo(34, -28 - phase.strike * 8 - phase.snap * 6, isKick ? 126 + phase.strike * 16 + phase.snap * 16 : 88 + phase.strike * 12 + phase.snap * 10, -8);
+  ctx.quadraticCurveTo(
+    34,
+    (-28 - phase.strike * 8 - phase.snap * 6) * motion.lift,
+    isKick ? 126 * motion.reach + phase.strike * 16 + phase.snap * 16 : 88 * motion.reach + phase.strike * 12 + phase.snap * 10,
+    -8 * motion.lift
+  );
   ctx.stroke();
 
   if (phase.snap > 0.05) {
@@ -8169,20 +8269,22 @@ function attackMassProfile(f) {
   const heavy = type === "kick" || type === "airKick" || type === "sweep" || type === "special" || type === "grab";
   const low = type === "sweep";
   const air = type === "airPunch" || type === "airKick";
+  const motion = characterMotion(f);
   const typeWeight =
     type === "special" ? 1.3 :
     type === "sweep" ? 1.18 :
     type === "kick" || type === "airKick" ? 1.14 :
     type === "grab" ? 1.08 :
     1;
-  const load = phase.anticipation * typeWeight;
-  const drive = Math.max(phase.strike, phase.snap * 1.05) * typeWeight;
-  const follow = Math.max(phase.followThrough, phase.recovery * 0.42) * typeWeight;
-  const recover = phase.recovery * typeWeight;
-  const plant = clamp(load * 0.62 + drive * (heavy ? 0.72 : 0.55) + follow * 0.34, 0, 1.5);
-  const brace = clamp(load * (heavy ? 1.05 : 0.85) + recover * 0.38, 0, 1.4);
-  const lift = air ? drive * 0.5 : low ? -drive * 0.42 : drive * (heavy ? 0.42 : 0.24);
-  const crush = clamp(load * 0.55 + plant * 0.34 + follow * 0.2, 0, 1.35);
+  const styledWeight = typeWeight * motion.force;
+  const load = phase.anticipation * styledWeight * motion.load;
+  const drive = Math.max(phase.strike, phase.snap * 1.05) * styledWeight * motion.drive;
+  const follow = Math.max(phase.followThrough, phase.recovery * 0.42) * styledWeight * motion.recover;
+  const recover = phase.recovery * styledWeight * motion.recover;
+  const plant = clamp((load * 0.62 + drive * (heavy ? 0.72 : 0.55) + follow * 0.34) * motion.plant, 0, 1.65);
+  const brace = clamp((load * (heavy ? 1.05 : 0.85) + recover * 0.38) * motion.brace, 0, 1.55);
+  const lift = (air ? drive * 0.5 : low ? -drive * 0.42 : drive * (heavy ? 0.42 : 0.24)) * motion.lift;
+  const crush = clamp((load * 0.55 + plant * 0.34 + follow * 0.2) * motion.crush, 0, 1.55);
   const footSide = type === "grab" ? 1 : -1;
 
   return {
@@ -8196,7 +8298,7 @@ function attackMassProfile(f) {
     brace,
     lift,
     crush,
-    typeWeight,
+    typeWeight: styledWeight,
     footSide,
   };
 }
@@ -8227,6 +8329,35 @@ function attackChainProfile(f, currentType = "") {
     toPunch,
     special,
     sameFamily: (fromKick && toKick) || (fromPunch && toPunch) || from === to,
+  };
+}
+
+function styleAttackFrameForCharacter(f, type, frame) {
+  const motion = characterMotion(f);
+  const special = type === "special";
+  const sweep = type === "sweep";
+  const forwardBias = f?.profileId === "p1"
+    ? frame.active * (special ? 0.7 : sweep ? 0.45 : 0.9)
+    : 0;
+  const liftBias = f?.profileId === "p2"
+    ? -frame.active * (special ? 1.2 : sweep ? 0.3 : 0.7)
+    : frame.active * 0.2;
+
+  return {
+    ...frame,
+    bodyX: frame.bodyX * motion.reach + forwardBias,
+    bodyY: frame.bodyY * motion.lift + liftBias,
+    rotation: frame.rotation * motion.rotation,
+    scaleX: 1 + (frame.scaleX - 1) * motion.stretchX,
+    scaleY: 1 + (frame.scaleY - 1) * motion.stretchY,
+    afterimage: frame.afterimage * motion.afterimage,
+    bandT: frame.bandT * (f?.profileId === "p1" ? 1.08 : 1),
+    bandShiftX: frame.bandShiftX * motion.reach + forwardBias * 1.6,
+    bandShiftY: frame.bandShiftY * motion.lift + liftBias * 0.8,
+    bandRotate: frame.bandRotate * motion.rotation,
+    bandScaleX: 1 + (frame.bandScaleX - 1) * motion.stretchX,
+    bandScaleY: 1 + (frame.bandScaleY - 1) * motion.stretchY,
+    arcFan: frame.arcFan * motion.arcFan,
   };
 }
 
@@ -8263,7 +8394,7 @@ function attackFrameProfile(f) {
   const type = attack.type;
 
   if (type === "kick" || type === "airKick") {
-    return {
+    return styleAttackFrameForCharacter(f, type, {
       active: Math.max(wind * 0.7, drive, recoil * 0.55),
       bodyX: -wind * 2.4 + drive * 4.15 - recoil * 1.35,
       bodyY: wind * 1.2 - drive * 2.65 + recoil * 0.9,
@@ -8279,11 +8410,11 @@ function attackFrameProfile(f) {
       bandScaleX: 1 + drive * 0.076,
       bandScaleY: 1 - drive * 0.04,
       arcFan: drive,
-    };
+    });
   }
 
   if (type === "sweep") {
-    return {
+    return styleAttackFrameForCharacter(f, type, {
       active: Math.max(wind * 0.85, drive, recoil * 0.62),
       bodyX: -wind * 1.3 + drive * 2.55 - recoil * 0.8,
       bodyY: wind * 2.9 + drive * 3.9 + recoil * 1.2,
@@ -8299,12 +8430,12 @@ function attackFrameProfile(f) {
       bandScaleX: 1 + drive * 0.07,
       bandScaleY: 1 - drive * 0.055,
       arcFan: drive,
-    };
+    });
   }
 
   if (type === "special") {
     const profileWeight = f.profileId === "p2" ? 1.06 : f.profileId === "p1" ? 1.12 : 1;
-    return {
+    return styleAttackFrameForCharacter(f, type, {
       active: Math.max(wind, drive, recoil * 0.65) * profileWeight,
       bodyX: (-wind * 1.8 + drive * 4.15 - recoil * 1.05) * profileWeight,
       bodyY: (-wind * 0.2 - drive * 1.8 + recoil * 0.55) * profileWeight,
@@ -8320,10 +8451,10 @@ function attackFrameProfile(f) {
       bandScaleX: 1 + drive * 0.038,
       bandScaleY: 1 - drive * 0.02 + wind * 0.012,
       arcFan: Math.max(wind * 0.7, drive),
-    };
+    });
   }
 
-  return {
+  return styleAttackFrameForCharacter(f, type, {
     active: Math.max(wind * 0.6, drive, recoil * 0.45),
     bodyX: -wind * 1.25 + drive * 2.25 - recoil * 0.65,
     bodyY: wind * 0.45 - drive * 0.8 + recoil * 0.4,
@@ -8339,7 +8470,7 @@ function attackFrameProfile(f) {
     bandScaleX: 1 + drive * 0.052,
     bandScaleY: 1 - drive * 0.022,
     arcFan: drive,
-  };
+  });
 }
 
 function headActingProfile(f, stride = 0) {
@@ -8347,8 +8478,9 @@ function headActingProfile(f, stride = 0) {
   const phase = attackPhase(f.attack);
   const type = f.attack?.type ?? "";
   const dir = f.dir || 1;
+  const motion = characterMotion(f);
   const speed = clamp(Math.abs(f.vx ?? 0) / 3.35, 0, 1.3);
-  const walkSway = Math.sin((f.walkCycle ?? roundFrame * 0.2) + 0.7) * speed;
+  const walkSway = Math.sin((f.walkCycle ?? roundFrame * 0.2) + 0.7) * speed * motion.headSway;
   const attackDrive = f.attack ? Math.max(phase.strike, phase.snap * 1.1, phase.followThrough * 0.65) : 0;
   const attackPrep = f.attack ? phase.anticipation : 0;
   const attackRecover = f.attack ? phase.recovery : 0;
@@ -8369,45 +8501,50 @@ function headActingProfile(f, stride = 0) {
   const faceImpactDir = (f.faceImpactDir ?? f.impactDir ?? dir) === dir ? 1 : -1;
   const faceHead = (f.faceImpactZone ?? localizedImpact.zone) === "head";
   const effort = clamp(attackPrep * 0.5 + attackDrive * 0.85 + specialFocus * 0.25 + guardHit * 0.55 + headHit * 0.8 + faceImpact * 0.68, 0, 1.9);
+  let attackTurn = 0.024;
+  if (type === "special") attackTurn = 0.052;
+  else if (type === "sweep") attackTurn = 0.04;
+  else if (type === "kick" || type === "airKick") attackTurn = 0.034;
 
   return {
     x:
       -localizedImpact.localDir * headHit * 5.6 +
       -faceImpactDir * faceImpact * (faceHead ? 5.2 : 2.4) +
       localizedImpact.shake * 0.8 -
-      dir * attackPrep * 2.2 +
-      dir * attackDrive * (type === "special" ? 2.2 : 1.35) +
+      dir * attackPrep * 2.2 * motion.headPrep +
+      dir * attackDrive * (type === "special" ? 2.2 : 1.35) * motion.headDrive +
       walkSway * 1.1,
     y:
       -headHit * 2.2 +
       -faceImpact * (faceHead ? 1.4 : 0.45) +
       (localizedImpact.zone === "legs" ? localizedImpact.rebound * 1.2 : 0) -
-      specialFocus * 1.6 +
-      kickFocus * 0.85 +
+      specialFocus * 1.6 * motion.headDrive +
+      kickFocus * 0.85 * motion.lift +
       guard * 0.6,
     rotation:
       (stride * 0.018) -
       localizedImpact.localDir * headHit * 0.075 +
       -faceImpactDir * faceImpact * (faceHead ? 0.052 : 0.022) +
       localizedImpact.shake * 0.012 -
-      dir * attackPrep * 0.025 +
-      dir * attackDrive * (type === "special" ? 0.052 : type === "sweep" ? 0.04 : type === "kick" || type === "airKick" ? 0.034 : 0.024) -
-      dir * attackRecover * 0.014 -
+      dir * attackPrep * 0.025 * motion.headPrep +
+      dir * attackDrive * attackTurn * motion.rotation -
+      dir * attackRecover * 0.014 * motion.headRecover -
       dir * guardHit * 0.045 +
       walkSway * 0.01,
-    scaleX: 1 + headHit * 0.024 + attackDrive * 0.006,
-    scaleY: 1 - headHit * 0.018 - attackDrive * 0.004 + guardHit * 0.006 - faceImpact * 0.01,
+    scaleX: 1 + headHit * 0.024 + attackDrive * 0.006 * motion.stretchX,
+    scaleY: 1 - headHit * 0.018 - attackDrive * 0.004 * motion.stretchY + guardHit * 0.006 - faceImpact * 0.01,
     focus: clamp(effort + hurtSquint * 0.4, 0, 1.45),
     squint: clamp(hurtSquint * 0.75 + attackDrive * 0.42 + guardHit * 0.55 + faceImpact * (faceHead ? 0.78 : 0.38), 0, 1.25),
     cheek: clamp(attackDrive * 0.45 + headHit * 0.8 + guardHit * 0.45 + faceImpact * 0.62, 0, 1.18),
     grimace: clamp(faceImpact * (faceHead ? 1.1 : 0.68) + hurtSquint * 0.28, 0, 1.24),
-    bandanaFlutter: clamp(speed * 0.45 + attackDrive * 0.95 + specialFocus * 0.85 + guardHit * 0.55 + headHit * 0.9, 0, 1.8),
-    bandanaLift: -attackDrive * 2.8 - specialFocus * 3.2 + headHit * 1.4 + guardHit * 1.8,
+    bandanaFlutter: clamp((speed * 0.45 + attackDrive * 0.95 + specialFocus * 0.85 + guardHit * 0.55 + headHit * 0.9) * motion.accessory, 0, 2.1),
+    bandanaLift: (-attackDrive * 2.8 - specialFocus * 3.2) * motion.accessory + headHit * 1.4 + guardHit * 1.8,
   };
 }
 
 function getPose(f, stride) {
   const spec = bodySpec(f);
+  const motion = characterMotion(f);
   const crouch = f.crouch * 18;
   const phase = attackPhase(f.attack);
   const progress = f.attack ? phase.power : 0;
@@ -8456,18 +8593,18 @@ function getPose(f, stride) {
 
   const walkingPose = f.grounded && f.hurt <= 0 && !f.attack && Math.abs(f.vx) > 0.45;
   if (walkingPose) {
-    const weight = clamp(f.walkWeight ?? 0, 0, 1.25);
+    const weight = clamp((f.walkWeight ?? 0) * motion.walkWeight, 0, 1.35);
     const plant = clamp(f.walkPlant ?? 0, 0, 1);
     const anchor = clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1);
     const push = clamp((f.walkPushPulse ?? 0) / 9, 0, 1);
     const anchorSide = f.walkAnchorSide || f.footPlantSide || 1;
     const frontAnchor = anchorSide > 0 ? anchor : 0;
     const backAnchor = anchorSide < 0 ? anchor : 0;
-    const lift = (1 - plant * 0.35) * weight;
+    const lift = (1 - plant * 0.35) * weight * motion.walkLift;
     const frontLift = Math.max(0, -stride) * lift * (1 + backAnchor * 0.28);
     const backLift = Math.max(0, stride) * lift * (1 + frontAnchor * 0.28);
     const moveLocal = Math.sign(f.vx) === f.dir ? 1 : -1;
-    base.torsoTilt += moveLocal * stride * 0.018 * weight - moveLocal * push * 0.012 + (backAnchor - frontAnchor) * 0.008;
+    base.torsoTilt += moveLocal * stride * 0.018 * weight - moveLocal * push * 0.012 * motion.walkPush + (backAnchor - frontAnchor) * 0.008;
     base.frontLeg.knee.x += moveLocal * frontLift * 4 * spec.stance;
     base.frontLeg.knee.y -= frontLift * 5;
     base.frontLeg.foot.x += moveLocal * frontLift * 6 * spec.stance;
@@ -8535,6 +8672,21 @@ function getPose(f, stride) {
     base.backLeg.knee.y += load * 5.2 + drive * 2.4;
     base.backLeg.foot.x -= 11 * activePulse + 4 * windup - recovery * 5 + load * 6 + drive * 5;
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 0.74);
+    if (f.profileId === "p1") {
+      base.torsoTilt += drive * 0.025 - recovery * 0.008;
+      base.frontArm.hand.x += drive * 12 * spec.stance;
+      base.frontArm.elbow.x += drive * 6 * spec.stance;
+      base.backLeg.foot.x -= (load * 6 + drive * 8) * spec.stance;
+      base.frontLeg.foot.x += drive * 5 * spec.stance;
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant);
+    } else if (f.profileId === "p2") {
+      base.torsoTilt -= drive * 0.012;
+      base.frontArm.hand.x += drive * 6 * spec.stance;
+      base.frontArm.hand.y -= drive * 7;
+      base.backArm.hand.y -= windup * 6;
+      base.frontLeg.foot.y -= drive * 2.4;
+      base.backLeg.foot.x -= load * 3 * spec.stance;
+    }
   } else if (attackType === "kick" || attackType === "airKick") {
     const mass = attackMass ?? attackMassProfile(null);
     const drive = mass.drive + mass.snap * 0.42;
@@ -8555,6 +8707,22 @@ function getPose(f, stride) {
     base.backLeg.foot.x -= load * 8 * spec.stance + drive * 9 * spec.stance;
     base.backLeg.foot.y += load * 1.4 + drive * 1.2;
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 0.82);
+    if (f.profileId === "p1") {
+      base.torsoTilt += drive * 0.02;
+      base.frontLeg.foot.x += drive * 7 * spec.stance;
+      base.frontLeg.foot.y += drive * 3;
+      base.backLeg.knee.y += load * 5 + drive * 4;
+      base.backLeg.foot.x -= (load * 8 + drive * 7) * spec.stance;
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 1.08);
+    } else if (f.profileId === "p2") {
+      base.torsoTilt -= drive * 0.028;
+      base.frontLeg.knee.y -= drive * 7;
+      base.frontLeg.foot.x += drive * 13 * spec.stance;
+      base.frontLeg.foot.y -= drive * 12;
+      base.frontArm.hand.y -= drive * 7;
+      base.backArm.hand.y -= drive * 9;
+      base.backLeg.foot.y -= load * 2;
+    }
   } else if (attackType === "sweep") {
     const mass = attackMass ?? attackMassProfile(null);
     const drive = mass.drive + mass.snap * 0.36;
@@ -8572,6 +8740,18 @@ function getPose(f, stride) {
     base.backLeg.foot.x -= load * 10 * spec.stance + drive * 8 * spec.stance;
     base.backLeg.knee.y += load * 7 + drive * 4;
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant);
+    if (f.profileId === "p1") {
+      base.torsoTilt += drive * 0.035;
+      base.frontLeg.foot.x += drive * 11 * spec.stance;
+      base.backLeg.foot.x -= load * 6 * spec.stance;
+      base.backLeg.knee.y += drive * 4;
+    } else if (f.profileId === "p2") {
+      base.torsoTilt -= windup * 0.018 + drive * 0.012;
+      base.frontLeg.foot.x += drive * 16 * spec.stance;
+      base.frontLeg.foot.y -= drive * 3;
+      base.frontArm.hand.y -= drive * 7;
+      base.backArm.hand.y -= drive * 6;
+    }
   } else if (attackType === "grab") {
     const mass = attackMass ?? attackMassProfile(null);
     const drive = mass.drive + mass.snap * 0.3;
