@@ -4571,6 +4571,29 @@ function poseTransitionProfile(f) {
   };
 }
 
+function fighterEntranceCue(f) {
+  if (!running || winner || countdownFrames <= 0) return null;
+  const settleFrame = f.id === "right" ? 54 : 46;
+  const raw = clamp((countdownFrames - settleFrame) / (180 - settleFrame), 0, 1);
+  if (raw <= 0.012) return null;
+  const ease = raw * raw * (3 - 2 * raw);
+  const reveal = 1 - ease;
+  const step = Math.sin(reveal * Math.PI);
+  const side = f.id === "left" ? -1 : 1;
+  const heavy = f.profileId === "p1";
+  const agile = f.profileId === "p2";
+  return {
+    side,
+    ease,
+    reveal,
+    step,
+    slide: heavy ? 1.12 : agile ? 0.84 : 1,
+    lift: agile ? 1.18 : heavy ? 0.82 : 1,
+    weight: heavy ? 1.18 : agile ? 0.9 : 1,
+    flourish: agile ? 1.12 : heavy ? 0.86 : 1,
+  };
+}
+
 function fighterTransitionMotion(f, walking) {
   const motion = {
     x: 0,
@@ -4582,6 +4605,16 @@ function fighterTransitionMotion(f, walking) {
   };
   const dir = f.dir || 1;
   const style = characterMotion(f);
+  const entrance = fighterEntranceCue(f);
+
+  if (entrance) {
+    motion.x += entrance.side * 52 * entrance.ease * entrance.slide;
+    motion.y += entrance.ease * 5.4 * entrance.weight - entrance.step * 1.35 * entrance.lift;
+    motion.rotation -= entrance.side * (entrance.ease * 0.044 * entrance.weight + entrance.step * 0.008);
+    motion.scaleX *= 1 + entrance.ease * 0.014 + entrance.step * 0.006;
+    motion.scaleY *= 1 - entrance.ease * 0.012 - entrance.step * 0.004;
+    motion.afterimage = Math.max(motion.afterimage, entrance.ease * 0.052 * entrance.flourish);
+  }
 
   if (walking) {
     const speed = clamp(Math.abs(f.vx) / 3.35, 0, 1.25);
@@ -4956,21 +4989,26 @@ function fighterTransitionMotion(f, walking) {
     const settle = 0.5 + Math.sin((roundFrame + resultFrame) * 0.08) * 0.5;
     if (f.id === roundWinnerId) {
       const victory = clamp(Math.max(0, (f.victoryPulse ?? 60) - resultFrame * 0.9) / 60, 0, 1);
-      motion.y -= settle * 0.8 + victory * 1.8;
-      motion.rotation += dir * (0.006 * settle - victory * 0.012);
-      motion.scaleX *= 1 + victory * 0.012;
-      motion.scaleY *= 1 - victory * 0.006;
+      const hero = f.profileId === "p1";
+      const agile = f.profileId === "p2";
+      const cheer = Math.sin(Math.min(resultFrame, 72) * 0.17) * clamp(resultFrame / 48, 0, 1);
+      motion.y -= settle * (agile ? 0.55 : 0.72) + victory * (hero ? 1.25 : 1.7) + Math.max(0, cheer) * (agile ? 1.1 : 0.45);
+      motion.rotation += dir * (settle * (hero ? 0.004 : 0.007) - victory * (hero ? 0.008 : 0.013) + cheer * (agile ? 0.008 : 0.003));
+      motion.scaleX *= 1 + victory * (hero ? 0.018 : 0.011) + Math.max(0, cheer) * 0.004;
+      motion.scaleY *= 1 - victory * (hero ? 0.01 : 0.006) - Math.max(0, cheer) * 0.003;
     } else {
       const fall = smoothStep01(clamp(resultFrame / 46, 0, 1));
       const bounce = Math.max(0, Math.sin(clamp((resultFrame - 16) / 28, 0, 1) * Math.PI));
       const impact = Math.max(0, 1 - resultFrame / 34);
       const fallDir = f.koFallDir || f.impactDir || -dir;
-      motion.x += fallDir * (fall * 12 + impact * 4.8);
-      motion.y += 0.8 + fall * 21 - bounce * 4.5;
-      motion.rotation += fallDir * (0.045 + fall * 0.16 + impact * 0.035);
-      motion.scaleX *= 1 + impact * 0.02 + fall * 0.025;
-      motion.scaleY *= 1 - impact * 0.012 - fall * 0.018;
-      motion.afterimage = Math.max(motion.afterimage, impact * 0.12);
+      const heavy = f.profileId === "p1";
+      const agile = f.profileId === "p2";
+      motion.x += fallDir * (fall * (heavy ? 10 : 13) + impact * (agile ? 5.6 : 4.4));
+      motion.y += 0.8 + fall * (heavy ? 19 : 22) - bounce * (heavy ? 3.5 : 5.2);
+      motion.rotation += fallDir * (0.036 + fall * (agile ? 0.18 : 0.13) + impact * 0.028);
+      motion.scaleX *= 1 + impact * 0.016 + fall * (heavy ? 0.018 : 0.026);
+      motion.scaleY *= 1 - impact * 0.01 - fall * (heavy ? 0.014 : 0.02);
+      motion.afterimage = Math.max(motion.afterimage, impact * 0.08);
     }
   }
 
@@ -5250,6 +5288,7 @@ function drawFighter(f) {
 
   drawFighterRimLight(f, crouch);
   drawMovementPoseFX(f, crouch, walking, stride);
+  drawEntrancePoseEffect(f, crouch);
   if (f.attack) drawAttackBodyGlow(f, crouch);
   if (f.attack) drawAttackKineticFX(f, crouch, "back");
   if (f.energy >= 45 && f.hurt <= 0) drawEnergyAura(f.trim, crouch);
@@ -5746,16 +5785,20 @@ function rasterHeadPose(f, frameName, frameIndex) {
     if (frameName === "special") {
       pose.x = frameIndex === 4 ? -2 : frameIndex === 5 ? 3 : frameIndex === 18 ? 2 : 0;
       pose.scale = frameIndex === 5 ? 0.73 : 0.74;
+      pose.y = -44;
+    } else {
+      pose.x = f.profileId === "p2" ? -1 : 0;
+      pose.y = f.profileId === "p2" ? -45 : -46;
+      pose.scale = f.profileId === "p2" ? 0.735 : 0.745;
     }
-    pose.y = -44;
   } else if (frameName === "sweep") {
     pose.x = 4;
     pose.y = -31;
     pose.scale = 0.7;
   } else if (frameName === "defeat") {
-    pose.x = 8;
-    pose.y = -12;
-    pose.scale = 0.68;
+    pose.x = f.profileId === "p2" ? 5 : 4;
+    pose.y = f.profileId === "p2" ? -20 : -22;
+    pose.scale = f.profileId === "p2" ? 0.665 : 0.675;
   }
 
   if (f.profileId === "p1") pose.y -= 3;
@@ -8274,7 +8317,8 @@ function drawResultPoseEffect(f, crouch) {
     ctx.ellipse(0, -96 + crouch, 78, 130, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    for (let i = 0; i < 5; i += 1) {
+    const glints = fxCount(isMobileFightView() ? 3 : 5);
+    for (let i = 0; i < glints; i += 1) {
       const angle = clock * 0.035 + i * 1.26;
       const x = Math.cos(angle) * 44;
       const y = -148 + crouch + Math.sin(angle * 1.4) * 18;
@@ -8291,36 +8335,105 @@ function drawResultPoseEffect(f, crouch) {
       ctx.closePath();
       ctx.fill();
     }
+
+    if (f.profileId === "p2") {
+      ctx.strokeStyle = "rgba(95, 240, 199, 0.22)";
+      ctx.lineWidth = 2.2;
+      for (let i = 0; i < 3; i += 1) {
+        const phase = clock * 0.035 + i * 0.72;
+        ctx.beginPath();
+        ctx.ellipse(Math.sin(phase) * 18, -120 + crouch + i * 12, 34 + i * 8, 10, phase * 0.12, 0, Math.PI * 1.45);
+        ctx.stroke();
+      }
+    } else if (f.profileId === "p1") {
+      ctx.strokeStyle = "rgba(91, 215, 255, 0.22)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-42, -34 + crouch);
+      ctx.quadraticCurveTo(-17, -94 + crouch + Math.sin(clock * 0.05) * 6, -32, -164 + crouch);
+      ctx.moveTo(43, -34 + crouch);
+      ctx.quadraticCurveTo(17, -96 + crouch + Math.cos(clock * 0.05) * 6, 32, -166 + crouch);
+      ctx.stroke();
+    }
   } else {
     ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = "rgba(12, 8, 7, 0.28)";
+    const fall = smoothStep01(clamp(resultFrame / 50, 0, 1));
+    const breath = 0.5 + Math.sin(clock * 0.06) * 0.5;
+    ctx.fillStyle = `rgba(12, 8, 7, ${0.28 + fall * 0.12})`;
     ctx.beginPath();
-    ctx.ellipse(0, -2 + crouch, 58, 10, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -2 + crouch, 58 + fall * 18, 10 + fall * 3, 0, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.globalCompositeOperation = "screen";
-    ctx.globalAlpha = 0.62;
-    ctx.strokeStyle = "rgba(255, 241, 189, 0.48)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.ellipse(0, -170 + crouch, 23, 10, 0.08, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = "rgba(255, 241, 189, 0.5)";
-    for (let i = 0; i < 3; i += 1) {
-      ctx.beginPath();
-      ctx.arc(-18 + i * 18, -171 + crouch + Math.sin(clock * 0.12 + i) * 4, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.globalAlpha = 0.3;
-    ctx.fillStyle = colorWithAlpha(f.trim, 0.38);
+    ctx.globalAlpha = 0.22 + breath * 0.08;
+    ctx.strokeStyle = colorWithAlpha(f.trim, 0.28);
+    ctx.lineWidth = 2;
     for (let i = 0; i < 4; i += 1) {
       const x = -34 + i * 22 + Math.sin(clock * 0.05 + i) * 3;
-      const y = -20 + crouch - Math.sin(clock * 0.07 + i) * 5;
+      const y = -18 + crouch - Math.sin(clock * 0.07 + i) * 5;
       ctx.beginPath();
-      ctx.ellipse(x, y, 9 + i, 4, 0.1, 0, Math.PI * 2);
+      ctx.moveTo(x - 12, y + 3);
+      ctx.quadraticCurveTo(x, y - 4 - fall * 4, x + 18, y + 1);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 0.2 * (1 - fall * 0.35);
+    ctx.fillStyle = "rgba(255, 241, 189, 0.6)";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.ellipse(-18 + i * 18, -52 + crouch + Math.sin(clock * 0.08 + i) * 3, 5, 2.6, 0.1, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+  ctx.restore();
+}
+
+function drawEntrancePoseEffect(f, crouch) {
+  const entrance = fighterEntranceCue(f);
+  if (!entrance) return;
+  const clock = 180 - countdownFrames;
+  const alpha = clamp(entrance.ease * 0.22 + entrance.step * 0.08, 0.04, 0.28);
+  const trim = f.trim ?? "#fff1bd";
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(trim, alpha);
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.ellipse(0, -3 + crouch, 42 + entrance.reveal * 28, 8 + entrance.reveal * 4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  const trailSide = -entrance.side;
+  const trailCount = isMobileFightView() ? 2 : 3;
+  for (let i = 0; i < trailCount; i += 1) {
+    const offset = trailSide * (34 + i * 18 + entrance.ease * 18);
+    const height = f.profileId === "p2" ? 128 : 150;
+    const drift = Math.sin(clock * 0.1 + i) * 4;
+    const grad = ctx.createLinearGradient(offset, -36 + crouch, offset + trailSide * 12, -height + crouch);
+    grad.addColorStop(0, colorWithAlpha(trim, alpha * 0.7));
+    grad.addColorStop(0.62, colorWithAlpha(trim, alpha * 0.18));
+    grad.addColorStop(1, colorWithAlpha(trim, 0));
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1.4 + i * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(offset, -34 + crouch);
+    ctx.quadraticCurveTo(offset + trailSide * 11 + drift, -86 + crouch, offset + trailSide * 2, -height + crouch);
+    ctx.stroke();
+  }
+
+  if (f.profileId === "p2") {
+    ctx.strokeStyle = "rgba(255, 95, 111, 0.16)";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.ellipse(0, -104 + crouch, 48, 18, clock * 0.018, Math.PI * 0.05, Math.PI * 1.12);
+    ctx.stroke();
+  } else if (f.profileId === "p1") {
+    ctx.strokeStyle = "rgba(91, 215, 255, 0.16)";
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(-36, -28 + crouch);
+    ctx.quadraticCurveTo(-4, -82 + crouch, -26, -142 + crouch);
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -9427,31 +9540,78 @@ function getPose(f, stride) {
     base.backLeg.foot.y -= 8;
   }
 
+  const entrance = fighterEntranceCue(f);
+  if (entrance && f.grounded && f.hurt <= 0 && !f.attack) {
+    const guard = entrance.ease;
+    const settle = entrance.step;
+    if (f.profileId === "p2") {
+      base.torsoTilt -= 0.035 * guard;
+      base.frontArm.elbow = { x: 42 * spec.stance, y: -121 + crouch - settle * 4 };
+      base.frontArm.hand = { x: 48 * spec.stance, y: -142 + crouch - settle * 8 };
+      base.backArm.elbow = { x: -36 * spec.stance, y: -98 + crouch + guard * 5 };
+      base.backArm.hand = { x: -28 * spec.stance, y: -82 + crouch + guard * 7 };
+      base.frontLeg.foot.x += 5 * spec.stance * guard;
+      base.backLeg.foot.x -= 4 * spec.stance * guard;
+    } else if (f.profileId === "p1") {
+      base.torsoTilt += 0.025 * guard;
+      base.frontArm.elbow = { x: 45 * spec.stance, y: -112 + crouch + guard * 4 };
+      base.frontArm.hand = { x: 48 * spec.stance, y: -92 + crouch + guard * 4 };
+      base.backArm.elbow = { x: -42 * spec.stance, y: -118 + crouch - settle * 3 };
+      base.backArm.hand = { x: -35 * spec.stance, y: -98 + crouch - settle * 4 };
+      base.frontLeg.foot.x += 8 * spec.stance * guard;
+      base.backLeg.foot.x -= 8 * spec.stance * guard;
+      base.frontLeg.knee.y += guard * 4;
+      base.backLeg.knee.y += guard * 5;
+    }
+  }
+
   if (winner) {
     if (f.id === roundWinnerId) {
       const victory = clamp(Math.max(0, (f.victoryPulse ?? 60) - resultFrame * 0.9) / 60, 0, 1);
-      base.torsoTilt = -0.08 - victory * 0.04;
-      base.frontArm = {
-        shoulder: { x: shoulderX, y: shoulderY },
-        elbow: { x: 42 * spec.stance, y: -155 + crouch - victory * 7 },
-        hand: { x: 54 * spec.stance, y: -184 + crouch - victory * 9 },
-      };
-      base.backArm = {
-        shoulder: { x: -shoulderX, y: shoulderY + 4 },
-        elbow: { x: -42 * spec.stance, y: -151 + crouch - victory * 6 },
-        hand: { x: -54 * spec.stance, y: -178 + crouch - victory * 8 },
-      };
-      base.frontLeg.foot.x += 8 * spec.stance;
-      base.backLeg.foot.x -= 8 * spec.stance;
+      const cheer = Math.sin(Math.min(resultFrame, 72) * 0.17) * clamp(resultFrame / 48, 0, 1);
+      if (f.profileId === "p2") {
+        base.torsoTilt = -0.07 - victory * 0.03 + cheer * 0.012;
+        base.frontArm = {
+          shoulder: { x: shoulderX, y: shoulderY },
+          elbow: { x: 47 * spec.stance, y: -147 + crouch - victory * 5 },
+          hand: { x: 58 * spec.stance, y: -166 + crouch - victory * 8 - Math.max(0, cheer) * 4 },
+        };
+        base.backArm = {
+          shoulder: { x: -shoulderX, y: shoulderY + 4 },
+          elbow: { x: -39 * spec.stance, y: -110 + crouch + cheer * 2 },
+          hand: { x: -28 * spec.stance, y: -94 + crouch + cheer * 3 },
+        };
+        base.frontLeg.foot.x += 5 * spec.stance;
+        base.backLeg.foot.x -= 6 * spec.stance;
+      } else {
+        base.torsoTilt = -0.055 - victory * 0.025;
+        base.frontArm = {
+          shoulder: { x: shoulderX, y: shoulderY },
+          elbow: { x: 45 * spec.stance, y: -151 + crouch - victory * 5 },
+          hand: { x: 52 * spec.stance, y: -178 + crouch - victory * 7 },
+        };
+        base.backArm = {
+          shoulder: { x: -shoulderX, y: shoulderY + 4 },
+          elbow: { x: -38 * spec.stance, y: -111 + crouch + cheer * 1.5 },
+          hand: { x: -24 * spec.stance, y: -93 + crouch + cheer * 2 },
+        };
+        base.frontLeg.foot.x += 10 * spec.stance;
+        base.backLeg.foot.x -= 10 * spec.stance;
+        base.frontLeg.knee.y += 3;
+        base.backLeg.knee.y += 4;
+      }
     } else {
       const fall = smoothStep01(clamp(resultFrame / 46, 0, 1));
-      base.torsoTilt = 0.16 + fall * 0.24;
-      base.frontArm.hand = { x: (48 + fall * 12) * spec.stance, y: -42 + crouch + fall * 16 };
-      base.backArm.hand = { x: (-40 - fall * 10) * spec.stance, y: -38 + crouch + fall * 18 };
-      base.frontLeg.knee.y += 10 + fall * 14;
-      base.backLeg.knee.y += 12 + fall * 16;
-      base.frontLeg.foot.x += (12 + fall * 10) * spec.stance;
-      base.backLeg.foot.x -= (14 + fall * 10) * spec.stance;
+      const limp = smoothStep01(clamp((resultFrame - 10) / 54, 0, 1));
+      base.torsoTilt = 0.12 + fall * (f.profileId === "p2" ? 0.25 : 0.18);
+      base.frontArm.elbow.y += fall * 10;
+      base.backArm.elbow.y += fall * 12;
+      base.frontArm.hand = { x: (42 + fall * 10) * spec.stance, y: -48 + crouch + fall * 18 + limp * 4 };
+      base.backArm.hand = { x: (-38 - fall * 8) * spec.stance, y: -46 + crouch + fall * 20 + limp * 5 };
+      base.frontLeg.knee.y += 8 + fall * 12;
+      base.backLeg.knee.y += 10 + fall * 14;
+      base.frontLeg.foot.x += (10 + fall * 9) * spec.stance;
+      base.backLeg.foot.x -= (12 + fall * 9) * spec.stance;
     }
   }
 
