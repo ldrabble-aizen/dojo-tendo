@@ -196,6 +196,14 @@ const CHARACTER_MOTION = {
     walkLift: 1,
     walkPush: 1,
     accessory: 1,
+    impactSnap: 1,
+    impactRebound: 1,
+    impactShake: 1,
+    impactFloor: 1,
+    impactSkid: 1,
+    impactTime: 1,
+    hurtRecover: 1,
+    damageFx: 1,
   },
   p1: {
     force: 1.14,
@@ -220,6 +228,14 @@ const CHARACTER_MOTION = {
     walkLift: 0.72,
     walkPush: 1.22,
     accessory: 0.95,
+    impactSnap: 0.78,
+    impactRebound: 0.7,
+    impactShake: 0.74,
+    impactFloor: 1.28,
+    impactSkid: 0.72,
+    impactTime: 0.9,
+    hurtRecover: 0.78,
+    damageFx: 0.88,
   },
   p2: {
     force: 0.94,
@@ -244,6 +260,14 @@ const CHARACTER_MOTION = {
     walkLift: 1.28,
     walkPush: 0.88,
     accessory: 1.34,
+    impactSnap: 1.18,
+    impactRebound: 1.28,
+    impactShake: 1.16,
+    impactFloor: 0.76,
+    impactSkid: 1.24,
+    impactTime: 1.12,
+    hurtRecover: 1.18,
+    damageFx: 1.16,
   },
 };
 
@@ -2179,6 +2203,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   const zone = hitZoneReaction(hitZone, blocked, projectile, heavyImpact, finishingHit);
   const cinematic = impactCinematicProfile({ blocked, heavyImpact, counter, projectile, finishingHit, attackType, hitZone, impactStrength });
   const cinematicHit = cinematic.specialFx;
+  const targetMotion = characterMotion(target);
 
   target.health = nextHealth;
   target.hurt = finishingHit ? 38 + zone.hurtBonus : blocked ? 9 : attacker?.attack?.type === "grab" ? 30 : projectile ? 21 + zone.hurtBonus : 24 + zone.hurtBonus;
@@ -2212,7 +2237,8 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
             : heavyImpact
               ? "heavy"
               : "light";
-  const reactionMax = blocked ? 12 : finishingHit ? 34 : counter || projectile ? 27 : heavyImpact ? 23 : 18;
+  const baseReactionMax = blocked ? 12 : finishingHit ? 34 : counter || projectile ? 27 : heavyImpact ? 23 : 18;
+  const reactionMax = Math.max(1, Math.round(baseReactionMax * targetMotion.impactTime));
   target.reactionPulse = Math.max(target.reactionPulse ?? 0, reactionMax);
   target.reactionMax = Math.max(target.reactionMax ?? 1, reactionMax);
   target.reactionZone = hitZone;
@@ -4196,6 +4222,7 @@ function smoothStep01(value) {
 }
 
 function localizedImpactProfile(f) {
+  const motion = characterMotion(f);
   const rawZone = winner ? Math.max(0, (f.hitZonePulse ?? 0) - resultFrame * 0.78) : (f.hitZonePulse ?? 0);
   const rawImpact = winner ? Math.max(0, (f.impactPulse ?? 0) - resultFrame * 0.86) : (f.impactPulse ?? 0);
   const rawDamage = winner ? Math.max(0, (f.damagePulse ?? 0) - resultFrame * 0.78) : (f.damagePulse ?? 0);
@@ -4222,15 +4249,16 @@ function localizedImpactProfile(f) {
   return {
     zone,
     t,
-    snap: smoothStep01(t) * strength,
-    rebound: Math.sin(t * Math.PI) * strength,
-    shake: Math.sin((roundFrame + resultFrame) * 2.35) * t * strength,
+    snap: smoothStep01(t) * strength * motion.impactSnap,
+    rebound: Math.sin(t * Math.PI) * strength * motion.impactRebound,
+    shake: Math.sin((roundFrame + resultFrame) * 2.35) * t * strength * motion.impactShake,
     localDir,
-    strength,
+    strength: strength * motion.impactSnap,
   };
 }
 
 function impactReactionProfile(f) {
+  const motion = characterMotion(f);
   const rawPulse = winner ? Math.max(0, (f.reactionPulse ?? 0) - resultFrame * 0.82) : (f.reactionPulse ?? 0);
   const max = Math.max(1, f.reactionMax ?? 1);
   const t = clamp(rawPulse / max, 0, 1);
@@ -4258,18 +4286,19 @@ function impactReactionProfile(f) {
     zone,
     kind,
     t,
-    snap: smoothStep01(t) * strength,
-    rebound: Math.sin(reboundClock * Math.PI) * strength,
-    shake: Math.sin((roundFrame + resultFrame) * 2.55) * t * strength,
+    snap: smoothStep01(t) * strength * motion.impactSnap,
+    rebound: Math.sin(reboundClock * Math.PI) * strength * motion.impactRebound,
+    shake: Math.sin((roundFrame + resultFrame) * 2.55) * t * strength * motion.impactShake,
     localDir,
     worldDir,
-    strength,
+    strength: strength * motion.impactSnap,
   };
 }
 
 function hitReactionMassProfile(f) {
   const reaction = impactReactionProfile(f);
   const localized = localizedImpactProfile(f);
+  const motion = characterMotion(f);
   const active = Math.max(reaction.t, localized.t * 0.86);
   const zone = reaction.zone === "head" || reaction.zone === "legs" ? reaction.zone : "torso";
   const kind = reaction.kind || "light";
@@ -4286,10 +4315,14 @@ function hitReactionMassProfile(f) {
   const snap = reaction.snap * kindWeight * zoneWeight;
   const rebound = reaction.rebound * kindWeight;
   const absorb = smoothStep01(active) * strength * kindWeight;
-  const floor = f.grounded ? clamp(absorb * (zone === "legs" ? 0.9 : 0.62) + Math.abs(f.vx ?? 0) / 12, 0, 1.7) : 0;
-  const skid = f.grounded ? clamp((Math.abs(f.vx ?? 0) / 7.4 + snap * 0.24 + (zone === "legs" ? 0.28 : 0)) * kindWeight, 0, 1.85) : 0;
-  const fold = zone === "head" ? -0.55 : zone === "legs" ? 0.72 : 0.46;
-  const lift = zone === "head" ? 0.38 : zone === "legs" ? -0.34 : 0.12;
+  const floor = f.grounded
+    ? clamp((absorb * (zone === "legs" ? 0.9 : 0.62) + Math.abs(f.vx ?? 0) / 12) * motion.impactFloor, 0, 1.9)
+    : 0;
+  const skid = f.grounded
+    ? clamp((Math.abs(f.vx ?? 0) / 7.4 + snap * 0.24 + (zone === "legs" ? 0.28 : 0)) * kindWeight * motion.impactSkid, 0, 2.05)
+    : 0;
+  const fold = (zone === "head" ? -0.55 : zone === "legs" ? 0.72 : 0.46) * (f.profileId === "p1" ? 0.78 : f.profileId === "p2" ? 1.14 : 1);
+  const lift = (zone === "head" ? 0.38 : zone === "legs" ? -0.34 : 0.12) * (f.profileId === "p1" ? 0.72 : f.profileId === "p2" ? 1.22 : 1);
 
   return {
     active,
@@ -4399,6 +4432,7 @@ function fighterTransitionMotion(f, walking) {
     afterimage: 0,
   };
   const dir = f.dir || 1;
+  const style = characterMotion(f);
 
   if (walking) {
     const speed = clamp(Math.abs(f.vx) / 3.35, 0, 1.25);
@@ -4568,7 +4602,7 @@ function fighterTransitionMotion(f, walking) {
     }
 
     if (hurtRecover > 0.02 && f.hurt <= 0) {
-      const rebound = Math.sin(hurtRecover * Math.PI);
+      const rebound = Math.sin(hurtRecover * Math.PI) * style.hurtRecover;
       motion.x -= impactDir * rebound * 1.4;
       motion.y -= rebound * 0.75;
       motion.rotation -= impactDir * rebound * 0.018;
@@ -4696,13 +4730,15 @@ function fighterTransitionMotion(f, walking) {
     const headHit = f.hitZone === "head" ? zoneT : 0;
     const bodyHit = f.hitZone === "torso" ? zoneT : 0;
     const legHit = f.hitZone === "legs" ? zoneT : 0;
-    const shakePulse = Math.sin((roundFrame + resultFrame) * 1.75) * hurtT;
+    const shakePulse = Math.sin((roundFrame + resultFrame) * 1.75) * hurtT * style.impactShake;
     const impactDir = f.impactDir ?? dir;
-    motion.x += impactDir * (impactT * (2.4 + strength * 3.1) + hurtT * (0.8 + strength * 0.9) + headHit * 2.4 + bodyHit * 1.2 + legHit * 1.7) + shakePulse * 0.9;
-    motion.y += Math.sin(effectiveHurt * 0.82) * hurtT * 0.8 - impactT * (0.35 + strength * 0.45) + contactT * 0.8 - headHit * 1.3 + legHit * 2.4;
-    motion.rotation += impactDir * (impactT * (0.016 + strength * 0.023) + hurtT * 0.012 + headHit * 0.046 + bodyHit * 0.022 - legHit * 0.024) + shakePulse * 0.005;
-    motion.scaleX *= 1 + impactT * (0.008 + strength * 0.012) + contactT * 0.006 + legHit * 0.028 + bodyHit * 0.012;
-    motion.scaleY *= 1 - impactT * (0.004 + strength * 0.006) + contactT * 0.004 - legHit * 0.035 - bodyHit * 0.008 + headHit * 0.008;
+    const absorbStyle = f.profileId === "p1" ? 0.82 : f.profileId === "p2" ? 1.12 : 1;
+    const liftStyle = f.profileId === "p1" ? 0.72 : f.profileId === "p2" ? 1.18 : 1;
+    motion.x += impactDir * (impactT * (2.4 + strength * 3.1) * style.impactSnap + hurtT * (0.8 + strength * 0.9) * absorbStyle + headHit * 2.4 + bodyHit * 1.2 + legHit * 1.7) + shakePulse * 0.9;
+    motion.y += Math.sin(effectiveHurt * 0.82) * hurtT * 0.8 * liftStyle - impactT * (0.35 + strength * 0.45) * style.impactRebound + contactT * 0.8 - headHit * 1.3 * liftStyle + legHit * 2.4 * liftStyle;
+    motion.rotation += impactDir * (impactT * (0.016 + strength * 0.023) * absorbStyle + hurtT * 0.012 + headHit * 0.046 * liftStyle + bodyHit * 0.022 - legHit * 0.024 * liftStyle) + shakePulse * 0.005;
+    motion.scaleX *= 1 + impactT * (0.008 + strength * 0.012) * absorbStyle + contactT * 0.006 + legHit * 0.028 * liftStyle + bodyHit * 0.012;
+    motion.scaleY *= 1 - impactT * (0.004 + strength * 0.006) * absorbStyle + contactT * 0.004 - legHit * 0.035 * liftStyle - bodyHit * 0.008 + headHit * 0.008;
   }
 
   const reaction = impactReactionProfile(f);
@@ -4712,27 +4748,29 @@ function fighterTransitionMotion(f, walking) {
     const worldDir = reaction.worldDir || dir;
     const kindBoost = reaction.kind === "finish" ? 1.3 : reaction.kind === "counter" || reaction.kind === "blast" ? 1.14 : reaction.kind === "heavy" ? 1.05 : 0.86;
     const zone = reaction.zone === "head" || reaction.zone === "legs" ? reaction.zone : "torso";
+    const liftStyle = f.profileId === "p1" ? 0.74 : f.profileId === "p2" ? 1.18 : 1;
+    const absorbStyle = f.profileId === "p1" ? 0.86 : f.profileId === "p2" ? 1.1 : 1;
 
     if (zone === "head") {
       motion.x += worldDir * (snap * 4.2 + rebound * 2.2) * kindBoost;
-      motion.y -= (snap * 1.8 + rebound * 0.55) * kindBoost;
-      motion.rotation += worldDir * (snap * 0.052 + rebound * 0.027) * kindBoost;
-      motion.scaleX *= 1 + snap * 0.012;
-      motion.scaleY *= 1 - snap * 0.01;
+      motion.y -= (snap * 1.8 + rebound * 0.55) * kindBoost * liftStyle;
+      motion.rotation += worldDir * (snap * 0.052 + rebound * 0.027) * kindBoost * absorbStyle;
+      motion.scaleX *= 1 + snap * 0.012 * absorbStyle;
+      motion.scaleY *= 1 - snap * 0.01 * liftStyle;
       motion.afterimage = Math.max(motion.afterimage, reaction.t * 0.07 * kindBoost);
     } else if (zone === "legs") {
       motion.x += worldDir * (snap * 2.7 + rebound * 1.9) * kindBoost;
-      motion.y += (snap * 3.2 + rebound * 0.9) * kindBoost;
-      motion.rotation -= worldDir * (snap * 0.04 + rebound * 0.022) * kindBoost;
-      motion.scaleX *= 1 + snap * 0.022;
-      motion.scaleY *= 1 - snap * 0.036;
+      motion.y += (snap * 3.2 + rebound * 0.9) * kindBoost * liftStyle;
+      motion.rotation -= worldDir * (snap * 0.04 + rebound * 0.022) * kindBoost * absorbStyle;
+      motion.scaleX *= 1 + snap * 0.022 * liftStyle;
+      motion.scaleY *= 1 - snap * 0.036 * liftStyle;
       motion.afterimage = Math.max(motion.afterimage, reaction.t * 0.055 * kindBoost);
     } else {
       motion.x += worldDir * (snap * 3.4 + rebound * 1.7) * kindBoost;
-      motion.y += (snap * 1.35 - rebound * 0.35) * kindBoost;
-      motion.rotation += worldDir * (snap * 0.033 + rebound * 0.018) * kindBoost;
-      motion.scaleX *= 1 + snap * 0.026;
-      motion.scaleY *= 1 - snap * 0.025;
+      motion.y += (snap * 1.35 - rebound * 0.35) * kindBoost * liftStyle;
+      motion.rotation += worldDir * (snap * 0.033 + rebound * 0.018) * kindBoost * absorbStyle;
+      motion.scaleX *= 1 + snap * 0.026 * absorbStyle;
+      motion.scaleY *= 1 - snap * 0.025 * absorbStyle;
       motion.afterimage = Math.max(motion.afterimage, reaction.t * 0.06 * kindBoost);
     }
   }
@@ -4742,12 +4780,14 @@ function fighterTransitionMotion(f, walking) {
     const skidEase = smoothStep01(hitMass.skid);
     const snapEase = clamp(hitMass.snap, 0, 1.85);
     const zoneLift = hitMass.zone === "head" ? -1 : hitMass.zone === "legs" ? 1 : 0.15;
-    motion.x += hitMass.worldDir * (skidEase * 2.9 + snapEase * 1.15);
-    motion.y += hitMass.floor * 1.05 + zoneLift * snapEase * 0.85 - hitMass.lift * snapEase;
-    motion.rotation += hitMass.worldDir * (hitMass.fold * snapEase * 0.042 + hitMass.rebound * 0.011);
-    motion.scaleX *= 1 + hitMass.floor * 0.012 + (hitMass.zone === "legs" ? snapEase * 0.016 : snapEase * 0.008);
-    motion.scaleY *= 1 - hitMass.floor * 0.016 - (hitMass.zone === "torso" ? snapEase * 0.012 : 0) + (hitMass.zone === "head" ? snapEase * 0.006 : 0);
-    motion.afterimage = Math.max(motion.afterimage, hitMass.active * (hitMass.kind === "finish" ? 0.13 : hitMass.kind === "counter" || hitMass.kind === "blast" ? 0.09 : 0.055));
+    const absorbStyle = f.profileId === "p1" ? 0.86 : f.profileId === "p2" ? 1.12 : 1;
+    const liftStyle = f.profileId === "p1" ? 0.76 : f.profileId === "p2" ? 1.18 : 1;
+    motion.x += hitMass.worldDir * (skidEase * 2.9 + snapEase * 1.15) * absorbStyle;
+    motion.y += hitMass.floor * 1.05 + zoneLift * snapEase * 0.85 * liftStyle - hitMass.lift * snapEase * liftStyle;
+    motion.rotation += hitMass.worldDir * (hitMass.fold * snapEase * 0.042 + hitMass.rebound * 0.011) * absorbStyle;
+    motion.scaleX *= 1 + hitMass.floor * 0.012 + (hitMass.zone === "legs" ? snapEase * 0.016 : snapEase * 0.008) * absorbStyle;
+    motion.scaleY *= 1 - hitMass.floor * 0.016 - (hitMass.zone === "torso" ? snapEase * 0.012 * absorbStyle : 0) + (hitMass.zone === "head" ? snapEase * 0.006 * liftStyle : 0);
+    motion.afterimage = Math.max(motion.afterimage, hitMass.active * (hitMass.kind === "finish" ? 0.13 : hitMass.kind === "counter" || hitMass.kind === "blast" ? 0.09 : 0.055) * style.damageFx);
   }
 
   const lowHealth = f.health < 30 && f.hurt <= 0 && !winner ? clamp((30 - f.health) / 30, 0, 1) : 0;
@@ -6694,6 +6734,7 @@ function drawSpriteImpactWarp(f, image, frameX, crouch) {
   const impact = localizedImpactProfile(f);
   if (impact.t <= 0.035 || f.hitZone === "guard") return;
   const reaction = impactReactionProfile(f);
+  const style = characterMotion(f);
 
   const zones = {
     head: { srcY: 116, h: 66, yBoost: -5, xKick: 7.4, scaleX: 0.036, scaleY: -0.02, rot: 0.052 },
@@ -6711,12 +6752,13 @@ function drawSpriteImpactWarp(f, image, frameX, crouch) {
   const squashX = 1 + zone.scaleX * warpAmount;
   const squashY = 1 + zone.scaleY * warpAmount;
   const rotation = -impact.localDir * zone.rot * (impact.rebound * flavor.warp + reactionBoost * 0.65);
+  const fxAlpha = clamp(0.92 + (style.damageFx - 1) * 0.45, 0.82, 1.12);
 
   ctx.save();
   ctx.beginPath();
   ctx.rect(-BODY_SPRITE_ANCHOR_X - pad, localY - pad, BODY_SPRITE_FRAME_W + pad * 2, zone.h + pad * 2);
   ctx.clip();
-  ctx.globalAlpha = clamp(0.34 + impact.t * 0.28, 0.2, 0.68);
+  ctx.globalAlpha = clamp((0.34 + impact.t * 0.28) * fxAlpha, 0.2, 0.72);
   ctx.globalCompositeOperation = "source-over";
   ctx.translate(kick, centerY + impact.shake * 1.3);
   ctx.rotate(rotation);
@@ -6737,9 +6779,9 @@ function drawSpriteImpactWarp(f, image, frameX, crouch) {
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  ctx.globalAlpha = clamp(0.12 + impact.t * 0.18, 0.08, 0.34);
-  ctx.strokeStyle = colorWithAlpha(flavor.highlight, impact.zone === "legs" ? 0.9 : 0.86);
-  ctx.lineWidth = 1.8 + impact.snap * 1.4;
+  ctx.globalAlpha = clamp((0.12 + impact.t * 0.18) * fxAlpha, 0.08, 0.38);
+  ctx.strokeStyle = colorWithAlpha(flavor.highlight, (impact.zone === "legs" ? 0.9 : 0.86) * fxAlpha);
+  ctx.lineWidth = 1.8 + impact.snap * 1.4 * style.damageFx;
   ctx.lineCap = "round";
   for (let i = 0; i < 3; i += 1) {
     const lane = i - 1;
@@ -6755,6 +6797,7 @@ function drawSpriteImpactWarp(f, image, frameX, crouch) {
 function drawSpriteReactionPoseWarp(f, image, frameX, crouch) {
   const reaction = impactReactionProfile(f);
   if (reaction.t <= 0.04 || reaction.kind === "guard" || !image?.complete || !image.naturalWidth) return;
+  const style = characterMotion(f);
 
   const zone = reaction.zone === "head" || reaction.zone === "legs" ? reaction.zone : "torso";
   const kindBoost = reaction.kind === "finish" ? 1.26 : reaction.kind === "counter" || reaction.kind === "blast" ? 1.14 : reaction.kind === "heavy" ? 1.06 : 0.88;
@@ -6763,7 +6806,7 @@ function drawSpriteReactionPoseWarp(f, image, frameX, crouch) {
 
   const localCrouch = crouch * 0.18;
   const dir = reaction.localDir || 1;
-  const alpha = clamp(0.12 + reaction.t * 0.24, 0.08, 0.38);
+  const alpha = clamp((0.12 + reaction.t * 0.24) * style.damageFx, 0.08, 0.42);
   const sliceSets = {
     head: [
       { srcY: 132, h: 44, tx: -dir * 11.5, ty: -3.2, rot: -dir * 0.055, sx: 1.022, sy: 0.982, a: 0.86 },
@@ -7793,15 +7836,18 @@ function drawHurtRim(f, crouch) {
 }
 
 function drawDamageReactionFX(f, crouch) {
+  const motion = characterMotion(f);
   const rawDamage = winner ? Math.max(0, (f.damagePulse ?? 0) - resultFrame * 0.78) : (f.damagePulse ?? 0);
   const damage = clamp(rawDamage / 34, 0, 1);
   const level = clamp(f.damageLevel ?? 0, 0, 1.7);
+  const styledDamage = clamp(damage * motion.damageFx, 0, 1.35);
+  const styledLevel = level * motion.damageFx;
   const localizedImpact = localizedImpactProfile(f);
   const ko = winner && f.id !== roundWinnerId ? clamp(resultFrame / 58, 0, 1) : 0;
   if (damage <= 0.03 && ko <= 0.03) return;
 
   const localDir = (f.impactDir ?? f.dir) === f.dir ? 1 : -1;
-  const shake = Math.sin((roundFrame + resultFrame) * 1.55) * damage;
+  const shake = Math.sin((roundFrame + resultFrame) * 1.55) * damage * motion.impactShake;
   const zone = f.hitZone ?? "torso";
   const centerY = zone === "head" ? -136 + crouch : zone === "legs" ? -46 + crouch : -98 + crouch;
   const glowRx = zone === "head" ? 48 : zone === "legs" ? 62 : 58;
@@ -7816,30 +7862,30 @@ function drawDamageReactionFX(f, crouch) {
   ctx.lineJoin = "round";
 
   if (damage > 0.03) {
-    const glow = ctx.createRadialGradient(localDir * 16, centerY, 5, localDir * 10, centerY, 88 + level * 14);
-    glow.addColorStop(0, `rgba(255, 247, 212, ${0.18 * damage})`);
-    glow.addColorStop(0.42, colorWithAlpha(flavor.highlight, 0.13 * damage * level));
+    const glow = ctx.createRadialGradient(localDir * 16, centerY, 5, localDir * 10, centerY, 88 + styledLevel * 14);
+    glow.addColorStop(0, `rgba(255, 247, 212, ${0.18 * styledDamage})`);
+    glow.addColorStop(0.42, colorWithAlpha(flavor.highlight, 0.13 * styledDamage * level));
     glow.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.ellipse(localDir * 8, centerY, glowRx + level * 10, glowRy + level * 8, -localDir * 0.08, 0, Math.PI * 2);
+    ctx.ellipse(localDir * 8, centerY, glowRx + styledLevel * 10, glowRy + styledLevel * 8, -localDir * 0.08, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.36 * damage);
-    ctx.lineWidth = 2.2 + level * 1.8;
+    ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.36 * styledDamage);
+    ctx.lineWidth = 2.2 + styledLevel * 1.8;
     for (let i = 0; i < 3; i += 1) {
       const lane = i - 1;
       const y = slashTop + crouch + lane * slashGap + shake * 5;
       ctx.beginPath();
-      ctx.moveTo(localDir * (-44 - damage * 8), y - lane * 6);
-      ctx.lineTo(localDir * (-18 + damage * 18), y + 13);
-      ctx.moveTo(localDir * (37 + damage * 10), y + 4);
-      ctx.lineTo(localDir * (18 - damage * 14), y + 17);
+      ctx.moveTo(localDir * (-44 - styledDamage * 8), y - lane * 6);
+      ctx.lineTo(localDir * (-18 + styledDamage * 18), y + 13);
+      ctx.moveTo(localDir * (37 + styledDamage * 10), y + 4);
+      ctx.lineTo(localDir * (18 - styledDamage * 14), y + 17);
       ctx.stroke();
     }
 
-    ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.16 * damage * level);
-    ctx.lineWidth = 6 + level * 2.5;
+    ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.16 * styledDamage * styledLevel);
+    ctx.lineWidth = 6 + styledLevel * 2.5;
     ctx.beginPath();
     ctx.moveTo(localDir * -34, centerY - glowRy * 0.28);
     ctx.quadraticCurveTo(localDir * 8, centerY + shake * 8, localDir * 34, centerY + glowRy * 0.28);
@@ -7848,8 +7894,8 @@ function drawDamageReactionFX(f, crouch) {
     if (localizedImpact.t > 0.04) {
       const compression = localizedImpact.snap;
       const impactCenterX = -localizedImpact.localDir * (zone === "head" ? 18 : zone === "legs" ? 12 : 15);
-      ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.2 * damage + compression * 0.12);
-      ctx.lineWidth = 1.5 + compression * 1.9;
+      ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.2 * styledDamage + compression * 0.12 * motion.damageFx);
+      ctx.lineWidth = 1.5 + compression * 1.9 * motion.damageFx;
       for (let i = 0; i < 3; i += 1) {
         const ring = i / 2;
         ctx.beginPath();
@@ -7865,8 +7911,8 @@ function drawDamageReactionFX(f, crouch) {
         ctx.stroke();
       }
 
-      ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.12 * level + compression * 0.08);
-      ctx.lineWidth = 4 + compression * 2.5;
+      ctx.strokeStyle = colorWithAlpha(flavor.highlight, 0.12 * styledLevel + compression * 0.08 * motion.damageFx);
+      ctx.lineWidth = 4 + compression * 2.5 * motion.damageFx;
       ctx.beginPath();
       ctx.moveTo(impactCenterX - localizedImpact.localDir * (glowRx * 0.35), centerY - glowRy * 0.18);
       ctx.quadraticCurveTo(
@@ -8963,7 +9009,7 @@ function getPose(f, stride) {
     }
 
     if (hurtRecoverT > 0.02 && f.hurt <= 0 && !f.attack) {
-      const rebound = Math.sin(hurtRecoverT * Math.PI);
+      const rebound = Math.sin(hurtRecoverT * Math.PI) * motion.hurtRecover;
       const impactDir = f.impactDir ?? f.dir;
       base.torsoTilt -= impactDir * rebound * 0.035;
       base.frontArm.elbow.x -= impactDir * rebound * 5 * spec.stance;
@@ -8982,45 +9028,47 @@ function getPose(f, stride) {
     const snap = localizedImpact.snap;
     const recoil = localizedImpact.rebound;
     const localDir = localizedImpact.localDir;
+    const absorbStyle = f.profileId === "p1" ? 0.78 : f.profileId === "p2" ? 1.16 : 1;
+    const liftStyle = f.profileId === "p1" ? 0.72 : f.profileId === "p2" ? 1.18 : 1;
 
     if (localizedImpact.zone === "head") {
-      base.torsoTilt -= localDir * (0.035 + recoil * 0.028);
-      base.frontArm.elbow.x += localDir * snap * 7 * spec.stance;
-      base.frontArm.elbow.y -= snap * 8;
-      base.frontArm.hand.x += localDir * snap * 9 * spec.stance;
-      base.frontArm.hand.y -= snap * 12;
-      base.backArm.elbow.x += localDir * snap * 5 * spec.stance;
-      base.backArm.elbow.y -= snap * 6;
-      base.backArm.hand.x += localDir * snap * 7 * spec.stance;
-      base.backArm.hand.y -= snap * 10;
-      base.frontLeg.knee.y += recoil * 3;
-      base.backLeg.foot.x -= localDir * snap * 4 * spec.stance;
+      base.torsoTilt -= localDir * (0.035 + recoil * 0.028) * absorbStyle;
+      base.frontArm.elbow.x += localDir * snap * 7 * spec.stance * absorbStyle;
+      base.frontArm.elbow.y -= snap * 8 * liftStyle;
+      base.frontArm.hand.x += localDir * snap * 9 * spec.stance * absorbStyle;
+      base.frontArm.hand.y -= snap * 12 * liftStyle;
+      base.backArm.elbow.x += localDir * snap * 5 * spec.stance * absorbStyle;
+      base.backArm.elbow.y -= snap * 6 * liftStyle;
+      base.backArm.hand.x += localDir * snap * 7 * spec.stance * absorbStyle;
+      base.backArm.hand.y -= snap * 10 * liftStyle;
+      base.frontLeg.knee.y += recoil * 3 * liftStyle;
+      base.backLeg.foot.x -= localDir * snap * 4 * spec.stance * absorbStyle;
     } else if (localizedImpact.zone === "legs") {
-      base.torsoTilt += localDir * (0.028 + snap * 0.018);
-      base.frontLeg.knee.x -= localDir * snap * 12 * spec.stance;
-      base.frontLeg.knee.y += snap * 14;
-      base.frontLeg.foot.x += localDir * snap * 10 * spec.stance;
-      base.backLeg.knee.x += localDir * snap * 8 * spec.stance;
-      base.backLeg.knee.y += snap * 12;
-      base.backLeg.foot.x -= localDir * snap * 12 * spec.stance;
-      base.frontArm.elbow.y += recoil * 8;
-      base.frontArm.hand.y += recoil * 11;
-      base.backArm.elbow.y += recoil * 6;
-      base.backArm.hand.y += recoil * 8;
+      base.torsoTilt += localDir * (0.028 + snap * 0.018) * absorbStyle;
+      base.frontLeg.knee.x -= localDir * snap * 12 * spec.stance * absorbStyle;
+      base.frontLeg.knee.y += snap * 14 * liftStyle;
+      base.frontLeg.foot.x += localDir * snap * 10 * spec.stance * absorbStyle;
+      base.backLeg.knee.x += localDir * snap * 8 * spec.stance * absorbStyle;
+      base.backLeg.knee.y += snap * 12 * liftStyle;
+      base.backLeg.foot.x -= localDir * snap * 12 * spec.stance * absorbStyle;
+      base.frontArm.elbow.y += recoil * 8 * liftStyle;
+      base.frontArm.hand.y += recoil * 11 * liftStyle;
+      base.backArm.elbow.y += recoil * 6 * liftStyle;
+      base.backArm.hand.y += recoil * 8 * liftStyle;
     } else {
-      base.torsoTilt += localDir * (0.026 + recoil * 0.018);
-      base.frontArm.elbow.x -= localDir * snap * 5 * spec.stance;
-      base.frontArm.hand.x -= localDir * snap * 7 * spec.stance;
-      base.backArm.elbow.x -= localDir * snap * 4 * spec.stance;
-      base.backArm.hand.x -= localDir * snap * 6 * spec.stance;
-      base.frontArm.elbow.y += recoil * 6;
-      base.frontArm.hand.y += recoil * 8;
-      base.backArm.elbow.y += recoil * 4;
-      base.backArm.hand.y += recoil * 6;
-      base.frontLeg.knee.y += snap * 5;
-      base.backLeg.knee.y += snap * 4;
-      base.frontLeg.foot.x += localDir * snap * 5 * spec.stance;
-      base.backLeg.foot.x -= localDir * snap * 7 * spec.stance;
+      base.torsoTilt += localDir * (0.026 + recoil * 0.018) * absorbStyle;
+      base.frontArm.elbow.x -= localDir * snap * 5 * spec.stance * absorbStyle;
+      base.frontArm.hand.x -= localDir * snap * 7 * spec.stance * absorbStyle;
+      base.backArm.elbow.x -= localDir * snap * 4 * spec.stance * absorbStyle;
+      base.backArm.hand.x -= localDir * snap * 6 * spec.stance * absorbStyle;
+      base.frontArm.elbow.y += recoil * 6 * liftStyle;
+      base.frontArm.hand.y += recoil * 8 * liftStyle;
+      base.backArm.elbow.y += recoil * 4 * liftStyle;
+      base.backArm.hand.y += recoil * 6 * liftStyle;
+      base.frontLeg.knee.y += snap * 5 * liftStyle;
+      base.backLeg.knee.y += snap * 4 * liftStyle;
+      base.frontLeg.foot.x += localDir * snap * 5 * spec.stance * absorbStyle;
+      base.backLeg.foot.x -= localDir * snap * 7 * spec.stance * absorbStyle;
     }
   }
 
@@ -9064,10 +9112,12 @@ function getPose(f, stride) {
     const recoil = clamp(hitMass.rebound, 0, 1.85);
     const floor = clamp(hitMass.floor, 0, 1.7);
     const skid = clamp(hitMass.skid, 0, 1.85);
+    const absorbStyle = f.profileId === "p1" ? 0.82 : f.profileId === "p2" ? 1.12 : 1;
+    const liftStyle = f.profileId === "p1" ? 0.74 : f.profileId === "p2" ? 1.18 : 1;
     const braceFoot = worldLocal > 0 ? "backLeg" : "frontLeg";
     const freeFoot = braceFoot === "backLeg" ? "frontLeg" : "backLeg";
 
-    base.torsoTilt += localDir * hitMass.fold * snap * 0.05 + localDir * recoil * 0.018;
+    base.torsoTilt += (localDir * hitMass.fold * snap * 0.05 + localDir * recoil * 0.018) * absorbStyle;
     base[braceFoot].knee.y += floor * 5.5;
     base[braceFoot].foot.y += floor * 1.4;
     base[braceFoot].foot.x -= worldLocal * (floor * 7 + skid * 6) * spec.stance;
@@ -9076,37 +9126,37 @@ function getPose(f, stride) {
     base[freeFoot].foot.x += worldLocal * skid * 4.5 * spec.stance;
 
     if (hitMass.zone === "head") {
-      base.frontArm.elbow.x += localDir * snap * 10 * spec.stance;
-      base.frontArm.elbow.y -= snap * 8 + recoil * 3;
-      base.frontArm.hand.x += localDir * snap * 13 * spec.stance;
-      base.frontArm.hand.y -= snap * 15 + recoil * 5;
-      base.backArm.elbow.x += localDir * snap * 7 * spec.stance;
-      base.backArm.elbow.y -= snap * 6;
-      base.backArm.hand.x += localDir * snap * 11 * spec.stance;
-      base.backArm.hand.y -= snap * 12;
+      base.frontArm.elbow.x += localDir * snap * 10 * spec.stance * absorbStyle;
+      base.frontArm.elbow.y -= (snap * 8 + recoil * 3) * liftStyle;
+      base.frontArm.hand.x += localDir * snap * 13 * spec.stance * absorbStyle;
+      base.frontArm.hand.y -= (snap * 15 + recoil * 5) * liftStyle;
+      base.backArm.elbow.x += localDir * snap * 7 * spec.stance * absorbStyle;
+      base.backArm.elbow.y -= snap * 6 * liftStyle;
+      base.backArm.hand.x += localDir * snap * 11 * spec.stance * absorbStyle;
+      base.backArm.hand.y -= snap * 12 * liftStyle;
       base.frontLeg.knee.y += floor * 2;
     } else if (hitMass.zone === "legs") {
-      base.frontLeg.knee.x -= localDir * snap * 9 * spec.stance;
-      base.frontLeg.knee.y += snap * 11 + floor * 6;
-      base.frontLeg.foot.x += localDir * snap * 9 * spec.stance;
-      base.backLeg.knee.x += localDir * snap * 8 * spec.stance;
-      base.backLeg.knee.y += snap * 13 + floor * 7;
-      base.backLeg.foot.x -= localDir * snap * 11 * spec.stance;
-      base.frontArm.elbow.y += snap * 8;
-      base.frontArm.hand.y += snap * 12;
-      base.backArm.elbow.y += snap * 6;
-      base.backArm.hand.y += snap * 9;
+      base.frontLeg.knee.x -= localDir * snap * 9 * spec.stance * absorbStyle;
+      base.frontLeg.knee.y += snap * 11 * liftStyle + floor * 6;
+      base.frontLeg.foot.x += localDir * snap * 9 * spec.stance * absorbStyle;
+      base.backLeg.knee.x += localDir * snap * 8 * spec.stance * absorbStyle;
+      base.backLeg.knee.y += snap * 13 * liftStyle + floor * 7;
+      base.backLeg.foot.x -= localDir * snap * 11 * spec.stance * absorbStyle;
+      base.frontArm.elbow.y += snap * 8 * liftStyle;
+      base.frontArm.hand.y += snap * 12 * liftStyle;
+      base.backArm.elbow.y += snap * 6 * liftStyle;
+      base.backArm.hand.y += snap * 9 * liftStyle;
     } else {
-      base.frontArm.elbow.x -= localDir * snap * 6 * spec.stance;
-      base.frontArm.elbow.y += recoil * 7 + floor * 1.5;
-      base.frontArm.hand.x -= localDir * snap * 9 * spec.stance;
-      base.frontArm.hand.y += recoil * 9 + floor * 2.2;
-      base.backArm.elbow.x -= localDir * snap * 5 * spec.stance;
-      base.backArm.elbow.y += recoil * 5;
-      base.backArm.hand.x -= localDir * snap * 8 * spec.stance;
-      base.backArm.hand.y += recoil * 7;
-      base.frontLeg.knee.y += floor * 4;
-      base.backLeg.knee.y += floor * 4.5;
+      base.frontArm.elbow.x -= localDir * snap * 6 * spec.stance * absorbStyle;
+      base.frontArm.elbow.y += recoil * 7 * liftStyle + floor * 1.5;
+      base.frontArm.hand.x -= localDir * snap * 9 * spec.stance * absorbStyle;
+      base.frontArm.hand.y += recoil * 9 * liftStyle + floor * 2.2;
+      base.backArm.elbow.x -= localDir * snap * 5 * spec.stance * absorbStyle;
+      base.backArm.elbow.y += recoil * 5 * liftStyle;
+      base.backArm.hand.x -= localDir * snap * 8 * spec.stance * absorbStyle;
+      base.backArm.hand.y += recoil * 7 * liftStyle;
+      base.frontLeg.knee.y += floor * 4 * liftStyle;
+      base.backLeg.knee.y += floor * 4.5 * liftStyle;
     }
   }
 
