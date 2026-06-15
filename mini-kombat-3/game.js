@@ -53,12 +53,12 @@ const faces = {
   p6: loadImage("assets/fighter-6-face.png"),
 };
 const bodySpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-body.svg?v=57"),
-  p2: loadImage("assets/sprite-akane-body.svg?v=57"),
+  p1: loadImage("assets/sprite-pchan-body.svg?v=58"),
+  p2: loadImage("assets/sprite-akane-body.svg?v=58"),
 };
 const unifiedSpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-unified.svg?v=57"),
-  p2: loadImage("assets/sprite-akane-unified.svg?v=57"),
+  p1: loadImage("assets/sprite-pchan-unified.svg?v=58"),
+  p2: loadImage("assets/sprite-akane-unified.svg?v=58"),
 };
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
@@ -157,6 +157,20 @@ const BODY_SPRITE_FRAMES = {
   defeat: [15],
   sweep: [16],
 };
+
+const ATTACK_TIMINGS = {
+  punch: { activeStart: 7, activeEnd: 12, duration: 25, cooldown: 14, entry: 10, recover: 10 },
+  airPunch: { activeStart: 7, activeEnd: 12, duration: 25, cooldown: 14, entry: 10, recover: 10 },
+  kick: { activeStart: 12, activeEnd: 19, duration: 34, cooldown: 24, entry: 12, recover: 13 },
+  airKick: { activeStart: 11, activeEnd: 18, duration: 32, cooldown: 24, entry: 12, recover: 13 },
+  sweep: { activeStart: 10, activeEnd: 17, duration: 32, cooldown: 25, entry: 12, recover: 13 },
+  grab: { activeStart: 8, activeEnd: 14, duration: 26, cooldown: 28, entry: 11, recover: 12 },
+  special: { activeStart: 14, activeEnd: 21, duration: 34, cooldown: 30, entry: 16, recover: 18 },
+};
+
+function attackTiming(type) {
+  return ATTACK_TIMINGS[type] ?? ATTACK_TIMINGS.punch;
+}
 
 const BODY_SPECS = {
   athletic: {
@@ -1192,14 +1206,15 @@ function startAttack(f, type) {
   const sweep = type === "sweep";
   const grab = type === "grab";
   const air = type === "airPunch" || type === "airKick";
+  const timing = attackTiming(type);
   const flowReady = comboReady || (f.attackRecoverPulse ?? 0) > 2 || (f.comboTimer ?? 0) > 0;
   const chainMax = comboReady ? 14 : flowReady ? 10 : 1;
   f.attack = {
     type,
     frame: 0,
-    activeStart: grab ? 7 : sweep ? 8 : heavy ? 10 : 5,
-    activeEnd: grab ? 13 : sweep ? 16 : heavy ? 18 : 12,
-    duration: grab ? 24 : sweep ? 29 : heavy ? 31 : 22,
+    activeStart: timing.activeStart,
+    activeEnd: timing.activeEnd,
+    duration: timing.duration,
     damage: grab ? 12 : sweep ? 8 : air ? 9 : heavy ? 11 : 7,
     reach: grab ? 48 : sweep ? 88 : heavy ? 84 : 58,
     height: grab ? 70 : sweep ? 34 : heavy ? 70 : 50,
@@ -1212,9 +1227,9 @@ function startAttack(f, type) {
   f.attackChainTo = type;
   f.attackChainMax = flowReady ? chainMax : 1;
   f.attackChainPulse = flowReady ? chainMax : 0;
-  f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, Math.round((grab ? 11 : sweep ? 10 : heavy ? 11 : 8) * (flowReady ? 0.58 : 1)));
+  f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, Math.round(timing.entry * (flowReady ? 0.58 : 1)));
   f.guardExitPulse = Math.max(f.guardExitPulse ?? 0, (f.guardPulse ?? 0) > 2 ? 8 : 0);
-  f.cooldown = grab ? 28 : sweep ? 25 : heavy ? 24 : 13;
+  f.cooldown = timing.cooldown;
   playSound(heavy || sweep ? "kick" : "punch");
 }
 
@@ -1222,22 +1237,23 @@ function startSpecial(f) {
   if (f.energy < 45 || f.specialCooldown > 0 || f.attack || f.hurt > 16) return;
 
   const flowReady = (f.attackRecoverPulse ?? 0) > 2 || (f.comboTimer ?? 0) > 0;
+  const timing = attackTiming("special");
   f.energy -= 45;
   f.blocking = false;
-  f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, flowReady ? 8 : 14);
+  f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, Math.round(timing.entry * (flowReady ? 0.56 : 1)));
   f.attackChainFrom = flowReady ? (f.lastAttackType || f.attackChainTo || "") : "";
   f.attackChainTo = "special";
   f.attackChainMax = flowReady ? 12 : 1;
   f.attackChainPulse = flowReady ? 12 : 0;
   f.guardExitPulse = Math.max(f.guardExitPulse ?? 0, (f.guardPulse ?? 0) > 2 ? 8 : 0);
   f.specialCooldown = 66;
-  f.cooldown = 28;
+  f.cooldown = timing.cooldown;
   f.attack = {
     type: "special",
     frame: 0,
-    activeStart: 12,
-    activeEnd: 18,
-    duration: 28,
+    activeStart: timing.activeStart,
+    activeEnd: timing.activeEnd,
+    duration: timing.duration,
     damage: 0,
     reach: 0,
     height: 0,
@@ -1664,8 +1680,8 @@ function updateFighter(f, opponent) {
     }
     if (f.attack.frame >= f.attack.duration) {
       const endedType = f.attack.type;
-      const endedHeavy = endedType === "kick" || endedType === "airKick" || endedType === "sweep" || endedType === "grab";
-      f.attackRecoverPulse = Math.max(f.attackRecoverPulse ?? 0, endedType === "special" ? 16 : endedHeavy ? 12 : 9);
+      const timing = attackTiming(endedType);
+      f.attackRecoverPulse = Math.max(f.attackRecoverPulse ?? 0, timing.recover);
       f.lastAttackType = endedType;
       f.attackChainFrom = endedType;
       f.attack = null;
@@ -5200,40 +5216,46 @@ function rasterBodyFrameFor(f, walking) {
   return "idle";
 }
 
+function stagedAttackFrameIndex(f, frames) {
+  if (!f.attack) return frames[0];
+  const phase = attackPhase(f.attack);
+
+  if (f.attack.frame < f.attack.activeStart) {
+    return phase.windupT < 0.42 ? frames[0] : frames[1] ?? frames[0];
+  }
+
+  if (f.attack.frame <= f.attack.activeEnd) {
+    return phase.strikeT < 0.56 || phase.snap > 0.18
+      ? frames[2] ?? frames[1] ?? frames[0]
+      : frames[3] ?? frames[2] ?? frames[0];
+  }
+
+  return phase.recoveryT < 0.48
+    ? frames[3] ?? frames[2] ?? frames[0]
+    : frames[4] ?? frames[frames.length - 1];
+}
+
 function rasterBodyFrameIndex(f, frameName, walking) {
   const frames = BODY_SPRITE_FRAMES[frameName] ?? BODY_SPRITE_FRAMES.idle;
 
   if (f.attack && frameName === "sweep") {
-    if (f.attack.frame < f.attack.activeStart) return 19;
+    const phase = attackPhase(f.attack);
+    if (f.attack.frame < f.attack.activeStart) return phase.windupT < 0.55 ? 19 : 16;
     if (f.attack.frame <= f.attack.activeEnd) return 16;
-    return 20;
+    return phase.recoveryT < 0.5 ? 20 : 9;
   }
 
   if (f.attack && frameName === "special") {
-    const windupT = clamp(f.attack.frame / Math.max(1, f.attack.activeStart), 0, 1);
-    const recoveryT = clamp((f.attack.frame - f.attack.activeEnd) / Math.max(1, f.attack.duration - f.attack.activeEnd), 0, 1);
-    if (f.attack.frame < f.attack.activeStart) return windupT < 0.5 ? 4 : 13;
+    const phase = attackPhase(f.attack);
+    if (f.attack.frame < f.attack.activeStart) return phase.windupT < 0.42 ? 4 : 13;
     if (f.attack.frame <= f.attack.activeEnd) return f.profileId === "p2" ? 5 : 13;
-    return recoveryT < 0.56 ? 18 : 13;
+    return phase.recoveryT < 0.52 ? 18 : 13;
   }
 
   if (frames.length === 1) return frames[0];
 
   if (f.attack && (frameName === "punch" || frameName === "kick")) {
-    const windupT = clamp(f.attack.frame / Math.max(1, f.attack.activeStart), 0, 1);
-    const recoveryT = clamp((f.attack.frame - f.attack.activeEnd) / Math.max(1, f.attack.duration - f.attack.activeEnd), 0, 1);
-    if (frameName === "punch") {
-      if (f.attack.frame < f.attack.activeStart) return windupT < 0.58 ? frames[0] : frames[1];
-      if (f.attack.frame <= f.attack.activeEnd) return frames[2];
-      return recoveryT < 0.48 ? frames[3] : frames[4];
-    }
-    if (frameName === "kick") {
-      if (f.attack.frame < f.attack.activeStart) return windupT < 0.56 ? frames[0] : frames[1];
-      if (f.attack.frame <= f.attack.activeEnd) return frames[2];
-      return recoveryT < 0.5 ? frames[3] : frames[4];
-    }
-    const t = clamp(f.attack.frame / Math.max(1, f.attack.duration), 0, 0.999);
-    return frames[Math.floor(t * frames.length)] ?? frames[frames.length - 1];
+    return stagedAttackFrameIndex(f, frames);
   }
 
   if (frameName === "hurt") {
@@ -7990,21 +8012,22 @@ function attackPhase(attack) {
     1
   );
   const recoveryT = clamp((attack.frame - attack.activeEnd) / Math.max(1, attack.duration - attack.activeEnd), 0, 1);
-  const windupCarry = attack.frame >= attack.activeStart && attack.frame <= attack.activeStart + 4
-    ? (1 - clamp((attack.frame - attack.activeStart) / 4, 0, 1)) * 0.34
+  const windupLoad = Math.max(Math.sin(windupT * Math.PI) * 0.5, smoothStep01(windupT) * 0.95);
+  const windupCarry = attack.frame >= attack.activeStart && attack.frame <= attack.activeStart + 5
+    ? (1 - clamp((attack.frame - attack.activeStart) / 5, 0, 1)) * 0.42
     : 0;
-  const strikeCarry = attack.frame > attack.activeEnd && attack.frame <= attack.activeEnd + 5
-    ? (1 - clamp((attack.frame - attack.activeEnd) / 5, 0, 1)) * 0.28
+  const strikeCarry = attack.frame > attack.activeEnd && attack.frame <= attack.activeEnd + 6
+    ? (1 - clamp((attack.frame - attack.activeEnd) / 6, 0, 1)) * 0.36
     : 0;
-  const anticipation = attack.frame < attack.activeStart ? Math.sin(windupT * Math.PI) : windupCarry;
+  const anticipation = attack.frame < attack.activeStart ? windupLoad : windupCarry;
   const strike = attack.frame >= attack.activeStart && attack.frame <= attack.activeEnd ? Math.sin(strikeT * Math.PI) : strikeCarry;
   const recovery = attack.frame > attack.activeEnd ? Math.sin(recoveryT * Math.PI) : 0;
   const settle = attack.frame > attack.activeEnd ? smoothStep01(recoveryT) : 0;
-  const snap = attack.frame >= attack.activeStart && attack.frame <= attack.activeStart + 4
-    ? 1 - clamp((attack.frame - attack.activeStart) / 4, 0, 1)
+  const snap = attack.frame >= attack.activeStart && attack.frame <= attack.activeStart + 5
+    ? 1 - clamp((attack.frame - attack.activeStart) / 5, 0, 1)
     : 0;
-  const followThrough = attack.frame > attack.activeEnd && attack.frame <= attack.activeEnd + 5
-    ? Math.sin(clamp((attack.frame - attack.activeEnd) / 5, 0, 1) * Math.PI)
+  const followThrough = attack.frame > attack.activeEnd && attack.frame <= attack.activeEnd + 6
+    ? Math.sin(clamp((attack.frame - attack.activeEnd) / 6, 0, 1) * Math.PI)
     : 0;
 
   return {

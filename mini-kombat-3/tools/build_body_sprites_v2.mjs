@@ -18,10 +18,10 @@ const frames = [
   { key: "walk2", pose: "walk", lean: -4, arm: "walkB", legs: "walkB", torsoTop: -1, shadowRx: 48 },
   { key: "punch1", pose: "punch", lean: -9, arm: "punchPrep", legs: "braceLoad", torsoTop: 3, torsoBottom: 5, shadowRx: 68 },
   { key: "punch2", pose: "punch", lean: 22, arm: "punchHit", legs: "lungeDeep", torsoTop: -7, torsoBottom: -5, shadowRx: 82 },
-  { key: "punch3", pose: "punch", lean: 4, arm: "punchRecover", legs: "rebound", torsoTop: 1, torsoBottom: 2, shadowRx: 60 },
+  { key: "punch3", pose: "punch", lean: 1, arm: "punchRecover", legs: "rebound", torsoTop: 0, torsoBottom: 1, shadowRx: 60 },
   { key: "kick1", pose: "kick", lean: -11, arm: "kickBalance", legs: "kickChamber", torsoTop: 2, torsoBottom: 3, shadowRx: 64 },
   { key: "kick2", pose: "kick", lean: -23, arm: "kickBalanceWide", legs: "kickHit", torsoTop: -6, torsoBottom: -5, shadowRx: 84 },
-  { key: "kick3", pose: "kick", lean: -5, arm: "kickGuard", legs: "kickRecover", torsoTop: 0, shadowRx: 60 },
+  { key: "kick3", pose: "kick", lean: -2, arm: "kickGuard", legs: "kickRecover", torsoTop: 0, torsoBottom: 1, shadowRx: 60 },
   { key: "block", pose: "block", lean: -13, arm: "block", legs: "brace", torsoTop: 2, torsoBottom: 8, shadowRx: 72 },
   { key: "hurt1", pose: "hurt", lean: 18, arm: "hurt", legs: "stumble", torsoTop: 7, torsoBottom: 8, shadowRx: 66 },
   { key: "hurt2", pose: "hurt", lean: 24, arm: "hurtLow", legs: "stumbleLow", torsoTop: 13, torsoBottom: 12, shadowRx: 72 },
@@ -383,8 +383,8 @@ function armPose(kind, b) {
       [{ x: 136, y: 106 }, { x: 162, y: 97 }, { x: 187, y: 100 }, { x: 206, y: 107 }],
     ],
     punchRecover: [
-      [{ x: 73, y: 110 }, { x: 59, y: 134 }, { x: 59, y: 160 }, { x: 70, y: 181 }],
-      [{ x: 136, y: 107 }, { x: 151, y: 121 }, { x: 155, y: 145 }, { x: 144, y: 166 }],
+      [{ x: 73, y: 109 }, { x: 58, y: 124 }, { x: 58, y: 145 }, { x: 70, y: 162 }],
+      [{ x: 136, y: 106 }, { x: 149, y: 112 }, { x: 152, y: 131 }, { x: 142, y: 147 }],
     ],
     kickGuard: [
       [{ x: 74, y: 107 }, { x: 58, y: 118 }, { x: 53, y: 139 }, { x: 62, y: 159 }],
