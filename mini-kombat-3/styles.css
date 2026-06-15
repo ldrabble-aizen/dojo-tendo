@@ -196,9 +196,10 @@ canvas {
 }
 
 .mobile-actions {
-  grid-template-columns: repeat(2, 54px);
+  grid-template-columns: repeat(3, 54px);
   justify-self: end;
   align-self: end;
+  gap: 9px;
 }
 
 .mobile-controls button {
@@ -225,6 +226,26 @@ canvas {
   text-shadow: 0 2px 0 rgba(0,0,0,0.72);
   touch-action: none;
   transition: filter 90ms ease, transform 90ms ease, box-shadow 90ms ease;
+}
+
+.mobile-actions button[data-touch="punch"] {
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255, 246, 186, 0.36), transparent 28%),
+    linear-gradient(180deg, rgba(145, 38, 24, 0.86), rgba(36, 10, 9, 0.86));
+}
+
+.mobile-actions button[data-touch="kick"] {
+  background:
+    radial-gradient(circle at 34% 24%, rgba(214, 246, 255, 0.32), transparent 30%),
+    linear-gradient(180deg, rgba(30, 96, 124, 0.86), rgba(9, 22, 31, 0.86));
+}
+
+.mobile-actions button[data-touch="special"] {
+  color: #181004;
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.52), transparent 30%),
+    linear-gradient(180deg, #fff1bd, #ffd44d 48%, #b8371f);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
 }
 
 .mobile-controls button::after {
@@ -827,12 +848,14 @@ canvas {
 }
 
 .fighter-showcase {
+  position: relative;
+  overflow: hidden;
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 14px;
   align-items: center;
-  min-height: 124px;
-  padding: 9px;
+  min-height: 138px;
+  padding: 11px;
   border: 1px solid rgba(255, 241, 189, 0.2);
   border-radius: 8px;
   background:
@@ -843,12 +866,22 @@ canvas {
     inset 0 -18px 32px rgba(0,0,0,0.18);
 }
 
+.fighter-showcase::before {
+  content: "";
+  position: absolute;
+  inset: -35% 36% -35% auto;
+  width: 120px;
+  transform: rotate(24deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  pointer-events: none;
+}
+
 .fighter-showcase-portrait {
   position: relative;
   display: grid;
   place-items: center;
-  width: 104px;
-  height: 104px;
+  width: 118px;
+  height: 118px;
   border: 1px solid rgba(255, 228, 131, 0.56);
   border-radius: 8px;
   background:
@@ -860,8 +893,8 @@ canvas {
 }
 
 .fighter-showcase-portrait img {
-  width: 86px;
-  height: 86px;
+  width: 98px;
+  height: 98px;
   object-fit: contain;
   filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.62));
 }
@@ -911,6 +944,19 @@ canvas {
   text-transform: uppercase;
 }
 
+.fighter-showcase-trait {
+  display: block;
+  width: fit-content;
+  margin-top: 7px;
+  padding: 4px 8px;
+  color: color-mix(in srgb, var(--fighter-trim) 86%, #fff7d6);
+  border-left: 3px solid var(--fighter-trim);
+  background: rgba(0, 0, 0, 0.22);
+  font: 900 10px/1 system-ui, sans-serif;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.78);
+}
+
 .fighter-showcase-stats {
   display: grid;
   gap: 4px;
@@ -950,13 +996,14 @@ canvas {
 
 .overlay[data-screen="home"] .fighter-choice-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
 }
 
 .overlay[data-screen="home"] .fighter-choice {
   grid-template-columns: 1fr;
   justify-items: center;
   gap: 5px;
-  min-height: 76px;
+  min-height: 82px;
   padding: 7px 5px;
   border-radius: 7px;
 }
@@ -1085,34 +1132,34 @@ canvas {
 }
 
 .overlay[data-screen="winner"] h1 {
-  width: min(300px, calc(100% - 32px));
+  width: min(390px, calc(100% - 32px));
   margin-top: auto;
-  padding: 5px 12px 6px;
+  padding: 7px 16px 8px;
   color: #fff2c2;
-  border: 1px solid rgba(255, 226, 132, 0.42);
+  border: 1px solid rgba(255, 226, 132, 0.5);
   border-radius: 7px;
   background:
-    linear-gradient(180deg, rgba(42, 14, 12, 0.56), rgba(13, 10, 10, 0.58)),
-    radial-gradient(circle at 50% 0%, rgba(255, 226, 132, 0.12), transparent 62%);
+    linear-gradient(180deg, rgba(54, 15, 12, 0.48), rgba(8, 8, 10, 0.44)),
+    radial-gradient(circle at 50% 0%, rgba(255, 226, 132, 0.18), transparent 62%);
   box-shadow:
-    0 6px 14px rgba(0,0,0,0.18),
-    inset 0 1px 0 rgba(255,255,255,0.1);
-  font: 850 clamp(14px, 1.7vw, 19px)/1.05 system-ui, sans-serif;
-  text-transform: none;
+    0 8px 18px rgba(0,0,0,0.16),
+    inset 0 1px 0 rgba(255,255,255,0.14);
+  font: 900 clamp(17px, 2.3vw, 26px)/0.96 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+  text-transform: uppercase;
   text-shadow:
-    0 1px 0 rgba(41, 9, 7, 0.86),
-    0 0 8px rgba(255, 209, 92, 0.16);
+    0 2px 0 rgba(41, 9, 7, 0.88),
+    0 0 12px rgba(255, 209, 92, 0.2);
   pointer-events: auto;
 }
 
 .overlay[data-screen="winner"] .overlay-copy {
-  width: min(300px, calc(100% - 32px));
-  padding: 4px 10px;
-  color: rgba(255, 247, 214, 0.82);
-  border: 1px solid rgba(255, 226, 132, 0.16);
+  width: min(390px, calc(100% - 32px));
+  padding: 5px 12px;
+  color: rgba(255, 247, 214, 0.88);
+  border: 1px solid rgba(255, 226, 132, 0.2);
   border-radius: 7px;
-  background: rgba(8, 8, 10, 0.12);
-  font-size: clamp(9px, 1vw, 11px);
+  background: rgba(8, 8, 10, 0.16);
+  font-size: clamp(10px, 1.15vw, 12px);
   line-height: 1.25;
   pointer-events: auto;
 }
@@ -1123,9 +1170,9 @@ canvas {
 }
 
 .overlay[data-screen="winner"] #start {
-  min-width: 118px;
-  min-height: 30px;
-  font-size: 10px;
+  min-width: 134px;
+  min-height: 34px;
+  font-size: 11px;
   box-shadow:
     0 4px 0 #9b651b,
     0 0 10px rgba(255, 212, 77, 0.14);
@@ -1268,6 +1315,12 @@ canvas {
     margin-top: 4px;
     padding: 4px 7px;
     font-size: 9px;
+  }
+
+  .fighter-showcase-trait {
+    margin-top: 4px;
+    padding: 3px 6px;
+    font-size: 8px;
   }
 
   .fighter-showcase-stats {
@@ -1428,10 +1481,10 @@ canvas {
   }
 
   .overlay[data-screen="home"] {
-    grid-template-rows: auto minmax(0, 1fr) 34px;
+    grid-template-rows: minmax(0, 1fr) 34px;
     align-content: stretch;
     gap: 3px;
-    padding: 5px 8px 6px;
+    padding: 38px 8px 6px;
     overflow: hidden;
   }
 
@@ -1440,11 +1493,7 @@ canvas {
   }
 
   .overlay[data-screen="home"] .overlay-copy {
-    width: min(900px, calc(100% - 16px));
-    font-size: clamp(8px, 1.95vw, 11px);
-    line-height: 1.08;
-    max-height: 24px;
-    overflow: hidden;
+    display: none;
   }
 
   .overlay[data-screen="home"] .fighter-select,
@@ -1559,16 +1608,16 @@ canvas {
   }
 
   .mobile-actions {
-    grid-template-columns: repeat(2, 50px);
-    gap: 7px;
+    grid-template-columns: repeat(3, 46px);
+    gap: 6px;
   }
 
   .mobile-controls button {
-    width: 50px;
-    height: 50px;
-    min-width: 50px;
-    min-height: 50px;
-    font-size: 15px;
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    min-height: 46px;
+    font-size: 13px;
   }
 
   .mobile-stick {

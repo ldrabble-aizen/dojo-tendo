@@ -1183,8 +1183,8 @@ function scheduleWinnerOverlay() {
 
 function homeOverlayCopy() {
   return tournamentMode
-    ? "Modo torneo: elegí tu luchador a la derecha y el primer rival a la izquierda. En telefono gira la pantalla y usa los botones tactiles."
-    : `Elegí tus luchadores. En telefono gira la pantalla y usa los botones tactiles. Izquierda usa A/D, W, S, F, G, R y T${cpuEnabled ? " o CPU" : ""}. Derecha usa flechas, K, L, O y P.`;
+    ? "Modo torneo: elegi tu luchador a la derecha y el primer rival a la izquierda. En telefono usa joystick, pina, patada y especial."
+    : `Elegi tus luchadores. En telefono usa joystick, pina, patada y especial. Izquierda usa A/D, W, S, F, G, R y T${cpuEnabled ? " o CPU" : ""}. Derecha usa flechas, K, L, O y P.`;
 }
 
 function showHomeOverlay() {
@@ -4758,13 +4758,14 @@ function fighterTransitionMotion(f, walking) {
 
   const counterReady = clamp((f.counterWindow ?? 0) / 34, 0, 1);
   if (counterReady > 0.03 && f.hurt <= 0 && !f.attack && !winner) {
+    const guardProfile = characterGuard(f);
     const coil = Math.sin((1 - counterReady) * Math.PI);
-    motion.x += dir * (counterReady * 1.1 + coil * 0.8);
-    motion.y += counterReady * 0.5;
-    motion.rotation += dir * (counterReady * 0.014 + coil * 0.014);
-    motion.scaleX *= 1 + counterReady * 0.008 + coil * 0.006;
-    motion.scaleY *= 1 - counterReady * 0.006;
-    motion.afterimage = Math.max(motion.afterimage, counterReady * 0.035);
+    motion.x += dir * (counterReady * 1.1 + coil * 0.8) * guardProfile.counter;
+    motion.y += counterReady * 0.5 * guardProfile.crouch - coil * 0.26 * guardProfile.handLift;
+    motion.rotation += dir * (counterReady * 0.014 + coil * 0.014) * guardProfile.counter;
+    motion.scaleX *= 1 + counterReady * 0.008 * guardProfile.counter + coil * 0.006;
+    motion.scaleY *= 1 - counterReady * 0.006 * guardProfile.counter;
+    motion.afterimage = Math.max(motion.afterimage, counterReady * 0.035 * guardProfile.spark);
   }
 
   const effectiveHurt = winner ? Math.max(0, (f.hurt ?? 0) - resultFrame * 0.9) : (f.hurt ?? 0);
@@ -8786,6 +8787,7 @@ function getPose(f, stride) {
   const guardExitT = clamp((f.guardExitPulse ?? 0) / 10, 0, 1);
   const hurtRecoverT = clamp((f.hurtRecoverPulse ?? 0) / 14, 0, 1);
   const moveTurnT = clamp((f.moveTurnPulse ?? 0) / 10, 0, 1);
+  const counterReadyT = clamp((f.counterWindow ?? 0) / 34, 0, 1);
 
   if (f.blocking) {
     if (f.profileId === "p1") {
@@ -9113,6 +9115,27 @@ function getPose(f, stride) {
       base.backArm.hand.x -= open * 5 * spec.stance;
       base.frontLeg.foot.x += open * 3 * spec.stance;
       base.backLeg.foot.x -= open * 4 * spec.stance;
+    }
+
+    if (counterReadyT > 0.03 && f.hurt <= 0 && !f.attack) {
+      const coil = Math.sin((1 - counterReadyT) * Math.PI);
+      const counter = counterReadyT * guardProfile.counter;
+      base.torsoTilt += f.dir * (0.014 + coil * 0.02) * counter;
+      if (f.profileId === "p2") {
+        base.frontArm.elbow.x += (5 + coil * 9) * spec.stance * counter;
+        base.frontArm.elbow.y -= (4 + coil * 6) * guardProfile.handLift;
+        base.frontArm.hand.x += (8 + coil * 14) * spec.stance * counter;
+        base.frontArm.hand.y -= (7 + coil * 8) * guardProfile.handLift;
+        base.backArm.hand.x -= 5 * spec.stance * counter;
+        base.frontLeg.foot.y -= 2 * counter;
+      } else {
+        base.frontArm.elbow.x += (3 + coil * 5) * spec.stance * counter;
+        base.frontArm.hand.x += (5 + coil * 8) * spec.stance * counter;
+        base.backArm.elbow.y -= (2 + coil * 4) * guardProfile.handLift;
+        base.backArm.hand.y -= (3 + coil * 5) * guardProfile.handLift;
+        base.backLeg.foot.x -= 4 * spec.stance * counter;
+        base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, 0.68 * counter);
+      }
     }
 
     if (attackEntryT > 0.02 && f.attack) {
@@ -11191,36 +11214,45 @@ function drawParticles() {
 }
 
 function drawKOBanner() {
-  if (!winner || matchOver) return;
+  if (!winner) return;
   if (overlay.dataset.screen === "winner" && !overlay.classList.contains("hidden")) return;
-  const alpha = overlay.classList.contains("hidden") ? 0.26 : 0.12;
-  const x = W / 2 - 60;
-  const y = 82;
-  const banner = ctx.createLinearGradient(x, y, x + 120, y + 34);
-  banner.addColorStop(0, `rgba(30, 8, 7, ${alpha})`);
-  banner.addColorStop(0.48, `rgba(126, 33, 21, ${alpha})`);
-  banner.addColorStop(1, `rgba(30, 8, 7, ${alpha})`);
+  const reveal = smoothStep01(clamp(resultFrame / 24, 0, 1));
+  const panelAlpha = overlay.classList.contains("hidden") ? 0.42 : 0.2;
+  const width = matchOver ? 276 : 248;
+  const height = 54;
+  const x = W / 2 - width / 2;
+  const y = 92 - reveal * 6;
+  const label = matchOver ? "MATCH" : `ROUND ${toRoman(roundNumber)}`;
+  const subtitle = `${winner.toUpperCase()} GANA`;
+  const banner = ctx.createLinearGradient(x, y, x + width, y + height);
+  banner.addColorStop(0, `rgba(24, 7, 6, ${panelAlpha})`);
+  banner.addColorStop(0.48, `rgba(116, 25, 18, ${panelAlpha + 0.08})`);
+  banner.addColorStop(1, `rgba(24, 7, 6, ${panelAlpha})`);
+
+  ctx.save();
+  ctx.globalAlpha = reveal;
   ctx.fillStyle = banner;
   ctx.beginPath();
-  ctx.roundRect(x, y, 120, 34, 8);
+  ctx.roundRect(x, y, width, height, 8);
   ctx.fill();
-  ctx.strokeStyle = `rgba(255, 226, 132, ${0.28 + alpha * 0.14})`;
+  ctx.strokeStyle = `rgba(255, 226, 132, ${0.34 + panelAlpha * 0.22})`;
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  ctx.fillStyle = `rgba(255, 241, 189, ${0.72 + alpha * 0.12})`;
-  ctx.font = "850 18px system-ui, sans-serif";
+  ctx.fillStyle = `rgba(255, 241, 189, ${0.88 + panelAlpha * 0.08})`;
+  ctx.font = "900 24px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = `rgba(43, 20, 16, ${0.5 + alpha * 0.12})`;
-  ctx.strokeText("K.O.", W / 2, y + 14);
-  ctx.fillText("K.O.", W / 2, y + 14);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = `rgba(43, 20, 16, ${0.62 + panelAlpha * 0.14})`;
+  ctx.strokeText(label, W / 2, y + 19);
+  ctx.fillText(label, W / 2, y + 19);
 
-  ctx.font = "800 8px system-ui, sans-serif";
-  ctx.fillStyle = `rgba(255, 226, 132, ${0.54 + alpha * 0.1})`;
-  ctx.fillText(`${winner.toUpperCase()} GANA`, W / 2, y + 27);
+  ctx.font = "900 11px system-ui, sans-serif";
+  ctx.fillStyle = `rgba(255, 226, 132, ${0.72 + panelAlpha * 0.12})`;
+  ctx.fillText(subtitle, W / 2, y + 39);
   ctx.textBaseline = "alphabetic";
+  ctx.restore();
 }
 
 function showWinner() {
@@ -11232,18 +11264,18 @@ function showWinner() {
   if (matchOver && tournamentActive) {
     const playerWon = matchWinnerId === "right";
     const hasNext = playerWon && tournamentIndex < tournamentOpponents.length - 1;
-    overlay.querySelector("h1").textContent = playerWon && !hasNext ? `${winner} campeón` : playerWon ? `${winner} avanza` : "Torneo perdido";
+    overlay.querySelector("h1").textContent = playerWon && !hasNext ? `${winner} campeon` : playerWon ? `${winner} avanza` : "Torneo perdido";
     overlayCopy.textContent = playerWon
       ? hasNext
-        ? `Rival ${tournamentIndex + 1}/${tournamentOpponents.length} superado. Próximo combate en el Dojo Tendo.`
+        ? `Rival ${tournamentIndex + 1}/${tournamentOpponents.length} superado. Proximo combate en el Dojo Tendo.`
         : `Ganaste la escalera completa del Dojo Tendo. ${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}.`
-      : `${winner} ganó el match. Volvé al selector para reintentar el torneo.`;
+      : `${winner} gano el match. Volve al selector para reintentar el torneo.`;
     startButton.textContent = hasNext ? "SIGUIENTE RIVAL" : "VOLVER";
   } else {
-    overlay.querySelector("h1").textContent = matchOver ? `${winner} gana` : `${winner} gana round ${roundNumber}`;
+    overlay.querySelector("h1").textContent = matchOver ? `Victoria de ${winner}` : `${winner} gana round ${roundNumber}`;
     overlayCopy.textContent = matchOver
       ? `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Revancha disponible.`
-      : `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Prepará el siguiente round.`;
+      : `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Prepara el siguiente round.`;
     startButton.textContent = matchOver ? "REVANCHA" : "SIGUIENTE ROUND";
   }
   fighterSelect.classList.add("hidden");
@@ -11454,6 +11486,10 @@ function makeSelectColumn(side, title, selectedId) {
   const role = document.createElement("span");
   role.textContent = side === "left" && cpuEnabled ? "CPU" : side === "left" ? "Jugador 1" : "Jugador 2";
   info.append(role);
+  const trait = document.createElement("em");
+  trait.className = "fighter-showcase-trait";
+  trait.textContent = fighterTrait(selectedProfile);
+  info.append(trait);
   info.append(makeMenuStats(selectedProfile));
   showcase.append(info);
   column.append(showcase);
@@ -11483,6 +11519,17 @@ function makeSelectColumn(side, title, selectedId) {
   }
   column.append(grid);
   return column;
+}
+
+function fighterTrait(profile) {
+  return {
+    p1: "Potencia pesada",
+    p2: "Tecnica veloz",
+    p3: "Racing power",
+    p4: "Reflejos",
+    p5: "Alcance largo",
+    p6: "Defensa solida",
+  }[profile.id] ?? "Equilibrio";
 }
 
 function makeMenuStats(profile) {
@@ -11580,7 +11627,7 @@ function showHelpOverlay() {
   paused = running && !winner;
   overlay.querySelector("h1").textContent = "Controles";
   overlayCopy.textContent =
-    `${fighters[1].name}: botones tactiles o flechas mover/saltar/bloquear, K golpe, L patada, O especial, P agarre, abajo+L barrida. ${fighters[0].name}: A/D, W, S, F, G, R y T. Esc pausa.`;
+    `${fighters[1].name}: en telefono joystick, pina, patada y especial. En teclado: flechas mover/saltar/bloquear, K golpe, L patada, O especial, P agarre, abajo+L barrida. ${fighters[0].name}: A/D, W, S, F, G, R y T. Esc pausa.`;
   startButton.textContent = paused ? "SEGUIR" : "LISTO";
   fighterSelect.classList.add("hidden");
   overlay.classList.remove("hidden");
@@ -11699,7 +11746,6 @@ function setTouchControl(button, pressed) {
   const player = fighters.find((f) => f.id === "right");
   if (!player) return;
   if (action === "special" || (action === "punch" && touchInput.block)) startSpecial(player);
-  else if (action === "grab") startAttack(player, "grab");
   else if (action === "kick" && touchInput.block) startAttack(player, "sweep");
   else if (action === "punch") startAttack(player, player.grounded ? "punch" : "airPunch");
   else if (action === "kick") startAttack(player, player.grounded ? "kick" : "airKick");
