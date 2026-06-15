@@ -45,6 +45,7 @@ const touchInput = {
 };
 const projectiles = [];
 const MAX_PARTICLES = 280;
+const MOBILE_MAX_PARTICLES = 155;
 const faces = {
   p1: loadImage("assets/fighter-1-face.png"),
   p2: loadImage("assets/fighter-2-face.png"),
@@ -1478,8 +1479,9 @@ function specialChargeFX(f) {
     kind: "airRipple",
   });
 
-  for (let i = 0; i < 9; i += 1) {
-    const lane = i / 8 - 0.5;
+  const chargeCount = fxCount(9, 4);
+  for (let i = 0; i < chargeCount; i += 1) {
+    const lane = chargeCount === 1 ? 0 : i / (chargeCount - 1) - 0.5;
     const arc = lane * Math.PI * 0.72;
     const radius = fighterScale(22 + Math.random() * 22);
     particles.push({
@@ -1498,7 +1500,8 @@ function specialChargeFX(f) {
   }
 
   if (f.profileId === "p1") {
-    for (let i = 0; i < 6; i += 1) {
+    const dropletCount = fxCount(6, 3);
+    for (let i = 0; i < dropletCount; i += 1) {
       particles.push({
         x: x - dir * fighterScale(16) + Math.random() * 18 * dir,
         y: y - fighterScale(12) + Math.random() * 20,
@@ -1534,8 +1537,9 @@ function specialReleaseFX(f) {
     kind: "contactFlash",
   });
 
-  for (let i = 0; i < 11; i += 1) {
-    const lane = i / 10 - 0.5;
+  const releaseCount = fxCount(11, 5);
+  for (let i = 0; i < releaseCount; i += 1) {
+    const lane = releaseCount === 1 ? 0 : i / (releaseCount - 1) - 0.5;
     particles.push({
       x: x - dir * fighterScale(18),
       y: y + lane * fighterScale(38),
@@ -2365,6 +2369,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   premiumImpactFX(impactX, impactY, target, impactColor, impactDir, blocked, heavyImpact, counter, projectile);
   typedImpactFX(impactX, impactY, target, visual, impactDir, hitZone, blocked, counter);
   if (cinematicHit) cinematicSpecialImpactFX(impactX, impactY, target, attacker, projectileInfo, impactColor, impactDir, finishingHit, projectile, counter);
+  signatureImpactFX(impactX, impactY, target, visual, impactDir, hitZone, blocked, counter, projectile, finishingHit);
   floorDust(target.x, target.y + 3, blocked ? 4 : zone.dust);
   if (!blocked && target.grounded) {
     movementDust(
@@ -2433,7 +2438,7 @@ function contactFlashBurst(x, y, color, dir, blocked, heavyImpact, counter) {
     });
   }
 
-  const shardCount = blocked ? 4 : heavyImpact ? 10 : 7;
+  const shardCount = fxCount(blocked ? 4 : heavyImpact ? 10 : 7, blocked ? 2 : 3);
   const spread = blocked ? 0.78 : heavyImpact ? 1.18 : 0.98;
   const base = dir > 0 ? 0 : Math.PI;
   for (let i = 0; i < shardCount; i += 1) {
@@ -2480,7 +2485,7 @@ function attackWhoosh(f) {
     kind: "airRipple",
   });
 
-  const count = spec.sweep ? 5 : spec.kick ? 6 : spec.special ? 7 : spec.grab ? 4 : 4;
+  const count = fxCount(spec.sweep ? 5 : spec.kick ? 6 : spec.special ? 7 : spec.grab ? 4 : 4, spec.special ? 4 : 2);
   for (let i = 0; i < count; i += 1) {
     const lane = count === 1 ? 0 : i / (count - 1) - 0.5;
     particles.push({
@@ -2504,12 +2509,13 @@ function attackWhoosh(f) {
 }
 
 function burst(x, y, color, count) {
-  for (let i = 0; i < count; i += 1) {
+  const fxTotal = fxCount(count, Math.min(2, count));
+  for (let i = 0; i < fxTotal; i += 1) {
     particles.push({
       x,
       y,
-      vx: Math.cos((Math.PI * 2 * i) / count) * (1.2 + Math.random() * 4),
-      vy: Math.sin((Math.PI * 2 * i) / count) * (1.2 + Math.random() * 4),
+      vx: Math.cos((Math.PI * 2 * i) / fxTotal) * (1.2 + Math.random() * 4),
+      vy: Math.sin((Math.PI * 2 * i) / fxTotal) * (1.2 + Math.random() * 4),
       life: 18 + Math.random() * 14,
       size: 2.2 + Math.random() * 2.8,
       color,
@@ -2518,7 +2524,7 @@ function burst(x, y, color, count) {
 }
 
 function impactBurst(x, y, color, blocked, heavyImpact = false) {
-  const count = blocked ? 4 : heavyImpact ? 9 : 7;
+  const count = fxCount(blocked ? 4 : heavyImpact ? 9 : 7, blocked ? 2 : 3);
   for (let i = 0; i < count; i += 1) {
     particles.push({
       x,
@@ -2547,7 +2553,7 @@ function impactShockwave(x, y, color, blocked, heavyImpact = false) {
     kind: "ring",
   });
 
-  const count = blocked ? 4 : heavyImpact ? 9 : 6;
+  const count = fxCount(blocked ? 4 : heavyImpact ? 9 : 6, blocked ? 2 : 3);
   for (let i = 0; i < count; i += 1) {
     const angle = -0.75 + i * (1.5 / Math.max(1, count - 1));
     particles.push({
@@ -2564,7 +2570,7 @@ function impactShockwave(x, y, color, blocked, heavyImpact = false) {
 }
 
 function impactGlints(x, y, color, blocked, heavyImpact) {
-  const count = blocked ? 2 : heavyImpact ? 5 : 3;
+  const count = fxCount(blocked ? 2 : heavyImpact ? 5 : 3, blocked ? 1 : 2);
   for (let i = 0; i < count; i += 1) {
     particles.push({
       x: x + (Math.random() - 0.5) * 18,
@@ -2592,7 +2598,7 @@ function cinematicImpact(x, y, color, dir, blocked, heavyImpact, counter) {
     kind: "impactCore",
   });
 
-  const count = blocked ? 2 : heavyImpact ? 6 : 4;
+  const count = fxCount(blocked ? 2 : heavyImpact ? 6 : 4, blocked ? 1 : 2);
   const spread = blocked ? 0.44 : heavyImpact ? 0.78 : 0.6;
   const baseAngle = dir > 0 ? 0 : Math.PI;
   for (let i = 0; i < count; i += 1) {
@@ -2664,7 +2670,7 @@ function premiumImpactFX(x, y, target, color, dir, blocked, heavyImpact, counter
     });
   }
 
-  const needleCount = blocked ? Math.max(2, Math.round(3 * guardProfile.spark)) : counter ? 10 : heavyImpact || projectile ? 8 : 5;
+  const needleCount = fxCount(blocked ? Math.max(2, Math.round(3 * guardProfile.spark)) : counter ? 10 : heavyImpact || projectile ? 8 : 5, blocked ? 2 : 3);
   const spread = blocked ? 0.36 * guardProfile.arc : counter ? 0.86 : heavyImpact ? 0.72 : 0.58;
   for (let i = 0; i < needleCount; i += 1) {
     const lane = needleCount === 1 ? 0 : i / (needleCount - 1) - 0.5;
@@ -2702,7 +2708,7 @@ function premiumImpactFX(x, y, target, color, dir, blocked, heavyImpact, counter
       kind: "floorShock",
     });
 
-    const ribbonCount = heavyImpact || projectile ? 8 : 5;
+    const ribbonCount = fxCount(heavyImpact || projectile ? 8 : 5, 2);
     for (let i = 0; i < ribbonCount; i += 1) {
       particles.push({
         x: target.x + (Math.random() - 0.5) * 38,
@@ -2759,8 +2765,9 @@ function typedImpactFX(x, y, target, visual, dir, hitZone, blocked, counter) {
   }
 
   if (flavor === "punch") {
-    for (let i = 0; i < 4; i += 1) {
-      const lane = i / 3 - 0.5;
+    const count = fxCount(4, 2);
+    for (let i = 0; i < count; i += 1) {
+      const lane = count === 1 ? 0 : i / (count - 1) - 0.5;
       particles.push({
         x: x - dir * 8,
         y: y + lane * 26,
@@ -2793,8 +2800,9 @@ function typedImpactFX(x, y, target, visual, dir, hitZone, blocked, counter) {
       strength: 1.1,
       kind: "recoilArc",
     });
-    for (let i = 0; i < 5; i += 1) {
-      const lane = i / 4 - 0.5;
+    const count = fxCount(5, 2);
+    for (let i = 0; i < count; i += 1) {
+      const lane = count === 1 ? 0 : i / (count - 1) - 0.5;
       particles.push({
         x: x - dir * 16,
         y: y + lane * 34,
@@ -2827,7 +2835,8 @@ function typedImpactFX(x, y, target, visual, dir, hitZone, blocked, counter) {
       color: "rgba(226, 197, 135, 0.78)",
       kind: "floorShock",
     });
-    for (let i = 0; i < 6; i += 1) {
+    const count = fxCount(6, 2);
+    for (let i = 0; i < count; i += 1) {
       particles.push({
         x: target.x + (Math.random() - 0.5) * 54,
         y: floorY + Math.random() * 4,
@@ -2848,11 +2857,13 @@ function typedImpactFX(x, y, target, visual, dir, hitZone, blocked, counter) {
   if (flavor === "grab") {
     particles.push({ x, y, vx: 0, vy: 0, angle: baseAngle, life: 12, maxLife: 12, size: 50 * scale, color, strength: 1.05, kind: "impactBloom" });
     particles.push({ x: x + dir * 4, y, vx: 0, vy: 0, angle: baseAngle, life: 15, maxLife: 15, size: 32 * scale, growth: 2.2, color: core, kind: "airRipple" });
-    for (let i = 0; i < 4; i += 1) {
-      const angle = baseAngle + (i / 3 - 0.5) * 0.58;
+    const count = fxCount(4, 2);
+    for (let i = 0; i < count; i += 1) {
+      const lane = count === 1 ? 0 : i / (count - 1) - 0.5;
+      const angle = baseAngle + lane * 0.58;
       particles.push({
         x: x - dir * 6,
-        y: y + (i / 3 - 0.5) * 28,
+        y: y + lane * 28,
         vx: Math.cos(angle) * 0.8,
         vy: Math.sin(angle) * 0.26,
         angle,
@@ -2880,6 +2891,52 @@ function typedImpactFX(x, y, target, visual, dir, hitZone, blocked, counter) {
     kind: "impactBloom",
   });
   particles.push({ x: x - dir * 8, y, vx: 0, vy: 0, angle: baseAngle, life: 18, maxLife: 18, size: 40 * scale, growth: 2.7, color: core, kind: "ring" });
+}
+
+function signatureImpactFX(x, y, target, visual, dir, hitZone, blocked, counter, projectile, finishingHit) {
+  const flavor = visual?.flavor ?? "punch";
+  const special = flavor === "special" || projectile;
+  const heavy = special || counter || finishingHit || flavor === "kick" || flavor === "sweep" || flavor === "grab";
+  const mobile = isMobileFightView();
+  if (!heavy && mobile) return;
+  if (particles.length > particleBudget() * 0.88) return;
+
+  const baseAngle = dir > 0 ? -0.06 : Math.PI + 0.06;
+  const zoneTilt = hitZone === "legs" ? 0.2 : hitZone === "head" ? -0.16 : 0;
+  const color = blocked ? "#bdeaff" : counter ? "#fff1bd" : visual?.color ?? "#ffd44d";
+  const core = visual?.core ?? "#fff7d6";
+  const scale = blocked ? 0.72 : finishingHit ? 1.28 : counter ? 1.18 : special ? 1.12 : heavy ? 1 : 0.82;
+  const yOffset = hitZone === "legs" ? 10 : hitZone === "head" ? -7 : 0;
+  particles.push({
+    x: x - dir * fighterScale(8),
+    y: y + yOffset,
+    vx: dir * 0.08,
+    vy: 0,
+    angle: baseAngle + zoneTilt,
+    life: Math.round((blocked ? 9 : heavy ? 13 : 10) * (mobile ? 0.88 : 1)),
+    maxLife: Math.round((blocked ? 9 : heavy ? 13 : 10) * (mobile ? 0.88 : 1)),
+    size: fighterScale((blocked ? 62 : heavy ? 104 : 76) * scale),
+    width: (blocked ? 10 : heavy ? 16 : 12) * scale,
+    color,
+    core,
+    kind: "signatureSlash",
+  });
+
+  if ((counter || special || finishingHit) && particles.length < particleBudget() * 0.82) {
+    particles.push({
+      x: x - dir * fighterScale(12),
+      y: y + yOffset,
+      vx: 0,
+      vy: 0,
+      angle: baseAngle,
+      life: mobile ? 10 : 12,
+      maxLife: mobile ? 10 : 12,
+      size: fighterScale((counter ? 48 : finishingHit ? 56 : 44) * scale),
+      color,
+      core,
+      kind: "signatureStar",
+    });
+  }
 }
 
 function cinematicSpecialImpactFX(x, y, target, attacker, projectileInfo, color, dir, finishingHit, projectile, counter) {
@@ -2916,7 +2973,7 @@ function cinematicSpecialImpactFX(x, y, target, attacker, projectileInfo, color,
     kind: "ring",
   });
 
-  const laneCount = projectile || counter ? 13 : 9;
+  const laneCount = fxCount(projectile || counter ? 13 : 9, projectile || counter ? 6 : 4);
   for (let i = 0; i < laneCount; i += 1) {
     const lane = i / Math.max(1, laneCount - 1) - 0.5;
     const angle = baseAngle + lane * (projectile ? 0.92 : 0.72) + (Math.random() - 0.5) * 0.08;
@@ -2936,8 +2993,10 @@ function cinematicSpecialImpactFX(x, y, target, attacker, projectileInfo, color,
   }
 
   if (attacker?.profileId === "p2") {
-    for (let i = 0; i < 7; i += 1) {
-      const angle = baseAngle + (i / 6 - 0.5) * 0.82;
+    const shardCount = fxCount(7, 3);
+    for (let i = 0; i < shardCount; i += 1) {
+      const lane = shardCount === 1 ? 0 : i / (shardCount - 1) - 0.5;
+      const angle = baseAngle + lane * 0.82;
       particles.push({
         x: x - dir * fighterScale(12),
         y: y + (Math.random() - 0.5) * fighterScale(42),
@@ -2952,7 +3011,8 @@ function cinematicSpecialImpactFX(x, y, target, attacker, projectileInfo, color,
       });
     }
   } else if (attacker?.profileId === "p1") {
-    for (let i = 0; i < 8; i += 1) {
+    const dropletCount = fxCount(8, 4);
+    for (let i = 0; i < dropletCount; i += 1) {
       particles.push({
         x: target.x + (Math.random() - 0.5) * fighterScale(58),
         y: target.y - fighterScale(92 + Math.random() * 54),
@@ -2995,8 +3055,9 @@ function attackVisualSpec(type = "") {
 }
 
 function coldWaterSplash(x, y, dir) {
-  for (let i = 0; i < 18; i += 1) {
-    const angle = -Math.PI * 0.78 + (i / 17) * Math.PI * 0.62;
+  const count = fxCount(18, 8);
+  for (let i = 0; i < count; i += 1) {
+    const angle = -Math.PI * 0.78 + (i / Math.max(1, count - 1)) * Math.PI * 0.62;
     particles.push({
       x,
       y,
@@ -3041,7 +3102,8 @@ function koCollapseFX(loser, winnerFighter) {
     strength: 1.35,
     kind: "contactFlash",
   });
-  for (let i = 0; i < 12; i += 1) {
+  const collapseDust = fxCount(12, 5);
+  for (let i = 0; i < collapseDust; i += 1) {
     particles.push({
       x: loser.x + (Math.random() - 0.5) * fighterScale(64),
       y: floorY + Math.random() * 4,
@@ -3059,7 +3121,8 @@ function koCollapseFX(loser, winnerFighter) {
 }
 
 function floorDust(x, y, count) {
-  for (let i = 0; i < count; i += 1) {
+  const dustCount = fxCount(count, Math.min(2, count));
+  for (let i = 0; i < dustCount; i += 1) {
     particles.push({
       x: x + (Math.random() - 0.5) * 34,
       y,
@@ -3074,7 +3137,8 @@ function floorDust(x, y, count) {
 }
 
 function movementDust(x, y, dir, strength = 1, count = 3) {
-  for (let i = 0; i < count; i += 1) {
+  const dustCount = fxCount(count, Math.min(1, count));
+  for (let i = 0; i < dustCount; i += 1) {
     particles.push({
       x: x + (Math.random() - 0.5) * 18,
       y: y + Math.random() * 3,
@@ -3102,6 +3166,8 @@ function updateParticles() {
         "recoilArc",
         "airRipple",
         "impactNeedle",
+        "signatureSlash",
+        "signatureStar",
         "guardPlate",
         "floorShock",
         "impactBloom",
@@ -3112,7 +3178,8 @@ function updateParticles() {
     p.life -= 1;
     return p.life > 0;
   });
-  if (particles.length > MAX_PARTICLES) particles.splice(0, particles.length - MAX_PARTICLES);
+  const budget = particleBudget();
+  if (particles.length > budget) particles.splice(0, particles.length - budget);
 }
 
 function addText(x, y, text, color) {
@@ -11101,6 +11168,58 @@ function drawParticles() {
       ctx.lineTo(length, 0);
       ctx.stroke();
       ctx.restore();
+    } else if (p.kind === "signatureSlash") {
+      const progress = 1 - p.life / (p.maxLife ?? 12);
+      const length = p.size * (1 - progress * 0.18);
+      const width = (p.width ?? 14) * (1 - progress * 0.62);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle ?? 0);
+      ctx.globalCompositeOperation = "screen";
+      ctx.lineCap = "round";
+      ctx.strokeStyle = colorWithAlpha(p.color, 0.26 * alpha);
+      ctx.lineWidth = width * 2.6;
+      ctx.beginPath();
+      ctx.moveTo(-length * 0.48, length * 0.06);
+      ctx.quadraticCurveTo(-length * 0.04, -length * 0.24, length * 0.58, -length * 0.02);
+      ctx.stroke();
+
+      ctx.strokeStyle = colorWithAlpha(p.core ?? "#fff7d6", 0.5 * alpha);
+      ctx.lineWidth = Math.max(1.4, width * 0.64);
+      ctx.beginPath();
+      ctx.moveTo(-length * 0.38, length * 0.02);
+      ctx.quadraticCurveTo(length * 0.02, -length * 0.16, length * 0.5, -length * 0.01);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(255,255,255,${0.44 * alpha})`;
+      ctx.lineWidth = Math.max(1, width * 0.22);
+      ctx.beginPath();
+      ctx.moveTo(-length * 0.22, -width * 0.18);
+      ctx.lineTo(length * 0.42, -width * 0.18);
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === "signatureStar") {
+      const progress = 1 - p.life / (p.maxLife ?? 11);
+      const radius = p.size * (1 + progress * 0.32);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate((p.angle ?? 0) + progress * 0.18);
+      ctx.globalCompositeOperation = "screen";
+      ctx.lineCap = "round";
+      ctx.strokeStyle = colorWithAlpha(p.color, 0.38 * alpha);
+      ctx.lineWidth = Math.max(1.6, 5 * (1 - progress));
+      for (let i = 0; i < 4; i += 1) {
+        const angle = (Math.PI * i) / 4;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * radius * 0.18, Math.sin(angle) * radius * 0.18);
+        ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+        ctx.stroke();
+      }
+      ctx.fillStyle = colorWithAlpha(p.core ?? "#fff7d6", 0.34 * alpha);
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     } else if (p.kind === "airRipple") {
       const progress = 1 - p.life / (p.maxLife ?? 14);
       const radius = p.size + progress * (p.growth ?? 2) * 24;
@@ -11395,6 +11514,23 @@ function colorParts(color) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function particleBudget() {
+  return isMobileFightView() ? MOBILE_MAX_PARTICLES : MAX_PARTICLES;
+}
+
+function fxBudgetScale() {
+  const budget = particleBudget();
+  const load = particles.length / Math.max(1, budget);
+  const deviceScale = isMobileFightView() ? 0.58 : 1;
+  if (load > 0.86) return deviceScale * 0.34;
+  if (load > 0.72) return deviceScale * 0.56;
+  return deviceScale;
+}
+
+function fxCount(count, minimum = 1) {
+  return Math.max(minimum, Math.round(count * fxBudgetScale()));
 }
 
 function syncShellState() {
