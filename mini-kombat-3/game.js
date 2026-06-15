@@ -5433,6 +5433,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
 
     drawSpritePoseTransitionBlend(f, unifiedSheet, frameIndex, crouch);
     drawSpriteContactOcclusion(f, crouch, frameName, walking ? stride : 0);
+    drawSpriteLayeredContactShadows(f, crouch, frameName, walking ? stride : 0);
     drawSpriteHeadActingWarp(f, crouch, walking ? stride : 0);
     drawSpriteGuardPoseOverlay(f, crouch, frameName);
     drawSpriteAttackFrameWarp(f, unifiedSheet, frameX, crouch);
@@ -5479,6 +5480,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   drawSpriteReactionPoseWarp(f, sheet, frameX, crouch);
   drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
   drawSpriteContactOcclusion(f, crouch, frameName, walking ? stride : 0);
+  drawSpriteLayeredContactShadows(f, crouch, frameName, walking ? stride : 0);
   drawSpriteGuardPoseOverlay(f, crouch, frameName);
   drawSpriteExtremityDetails(f, crouch, frameName, walking ? stride : 0);
   drawSpriteSecondaryMotion(f, crouch, frameName, walking ? stride : 0);
@@ -5645,6 +5647,231 @@ function drawSpriteContactOcclusion(f, crouch, frameName, stride) {
   ctx.quadraticCurveTo(0, neckY + 24 + breath * 0.5, 18, neckY + 16);
   ctx.stroke();
   ctx.restore();
+}
+
+function fillSoftContactShadow(x, y, rx, ry, rotation, alpha, squeeze = 1) {
+  if (alpha <= 0.004) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.scale(1, squeeze);
+  const grad = ctx.createRadialGradient(0, 0, 1, 0, 0, Math.max(rx, ry));
+  grad.addColorStop(0, `rgba(18, 9, 7, ${alpha})`);
+  grad.addColorStop(0.52, `rgba(26, 13, 9, ${alpha * 0.42})`);
+  grad.addColorStop(1, "rgba(26, 13, 9, 0)");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function strokeContactShadow(points, width, alpha, blur = 0) {
+  if (alpha <= 0.004) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.shadowColor = `rgba(10, 5, 4, ${alpha * 0.78})`;
+  ctx.shadowBlur = blur;
+  ctx.strokeStyle = `rgba(18, 9, 7, ${alpha * 0.82})`;
+  ctx.lineWidth = width + 3.4;
+  traceSecondaryRibbon(points);
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = `rgba(42, 20, 13, ${alpha * 0.46})`;
+  ctx.lineWidth = width;
+  traceSecondaryRibbon(points);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function strokeContactSeparation(points, color, width, alpha) {
+  if (alpha <= 0.004) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = colorWithAlpha(color, alpha);
+  ctx.lineWidth = width;
+  traceSecondaryRibbon(points);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawSpriteLayeredContactShadows(f, crouch, frameName, stride) {
+  const localCrouch = crouch * 0.18;
+  const phase = attackPhase(f.attack);
+  const impact = localizedImpactProfile(f);
+  const reaction = impactReactionProfile(f);
+  const motion = secondaryMotionProfile(f, stride);
+  const outfit = outfitSpec(f) ?? {};
+  const spec = bodySpec(f);
+  const action = f.attack ? Math.max(phase.strike, phase.snap, phase.followThrough * 0.5) : 0;
+  const prep = f.attack ? phase.anticipation : 0;
+  const guard = f.blocking || frameName === "block" ? clamp(Math.max((f.guardPulse ?? 0) / 18, 0.58), 0, 1) : 0;
+  const guardHit = clamp((f.guardImpact ?? 0) / 16, 0, 1);
+  const hurt = clamp((f.hurt ?? 0) / 24, 0, 1);
+  const hit = impact.t > 0.035 && f.hitZone !== "guard" ? Math.max(impact.snap, reaction.snap * 0.5) : 0;
+  const breath = Math.sin(roundFrame * 0.055 + f.x * 0.012);
+  const bodyWidth = (spec.shoulder ?? 40) * 1.05;
+  const hip = (spec.hip ?? 36) * (spec.belly ? 1.08 : 1);
+  const trim = outfit.accent ?? f.trim ?? "#fff1bd";
+  const sleeve = outfit.sleeve ?? f.trim ?? "#fff1bd";
+  const depth = clamp(0.78 + action * 0.42 + guard * 0.34 + guardHit * 0.4 + hurt * 0.22 + hit * 0.45, 0.55, 1.75);
+  const bodyShift = motion.x * 0.08 + impact.shake * 0.4;
+  const chestY = -135 + localCrouch + breath * 0.5;
+  const waistY = -78 + localCrouch;
+
+  fillSoftContactShadow(0 + bodyShift, -174 + localCrouch + motion.y * 0.08, bodyWidth * 0.68, 13, 0, 0.09 + hurt * 0.05 + action * 0.03);
+  fillSoftContactShadow(-bodyWidth * 0.72, -151 + localCrouch, 18, 13, -0.42, 0.06 + depth * 0.04);
+  fillSoftContactShadow(bodyWidth * 0.72, -151 + localCrouch, 18, 13, 0.42, 0.06 + depth * 0.04);
+
+  strokeContactShadow(
+    [
+      { x: -bodyWidth * 0.62, y: chestY - 6 },
+      { x: -bodyWidth * 0.45 + motion.x * 0.04, y: chestY + 24 },
+      { x: -bodyWidth * 0.35 + motion.x * 0.14, y: waistY + 16 },
+    ],
+    5.4,
+    0.055 + depth * 0.035,
+    3
+  );
+  strokeContactShadow(
+    [
+      { x: bodyWidth * 0.62, y: chestY - 6 },
+      { x: bodyWidth * 0.45 + motion.x * 0.04, y: chestY + 24 },
+      { x: bodyWidth * 0.35 + motion.x * 0.14, y: waistY + 16 },
+    ],
+    5.4,
+    0.055 + depth * 0.035,
+    3
+  );
+
+  fillSoftContactShadow(0 + motion.x * 0.08, -61 + localCrouch, hip + 8, 12, 0, 0.05 + depth * 0.035, 0.62);
+  strokeContactShadow(
+    [
+      { x: -hip + 7, y: -55 + localCrouch },
+      { x: 0 + motion.x * 0.12, y: -49 + localCrouch + motion.y * 0.08 },
+      { x: hip - 7, y: -55 + localCrouch },
+    ],
+    4.2,
+    0.045 + depth * 0.03,
+    2
+  );
+
+  if (guard > 0.04) {
+    const recoil = guardHit * guardHit;
+    strokeContactShadow(
+      [
+        { x: -39, y: -134 + localCrouch + guard * 3 },
+        { x: -18 + recoil * 4, y: -119 + localCrouch + guard * 8 },
+        { x: 7 + recoil * 7, y: -103 + localCrouch + guard * 7 },
+      ],
+      11 + guard * 3.2,
+      0.095 + guard * 0.08 + guardHit * 0.08,
+      4
+    );
+    strokeContactShadow(
+      [
+        { x: 39, y: -132 + localCrouch + guard * 3 },
+        { x: 18 + recoil * 5, y: -117 + localCrouch + guard * 8 },
+        { x: -5 + recoil * 8, y: -101 + localCrouch + guard * 7 },
+      ],
+      10 + guard * 3.2,
+      0.085 + guard * 0.075 + guardHit * 0.08,
+      4
+    );
+    strokeContactSeparation(
+      [
+        { x: -32, y: -145 + localCrouch },
+        { x: 0, y: -138 + localCrouch - guardHit * 4 },
+        { x: 36, y: -143 + localCrouch },
+      ],
+      sleeve,
+      1.5 + guardHit,
+      0.12 + guard * 0.05
+    );
+  } else if (frameName === "punch" || frameName === "special") {
+    const strike = Math.max(action, prep * 0.5);
+    fillSoftContactShadow(31 - prep * 5, -139 + localCrouch + prep * 1.5, 21 + strike * 9, 18 + strike * 5, -0.28, 0.08 + strike * 0.06);
+    strokeContactShadow(
+      [
+        { x: -37 - strike * 4, y: -128 + localCrouch },
+        { x: -20 - strike * 5, y: -115 + localCrouch + motion.wave * 0.8 },
+        { x: -6 - strike * 2, y: -93 + localCrouch },
+      ],
+      7 + strike * 2,
+      0.065 + strike * 0.07,
+      3
+    );
+    strokeContactShadow(
+      [
+        { x: 25 + strike * 2, y: -126 + localCrouch },
+        { x: 45 + strike * 8, y: -120 + localCrouch - strike * 4 },
+        { x: 64 + strike * 17, y: -118 + localCrouch - strike * 6 },
+      ],
+      6 + strike * 2.8,
+      0.052 + strike * 0.055,
+      3
+    );
+    strokeContactSeparation(
+      [
+        { x: 20, y: -151 + localCrouch },
+        { x: 44 + strike * 12, y: -146 + localCrouch - strike * 5 },
+        { x: 73 + strike * 20, y: -139 + localCrouch - strike * 7 },
+      ],
+      trim,
+      1.4 + strike * 0.7,
+      0.08 + strike * 0.08
+    );
+  } else if (frameName === "kick" || frameName === "sweep") {
+    const kick = f.attack ? Math.max(phase.strike, phase.snap * 0.9, phase.followThrough * 0.45) : 0.35;
+    const sweep = frameName === "sweep";
+    fillSoftContactShadow(15 + kick * 8, -81 + localCrouch + (sweep ? 11 : 0), 25 + kick * 15, 18 + kick * 7, 0.24, 0.075 + kick * 0.07);
+    strokeContactShadow(
+      [
+        { x: -hip + 5, y: -50 + localCrouch },
+        { x: 8 + kick * 7, y: -45 + localCrouch + (sweep ? 4 : -2) },
+        { x: 45 + kick * 26, y: -47 + localCrouch + (sweep ? 7 : -10) },
+      ],
+      sweep ? 7.2 : 8.8,
+      0.065 + kick * 0.07,
+      3
+    );
+    strokeContactSeparation(
+      [
+        { x: 6, y: -86 + localCrouch },
+        { x: 32 + kick * 9, y: -80 + localCrouch - kick * 5 },
+        { x: 66 + kick * 21, y: -70 + localCrouch - kick * 8 },
+      ],
+      trim,
+      1.5 + kick * 0.7,
+      0.08 + kick * 0.07
+    );
+  } else if (frameName === "walk") {
+    const walkSwing = Math.abs(stride);
+    fillSoftContactShadow(-24 - stride * 4, -55 + localCrouch, 15 + walkSwing * 6, 9, -0.18, 0.05 + walkSwing * 0.04);
+    fillSoftContactShadow(24 + stride * 4, -55 + localCrouch, 15 + walkSwing * 6, 9, 0.18, 0.05 + walkSwing * 0.04);
+    strokeContactSeparation(
+      [
+        { x: -29, y: -88 + localCrouch },
+        { x: -17 + stride * 3, y: -67 + localCrouch },
+        { x: -22 + stride * 4, y: -41 + localCrouch },
+      ],
+      trim,
+      1.1,
+      0.055 + walkSwing * 0.055
+    );
+  }
+
+  if (hit > 0.05) {
+    const zone = impact.zone === "head" || impact.zone === "legs" ? impact.zone : "torso";
+    const centerY = zone === "head" ? -160 + localCrouch : zone === "legs" ? -48 + localCrouch : -105 + localCrouch;
+    fillSoftContactShadow(-impact.localDir * (zone === "head" ? 18 : 12), centerY + impact.shake * 1.2, zone === "legs" ? 42 : 34, zone === "head" ? 18 : 24, -impact.localDir * 0.16, 0.05 + hit * 0.06);
+  }
 }
 
 function drawVectorContactOcclusion(f, crouch, stride) {
