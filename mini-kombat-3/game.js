@@ -275,6 +275,52 @@ function characterMotion(f) {
   return CHARACTER_MOTION[f?.profileId] ?? CHARACTER_MOTION.default;
 }
 
+const CHARACTER_GUARD = {
+  default: {
+    brace: 1,
+    recoil: 1,
+    crouch: 1,
+    shieldScale: 1,
+    shieldWidth: 1,
+    shieldAlpha: 1,
+    spark: 1,
+    arc: 1,
+    handLift: 1,
+    counter: 1,
+    color: "#bdeaff",
+  },
+  p1: {
+    brace: 1.22,
+    recoil: 0.72,
+    crouch: 1.18,
+    shieldScale: 1.12,
+    shieldWidth: 1.18,
+    shieldAlpha: 0.92,
+    spark: 0.78,
+    arc: 1.16,
+    handLift: 0.88,
+    counter: 0.94,
+    color: "#9cd9ff",
+  },
+  p2: {
+    brace: 0.82,
+    recoil: 1.18,
+    crouch: 0.78,
+    shieldScale: 0.92,
+    shieldWidth: 0.86,
+    shieldAlpha: 1.18,
+    spark: 1.26,
+    arc: 0.82,
+    handLift: 1.22,
+    counter: 1.18,
+    color: "#aef7df",
+  },
+};
+
+function characterGuard(f) {
+  return CHARACTER_GUARD[f?.profileId] ?? CHARACTER_GUARD.default;
+}
+
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
@@ -2204,6 +2250,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   const cinematic = impactCinematicProfile({ blocked, heavyImpact, counter, projectile, finishingHit, attackType, hitZone, impactStrength });
   const cinematicHit = cinematic.specialFx;
   const targetMotion = characterMotion(target);
+  const targetGuard = characterGuard(target);
 
   target.health = nextHealth;
   target.hurt = finishingHit ? 38 + zone.hurtBonus : blocked ? 9 : attacker?.attack?.type === "grab" ? 30 : projectile ? 21 + zone.hurtBonus : 24 + zone.hurtBonus;
@@ -2250,7 +2297,8 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
     target.koFallDir = impactDir;
     target.koFallStrength = impactStrength;
   }
-  target.guardImpact = blocked ? Math.max(target.guardImpact ?? 0, heavyImpact || projectile ? 16 : 13) : 0;
+  const guardImpactMax = Math.round((heavyImpact || projectile ? 16 : 13) * targetGuard.recoil);
+  target.guardImpact = blocked ? Math.max(target.guardImpact ?? 0, guardImpactMax) : 0;
   if (!blocked && target.health < 32) {
     target.staggerPulse = Math.max(target.staggerPulse ?? 0, heavyImpact || projectile ? 18 : 13);
   }
@@ -2577,6 +2625,7 @@ function cinematicImpact(x, y, color, dir, blocked, heavyImpact, counter) {
 }
 
 function premiumImpactFX(x, y, target, color, dir, blocked, heavyImpact, counter, projectile) {
+  const guardProfile = blocked ? characterGuard(target) : CHARACTER_GUARD.default;
   const strength = blocked ? 0.55 : counter ? 1.42 : projectile ? 1.24 : heavyImpact ? 1.12 : 0.88;
   const baseAngle = dir > 0 ? 0 : Math.PI;
   const rippleLife = blocked ? 12 : counter ? 18 : heavyImpact ? 16 : 14;
@@ -2601,31 +2650,31 @@ function premiumImpactFX(x, y, target, color, dir, blocked, heavyImpact, counter
       vx: dir * 0.18,
       vy: 0,
       angle: baseAngle,
-      life: 15,
-      maxLife: 15,
-      size: 34,
-      color: "#bdeaff",
+      life: Math.round(15 * guardProfile.recoil),
+      maxLife: Math.round(15 * guardProfile.recoil),
+      size: 34 * guardProfile.shieldScale,
+      color: guardProfile.color,
       kind: "guardPlate",
     });
   }
 
-  const needleCount = blocked ? 3 : counter ? 10 : heavyImpact || projectile ? 8 : 5;
-  const spread = blocked ? 0.36 : counter ? 0.86 : heavyImpact ? 0.72 : 0.58;
+  const needleCount = blocked ? Math.max(2, Math.round(3 * guardProfile.spark)) : counter ? 10 : heavyImpact || projectile ? 8 : 5;
+  const spread = blocked ? 0.36 * guardProfile.arc : counter ? 0.86 : heavyImpact ? 0.72 : 0.58;
   for (let i = 0; i < needleCount; i += 1) {
     const lane = needleCount === 1 ? 0 : i / (needleCount - 1) - 0.5;
     const angle = baseAngle + lane * spread + (Math.random() - 0.5) * 0.1;
-    const speed = blocked ? 0.32 : heavyImpact ? 0.92 : 0.68;
+    const speed = blocked ? 0.32 * guardProfile.spark : heavyImpact ? 0.92 : 0.68;
     particles.push({
       x: x - Math.cos(angle) * 10,
       y: y + lane * (blocked ? 22 : 32),
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed * 0.26,
       angle,
-      length: (blocked ? 26 : heavyImpact ? 72 : 54) * (0.82 + Math.random() * 0.38),
-      life: blocked ? 9 + Math.random() * 5 : 12 + Math.random() * 7,
-      maxLife: blocked ? 11 : 16,
-      size: blocked ? 2.2 : heavyImpact ? 4.4 : 3.2,
-      color,
+      length: (blocked ? 26 * guardProfile.shieldWidth : heavyImpact ? 72 : 54) * (0.82 + Math.random() * 0.38),
+      life: blocked ? (9 + Math.random() * 5) * guardProfile.recoil : 12 + Math.random() * 7,
+      maxLife: blocked ? 11 * guardProfile.recoil : 16,
+      size: blocked ? 2.2 * guardProfile.spark : heavyImpact ? 4.4 : 3.2,
+      color: blocked ? guardProfile.color : color,
       kind: "impactNeedle",
     });
   }
@@ -4695,15 +4744,16 @@ function fighterTransitionMotion(f, walking) {
   }
 
   if (f.blocking && !winner) {
+    const guardProfile = characterGuard(f);
     const pulse = 0.5 + Math.sin(roundFrame * 0.58) * 0.5;
     const guard = clamp((f.guardPulse ?? 0) / 18, 0, 1);
     const guardHit = clamp((f.guardImpact ?? 0) / 16, 0, 1);
-    motion.x -= dir * (1.65 + pulse * 0.72 + guard * 1.15 + guardHit * 5.6);
-    motion.y += 1.05 + pulse * 0.42 + guard * 0.8 + guardHit * 2.7;
-    motion.rotation -= dir * (0.014 + pulse * 0.004 + guard * 0.012 + guardHit * 0.044);
-    motion.scaleX *= 1.004 + guard * 0.008 - guardHit * 0.006;
-    motion.scaleY *= 0.992 - guard * 0.012 + guardHit * 0.018;
-    motion.afterimage = Math.max(motion.afterimage, guardHit * 0.09);
+    motion.x -= dir * (1.65 * guardProfile.brace + pulse * 0.72 + guard * 1.15 * guardProfile.brace + guardHit * 5.6 * guardProfile.recoil);
+    motion.y += (1.05 + pulse * 0.42 + guard * 0.8) * guardProfile.crouch + guardHit * 2.7 * guardProfile.recoil;
+    motion.rotation -= dir * (0.014 * guardProfile.brace + pulse * 0.004 + guard * 0.012 * guardProfile.brace + guardHit * 0.044 * guardProfile.recoil);
+    motion.scaleX *= 1.004 + guard * 0.008 * guardProfile.brace - guardHit * 0.006 * guardProfile.recoil;
+    motion.scaleY *= 0.992 - guard * 0.012 * guardProfile.crouch + guardHit * 0.018 * guardProfile.recoil;
+    motion.afterimage = Math.max(motion.afterimage, guardHit * 0.09 * guardProfile.spark);
   }
 
   const counterReady = clamp((f.counterWindow ?? 0) / 34, 0, 1);
@@ -6437,33 +6487,60 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
   const active = Math.max(guard, impact, counter * 0.84);
   if (active <= 0.04 || f.attack || f.hurt > 0 || winner) return;
 
+  const guardProfile = characterGuard(f);
   const outfit = outfitSpec(f) ?? {};
   const sleeve = outfit.sleeve ?? f.color ?? "#497ac4";
   const skin = f.skin ?? "#f3bd98";
   const trim = f.trim ?? "#fff1bd";
   const localCrouch = crouch * 0.18;
   const breath = Math.sin(roundFrame * 0.12 + f.x * 0.01);
-  const recoil = impact * impact;
-  const counterPulse = counter * (0.7 + Math.sin(roundFrame * 0.32) * 0.3);
+  const recoil = impact * impact * guardProfile.recoil;
+  const counterPulse = counter * guardProfile.counter * (0.7 + Math.sin(roundFrame * 0.32) * 0.3);
+  const heavyGuard = f.profileId === "p1";
+  const technicalGuard = f.profileId === "p2";
 
-  const frontShoulder = { x: 34 - recoil * 3, y: -154 + localCrouch + guard * 2 };
-  const frontElbow = { x: 52 + recoil * 4, y: -132 + localCrouch + guard * 7 + breath };
-  const frontHand = { x: 36 + recoil * 9 + counter * 5, y: -111 + localCrouch + guard * 6 + impact * 4 };
-  const backShoulder = { x: -31, y: -150 + localCrouch + guard * 4 };
-  const backElbow = { x: 9 + recoil * 5, y: -134 + localCrouch + guard * 9 - breath * 0.6 };
-  const backHand = { x: 13 + recoil * 7, y: -107 + localCrouch + guard * 8 + impact * 3 };
+  const frontShoulder = heavyGuard
+    ? { x: 28 - recoil * 2, y: -153 + localCrouch + guard * 2 }
+    : technicalGuard
+      ? { x: 36 - recoil * 2, y: -158 + localCrouch - guard }
+      : { x: 34 - recoil * 3, y: -154 + localCrouch + guard * 2 };
+  const frontElbow = heavyGuard
+    ? { x: 40 + recoil * 3, y: -136 + localCrouch + guard * 5 + breath * 0.55 }
+    : technicalGuard
+      ? { x: 58 + recoil * 6, y: -139 + localCrouch + guard * 2 + breath * 1.15 }
+      : { x: 52 + recoil * 4, y: -132 + localCrouch + guard * 7 + breath };
+  const frontHand = heavyGuard
+    ? { x: 31 + recoil * 5 + counter * 3, y: -113 + localCrouch + guard * 4 + impact * 2 }
+    : technicalGuard
+      ? { x: 50 + recoil * 12 + counter * 8, y: -119 + localCrouch + guard * 2 + impact * 5 }
+      : { x: 36 + recoil * 9 + counter * 5, y: -111 + localCrouch + guard * 6 + impact * 4 };
+  const backShoulder = heavyGuard
+    ? { x: -28, y: -148 + localCrouch + guard * 5 }
+    : technicalGuard
+      ? { x: -30, y: -151 + localCrouch + guard * 3 }
+      : { x: -31, y: -150 + localCrouch + guard * 4 };
+  const backElbow = heavyGuard
+    ? { x: 4 + recoil * 3, y: -131 + localCrouch + guard * 8 - breath * 0.35 }
+    : technicalGuard
+      ? { x: 12 + recoil * 6, y: -128 + localCrouch + guard * 6 - breath * 0.9 }
+      : { x: 9 + recoil * 5, y: -134 + localCrouch + guard * 9 - breath * 0.6 };
+  const backHand = heavyGuard
+    ? { x: 9 + recoil * 4, y: -106 + localCrouch + guard * 6 + impact * 2 }
+    : technicalGuard
+      ? { x: 3 + recoil * 9, y: -96 + localCrouch + guard * 6 + impact * 4 }
+      : { x: 13 + recoil * 7, y: -107 + localCrouch + guard * 8 + impact * 3 };
 
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.globalAlpha = clamp(0.24 + active * 0.46, 0.2, 0.72);
+  ctx.globalAlpha = clamp((0.24 + active * 0.46) * guardProfile.shieldAlpha, 0.18, 0.78);
   ctx.shadowColor = "rgba(9, 7, 6, 0.38)";
   ctx.shadowBlur = 4;
   ctx.shadowOffsetY = 1.5;
 
   ctx.globalCompositeOperation = "source-over";
   ctx.strokeStyle = darken(sleeve, 18);
-  ctx.lineWidth = 17 + guard * 2 + impact * 4;
+  ctx.lineWidth = 17 * guardProfile.shieldWidth + guard * 2 * guardProfile.brace + impact * 4 * guardProfile.recoil;
   ctx.beginPath();
   ctx.moveTo(backShoulder.x, backShoulder.y);
   ctx.quadraticCurveTo(backElbow.x - 12, backElbow.y - 3, backHand.x, backHand.y);
@@ -6472,7 +6549,7 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
   ctx.stroke();
 
   ctx.strokeStyle = colorWithAlpha(sleeve, 0.96);
-  ctx.lineWidth = 11 + guard * 2.2 + impact * 2.4;
+  ctx.lineWidth = 11 * guardProfile.shieldWidth + guard * 2.2 * guardProfile.brace + impact * 2.4 * guardProfile.recoil;
   ctx.beginPath();
   ctx.moveTo(backShoulder.x + 3, backShoulder.y + 1);
   ctx.quadraticCurveTo(backElbow.x - 5, backElbow.y - 1, backHand.x + 2, backHand.y);
@@ -6481,7 +6558,7 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
   ctx.stroke();
 
   ctx.strokeStyle = colorWithAlpha(skin, 0.92);
-  ctx.lineWidth = 8.4 + impact * 1.4;
+  ctx.lineWidth = 8.4 + impact * 1.4 * guardProfile.recoil;
   ctx.beginPath();
   ctx.moveTo(backHand.x - 5, backHand.y + 1);
   ctx.lineTo(backHand.x + 10, backHand.y + 2);
@@ -6491,15 +6568,15 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
 
   ctx.fillStyle = colorWithAlpha(skin, 0.96);
   ctx.beginPath();
-  ctx.ellipse(backHand.x + 11, backHand.y + 2, 9.5 + impact * 2, 7.4, 0.05, 0, Math.PI * 2);
-  ctx.ellipse(frontHand.x + 14, frontHand.y + 1, 10.5 + impact * 2.4, 7.6, -0.08, 0, Math.PI * 2);
+  ctx.ellipse(backHand.x + 11, backHand.y + 2, 9.5 + impact * 2 * guardProfile.recoil, 7.4, 0.05, 0, Math.PI * 2);
+  ctx.ellipse(frontHand.x + 14, frontHand.y + 1, 10.5 + impact * 2.4 * guardProfile.recoil, 7.6, -0.08, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.shadowBlur = 0;
   ctx.globalCompositeOperation = "multiply";
   ctx.globalAlpha = clamp(0.08 + active * 0.12, 0.06, 0.22);
   ctx.strokeStyle = "rgba(19, 10, 8, 0.9)";
-  ctx.lineWidth = 4 + guard * 2;
+  ctx.lineWidth = 4 + guard * 2 * guardProfile.brace;
   ctx.beginPath();
   ctx.moveTo(-38, -73 + localCrouch + guard * 5);
   ctx.quadraticCurveTo(-15, -57 + localCrouch + guard * 8, 4, -40 + localCrouch + guard * 7);
@@ -6508,9 +6585,9 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
   ctx.stroke();
 
   ctx.globalCompositeOperation = "screen";
-  ctx.globalAlpha = clamp(0.08 + guard * 0.13 + counterPulse * 0.2 + impact * 0.2, 0.05, 0.34);
-  ctx.strokeStyle = counter > 0.05 ? colorWithAlpha(trim, 0.96) : "rgba(189, 234, 255, 0.82)";
-  ctx.lineWidth = 1.5 + guard * 1.2 + counter * 1.4 + impact * 1.6;
+  ctx.globalAlpha = clamp((0.08 + guard * 0.13 + counterPulse * 0.2 + impact * 0.2) * guardProfile.shieldAlpha, 0.05, 0.4);
+  ctx.strokeStyle = counter > 0.05 ? colorWithAlpha(trim, 0.96) : colorWithAlpha(guardProfile.color, 0.82);
+  ctx.lineWidth = 1.5 + guard * 1.2 * guardProfile.shieldWidth + counter * 1.4 * guardProfile.counter + impact * 1.6 * guardProfile.recoil;
   ctx.beginPath();
   ctx.moveTo(backShoulder.x - 1, backShoulder.y - 6);
   ctx.quadraticCurveTo(4 + recoil * 5, -157 + localCrouch - counter * 6, frontShoulder.x + 9, frontShoulder.y - 5);
@@ -6518,11 +6595,31 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
   ctx.quadraticCurveTo(20 + counter * 8, -124 + localCrouch - counter * 5, frontHand.x + 20, frontHand.y - 8);
   ctx.stroke();
 
-  if (counter > 0.05) {
-    ctx.globalAlpha = clamp(0.1 + counterPulse * 0.26, 0.08, 0.36);
-    ctx.lineWidth = 2.2;
+  if (technicalGuard) {
+    ctx.globalAlpha = clamp(0.08 + active * 0.2 + counterPulse * 0.18, 0.06, 0.34);
+    ctx.strokeStyle = colorWithAlpha(trim, 0.78);
+    ctx.lineWidth = 1.2 + guard * 1.1 + impact;
     ctx.beginPath();
-    ctx.arc(28 + counter * 5, -115 + localCrouch, 34 + counter * 8, -0.92, 0.78);
+    ctx.moveTo(backHand.x - 10, backHand.y - 5);
+    ctx.lineTo(frontHand.x + 23 + impact * 7, frontHand.y - 18 - counter * 5);
+    ctx.moveTo(backHand.x - 4, backHand.y + 8);
+    ctx.lineTo(frontHand.x + 18 + impact * 5, frontHand.y - 2);
+    ctx.stroke();
+  } else if (heavyGuard) {
+    ctx.globalAlpha = clamp(0.06 + active * 0.16, 0.04, 0.26);
+    ctx.strokeStyle = colorWithAlpha(guardProfile.color, 0.74);
+    ctx.lineWidth = 4 + guard * 2 + impact * 1.4;
+    ctx.beginPath();
+    ctx.moveTo(backHand.x - 9, backHand.y + 11);
+    ctx.quadraticCurveTo(20 + recoil * 3, -106 + localCrouch + guard * 4, frontHand.x + 23, frontHand.y + 11);
+    ctx.stroke();
+  }
+
+  if (counter > 0.05) {
+    ctx.globalAlpha = clamp((0.1 + counterPulse * 0.26) * guardProfile.shieldAlpha, 0.08, 0.4);
+    ctx.lineWidth = 2.2 * guardProfile.shieldWidth;
+    ctx.beginPath();
+    ctx.arc(28 + counter * 5, -115 + localCrouch, (34 + counter * 8) * guardProfile.shieldScale, -0.92 * guardProfile.arc, 0.78 * guardProfile.arc);
     ctx.stroke();
   }
 
@@ -8591,6 +8688,7 @@ function headActingProfile(f, stride = 0) {
 function getPose(f, stride) {
   const spec = bodySpec(f);
   const motion = characterMotion(f);
+  const guardProfile = characterGuard(f);
   const crouch = f.crouch * 18;
   const phase = attackPhase(f.attack);
   const progress = f.attack ? phase.power : 0;
@@ -8690,18 +8788,57 @@ function getPose(f, stride) {
   const moveTurnT = clamp((f.moveTurnPulse ?? 0) / 10, 0, 1);
 
   if (f.blocking) {
-    base.frontArm = {
-      shoulder: { x: 26, y: shoulderY },
-      elbow: { x: 39, y: -124 + crouch },
-      hand: { x: 42, y: -99 + crouch },
-    };
-    base.backArm = {
-      shoulder: { x: -24, y: shoulderY + 6 },
-      elbow: { x: 14, y: -122 + crouch },
-      hand: { x: 16, y: -97 + crouch },
-    };
-    base.frontLeg.knee.x += 8;
-    base.backLeg.foot.x -= 8;
+    if (f.profileId === "p1") {
+      base.torsoTilt -= 0.045;
+      base.frontArm = {
+        shoulder: { x: 25, y: shoulderY + 1 },
+        elbow: { x: 34, y: -130 + crouch },
+        hand: { x: 31, y: -108 + crouch },
+      };
+      base.backArm = {
+        shoulder: { x: -24, y: shoulderY + 7 },
+        elbow: { x: 7, y: -128 + crouch },
+        hand: { x: 10, y: -104 + crouch },
+      };
+      base.frontLeg.knee.x += 11;
+      base.frontLeg.knee.y += 4;
+      base.frontLeg.foot.x += 7 * spec.stance;
+      base.backLeg.knee.y += 7;
+      base.backLeg.foot.x -= 14 * spec.stance;
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, 0.9);
+      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, 0.7);
+    } else if (f.profileId === "p2") {
+      base.torsoTilt -= 0.016;
+      base.frontArm = {
+        shoulder: { x: 28, y: shoulderY - 2 },
+        elbow: { x: 47, y: -135 + crouch },
+        hand: { x: 48, y: -116 + crouch },
+      };
+      base.backArm = {
+        shoulder: { x: -24, y: shoulderY + 5 },
+        elbow: { x: 12, y: -125 + crouch },
+        hand: { x: 5, y: -94 + crouch },
+      };
+      base.frontLeg.knee.x += 5;
+      base.frontLeg.foot.x += 3 * spec.stance;
+      base.frontLeg.foot.y -= 1.5;
+      base.backLeg.foot.x -= 6 * spec.stance;
+      base.backLeg.foot.y -= 1;
+      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, 0.42);
+    } else {
+      base.frontArm = {
+        shoulder: { x: 26, y: shoulderY },
+        elbow: { x: 39, y: -124 + crouch },
+        hand: { x: 42, y: -99 + crouch },
+      };
+      base.backArm = {
+        shoulder: { x: -24, y: shoulderY + 6 },
+        elbow: { x: 14, y: -122 + crouch },
+        hand: { x: 16, y: -97 + crouch },
+      };
+      base.frontLeg.knee.x += 8;
+      base.backLeg.foot.x -= 8;
+    }
   }
 
   if (attackType === "punch" || attackType === "airPunch") {
@@ -8951,18 +9088,18 @@ function getPose(f, stride) {
     }
 
     if (guardEntryT > 0.02 && f.blocking && !f.attack) {
-      base.torsoTilt -= guardEntryT * 0.035;
-      base.frontArm.elbow.x += guardEntryT * 3 * spec.stance;
-      base.frontArm.elbow.y -= guardEntryT * 8;
-      base.frontArm.hand.x += guardEntryT * 2 * spec.stance;
-      base.frontArm.hand.y -= guardEntryT * 10;
-      base.backArm.elbow.x += guardEntryT * 5 * spec.stance;
-      base.backArm.elbow.y -= guardEntryT * 7;
-      base.backArm.hand.x += guardEntryT * 5 * spec.stance;
-      base.backArm.hand.y -= guardEntryT * 9;
-      base.frontLeg.knee.y += guardEntryT * 4;
-      base.backLeg.knee.y += guardEntryT * 5;
-      base.backLeg.foot.x -= guardEntryT * 7 * spec.stance;
+      base.torsoTilt -= guardEntryT * 0.035 * guardProfile.brace;
+      base.frontArm.elbow.x += guardEntryT * 3 * spec.stance * guardProfile.brace;
+      base.frontArm.elbow.y -= guardEntryT * 8 * guardProfile.handLift;
+      base.frontArm.hand.x += guardEntryT * 2 * spec.stance * guardProfile.brace;
+      base.frontArm.hand.y -= guardEntryT * 10 * guardProfile.handLift;
+      base.backArm.elbow.x += guardEntryT * 5 * spec.stance * guardProfile.brace;
+      base.backArm.elbow.y -= guardEntryT * 7 * guardProfile.handLift;
+      base.backArm.hand.x += guardEntryT * 5 * spec.stance * guardProfile.brace;
+      base.backArm.hand.y -= guardEntryT * 9 * guardProfile.handLift;
+      base.frontLeg.knee.y += guardEntryT * 4 * guardProfile.crouch;
+      base.backLeg.knee.y += guardEntryT * 5 * guardProfile.crouch;
+      base.backLeg.foot.x -= guardEntryT * 7 * spec.stance * guardProfile.brace;
     }
 
     if (guardExitT > 0.02 && !f.blocking && !f.attack && f.hurt <= 0) {
@@ -10541,56 +10678,61 @@ function drawGiFolds(f, shoulder, waist, crouch) {
 }
 
 function drawGuard(color, crouch, f) {
+  const guardProfile = characterGuard(f);
   const guard = clamp((f?.guardPulse ?? 0) / 18, 0, 1);
   const impact = clamp((f?.guardImpact ?? 0) / 16, 0, 1);
   const counter = clamp((f?.counterWindow ?? 0) / 34, 0, 1);
   const pulse = 0.5 + Math.sin(roundFrame * 0.32) * 0.5;
-  const centerX = 22 + impact * 5;
-  const centerY = -106 + crouch + impact * 2;
-  const radius = 30 + guard * 5 + impact * 12;
+  const centerX = 22 + impact * 5 * guardProfile.recoil + (f?.profileId === "p2" ? 4 : f?.profileId === "p1" ? -2 : 0);
+  const centerY = -106 + crouch + impact * 2 * guardProfile.recoil + (f?.profileId === "p2" ? -4 : f?.profileId === "p1" ? 1 : 0);
+  const radius = (30 + guard * 5 * guardProfile.brace + impact * 12 * guardProfile.recoil) * guardProfile.shieldScale;
+  const arcStart = -1.35 * guardProfile.arc;
+  const arcEnd = 1.38 * guardProfile.arc;
+  const guardColor = guardProfile.color ?? color;
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
 
   const glow = ctx.createRadialGradient(centerX, centerY, 4, centerX, centerY, radius + 32);
-  glow.addColorStop(0, colorWithAlpha(color, 0.16 + impact * 0.16 + counter * 0.08));
-  glow.addColorStop(0.48, "rgba(189, 234, 255, 0.08)");
+  glow.addColorStop(0, colorWithAlpha(color, (0.16 + impact * 0.16 + counter * 0.08) * guardProfile.shieldAlpha));
+  glow.addColorStop(0.48, colorWithAlpha(guardColor, 0.08 * guardProfile.shieldAlpha));
   glow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(centerX, centerY, radius + 22, radius + 34, -0.08, 0, Math.PI * 2);
+  ctx.ellipse(centerX, centerY, radius + 22 * guardProfile.shieldWidth, radius + 34, -0.08, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = colorWithAlpha(color, 0.48 + guard * 0.2 + impact * 0.22);
-  ctx.lineWidth = 4.2 + impact * 3;
+  ctx.strokeStyle = colorWithAlpha(color, (0.48 + guard * 0.2 + impact * 0.22) * guardProfile.shieldAlpha);
+  ctx.lineWidth = (4.2 + impact * 3 * guardProfile.recoil) * guardProfile.shieldWidth;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.arc(centerX, centerY, radius, -1.35, 1.38);
+  ctx.arc(centerX, centerY, radius, arcStart, arcEnd);
   ctx.stroke();
 
-  ctx.strokeStyle = `rgba(255,255,255,${0.36 + impact * 0.32 + counter * 0.2})`;
-  ctx.lineWidth = 1.8 + impact * 1.8;
+  ctx.strokeStyle = `rgba(255,255,255,${(0.36 + impact * 0.32 + counter * 0.2) * guardProfile.shieldAlpha})`;
+  ctx.lineWidth = 1.8 + impact * 1.8 * guardProfile.recoil;
   ctx.beginPath();
-  ctx.arc(centerX + 2, centerY, radius + 9 + impact * 3, -1.12, 1.13);
+  ctx.arc(centerX + 2, centerY, radius + 9 + impact * 3, -1.12 * guardProfile.arc, 1.13 * guardProfile.arc);
   ctx.stroke();
 
   if (impact > 0.05 || counter > 0.05) {
-    ctx.strokeStyle = counter > 0.05 ? `rgba(255, 241, 189, ${0.18 + counter * 0.34})` : `rgba(189, 234, 255, ${0.18 + impact * 0.3})`;
-    ctx.lineWidth = 1.4 + impact * 1.2;
-    for (let i = 0; i < 3; i += 1) {
-      const lane = i - 1;
+    ctx.strokeStyle = counter > 0.05 ? `rgba(255, 241, 189, ${0.18 + counter * 0.34 * guardProfile.counter})` : colorWithAlpha(guardColor, 0.18 + impact * 0.3 * guardProfile.shieldAlpha);
+    ctx.lineWidth = 1.4 + impact * 1.2 * guardProfile.spark;
+    const lanes = Math.max(2, Math.round(3 * guardProfile.spark));
+    for (let i = 0; i < lanes; i += 1) {
+      const lane = lanes === 1 ? 0 : (i / (lanes - 1) - 0.5) * 2;
       ctx.beginPath();
       ctx.moveTo(centerX - 7 + lane * 5, centerY - radius * 0.78 + lane * 7);
-      ctx.lineTo(centerX + 22 + impact * 16 + lane * 7, centerY + lane * 12);
+      ctx.lineTo(centerX + 22 + impact * 16 * guardProfile.recoil + lane * 7, centerY + lane * 12);
       ctx.stroke();
     }
   }
 
   if (counter > 0.05) {
-    ctx.strokeStyle = `rgba(255, 241, 189, ${0.16 + pulse * 0.16})`;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = `rgba(255, 241, 189, ${(0.16 + pulse * 0.16) * guardProfile.counter})`;
+    ctx.lineWidth = 2 * guardProfile.shieldWidth;
     ctx.beginPath();
-    ctx.arc(centerX - 2, centerY, radius + 18, -0.85, 0.82);
+    ctx.arc(centerX - 2, centerY, radius + 18, -0.85 * guardProfile.arc, 0.82 * guardProfile.arc);
     ctx.stroke();
   }
 
