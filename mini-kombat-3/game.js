@@ -4820,6 +4820,7 @@ function fighterTransitionMotion(f, walking) {
     const a = f.attack;
     const phase = attackPhase(a);
     const mass = attackMassProfile(f);
+    const bodyWeight = attackBodyWeightProfile(f);
     const windup = phase.anticipation;
     const strike = phase.strike;
     const recovery = phase.recovery;
@@ -4868,6 +4869,30 @@ function fighterTransitionMotion(f, walking) {
     motion.scaleX *= 1 - mass.crush * 0.014 + weightDrive * 0.026 + mass.follow * 0.007;
     motion.scaleY *= 1 + mass.crush * 0.018 - weightDrive * 0.016 - mass.plant * 0.007;
     motion.afterimage = Math.max(motion.afterimage, mass.drive * (isSpecial ? 0.34 : isKick ? 0.18 : 0.12) + mass.snap * 0.14);
+
+    if (bodyWeight.active > 0.025) {
+      const heavyBias = isSpecial ? 1.12 : isKick || isSweep ? 1.06 : 0.96;
+      const returnWeight = bodyWeight.recoil + bodyWeight.follow * 0.26;
+      motion.x += dir * (
+        -bodyWeight.load * (isSweep ? 2.35 : 2.7) +
+        bodyWeight.drive * (isKick ? 2.85 : isSweep ? 2.15 : isGrab ? 2.25 : 2.42) -
+        returnWeight * 1.52
+      ) * heavyBias;
+      motion.y +=
+        bodyWeight.compression * (isSweep ? 2.05 : 1.32) +
+        bodyWeight.low * 1.1 -
+        bodyWeight.lift * (isKick ? 1.2 : 0.82) +
+        bodyWeight.recover * 0.7;
+      motion.rotation += dir * (
+        -bodyWeight.load * (isKick ? 0.018 : 0.022) +
+        bodyWeight.drive * (isKick ? 0.024 : isSweep ? 0.019 : 0.018) -
+        bodyWeight.recover * 0.016 +
+        bodyWeight.follow * 0.008
+      ) * heavyBias;
+      motion.scaleX *= 1 + bodyWeight.plant * 0.012 + bodyWeight.drive * 0.009 - bodyWeight.load * 0.006;
+      motion.scaleY *= 1 - bodyWeight.plant * 0.015 - bodyWeight.drive * 0.005 + bodyWeight.load * 0.01 + bodyWeight.recover * 0.005;
+      motion.afterimage = Math.max(motion.afterimage, bodyWeight.drive * (isSpecial ? 0.16 : isKick ? 0.09 : 0.065));
+    }
 
     const chain = attackChainProfile(f, a.type);
     if (chain.active > 0.025) {
@@ -5049,17 +5074,19 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const anchor = walking ? clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1) : 0;
   const push = walking ? clamp((f.walkPushPulse ?? 0) / 9, 0, 1) : 0;
   const attackMass = f.attack ? attackMassProfile(f) : null;
-  const attackPlant = attackMass ? clamp(attackMass.plant, 0, 1.5) : 0;
-  const attackDrive = attackMass ? clamp(attackMass.drive + attackMass.snap * 0.35, 0, 1.6) : 0;
-  const attackLoad = attackMass ? clamp(attackMass.load, 0, 1.4) : 0;
+  const attackWeight = f.attack ? attackBodyWeightProfile(f) : null;
+  const attackPlant = attackMass ? clamp(Math.max(attackMass.plant, attackWeight?.plant ?? 0), 0, 1.65) : 0;
+  const attackDrive = attackMass ? clamp(Math.max(attackMass.drive + attackMass.snap * 0.35, attackWeight?.drive ?? 0), 0, 1.75) : 0;
+  const attackLoad = attackMass ? clamp(Math.max(attackMass.load, attackWeight?.load ?? 0), 0, 1.55) : 0;
+  const attackCompression = attackWeight ? clamp(attackWeight.compression + attackWeight.brace * 0.18, 0, 1.75) : 0;
   const hitMass = f.hurt > 0 || (f.reactionPulse ?? 0) > 0 ? hitReactionMassProfile(f) : null;
   const reactionFloor = hitMass ? clamp(hitMass.floor, 0, 1.7) : 0;
   const reactionSkid = hitMass ? clamp(hitMass.skid, 0, 1.85) : 0;
-  const attackOffset = (attackDrive * 8 - attackLoad * 5) * (f.dir || 1) * FIGHTER_SCALE;
+  const attackOffset = (attackDrive * 8 - attackLoad * 5 - (attackWeight?.recoil ?? 0) * 2.4) * (f.dir || 1) * FIGHTER_SCALE;
   const reactionOffset = hitMass ? hitMass.worldDir * reactionSkid * 7 * FIGHTER_SCALE : 0;
-  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 32 + step * 8 + plant * 10 + anchor * 12 + push * 7 + attackPlant * 24 + attackDrive * 18 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
-  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 4.8 + step * 1.4 + plant * 0.8 + anchor * 1.8 + attackPlant * 3.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
-  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.09 + step * 0.025 + plant * 0.018 + anchor * 0.04 + attackPlant * 0.055 + reactionFloor * 0.052, 0.08, 0.54);
+  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 32 + step * 8 + plant * 10 + anchor * 12 + push * 7 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
+  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 4.8 + step * 1.4 + plant * 0.8 + anchor * 1.8 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
+  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.09 + step * 0.025 + plant * 0.018 + anchor * 0.04 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.56);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -5108,11 +5135,11 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     ctx.restore();
   }
 
-  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.75, attackPlant * 0.42, reactionFloor * 0.34);
+  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.75, attackPlant * 0.46, attackCompression * 0.36, reactionFloor * 0.34);
   if (f.grounded && footPlant > 0.04) {
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
-    const side = hitMass && reactionFloor > attackPlant ? (hitMass.worldDir === (f.dir || 1) ? -1 : 1) : attackMass ? attackMass.footSide : f.walkAnchorSide || f.footPlantSide || 1;
+    const side = hitMass && reactionFloor > attackPlant ? (hitMass.worldDir === (f.dir || 1) ? -1 : 1) : attackWeight ? attackWeight.footSide : attackMass ? attackMass.footSide : f.walkAnchorSide || f.footPlantSide || 1;
     const footX = baseX + side * (26 + Math.abs(stride) * 12) * FIGHTER_SCALE * (f.dir || 1);
     ctx.fillStyle = `rgba(42, 25, 13, ${0.12 * footPlant})`;
     ctx.beginPath();
@@ -5139,13 +5166,15 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   const anchor = walking ? clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1) : 0;
   const push = walking ? clamp((f.walkPushPulse ?? 0) / 9, 0, 1) : 0;
   const attackMass = f.attack ? attackMassProfile(f) : null;
-  const attackPlant = attackMass ? clamp(attackMass.plant, 0, 1.4) : 0;
-  const attackDrive = attackMass ? clamp(attackMass.drive + attackMass.snap * 0.35, 0, 1.6) : 0;
+  const attackWeight = f.attack ? attackBodyWeightProfile(f) : null;
+  const attackPlant = attackMass ? clamp(Math.max(attackMass.plant, attackWeight?.plant ?? 0), 0, 1.55) : 0;
+  const attackDrive = attackMass ? clamp(Math.max(attackMass.drive + attackMass.snap * 0.35, attackWeight?.drive ?? 0), 0, 1.75) : 0;
+  const attackCompression = attackWeight ? clamp(attackWeight.compression + attackWeight.brace * 0.18, 0, 1.7) : 0;
   const hitMass = f.hurt > 0 || (f.reactionPulse ?? 0) > 0 ? hitReactionMassProfile(f) : null;
   const reactionFloor = hitMass ? clamp(hitMass.floor, 0, 1.7) : 0;
   const reactionSkid = hitMass ? clamp(hitMass.skid, 0, 1.85) : 0;
-  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.78, attackPlant * 0.42, reactionFloor * 0.34);
-  if (jump <= 0.03 && landing <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && attackPlant <= 0.03 && reactionSkid <= 0.03) return;
+  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.78, attackPlant * 0.45, attackCompression * 0.34, reactionFloor * 0.34);
+  if (jump <= 0.03 && landing <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && attackPlant <= 0.03 && attackCompression <= 0.03 && reactionSkid <= 0.03) return;
 
   const localCrouch = crouch * 0.18;
   const trim = f.trim ?? "#fff1bd";
@@ -5188,7 +5217,7 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   }
 
   if (footPlant > 0.03) {
-    const side = (hitMass && reactionFloor > attackPlant ? (hitMass.worldDir === (f.dir || 1) ? -1 : 1) : attackMass ? attackMass.footSide : f.walkAnchorSide || f.footPlantSide || 1) * 30;
+    const side = (hitMass && reactionFloor > attackPlant ? (hitMass.worldDir === (f.dir || 1) ? -1 : 1) : attackWeight ? attackWeight.footSide : attackMass ? attackMass.footSide : f.walkAnchorSide || f.footPlantSide || 1) * 30;
     ctx.strokeStyle = `rgba(255, 226, 145, ${0.16 * footPlant})`;
     ctx.lineWidth = 1.8 + footPlant * 1.4;
     ctx.beginPath();
@@ -5206,16 +5235,17 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   }
 
   if (attackPlant > 0.04) {
-    const side = (attackMass.footSide || -1) * 32;
+    const side = ((attackWeight?.footSide ?? attackMass.footSide) || -1) * 32;
     const driveDir = f.dir || 1;
-    ctx.strokeStyle = `rgba(255, 232, 158, ${0.08 + attackDrive * 0.1})`;
-    ctx.lineWidth = 1.4 + attackPlant * 1.2;
+    const attackPress = Math.max(attackPlant, attackCompression);
+    ctx.strokeStyle = `rgba(255, 232, 158, ${0.08 + attackDrive * 0.1 + attackCompression * 0.035})`;
+    ctx.lineWidth = 1.4 + attackPress * 1.25;
     ctx.beginPath();
-    ctx.ellipse(side - driveDir * attackDrive * 7, 5 + localCrouch, 20 + attackPlant * 12, 4 + attackPlant * 2, -driveDir * 0.06, 0, Math.PI * 2);
+    ctx.ellipse(side - driveDir * attackDrive * 7, 5 + localCrouch + attackCompression * 0.8, 20 + attackPress * 13, 4 + attackPress * 2.2, -driveDir * 0.06, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.strokeStyle = colorWithAlpha(trim, 0.07 + attackDrive * 0.12);
-    ctx.lineWidth = 1.2 + attackDrive * 1.5;
+    ctx.strokeStyle = colorWithAlpha(trim, 0.07 + attackDrive * 0.12 + attackCompression * 0.04);
+    ctx.lineWidth = 1.2 + attackDrive * 1.5 + attackCompression * 0.45;
     ctx.beginPath();
     ctx.moveTo(side - driveDir * 4, 1 + localCrouch);
     ctx.quadraticCurveTo(side - driveDir * (18 + attackDrive * 10), 8 + localCrouch, side - driveDir * (36 + attackDrive * 18), 6 + localCrouch);
@@ -6506,27 +6536,29 @@ function spriteFootDetailPose(frameName, action, walk, localCrouch, f = null) {
 function applyAttackFootPressure(feet, f) {
   if (!f?.attack || !f.grounded || !Array.isArray(feet) || feet.length < 2) return;
   const mass = attackMassProfile(f);
+  const bodyWeight = attackBodyWeightProfile(f);
   if (mass.active <= 0.03) return;
 
-  const supportIndex = mass.footSide < 0 ? 0 : 1;
+  const supportIndex = bodyWeight.footSide < 0 ? 0 : 1;
   const freeIndex = supportIndex === 0 ? 1 : 0;
   const support = feet[supportIndex];
   const free = feet[freeIndex];
-  const press = clamp(mass.plant * 0.72 + mass.load * 0.2, 0, 1);
-  const drive = clamp(mass.drive + mass.snap * 0.4, 0, 1.35);
+  const press = clamp(Math.max(mass.plant * 0.72 + mass.load * 0.2, bodyWeight.plant * 0.76 + bodyWeight.load * 0.18), 0, 1.12);
+  const drive = clamp(Math.max(mass.drive + mass.snap * 0.4, bodyWeight.drive + bodyWeight.follow * 0.18), 0, 1.45);
+  const compression = clamp(bodyWeight.compression + bodyWeight.brace * 0.12, 0, 1.25);
 
   support.press = Math.max(support.press ?? 0, press);
   support.plant = Math.max(support.plant ?? 0, 0.68 + press * 0.28);
-  support.w += press * 4.2;
-  support.h = Math.max(7.5, support.h - press * 1.1);
-  support.y += press * 1.1;
-  support.x -= (f.dir || 1) * drive * 2.4;
-  support.angle += mass.footSide < 0 ? -press * 0.035 : press * 0.035;
+  support.w += press * 4.2 + compression * 1.2;
+  support.h = Math.max(7.3, support.h - press * 1.1 - compression * 0.35);
+  support.y += press * 1.1 + compression * 0.55;
+  support.x -= (f.dir || 1) * (drive * 2.4 + bodyWeight.recoil * 0.6);
+  support.angle += bodyWeight.footSide < 0 ? -press * 0.038 : press * 0.038;
 
   if (free) {
     free.plant = Math.max(0.12, (free.plant ?? 0.7) - drive * 0.16);
-    free.y -= drive * 1.8;
-    free.x += (f.dir || 1) * drive * 2.8;
+    free.y -= drive * 1.8 + bodyWeight.lift * 1.2 - bodyWeight.low * 0.4;
+    free.x += (f.dir || 1) * (drive * 2.8 + bodyWeight.follow * 0.9);
     free.press = Math.max(free.press ?? 0, drive * 0.12);
   }
 }
@@ -6815,6 +6847,7 @@ function drawSpriteAttackFrameWarp(f, image, frameX, crouch) {
   const frame = attackFrameProfile(f);
   if (frame.bandT <= 0.04) return;
   const readability = attackReadabilityProfile(f);
+  const bodyWeight = attackBodyWeightProfile(f);
 
   const zones = {
     arms: { srcY: 74, h: 120, pad: 18, lineY: -132 },
@@ -6824,7 +6857,7 @@ function drawSpriteAttackFrameWarp(f, image, frameX, crouch) {
   const zone = zones[frame.band] ?? zones.torso;
   const localY = -BODY_SPRITE_ANCHOR_Y + zone.srcY + crouch * 0.18;
   const centerY = localY + zone.h * 0.5;
-  const alpha = clamp(0.07 + frame.bandT * 0.13 + readability.snap * 0.035, 0.06, 0.24);
+  const alpha = clamp(0.07 + frame.bandT * 0.13 + readability.snap * 0.035 + bodyWeight.drive * 0.018, 0.06, 0.26);
 
   ctx.save();
   ctx.beginPath();
@@ -6832,9 +6865,12 @@ function drawSpriteAttackFrameWarp(f, image, frameX, crouch) {
   ctx.clip();
   ctx.globalAlpha = alpha;
   ctx.globalCompositeOperation = "source-over";
-  ctx.translate(frame.bandShiftX, centerY + frame.bandShiftY);
-  ctx.rotate(frame.bandRotate);
-  ctx.scale(frame.bandScaleX, frame.bandScaleY);
+  ctx.translate(
+    frame.bandShiftX + bodyWeight.drive * 1.2 - bodyWeight.recoil * 0.7,
+    centerY + frame.bandShiftY + bodyWeight.compression * 1.1 - bodyWeight.lift * 0.65
+  );
+  ctx.rotate(frame.bandRotate + bodyWeight.drive * 0.004 - bodyWeight.recoil * 0.003);
+  ctx.scale(frame.bandScaleX + bodyWeight.drive * 0.01, frame.bandScaleY - bodyWeight.compression * 0.005);
   ctx.translate(0, -centerY);
   ctx.drawImage(
     image,
@@ -8846,6 +8882,66 @@ function attackMassProfile(f) {
   };
 }
 
+function attackBodyWeightProfile(f) {
+  const attack = f?.attack;
+  if (!attack) {
+    return {
+      active: 0,
+      load: 0,
+      drive: 0,
+      follow: 0,
+      recover: 0,
+      plant: 0,
+      brace: 0,
+      compression: 0,
+      lift: 0,
+      low: 0,
+      recoil: 0,
+      footSide: -1,
+      freeSide: 1,
+      grounded: 0,
+    };
+  }
+
+  const phase = attackPhase(attack);
+  const mass = attackMassProfile(f);
+  const spec = attackVisualSpec(attack.type);
+  const motion = characterMotion(f);
+  const grounded = f?.grounded ? 1 : 0.48;
+  const profileMass = f?.profileId === "p1" ? 1.12 : f?.profileId === "p2" ? 0.88 : 1;
+  const recoveryStyle = f?.profileId === "p2" ? 0.86 : f?.profileId === "p1" ? 1.08 : 1;
+  const attackWeight = spec.special ? 1.18 : spec.sweep ? 1.14 : spec.kick ? 1.1 : spec.grab ? 1.04 : 0.94;
+  const launchWeight = spec.sweep ? 0.88 : spec.kick ? 1.08 : spec.special ? 1.02 : 0.96;
+  const load = clamp((mass.load * 0.82 + phase.anticipation * 0.22) * profileMass * attackWeight * grounded, 0, 1.75);
+  const drive = clamp((mass.drive * 0.74 + mass.snap * 0.34) * launchWeight * grounded, 0, 1.95);
+  const follow = clamp((mass.follow * 0.72 + phase.followThrough * 0.32) * profileMass, 0, 1.55);
+  const recover = clamp((mass.recover * 0.82 + phase.recovery * 0.28) * recoveryStyle, 0, 1.65);
+  const brace = clamp((mass.brace * 0.54 + load * 0.68 + recover * 0.16) * grounded, 0, 1.7);
+  const plant = clamp((mass.plant * 0.76 + brace * 0.3 + drive * 0.18) * grounded, 0, 1.9);
+  const compression = clamp((load * 0.5 + plant * 0.34 + recover * 0.14) * (0.92 + motion.crush * 0.08), 0, 1.6);
+  const lift = clamp((Math.max(0, mass.lift) * 0.42 + drive * (spec.kick ? 0.26 : spec.special ? 0.18 : 0.12)) * (0.88 + motion.lift * 0.12), 0, 1.2);
+  const low = clamp(spec.sweep ? drive * 0.68 + load * 0.2 : 0, 0, 1.25);
+  const recoil = clamp(recover * 0.78 + follow * 0.36, 0, 1.55);
+  const footSide = mass.footSide || -1;
+
+  return {
+    active: Math.max(load * 0.84, drive, plant * 0.62, recoil * 0.45),
+    load,
+    drive,
+    follow,
+    recover,
+    plant,
+    brace,
+    compression,
+    lift,
+    low,
+    recoil,
+    footSide,
+    freeSide: -footSide,
+    grounded,
+  };
+}
+
 function attackChainProfile(f, currentType = "") {
   const max = Math.max(1, f?.attackChainMax ?? 1);
   const raw = clamp((f?.attackChainPulse ?? 0) / max, 0, 1);
@@ -9132,6 +9228,7 @@ function getPose(f, stride) {
   const progress = f.attack ? phase.power : 0;
   const attackType = f.attack?.type;
   const attackMass = f.attack ? attackMassProfile(f) : null;
+  const bodyWeight = f.attack ? attackBodyWeightProfile(f) : null;
   const activePulse = phase.strike;
   const windup = phase.anticipation;
   const recovery = phase.recovery;
@@ -9422,6 +9519,44 @@ function getPose(f, stride) {
     base.backLeg.foot.x -= load * 8 * spec.stance + drive * 8 * spec.stance;
     base.backLeg.knee.y += mass.plant * 4.5;
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 0.86);
+  }
+
+  if (bodyWeight && bodyWeight.active > 0.03 && f.grounded) {
+    const supportKey = bodyWeight.footSide < 0 ? "backLeg" : "frontLeg";
+    const freeKey = supportKey === "backLeg" ? "frontLeg" : "backLeg";
+    const support = base[supportKey];
+    const free = base[freeKey];
+    const supportSide = bodyWeight.footSide < 0 ? -1 : 1;
+    const freeSide = -supportSide;
+    const legAttack = attackType === "kick" || attackType === "airKick" || attackType === "sweep";
+    const load = bodyWeight.load;
+    const drive = bodyWeight.drive;
+    const plant = bodyWeight.plant;
+    const recoil = bodyWeight.recoil;
+    const profileBrace = f.profileId === "p1" ? 1.14 : f.profileId === "p2" ? 0.86 : 1;
+    const profileLift = f.profileId === "p2" ? 1.16 : f.profileId === "p1" ? 0.82 : 1;
+
+    base.torsoTilt += (-load * 0.024 + drive * (legAttack ? 0.018 : 0.024) - recoil * 0.014) * profileBrace;
+    support.knee.y += bodyWeight.compression * 4.2 * profileBrace + plant * 2.2 + bodyWeight.low * 2.4;
+    support.foot.y += bodyWeight.compression * 0.6 + plant * 0.55;
+    support.foot.x += supportSide * (load * 5.2 + drive * 3.2 + plant * 2.2 - recoil * 1.4) * spec.stance;
+    support.plant = Math.max(support.plant ?? 0, plant * (f.profileId === "p1" ? 1.04 : 0.92));
+
+    free.knee.x += freeSide * (drive * (legAttack ? 6.8 : 3.2) - load * 1.8 + recoil * 1.5) * spec.stance;
+    free.foot.x += freeSide * (drive * (legAttack ? 9.8 : 4.6) - load * 1.6 + recoil * 1.9) * spec.stance;
+    if (attackType === "sweep") {
+      free.knee.y += bodyWeight.low * 3.2;
+      free.foot.y += bodyWeight.low * 0.55;
+    } else {
+      free.knee.y -= bodyWeight.lift * 2.8 * profileLift;
+      free.foot.y -= bodyWeight.lift * 4.4 * profileLift;
+    }
+    free.plant = Math.max(0.12, (free.plant ?? 0.42) - drive * 0.12);
+
+    base.frontArm.hand.x -= supportSide * (load * 3.8 + recoil * 2.4) * spec.stance;
+    base.backArm.hand.x -= supportSide * (load * 2.6 + drive * 2.2) * spec.stance;
+    base.frontArm.hand.y += bodyWeight.compression * 1.8 - drive * (legAttack ? 2.5 : 1.2);
+    base.backArm.hand.y += bodyWeight.compression * 1.4 - drive * 1.7;
   }
 
   const framePose = attackFrameProfile(f);
