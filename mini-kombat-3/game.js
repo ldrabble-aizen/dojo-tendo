@@ -1749,11 +1749,13 @@ function updateFighter(f, opponent) {
     playSound("jump");
   }
 
-  if (wantSpecial) startSpecial(f);
-  else if (input.grab) startAttack(f, "grab");
-  else if (input.kick && input.block) startAttack(f, "sweep");
-  else if (input.punch) startAttack(f, f.grounded ? "punch" : "airPunch");
-  else if (input.kick) startAttack(f, f.grounded ? "kick" : "airKick");
+  if (cpuEnabled && f.id === cpuFighterId) {
+    if (wantSpecial) startSpecial(f);
+    else if (input.grab) startAttack(f, "grab");
+    else if (input.kick && input.block) startAttack(f, "sweep");
+    else if (input.punch) startAttack(f, f.grounded ? "punch" : "airPunch");
+    else if (input.kick) startAttack(f, f.grounded ? "kick" : "airKick");
+  }
 
   f.x += f.vx;
   f.y += f.vy;
@@ -12435,14 +12437,15 @@ function showOnlineOverlay() {
 window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   if (["arrowleft", "arrowright", "arrowup", "arrowdown", " "].includes(key)) event.preventDefault();
+  const freshPress = !event.repeat && !keys.has(key);
   if (key === "escape") {
     event.preventDefault();
     togglePause();
     return;
   }
   keys.add(key);
-  if (running && koFreeze <= 0 && countdownFrames <= 0) handleActionKey(key);
-  if ((key === "enter" || key === " ") && (!running || paused)) advanceOverlay();
+  if (freshPress && running && koFreeze <= 0 && countdownFrames <= 0) handleActionKey(key);
+  if (freshPress && (key === "enter" || key === " ") && (!running || paused)) advanceOverlay();
 });
 
 window.addEventListener("keyup", (event) => {
