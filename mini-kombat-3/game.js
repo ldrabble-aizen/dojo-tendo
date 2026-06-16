@@ -5352,6 +5352,7 @@ function drawFighter(f) {
   drawFighterRimLight(f, crouch);
   drawMovementPoseFX(f, crouch, walking, stride);
   drawEntrancePoseEffect(f, crouch);
+  if (f.attack) drawAttackAnticipationCue(f, crouch);
   if (f.attack) drawAttackBodyGlow(f, crouch);
   if (f.attack) drawAttackKineticFX(f, crouch, "back");
   if (f.energy >= 45 && f.hurt <= 0) drawEnergyAura(f.trim, crouch);
@@ -5410,6 +5411,100 @@ function drawFighter(f) {
     drawSpeedLines(f, box);
     drawAttackArc(f, box);
   }
+}
+
+function drawAttackAnticipationCue(f, crouch) {
+  if (!f.attack || f.attack.frame >= f.attack.activeStart) return;
+  const phase = attackPhase(f.attack);
+  const prep = phase.anticipation;
+  if (prep <= 0.08) return;
+
+  const spec = attackVisualSpec(f.attack.type);
+  const mass = attackMassProfile(f);
+  const read = attackReadabilityProfile(f);
+  const signature = spec.special ? fighterSignatureStyle(f) : null;
+  const color = signature?.trail ?? spec.color;
+  const core = signature?.core ?? spec.core;
+  const rim = signature?.rim ?? spec.color;
+  const localCrouch = crouch * 0.18;
+  const charge = smoothStep01(clamp((phase.windupT - 0.14) / 0.82, 0, 1));
+  const peak = Math.sin(clamp(phase.windupT, 0, 1) * Math.PI);
+  const release = smoothStep01(clamp((phase.windupT - 0.58) / 0.42, 0, 1));
+  const heavy = spec.heavy || spec.grab;
+  const anchorX = spec.kick || spec.sweep ? 31 : spec.special ? 23 : 38;
+  const anchorY = spec.sweep ? -35 : spec.kick ? -78 : spec.special ? -118 : -121;
+  const loadX = anchorX - (spec.kick ? 25 : spec.sweep ? 36 : spec.special ? 18 : 30) * prep;
+  const loadY = anchorY + localCrouch + (spec.sweep ? 18 * prep : spec.kick ? -8 * prep : spec.special ? -5 * prep : -4 * prep);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  const floorAlpha = clamp(0.04 + mass.plant * 0.07 + prep * 0.035 + charge * 0.035, 0.04, 0.18);
+  ctx.fillStyle = colorWithAlpha(color, floorAlpha);
+  ctx.beginPath();
+  ctx.ellipse(
+    -mass.footSide * 31 - f.dir * release * 5,
+    4 + localCrouch + mass.crush * 0.8,
+    31 + prep * (heavy ? 28 : 19),
+    4.5 + prep * 3.5,
+    -f.dir * release * 0.05,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  ctx.strokeStyle = colorWithAlpha(core, 0.14 + prep * 0.2 + charge * 0.12);
+  ctx.lineWidth = 1.5 + prep * (heavy ? 2.3 : 1.6) + charge * 0.7;
+  ctx.beginPath();
+  ctx.ellipse(loadX, loadY, 11 + prep * (spec.special ? 24 : 15), 6 + prep * (spec.special ? 15 : 9), -0.15, 0, Math.PI * 2);
+  ctx.stroke();
+
+  const glow = ctx.createRadialGradient(loadX, loadY, 2, loadX, loadY, 34 + prep * (heavy ? 40 : 28));
+  glow.addColorStop(0, `rgba(255,255,255,${0.08 + prep * 0.12})`);
+  glow.addColorStop(0.36, colorWithAlpha(rim, 0.08 + prep * 0.16));
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(loadX, loadY, 36 + prep * (heavy ? 38 : 28), 21 + prep * (heavy ? 24 : 16), -0.18, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = colorWithAlpha(color, 0.16 + prep * 0.22);
+  ctx.lineWidth = 1.2 + prep * 1.6;
+  const lanes = spec.special ? 4 : 3;
+  for (let i = 0; i < lanes; i += 1) {
+    const lane = i - (lanes - 1) / 2;
+    const pull = (heavy ? 25 : 18) + prep * (heavy ? 28 : 18);
+    ctx.beginPath();
+    if (spec.sweep) {
+      ctx.moveTo(-55 - prep * 18, -22 + localCrouch + lane * 8);
+      ctx.quadraticCurveTo(2 + lane * 7, -55 + localCrouch - prep * 8, loadX + 40 + prep * 18, loadY + lane * 4);
+    } else if (spec.kick) {
+      ctx.moveTo(loadX - pull, loadY + lane * 9);
+      ctx.quadraticCurveTo(loadX - 8, loadY - 33 - prep * 12, loadX + 44 + prep * 10, loadY - 6 + lane * 7);
+    } else if (spec.special) {
+      ctx.moveTo(loadX - 28 - prep * 8, loadY + lane * 9);
+      ctx.bezierCurveTo(loadX - 4, loadY - 34 - lane * 5, loadX + 34 + prep * 16, loadY - 12 + lane * 6, loadX + 54 + prep * 18, loadY + lane * 8);
+    } else {
+      ctx.moveTo(loadX - pull, loadY + lane * 8);
+      ctx.quadraticCurveTo(loadX - 6, loadY - 28 - prep * 9, loadX + 42 + prep * 13, loadY + lane * 4);
+    }
+    ctx.stroke();
+  }
+
+  if (release > 0.18) {
+    ctx.strokeStyle = colorWithAlpha("#ffffff", 0.18 + release * 0.42);
+    ctx.lineWidth = 1.4 + read.clarity * 1.2;
+    ctx.beginPath();
+    ctx.moveTo(loadX - 8, loadY - 4);
+    ctx.lineTo(loadX + 17 + release * 16, loadY - 8 + peak * 3);
+    ctx.moveTo(loadX - 5, loadY + 7);
+    ctx.lineTo(loadX + 13 + release * 13, loadY + 9 + peak * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 
 function drawEnergyAura(color, crouch) {
