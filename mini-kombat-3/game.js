@@ -1843,6 +1843,11 @@ function updateFighter(f, opponent) {
       const endedType = f.attack.type;
       const timing = attackTiming(endedType);
       f.attackRecoverPulse = Math.max(f.attackRecoverPulse ?? 0, timing.recover);
+      const recoveryCooldown = Math.max(
+        4,
+        Math.round(timing.recover * (endedType === "special" ? 0.62 : endedType === "kick" || endedType === "airKick" || endedType === "sweep" ? 0.54 : 0.48))
+      );
+      f.cooldown = Math.max(f.cooldown ?? 0, recoveryCooldown);
       f.lastAttackType = endedType;
       f.attackChainFrom = endedType;
       f.attack = null;
@@ -2015,9 +2020,9 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
     return {
       flash: 3,
       shake: 4,
-      hitStop: 2,
+      hitStop: 3,
       cameraPulse: 7,
-      cameraStrength: 0.48,
+      cameraStrength: 0.52,
       cinematic: true,
       specialFx: false,
       cinematicPulse: 6,
@@ -2032,10 +2037,10 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
 
   const profile = {
     flash: 5,
-    shake: 6,
-    hitStop: 3,
-    cameraPulse: 9,
-    cameraStrength: impactStrength,
+    shake: 7,
+    hitStop: 4,
+    cameraPulse: 10,
+    cameraStrength: Math.max(0.86, impactStrength),
     cinematic: true,
     specialFx: false,
     cinematicPulse: 7,
@@ -2050,9 +2055,9 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
   if (heavyImpact || kick || sweep || grab) {
     profile.flash = 9;
     profile.shake = 9;
-    profile.hitStop = 5;
-    profile.cameraPulse = 12;
-    profile.cameraStrength = Math.max(1.04, impactStrength);
+    profile.hitStop = 6;
+    profile.cameraPulse = 13;
+    profile.cameraStrength = Math.max(1.16, impactStrength);
     profile.cinematicPulse = 11;
     profile.cinematicStrength = grab ? 1.12 : sweep ? 1.02 : 1.04;
     profile.zoom = grab ? 0.034 : sweep ? 0.028 : 0.032;
@@ -2066,9 +2071,9 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
   if (projectile) {
     profile.flash = 11;
     profile.shake = 10;
-    profile.hitStop = 7;
-    profile.cameraPulse = 15;
-    profile.cameraStrength = Math.max(1.22, impactStrength);
+    profile.hitStop = 8;
+    profile.cameraPulse = 16;
+    profile.cameraStrength = Math.max(1.32, impactStrength);
     profile.cinematicPulse = 15;
     profile.cinematicStrength = 1.28;
     profile.zoom = 0.038;
@@ -2082,9 +2087,9 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
   if (counter) {
     profile.flash = 12;
     profile.shake = 12;
-    profile.hitStop = 7;
-    profile.cameraPulse = 15;
-    profile.cameraStrength = 1.34;
+    profile.hitStop = 8;
+    profile.cameraPulse = 16;
+    profile.cameraStrength = 1.46;
     profile.cinematicPulse = 16;
     profile.cinematicStrength = 1.42;
     profile.zoom = 0.044;
@@ -2098,9 +2103,9 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
   if (finishingHit) {
     profile.flash = 14;
     profile.shake = 15;
-    profile.hitStop = 9;
-    profile.cameraPulse = 18;
-    profile.cameraStrength = 1.62;
+    profile.hitStop = 10;
+    profile.cameraPulse = 19;
+    profile.cameraStrength = 1.74;
     profile.cinematicPulse = 20;
     profile.cinematicStrength = 1.68;
     profile.zoom = 0.056;
@@ -2324,7 +2329,10 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
     attacker.impactLift = 0.22;
     attacker.impactStrength = Math.max(attacker.impactStrength ?? 0, blocked ? 0.25 : 0.4);
     triggerDynamicLight(attacker, visual.core, "torso", impactDir, blocked ? 0.22 : 0.38, blocked ? 7 : 10);
-    attacker.vx -= impactDir * (blocked ? 0.35 : 0.18);
+    attacker.vx -= impactDir * (blocked ? 0.56 : heavyImpact || projectile ? 0.34 : 0.24);
+    attacker.bracePulse = Math.max(attacker.bracePulse ?? 0, blocked ? 9 : heavyImpact || projectile ? 8 : 6);
+    attacker.footPlantPulse = Math.max(attacker.footPlantPulse ?? 0, blocked ? 8 : 6);
+    attacker.attackRecoverPulse = Math.max(attacker.attackRecoverPulse ?? 0, blocked ? 9 : heavyImpact || projectile ? 10 : 7);
   }
   if (blocked) target.counterWindow = 34;
   if (counter && attacker) attacker.counterWindow = 0;
