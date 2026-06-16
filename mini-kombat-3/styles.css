@@ -425,6 +425,11 @@ canvas {
   color: rgba(236, 248, 255, 0.48);
 }
 
+.online-link-block textarea {
+  min-height: 56px;
+  font-size: 12px;
+}
+
 .online-code-block button {
   justify-self: end;
   min-height: 36px;

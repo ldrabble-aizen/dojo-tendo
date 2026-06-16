@@ -53,6 +53,7 @@ const ONLINE_ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
 ];
+const PEERJS_CDN_URL = "https://unpkg.com/peerjs@1/dist/peerjs.min.js";
 const faces = {
   p1: loadImage("assets/fighter-1-face.png"),
   p2: loadImage("assets/fighter-2-face.png"),
@@ -115,11 +116,16 @@ const onlineState = {
   localSide: "",
   remoteSide: "",
   pc: null,
+  peer: null,
   channel: null,
   connected: false,
   status: "Sin conexion online.",
   offerCode: "",
   answerCode: "",
+  inviteLink: "",
+  roomId: "",
+  manualVisible: false,
+  signaling: "",
   lastInputPayload: "",
   lastSnapshotFrame: -1,
   snapshotTick: 0,
@@ -1337,7 +1343,7 @@ function normalizeInput(input = {}) {
 }
 
 function onlineConnected() {
-  return onlineState.connected && onlineState.channel?.readyState === "open";
+  return onlineState.connected && onlineChannelIsOpen();
 }
 
 function onlineHostActive() {
@@ -12773,6 +12779,37 @@ function decodeOnlineSignal(code) {
   return JSON.parse(atob(padded));
 }
 
+function makeRoomId() {
+  const random = Math.random().toString(36).slice(2, 8);
+  return `mk3-${Date.now().toString(36).slice(-5)}-${random}`;
+}
+
+function buildInviteLink(roomId) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("room", roomId);
+  return url.toString();
+}
+
+function loadPeerJs() {
+  if (window.Peer) return Promise.resolve(window.Peer);
+  if (loadPeerJs.promise) return loadPeerJs.promise;
+  loadPeerJs.promise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = PEERJS_CDN_URL;
+    script.async = true;
+    script.onload = () => window.Peer ? resolve(window.Peer) : reject(new Error("PeerJS no quedo disponible."));
+    script.onerror = () => reject(new Error("No pude cargar el conector online gratuito."));
+    document.head.append(script);
+  });
+  return loadPeerJs.promise;
+}
+
+function onlineChannelIsOpen(channel = onlineState.channel) {
+  if (!channel) return false;
+  if (channel.readyState) return channel.readyState === "open";
+  return Boolean(channel.open);
+}
+
 function setOnlineStatus(status) {
   onlineState.status = status;
   syncOnlineButtons();
@@ -12804,10 +12841,17 @@ function resetOnlineConnection(keepCodes = false) {
     onlineState.pc.oniceconnectionstatechange = null;
     try { onlineState.pc.close(); } catch {}
   }
+  if (onlineState.peer) {
+    onlineState.peer.off?.("open");
+    onlineState.peer.off?.("connection");
+    onlineState.peer.off?.("error");
+    try { onlineState.peer.destroy(); } catch {}
+  }
   onlineState.role = "";
   onlineState.localSide = "";
   onlineState.remoteSide = "";
   onlineState.pc = null;
+  onlineState.peer = null;
   onlineState.channel = null;
   onlineState.connected = false;
   onlineState.lastInputPayload = "";
@@ -12817,7 +12861,10 @@ function resetOnlineConnection(keepCodes = false) {
   if (!keepCodes) {
     onlineState.offerCode = "";
     onlineState.answerCode = "";
+    onlineState.inviteLink = "";
+    onlineState.roomId = "";
   }
+  onlineState.signaling = "";
   setOnlineStatus("Sin conexion online.");
 }
 
@@ -12855,22 +12902,24 @@ function waitForIceGathering(pc) {
   });
 }
 
+function handleOnlineChannelOpen() {
+  onlineState.connected = true;
+  onlineState.remoteInput = emptyInput();
+  setCpuMode(false);
+  setOnlineStatus(onlineState.role === "host"
+    ? "Invitado conectado. Ya podés iniciar la pelea online."
+    : "Conectado. Esperando que el anfitrion inicie la pelea.");
+  if (onlineState.role === "host") {
+    sendOnlineSetup();
+    sendOnlineSnapshot(true);
+  } else {
+    sendLocalOnlineInput(true);
+  }
+}
+
 function setupOnlineChannel(channel) {
   onlineState.channel = channel;
-  channel.onopen = () => {
-    onlineState.connected = true;
-    onlineState.remoteInput = emptyInput();
-    setCpuMode(false);
-    setOnlineStatus(onlineState.role === "host"
-      ? "Invitado conectado. Ya podés iniciar la pelea online."
-      : "Conectado. Esperando que el anfitrion inicie la pelea.");
-    if (onlineState.role === "host") {
-      sendOnlineSetup();
-      sendOnlineSnapshot(true);
-    } else {
-      sendLocalOnlineInput(true);
-    }
-  };
+  channel.onopen = handleOnlineChannelOpen;
   channel.onmessage = (event) => {
     try {
       handleOnlineMessage(JSON.parse(event.data));
@@ -12886,6 +12935,101 @@ function setupOnlineChannel(channel) {
     onlineState.connected = false;
     setOnlineStatus("Hubo un error en la conexion online.");
   };
+}
+
+function setupOnlinePeerChannel(connection) {
+  onlineState.channel = connection;
+  connection.on("open", handleOnlineChannelOpen);
+  connection.on("data", (data) => {
+    try {
+      handleOnlineMessage(typeof data === "string" ? JSON.parse(data) : data);
+    } catch {
+      setOnlineStatus("Llego un mensaje online que no se pudo leer.");
+    }
+  });
+  connection.on("close", () => {
+    onlineState.connected = false;
+    setOnlineStatus("La conexion online se cerro.");
+  });
+  connection.on("error", () => {
+    onlineState.connected = false;
+    setOnlineStatus("Hubo un error en la conexion online.");
+  });
+}
+
+async function createOnlineInviteLink() {
+  if (!onlineSupported()) {
+    setOnlineStatus("Este navegador no soporta WebRTC.");
+    return;
+  }
+  try {
+    resetOnlineConnection();
+    setCpuMode(false);
+    onlineState.role = "host";
+    onlineState.localSide = "left";
+    onlineState.remoteSide = "right";
+    onlineState.signaling = "link";
+    onlineState.roomId = makeRoomId();
+    onlineState.inviteLink = buildInviteLink(onlineState.roomId);
+    onlineState.remoteInput = emptyInput();
+    setOnlineStatus("Creando link online...");
+    const Peer = await loadPeerJs();
+    onlineState.peer = new Peer(onlineState.roomId, { debug: 0 });
+    onlineState.peer.on("open", () => {
+      setOnlineStatus("Link listo. Compartilo con el invitado.");
+    });
+    onlineState.peer.on("connection", (connection) => {
+      setupOnlinePeerChannel(connection);
+    });
+    onlineState.peer.on("error", (error) => {
+      resetOnlineConnection(true);
+      onlineState.manualVisible = true;
+      setOnlineStatus(`No pude abrir la sala automatica: ${error.message}`);
+    });
+    renderOnlinePanel();
+  } catch (error) {
+    resetOnlineConnection(true);
+    onlineState.manualVisible = true;
+    setOnlineStatus(`${error.message} Usá el modo manual como respaldo.`);
+  }
+}
+
+async function joinOnlineInviteRoom(roomId) {
+  if (!onlineSupported()) {
+    setOnlineStatus("Este navegador no soporta WebRTC.");
+    return;
+  }
+  if (!roomId) {
+    setOnlineStatus("No encontre la sala online en el link.");
+    return;
+  }
+  try {
+    resetOnlineConnection(true);
+    setCpuMode(false);
+    onlineState.role = "guest";
+    onlineState.localSide = "right";
+    onlineState.remoteSide = "left";
+    onlineState.signaling = "link";
+    onlineState.roomId = roomId;
+    onlineState.inviteLink = buildInviteLink(roomId);
+    setOnlineStatus("Uniendote a la sala online...");
+    const Peer = await loadPeerJs();
+    onlineState.peer = new Peer(undefined, { debug: 0 });
+    onlineState.peer.on("open", () => {
+      const connection = onlineState.peer.connect(roomId, { reliable: true });
+      setupOnlinePeerChannel(connection);
+      setOnlineStatus("Conectando con el anfitrion...");
+    });
+    onlineState.peer.on("error", (error) => {
+      resetOnlineConnection(true);
+      onlineState.manualVisible = true;
+      setOnlineStatus(`No pude unirme automaticamente: ${error.message}`);
+    });
+    renderOnlinePanel();
+  } catch (error) {
+    resetOnlineConnection(true);
+    setOnlineStatus(`${error.message} Pedile al anfitrion usar el modo manual.`);
+  }
 }
 
 async function createOnlineRoom() {
@@ -12963,9 +13107,10 @@ async function acceptOnlineAnswer(code) {
 }
 
 function sendOnlineMessage(message) {
-  if (!onlineState.channel || onlineState.channel.readyState !== "open") return false;
+  if (!onlineChannelIsOpen()) return false;
   try {
-    onlineState.channel.send(JSON.stringify(message));
+    if (onlineState.channel.readyState) onlineState.channel.send(JSON.stringify(message));
+    else onlineState.channel.send(message);
     return true;
   } catch {
     onlineState.connected = false;
@@ -13227,6 +13372,27 @@ function copyOnlineCode(code) {
     .catch(() => setOnlineStatus("No pude copiarlo automaticamente. Seleccionalo y copialo manualmente."));
 }
 
+async function shareOnlineInviteLink() {
+  if (!onlineState.inviteLink) {
+    setOnlineStatus("Todavia no hay link para compartir.");
+    return;
+  }
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "Mini Kombat III Online",
+        text: "Unite a mi pelea de Mini Kombat III.",
+        url: onlineState.inviteLink,
+      });
+      setOnlineStatus("Link compartido. Esperando invitado...");
+      return;
+    } catch {
+      setOnlineStatus("No se compartio el link. Podés copiarlo.");
+    }
+  }
+  copyOnlineCode(onlineState.inviteLink);
+}
+
 function renderOnlinePanel() {
   fighterSelect.innerHTML = "";
   fighterSelect.classList.remove("versus-panel");
@@ -13249,14 +13415,31 @@ function renderOnlinePanel() {
 
   const actions = document.createElement("div");
   actions.className = "online-action-grid";
-  actions.append(
-    makeOnlineButton("CREAR SALA", "", () => createOnlineRoom()),
-    makeOnlineButton("UNIRME", "", () => {
-      const code = document.querySelector("#online-offer-input")?.value ?? "";
-      joinOnlineRoom(code);
-    }),
-  );
-  if (onlineState.role === "host" && onlineState.offerCode && !onlineConnected()) {
+  if (!onlineState.role) {
+    actions.append(makeOnlineButton("CREAR LINK", "primary-online", () => createOnlineInviteLink()));
+  }
+  if (onlineState.inviteLink && onlineState.role === "host" && !onlineConnected()) {
+    actions.append(
+      makeOnlineButton("COMPARTIR LINK", "primary-online", shareOnlineInviteLink),
+      makeOnlineButton("COPIAR LINK", "", () => copyOnlineCode(onlineState.inviteLink)),
+    );
+  }
+  if (!onlineState.role || onlineState.manualVisible) {
+    actions.append(makeOnlineButton(onlineState.manualVisible ? "OCULTAR CODIGOS" : "USAR CODIGOS", "", () => {
+      onlineState.manualVisible = !onlineState.manualVisible;
+      renderOnlinePanel();
+    }));
+  }
+  if (onlineState.manualVisible) {
+    actions.append(
+      makeOnlineButton("CREAR SALA MANUAL", "", () => createOnlineRoom()),
+      makeOnlineButton("UNIRME CON CODIGO", "", () => {
+        const code = document.querySelector("#online-offer-input")?.value ?? "";
+        joinOnlineRoom(code);
+      }),
+    );
+  }
+  if (onlineState.role === "host" && onlineState.offerCode && !onlineConnected() && onlineState.manualVisible) {
     actions.append(makeOnlineButton("CONECTAR RESPUESTA", "", () => {
       const code = document.querySelector("#online-answer-input")?.value ?? "";
       acceptOnlineAnswer(code);
@@ -13266,7 +13449,17 @@ function renderOnlinePanel() {
   if (onlineState.role || onlineConnected()) actions.append(makeOnlineButton("CORTAR", "danger-online", () => resetOnlineConnection()));
   panel.append(actions);
 
-  if (onlineState.role !== "guest") {
+  if (onlineState.inviteLink && onlineState.role === "host") {
+    const linkWrap = document.createElement("label");
+    linkWrap.className = "online-code-block online-link-block";
+    linkWrap.append(document.createElement("span"));
+    linkWrap.querySelector("span").textContent = "Link para enviar al invitado";
+    const linkInput = makeOnlineTextarea("online-invite-link", onlineState.inviteLink, "Link de invitacion online.", true);
+    linkWrap.append(linkInput);
+    panel.append(linkWrap);
+  }
+
+  if (onlineState.manualVisible && onlineState.role !== "guest") {
     const offerWrap = document.createElement("label");
     offerWrap.className = "online-code-block";
     offerWrap.append(document.createElement("span"));
@@ -13276,7 +13469,7 @@ function renderOnlinePanel() {
     panel.append(offerWrap);
   }
 
-  if (onlineState.role !== "guest" || onlineState.answerCode) {
+  if (onlineState.manualVisible && (onlineState.role !== "guest" || onlineState.answerCode)) {
     const answerWrap = document.createElement("label");
     answerWrap.className = "online-code-block";
     answerWrap.append(document.createElement("span"));
@@ -13288,7 +13481,9 @@ function renderOnlinePanel() {
 
   const note = document.createElement("p");
   note.className = "online-note";
-  note.textContent = "Flujo: el anfitrion crea sala, manda codigo; el invitado pega ese codigo, genera respuesta y se la manda al anfitrion.";
+  note.textContent = onlineState.manualVisible
+    ? "Modo respaldo: usa los codigos largos si el link automatico no conecta en una red estricta."
+    : "Flujo recomendado: crea el link, compartilo por WhatsApp o mensaje y espera a que el invitado entre.";
   panel.append(note);
   fighterSelect.append(panel);
 }
@@ -13299,13 +13494,26 @@ function showOnlineOverlay() {
   paused = running && !winner;
   overlay.querySelector("h1").textContent = "Online";
   overlayCopy.textContent =
-    "Crea una sala o unite con codigo. El anfitrion controla izquierda y el invitado controla derecha.";
+    "Crea un link, compartilo con el invitado y la conexion se arma sola. El anfitrion controla izquierda y el invitado derecha.";
   fighterSelect.classList.remove("hidden");
   renderOnlinePanel();
   startButton.textContent = onlineHostActive() ? "INICIAR ONLINE" : paused ? "SEGUIR" : "VOLVER";
   overlay.classList.remove("hidden");
   syncShellState();
   syncOnlineButtons();
+}
+
+function onlineRoomFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const room = params.get("room");
+  return room && /^mk3-[a-z0-9-]+$/iu.test(room) ? room : "";
+}
+
+function maybeAutoJoinOnlineFromUrl() {
+  const room = onlineRoomFromUrl();
+  if (!room) return;
+  showOnlineOverlay();
+  joinOnlineInviteRoom(room);
 }
 
 window.addEventListener("keydown", (event) => {
@@ -13515,4 +13723,5 @@ setTournamentMode(tournamentMode);
 setDifficulty(cpuDifficulty);
 setSound(soundEnabled);
 showHomeOverlay();
+maybeAutoJoinOnlineFromUrl();
 requestAnimationFrame(loop);
