@@ -46,6 +46,8 @@ const touchInput = {
 const projectiles = [];
 const MAX_PARTICLES = 280;
 const MOBILE_MAX_PARTICLES = 155;
+const GUARD_IMPACT_FRAMES = 18;
+const COUNTER_WINDOW_FRAMES = 42;
 const faces = {
   p1: loadImage("assets/fighter-1-face.png"),
   p2: loadImage("assets/fighter-2-face.png"),
@@ -2314,8 +2316,12 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
     target.koFallDir = impactDir;
     target.koFallStrength = impactStrength;
   }
-  const guardImpactMax = Math.round((heavyImpact || projectile ? 16 : 13) * targetGuard.recoil);
+  const guardImpactMax = Math.round((heavyImpact || projectile ? 21 : 17) * targetGuard.recoil);
   target.guardImpact = blocked ? Math.max(target.guardImpact ?? 0, guardImpactMax) : 0;
+  if (blocked) {
+    target.guardEntryPulse = Math.max(target.guardEntryPulse ?? 0, 10);
+    target.bracePulse = Math.max(target.bracePulse ?? 0, heavyImpact || projectile ? 14 : 11);
+  }
   if (!blocked && target.health < 32) {
     target.staggerPulse = Math.max(target.staggerPulse ?? 0, heavyImpact || projectile ? 18 : 13);
   }
@@ -2334,7 +2340,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
     attacker.footPlantPulse = Math.max(attacker.footPlantPulse ?? 0, blocked ? 8 : 6);
     attacker.attackRecoverPulse = Math.max(attacker.attackRecoverPulse ?? 0, blocked ? 9 : heavyImpact || projectile ? 10 : 7);
   }
-  if (blocked) target.counterWindow = 34;
+  if (blocked) target.counterWindow = heavyImpact || projectile ? COUNTER_WINDOW_FRAMES + 6 : COUNTER_WINDOW_FRAMES;
   if (counter && attacker) attacker.counterWindow = 0;
   flash = Math.max(flash, cinematic.flash);
   shake = Math.max(shake, cinematic.shake);
@@ -2377,6 +2383,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   contactFlashBurst(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   cinematicImpact(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   premiumImpactFX(impactX, impactY, target, impactColor, impactDir, blocked, heavyImpact, counter, projectile);
+  if (blocked) guardClashFX(impactX, impactY, target, impactColor, impactDir, heavyImpact, projectile);
   typedImpactFX(impactX, impactY, target, visual, impactDir, hitZone, blocked, counter);
   if (cinematicHit) cinematicSpecialImpactFX(impactX, impactY, target, attacker, projectileInfo, impactColor, impactDir, finishingHit, projectile, counter);
   signatureImpactFX(impactX, impactY, target, visual, impactDir, hitZone, blocked, counter, projectile, finishingHit);
@@ -2467,6 +2474,91 @@ function contactFlashBurst(x, y, color, dir, blocked, heavyImpact, counter) {
       color,
       strength,
       kind: "hitShard",
+    });
+  }
+}
+
+function guardClashFX(x, y, target, color, dir, heavyImpact, projectile) {
+  const guardProfile = characterGuard(target);
+  const strong = heavyImpact || projectile;
+  const baseAngle = dir > 0 ? 0 : Math.PI;
+  const plateCount = fxCount(strong ? 2 : 1, 1);
+
+  for (let i = 0; i < plateCount; i += 1) {
+    particles.push({
+      x: x - dir * (9 + i * 5),
+      y: y + (i - (plateCount - 1) / 2) * 18,
+      vx: dir * 0.08,
+      vy: 0,
+      angle: baseAngle,
+      life: Math.round((strong ? 18 : 15) * guardProfile.recoil),
+      maxLife: Math.round((strong ? 18 : 15) * guardProfile.recoil),
+      size: (strong ? 43 : 35) * guardProfile.shieldScale,
+      color: guardProfile.color,
+      kind: "guardPlate",
+    });
+  }
+
+  particles.push({
+    x: x - dir * 10,
+    y,
+    vx: 0,
+    vy: 0,
+    angle: baseAngle,
+    life: strong ? 16 : 13,
+    maxLife: strong ? 16 : 13,
+    size: (strong ? 22 : 17) * guardProfile.shieldScale,
+    growth: (strong ? 2.3 : 1.8) * guardProfile.shieldWidth,
+    color: guardProfile.color,
+    kind: "ring",
+  });
+
+  particles.push({
+    x: x - dir * 13,
+    y: y + 1,
+    vx: 0,
+    vy: 0,
+    angle: baseAngle,
+    life: strong ? 14 : 11,
+    maxLife: strong ? 14 : 11,
+    size: (strong ? 36 : 30) * guardProfile.shieldScale,
+    growth: strong ? 1.9 : 1.55,
+    color,
+    kind: "airRipple",
+  });
+
+  const sparkCount = fxCount(strong ? Math.round(7 * guardProfile.spark) : Math.round(5 * guardProfile.spark), 2);
+  const spread = (strong ? 0.72 : 0.54) * guardProfile.arc;
+  for (let i = 0; i < sparkCount; i += 1) {
+    const lane = sparkCount === 1 ? 0 : i / (sparkCount - 1) - 0.5;
+    const angle = baseAngle + lane * spread + (Math.random() - 0.5) * 0.08;
+    particles.push({
+      x: x - dir * (12 + Math.random() * 5),
+      y: y + lane * 34,
+      vx: Math.cos(angle) * (0.38 + Math.random() * 0.3),
+      vy: Math.sin(angle) * 0.36 - 0.08,
+      angle,
+      length: (strong ? 42 : 31) * guardProfile.shieldWidth * (0.82 + Math.random() * 0.35),
+      life: strong ? 14 + Math.random() * 5 : 11 + Math.random() * 4,
+      maxLife: strong ? 16 : 13,
+      size: (strong ? 3.1 : 2.4) * guardProfile.spark,
+      color: lane > 0.28 ? "#fff1bd" : guardProfile.color,
+      kind: "impactNeedle",
+    });
+  }
+
+  const glints = fxCount(strong ? 3 : 2, 1);
+  for (let i = 0; i < glints; i += 1) {
+    particles.push({
+      x: x - dir * (8 + Math.random() * 8),
+      y: y - 14 + Math.random() * 28,
+      vx: -dir * (0.08 + Math.random() * 0.22),
+      vy: -0.35 - Math.random() * 0.55,
+      life: 9 + Math.random() * 5,
+      maxLife: 12,
+      size: strong ? 5.4 : 4.2,
+      color: "#fff1bd",
+      kind: "glint",
     });
   }
 }
@@ -4938,7 +5030,7 @@ function fighterTransitionMotion(f, walking) {
     const guardProfile = characterGuard(f);
     const pulse = 0.5 + Math.sin(roundFrame * 0.58) * 0.5;
     const guard = clamp((f.guardPulse ?? 0) / 18, 0, 1);
-    const guardHit = clamp((f.guardImpact ?? 0) / 16, 0, 1);
+    const guardHit = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
     motion.x -= dir * (1.65 * guardProfile.brace + pulse * 0.72 + guard * 1.15 * guardProfile.brace + guardHit * 5.6 * guardProfile.recoil);
     motion.y += (1.05 + pulse * 0.42 + guard * 0.8) * guardProfile.crouch + guardHit * 2.7 * guardProfile.recoil;
     motion.rotation -= dir * (0.014 * guardProfile.brace + pulse * 0.004 + guard * 0.012 * guardProfile.brace + guardHit * 0.044 * guardProfile.recoil);
@@ -4947,7 +5039,7 @@ function fighterTransitionMotion(f, walking) {
     motion.afterimage = Math.max(motion.afterimage, guardHit * 0.09 * guardProfile.spark);
   }
 
-  const counterReady = clamp((f.counterWindow ?? 0) / 34, 0, 1);
+  const counterReady = clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
   if (counterReady > 0.03 && f.hurt <= 0 && !f.attack && !winner) {
     const guardProfile = characterGuard(f);
     const coil = Math.sin((1 - counterReady) * Math.PI);
@@ -5573,7 +5665,7 @@ function drawFighterStageLighting(f, crouch) {
 function dynamicLightProfile(f) {
   const raw = clamp((f.dynamicLightPulse ?? 0) / Math.max(1, f.dynamicLightMax ?? 1), 0, 1);
   const hitLight = smoothStep01(raw) * clamp(f.dynamicLightStrength ?? 0, 0, 1.5);
-  const guard = clamp((f.guardImpact ?? 0) / 16, 0, 1);
+  const guard = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
   const specialPhase = f.attack?.type === "special" ? attackPhase(f.attack) : null;
   const special = specialPhase ? Math.max(specialPhase.anticipation * 0.7, specialPhase.strike, specialPhase.snap) : 0;
   let active = hitLight;
@@ -6291,7 +6383,7 @@ function drawSpriteLayeredContactShadows(f, crouch, frameName, stride) {
   const action = f.attack ? Math.max(phase.strike, phase.snap, phase.followThrough * 0.5) : 0;
   const prep = f.attack ? phase.anticipation : 0;
   const guard = f.blocking || frameName === "block" ? clamp(Math.max((f.guardPulse ?? 0) / 18, 0.58), 0, 1) : 0;
-  const guardHit = clamp((f.guardImpact ?? 0) / 16, 0, 1);
+  const guardHit = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
   const hurt = clamp((f.hurt ?? 0) / 24, 0, 1);
   const hit = impact.t > 0.035 && f.hitZone !== "guard" ? Math.max(impact.snap, reaction.snap * 0.5) : 0;
   const breath = Math.sin(roundFrame * 0.055 + f.x * 0.012);
@@ -6772,8 +6864,8 @@ function drawSpriteFootDetail(foot, shoe, trim) {
 
 function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
   const guard = f.blocking ? clamp((f.guardPulse ?? 0) / 18, 0, 1) : 0;
-  const impact = clamp((f.guardImpact ?? 0) / 16, 0, 1);
-  const counter = clamp((f.counterWindow ?? 0) / 34, 0, 1);
+  const impact = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
+  const counter = clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
   const active = Math.max(guard, impact, counter * 0.84);
   if (active <= 0.04 || f.attack || f.hurt > 0 || winner) return;
 
@@ -7409,7 +7501,7 @@ function secondaryMotionProfile(f, stride = 0) {
   const attackPrep = f.attack ? phase.anticipation : 0;
   const special = type === "special" ? Math.max(phase.anticipation * 0.7, phase.strike, phase.snap) : 0;
   const guard = f.blocking ? clamp((f.guardPulse ?? 0) / 18, 0, 1) : 0;
-  const guardHit = clamp((f.guardImpact ?? 0) / 16, 0, 1);
+  const guardHit = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
   const hurt = clamp((f.hurt ?? 0) / 24, 0, 1);
   const air = f.grounded ? 0 : 1;
   const land = clamp((f.landingPulse ?? 0) / 16, 0, 1);
@@ -9273,7 +9365,7 @@ function headActingProfile(f, stride = 0) {
         ? localizedImpact.rebound * 0.14
         : 0;
   const guard = f.blocking ? clamp((f.guardPulse ?? 0) / 18, 0, 1) : 0;
-  const guardHit = clamp((f.guardImpact ?? 0) / 16, 0, 1);
+  const guardHit = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
   const specialFocus = type === "special" ? Math.max(phase.anticipation * 0.8, phase.strike, phase.snap) : 0;
   const kickFocus = type === "kick" || type === "airKick" || type === "sweep" ? attackDrive : 0;
   const hurtSquint = clamp((f.hurt ?? 0) / 26, 0, 1);
@@ -9464,7 +9556,7 @@ function getPose(f, stride) {
   const guardExitT = clamp((f.guardExitPulse ?? 0) / 10, 0, 1);
   const hurtRecoverT = clamp((f.hurtRecoverPulse ?? 0) / 14, 0, 1);
   const moveTurnT = clamp((f.moveTurnPulse ?? 0) / 10, 0, 1);
-  const counterReadyT = clamp((f.counterWindow ?? 0) / 34, 0, 1);
+  const counterReadyT = clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
 
   if (f.blocking) {
     if (f.profileId === "p1") {
@@ -11504,8 +11596,8 @@ function drawGiFolds(f, shoulder, waist, crouch) {
 function drawGuard(color, crouch, f) {
   const guardProfile = characterGuard(f);
   const guard = clamp((f?.guardPulse ?? 0) / 18, 0, 1);
-  const impact = clamp((f?.guardImpact ?? 0) / 16, 0, 1);
-  const counter = clamp((f?.counterWindow ?? 0) / 34, 0, 1);
+  const impact = clamp((f?.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
+  const counter = clamp((f?.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
   const pulse = 0.5 + Math.sin(roundFrame * 0.32) * 0.5;
   const centerX = 22 + impact * 5 * guardProfile.recoil + (f?.profileId === "p2" ? 4 : f?.profileId === "p1" ? -2 : 0);
   const centerY = -106 + crouch + impact * 2 * guardProfile.recoil + (f?.profileId === "p2" ? -4 : f?.profileId === "p1" ? 1 : 0);
@@ -11517,31 +11609,31 @@ function drawGuard(color, crouch, f) {
   ctx.save();
   ctx.globalCompositeOperation = "screen";
 
-  const glow = ctx.createRadialGradient(centerX, centerY, 4, centerX, centerY, radius + 32);
-  glow.addColorStop(0, colorWithAlpha(color, (0.16 + impact * 0.16 + counter * 0.08) * guardProfile.shieldAlpha));
-  glow.addColorStop(0.48, colorWithAlpha(guardColor, 0.08 * guardProfile.shieldAlpha));
+  const glow = ctx.createRadialGradient(centerX, centerY, 4, centerX, centerY, radius + 36);
+  glow.addColorStop(0, colorWithAlpha(color, (0.18 + impact * 0.2 + counter * 0.14) * guardProfile.shieldAlpha));
+  glow.addColorStop(0.42, colorWithAlpha(counter > 0.05 ? "#fff1bd" : guardColor, (0.08 + counter * 0.04) * guardProfile.shieldAlpha));
   glow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(centerX, centerY, radius + 22 * guardProfile.shieldWidth, radius + 34, -0.08, 0, Math.PI * 2);
+  ctx.ellipse(centerX, centerY, radius + 24 * guardProfile.shieldWidth, radius + 38, -0.08, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = colorWithAlpha(color, (0.48 + guard * 0.2 + impact * 0.22) * guardProfile.shieldAlpha);
-  ctx.lineWidth = (4.2 + impact * 3 * guardProfile.recoil) * guardProfile.shieldWidth;
+  ctx.strokeStyle = colorWithAlpha(color, (0.5 + guard * 0.22 + impact * 0.3 + counter * 0.08) * guardProfile.shieldAlpha);
+  ctx.lineWidth = (4.4 + impact * 3.8 * guardProfile.recoil + counter * 0.7) * guardProfile.shieldWidth;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.arc(centerX, centerY, radius, arcStart, arcEnd);
   ctx.stroke();
 
-  ctx.strokeStyle = `rgba(255,255,255,${(0.36 + impact * 0.32 + counter * 0.2) * guardProfile.shieldAlpha})`;
-  ctx.lineWidth = 1.8 + impact * 1.8 * guardProfile.recoil;
+  ctx.strokeStyle = `rgba(255,255,255,${(0.38 + impact * 0.36 + counter * 0.26) * guardProfile.shieldAlpha})`;
+  ctx.lineWidth = 1.9 + impact * 2.2 * guardProfile.recoil + counter * 0.6;
   ctx.beginPath();
   ctx.arc(centerX + 2, centerY, radius + 9 + impact * 3, -1.12 * guardProfile.arc, 1.13 * guardProfile.arc);
   ctx.stroke();
 
   if (impact > 0.05 || counter > 0.05) {
-    ctx.strokeStyle = counter > 0.05 ? `rgba(255, 241, 189, ${0.18 + counter * 0.34 * guardProfile.counter})` : colorWithAlpha(guardColor, 0.18 + impact * 0.3 * guardProfile.shieldAlpha);
-    ctx.lineWidth = 1.4 + impact * 1.2 * guardProfile.spark;
+    ctx.strokeStyle = counter > 0.05 ? `rgba(255, 241, 189, ${0.24 + counter * 0.44 * guardProfile.counter})` : colorWithAlpha(guardColor, 0.2 + impact * 0.36 * guardProfile.shieldAlpha);
+    ctx.lineWidth = 1.5 + impact * 1.5 * guardProfile.spark + counter * 0.7;
     const lanes = Math.max(2, Math.round(3 * guardProfile.spark));
     for (let i = 0; i < lanes; i += 1) {
       const lane = lanes === 1 ? 0 : (i / (lanes - 1) - 0.5) * 2;
@@ -11553,54 +11645,76 @@ function drawGuard(color, crouch, f) {
   }
 
   if (counter > 0.05) {
-    ctx.strokeStyle = `rgba(255, 241, 189, ${(0.16 + pulse * 0.16) * guardProfile.counter})`;
-    ctx.lineWidth = 2 * guardProfile.shieldWidth;
+    ctx.strokeStyle = `rgba(255, 241, 189, ${(0.22 + pulse * 0.22 + counter * 0.16) * guardProfile.counter})`;
+    ctx.lineWidth = (2.2 + counter * 1.1) * guardProfile.shieldWidth;
     ctx.beginPath();
     ctx.arc(centerX - 2, centerY, radius + 18, -0.85 * guardProfile.arc, 0.82 * guardProfile.arc);
     ctx.stroke();
+
+    ctx.fillStyle = `rgba(255, 241, 189, ${(0.16 + pulse * 0.18 + counter * 0.2) * guardProfile.counter})`;
+    for (let i = 0; i < 2; i += 1) {
+      const y = centerY - 14 + i * 28;
+      ctx.beginPath();
+      ctx.moveTo(centerX + radius * 0.48, y - 6);
+      ctx.lineTo(centerX + radius * 0.68 + pulse * 3, y);
+      ctx.lineTo(centerX + radius * 0.48, y + 6);
+      ctx.closePath();
+      ctx.fill();
+    }
   }
 
   ctx.restore();
 }
 
 function drawCounterReadyFX(color, crouch, f) {
-  const counter = clamp((f?.counterWindow ?? 0) / 34, 0, 1);
+  const counter = clamp((f?.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
   if (counter <= 0.04) return;
 
   const pulse = 0.5 + Math.sin(roundFrame * 0.38) * 0.5;
-  const spark = counter * (0.7 + pulse * 0.3);
-  const centerX = 31 + counter * 4;
+  const spark = counter * (0.76 + pulse * 0.34);
+  const centerX = 31 + counter * 5;
   const centerY = -112 + crouch;
-  const radius = 32 + spark * 12;
+  const radius = 32 + spark * 14;
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  const glow = ctx.createRadialGradient(centerX, centerY, 4, centerX, centerY, radius + 28);
-  glow.addColorStop(0, colorWithAlpha(color, 0.1 + spark * 0.14));
-  glow.addColorStop(0.42, "rgba(255, 241, 189, 0.08)");
+  const glow = ctx.createRadialGradient(centerX, centerY, 4, centerX, centerY, radius + 34);
+  glow.addColorStop(0, colorWithAlpha(color, 0.12 + spark * 0.18));
+  glow.addColorStop(0.38, `rgba(255, 241, 189, ${0.08 + spark * 0.1})`);
   glow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(centerX, centerY, radius + 20, radius + 28, -0.12, 0, Math.PI * 2);
+  ctx.ellipse(centerX, centerY, radius + 23, radius + 32, -0.12, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = `rgba(255, 241, 189, ${0.16 + spark * 0.34})`;
-  ctx.lineWidth = 2 + spark * 1.8;
+  ctx.strokeStyle = `rgba(255, 241, 189, ${0.22 + spark * 0.42})`;
+  ctx.lineWidth = 2.2 + spark * 2.2;
   ctx.beginPath();
   ctx.arc(centerX, centerY, radius, -0.92, 0.82);
   ctx.stroke();
 
-  ctx.strokeStyle = colorWithAlpha(color, 0.18 + spark * 0.26);
-  ctx.lineWidth = 1.5 + spark * 1.2;
+  ctx.strokeStyle = colorWithAlpha(color, 0.22 + spark * 0.32);
+  ctx.lineWidth = 1.7 + spark * 1.4;
   ctx.beginPath();
   ctx.moveTo(centerX - 26, centerY - 18);
   ctx.quadraticCurveTo(centerX + 6 + spark * 10, centerY - 36 - spark * 8, centerX + 38 + spark * 10, centerY - 12);
   ctx.moveTo(centerX - 18, centerY + 12);
   ctx.quadraticCurveTo(centerX + 11 + spark * 8, centerY + 25 + spark * 3, centerX + 44 + spark * 9, centerY + 8);
   ctx.stroke();
+
+  ctx.strokeStyle = `rgba(255, 241, 189, ${0.16 + spark * 0.28})`;
+  ctx.lineWidth = 1.6 + spark;
+  for (let i = 0; i < 2; i += 1) {
+    const y = centerY - 10 + i * 20;
+    ctx.beginPath();
+    ctx.moveTo(centerX + radius * 0.42, y - 6);
+    ctx.lineTo(centerX + radius * 0.66 + pulse * 3, y);
+    ctx.lineTo(centerX + radius * 0.42, y + 6);
+    ctx.stroke();
+  }
 
   ctx.fillStyle = `rgba(255, 241, 189, ${0.16 + spark * 0.32})`;
   for (let i = 0; i < 3; i += 1) {
