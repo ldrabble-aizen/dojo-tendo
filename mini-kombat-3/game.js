@@ -48,6 +48,11 @@ const MAX_PARTICLES = 280;
 const MOBILE_MAX_PARTICLES = 155;
 const GUARD_IMPACT_FRAMES = 18;
 const COUNTER_WINDOW_FRAMES = 42;
+const ONLINE_SYNC_EVERY = 3;
+const ONLINE_ICE_SERVERS = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+];
 const faces = {
   p1: loadImage("assets/fighter-1-face.png"),
   p2: loadImage("assets/fighter-2-face.png"),
@@ -105,6 +110,21 @@ let lastFrameTime = 0;
 let updateAccumulator = 0;
 let roundAdvanceTimer = null;
 let winnerOverlayTimer = null;
+const onlineState = {
+  role: "",
+  localSide: "",
+  remoteSide: "",
+  pc: null,
+  channel: null,
+  connected: false,
+  status: "Sin conexion online.",
+  offerCode: "",
+  answerCode: "",
+  lastInputPayload: "",
+  lastSnapshotFrame: -1,
+  snapshotTick: 0,
+  remoteInput: null,
+};
 
 const STEP_MS = 1000 / 60;
 const MAX_UPDATE_STEPS = 3;
@@ -804,6 +824,7 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
       grab: false,
       think: 0,
     },
+    onlinePrevInput: emptyInput(),
   };
 }
 
@@ -1121,6 +1142,10 @@ function resetRound() {
     comboWindow: 0,
   });
 
+  fighters.forEach((fighter) => {
+    fighter.onlinePrevInput = emptyInput();
+  });
+
   particles = [];
   floatingTexts = [];
   projectiles.length = 0;
@@ -1155,6 +1180,7 @@ function resetRound() {
   running = true;
   overlay.classList.add("hidden");
   syncShellState();
+  sendOnlineSnapshot(true);
 }
 
 function clearRoundTimers() {
@@ -1196,8 +1222,7 @@ function showHomeOverlay() {
   overlayMode = "home";
   overlay.dataset.screen = "home";
   overlay.dataset.mode = tournamentMode ? "tournament" : "match";
-  onlineButton.setAttribute("aria-pressed", "false");
-  onlineMenuButton.setAttribute("aria-pressed", "false");
+  syncOnlineButtons();
   overlay.querySelector("h1").textContent = "Mini Kombat III";
   overlayCopy.textContent = homeOverlayCopy();
   startButton.textContent = tournamentMode ? "INICIAR TORNEO" : "LUCHAR";
@@ -1285,10 +1310,60 @@ function resumeGame() {
   syncShellState();
 }
 
-function inputFor(f) {
+function emptyInput() {
+  return {
+    left: false,
+    right: false,
+    jump: false,
+    block: false,
+    punch: false,
+    kick: false,
+    special: false,
+    grab: false,
+  };
+}
+
+function normalizeInput(input = {}) {
+  return {
+    left: Boolean(input.left),
+    right: Boolean(input.right),
+    jump: Boolean(input.jump),
+    block: Boolean(input.block),
+    punch: Boolean(input.punch),
+    kick: Boolean(input.kick),
+    special: Boolean(input.special),
+    grab: Boolean(input.grab),
+  };
+}
+
+function onlineConnected() {
+  return onlineState.connected && onlineState.channel?.readyState === "open";
+}
+
+function onlineHostActive() {
+  return onlineConnected() && onlineState.role === "host";
+}
+
+function onlineGuestActive() {
+  return onlineConnected() && onlineState.role === "guest";
+}
+
+function onlineLocalFighterId() {
+  return onlineState.localSide || "";
+}
+
+function onlineRemoteFighterId() {
+  return onlineState.remoteSide || "";
+}
+
+function touchControlsFighterId() {
+  return onlineConnected() ? onlineLocalFighterId() : "right";
+}
+
+function readHumanInputForFighter(f) {
   if (cpuEnabled && f.id === cpuFighterId) return f.ai;
   const c = f.controls;
-  const touch = f.id === "right" ? touchInput : {};
+  const touch = f.id === touchControlsFighterId() ? touchInput : {};
   return {
     left: keys.has(c.left) || touch.left,
     right: keys.has(c.right) || touch.right,
@@ -1299,6 +1374,19 @@ function inputFor(f) {
     special: keys.has(c.special) || (keys.has(c.block) && keys.has(c.punch)) || touch.special || (touch.block && touch.punch),
     grab: keys.has(c.grab) || touch.grab,
   };
+}
+
+function inputFor(f) {
+  if (onlineHostActive() && f.id === onlineRemoteFighterId()) {
+    return onlineState.remoteInput ?? emptyInput();
+  }
+  if (onlineGuestActive()) return emptyInput();
+  return readHumanInputForFighter(f);
+}
+
+function canStartLocalActionFor(f) {
+  if (!onlineConnected()) return !(cpuEnabled && f.id === cpuFighterId);
+  return onlineState.role === "host" && f.id === onlineLocalFighterId();
 }
 
 function updateAI(f, opponent) {
@@ -1354,6 +1442,23 @@ function updateAI(f, opponent) {
       ai.right = opponent.x > f.x;
     }
   }
+}
+
+function maybeStartOnlineRemoteAction(f, input) {
+  if (!onlineHostActive() || f.id !== onlineRemoteFighterId()) return;
+  const previous = f.onlinePrevInput ?? emptyInput();
+  const freshSpecial = input.special && !previous.special;
+  const freshGrab = input.grab && !previous.grab;
+  const freshPunch = input.punch && !previous.punch;
+  const freshKick = input.kick && !previous.kick;
+
+  if (freshSpecial || (freshPunch && input.block)) startSpecial(f);
+  else if (freshGrab) startAttack(f, "grab");
+  else if (freshKick && input.block) startAttack(f, "sweep");
+  else if (freshPunch) startAttack(f, f.grounded ? "punch" : "airPunch");
+  else if (freshKick) startAttack(f, f.grounded ? "kick" : "airKick");
+
+  f.onlinePrevInput = { ...input };
 }
 
 function startAttack(f, type) {
@@ -1573,11 +1678,17 @@ function updateCameraImpactPulse() {
 }
 
 function update() {
+  if (onlineGuestActive()) {
+    updateOnlineGuestView();
+    return;
+  }
+
   if (hitStopFrames > 0) {
     hitStopFrames -= 1;
     updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
+    sendOnlineSnapshot(false);
     return;
   }
 
@@ -1587,6 +1698,7 @@ function update() {
     updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
+    sendOnlineSnapshot(false);
     return;
   }
 
@@ -1595,6 +1707,7 @@ function update() {
     updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
+    sendOnlineSnapshot(false);
     return;
   }
 
@@ -1604,6 +1717,7 @@ function update() {
     updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
+    sendOnlineSnapshot(false);
     return;
   }
 
@@ -1649,11 +1763,13 @@ function update() {
     playSound(matchOver ? tournamentActive && winnerFighter.id !== "right" ? "lose" : "victory" : "ko");
     if (matchOver) scheduleWinnerOverlay();
     else scheduleNextRound();
+    sendOnlineSnapshot(true);
   }
 
   if (flash > 0) flash -= 1;
   if (shake > 0) shake -= 1;
   updateCameraImpactPulse();
+  sendOnlineSnapshot(false);
 }
 
 function updateFighter(f, opponent) {
@@ -1750,6 +1866,8 @@ function updateFighter(f, opponent) {
     movementDust(f.x - f.dir * fighterScale(8), FLOOR + 4, -f.dir, 0.9, 5);
     playSound("jump");
   }
+
+  maybeStartOnlineRemoteAction(f, input);
 
   if (cpuEnabled && f.id === cpuFighterId) {
     if (wantSpecial) startSpecial(f);
@@ -12359,7 +12477,8 @@ function setCpuMode(enabled) {
   modeButton.setAttribute("aria-pressed", String(cpuEnabled));
   updateFighterLabels();
   if (overlayMode === "home") overlayCopy.textContent = homeOverlayCopy();
-  if (!fighterSelect.classList.contains("hidden")) renderFighterSelect();
+  if (!fighterSelect.classList.contains("hidden") && overlayMode === "home") renderFighterSelect();
+  if (!fighterSelect.classList.contains("hidden") && overlayMode === "online") renderOnlinePanel();
 }
 
 function setTournamentMode(enabled) {
@@ -12384,12 +12503,13 @@ function setSelectedFighter(side, nextId) {
   fighters = buildFighters();
   updateFighterLabels();
   renderFighterSelect();
+  if (onlineHostActive()) sendOnlineSetup();
   playSound("select");
 }
 
 function renderFighterSelect() {
   fighterSelect.innerHTML = "";
-  fighterSelect.classList.remove("versus-panel");
+  fighterSelect.classList.remove("versus-panel", "online-panel");
   fighterSelect.append(makeSelectColumn("left", "Izquierda", selectedLeftId));
 
   const versus = document.createElement("div");
@@ -12402,6 +12522,7 @@ function renderFighterSelect() {
 
 function renderVersusPanel(roundLabel) {
   fighterSelect.innerHTML = "";
+  fighterSelect.classList.remove("online-panel");
   fighterSelect.classList.add("versus-panel");
   const leftRole = tournamentActive ? "Rival" : cpuEnabled ? "CPU" : "Jugador 1";
   const rightRole = tournamentActive ? "Jugador" : "Jugador 2";
@@ -12604,7 +12725,14 @@ function advanceOverlay() {
     return;
   }
   if (overlayMode === "online") {
-    onlineButton.setAttribute("aria-pressed", "false");
+    if (onlineHostActive()) {
+      startOnlineMatch();
+      return;
+    }
+    if (paused) {
+      resumeGame();
+      return;
+    }
     showHomeOverlay();
     return;
   }
@@ -12631,24 +12759,553 @@ function showHelpOverlay() {
   syncShellState();
 }
 
+function onlineSupported() {
+  return "RTCPeerConnection" in window;
+}
+
+function encodeOnlineSignal(description) {
+  return btoa(JSON.stringify(description)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/u, "");
+}
+
+function decodeOnlineSignal(code) {
+  const compact = code.trim().replace(/\s+/gu, "").replace(/-/g, "+").replace(/_/g, "/");
+  const padded = compact.padEnd(Math.ceil(compact.length / 4) * 4, "=");
+  return JSON.parse(atob(padded));
+}
+
+function setOnlineStatus(status) {
+  onlineState.status = status;
+  syncOnlineButtons();
+  if (overlayMode === "online") {
+    startButton.textContent = onlineHostActive() ? "INICIAR ONLINE" : paused ? "SEGUIR" : "VOLVER";
+    renderOnlinePanel();
+  }
+}
+
+function syncOnlineButtons() {
+  const active = onlineConnected();
+  onlineButton.textContent = active ? "Online OK" : "Online";
+  onlineMenuButton.textContent = active ? "ONLINE OK" : "ONLINE";
+  onlineButton.setAttribute("aria-pressed", String(active || overlayMode === "online"));
+  onlineMenuButton.setAttribute("aria-pressed", String(active || overlayMode === "online"));
+}
+
+function resetOnlineConnection(keepCodes = false) {
+  if (onlineState.channel) {
+    onlineState.channel.onopen = null;
+    onlineState.channel.onmessage = null;
+    onlineState.channel.onclose = null;
+    onlineState.channel.onerror = null;
+    try { onlineState.channel.close(); } catch {}
+  }
+  if (onlineState.pc) {
+    onlineState.pc.ondatachannel = null;
+    onlineState.pc.onconnectionstatechange = null;
+    onlineState.pc.oniceconnectionstatechange = null;
+    try { onlineState.pc.close(); } catch {}
+  }
+  onlineState.role = "";
+  onlineState.localSide = "";
+  onlineState.remoteSide = "";
+  onlineState.pc = null;
+  onlineState.channel = null;
+  onlineState.connected = false;
+  onlineState.lastInputPayload = "";
+  onlineState.lastSnapshotFrame = -1;
+  onlineState.snapshotTick = 0;
+  onlineState.remoteInput = emptyInput();
+  if (!keepCodes) {
+    onlineState.offerCode = "";
+    onlineState.answerCode = "";
+  }
+  setOnlineStatus("Sin conexion online.");
+}
+
+function createOnlinePeerConnection() {
+  const pc = new RTCPeerConnection({ iceServers: ONLINE_ICE_SERVERS });
+  pc.onconnectionstatechange = () => {
+    const state = pc.connectionState || pc.iceConnectionState;
+    if (state === "connected") setOnlineStatus("Conexion online establecida.");
+    else if (state === "failed" || state === "disconnected" || state === "closed") {
+      onlineState.connected = false;
+      setOnlineStatus("La conexion online se corto. Podés crear una sala nueva.");
+    }
+  };
+  pc.oniceconnectionstatechange = () => {
+    if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+      setOnlineStatus("Conexion online establecida.");
+    }
+  };
+  return pc;
+}
+
+function waitForIceGathering(pc) {
+  if (pc.iceGatheringState === "complete") return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      pc.removeEventListener("icegatheringstatechange", onChange);
+      resolve();
+    };
+    const onChange = () => {
+      if (pc.iceGatheringState === "complete") done();
+    };
+    const timer = setTimeout(done, 4200);
+    pc.addEventListener("icegatheringstatechange", onChange);
+  });
+}
+
+function setupOnlineChannel(channel) {
+  onlineState.channel = channel;
+  channel.onopen = () => {
+    onlineState.connected = true;
+    onlineState.remoteInput = emptyInput();
+    setCpuMode(false);
+    setOnlineStatus(onlineState.role === "host"
+      ? "Invitado conectado. Ya podés iniciar la pelea online."
+      : "Conectado. Esperando que el anfitrion inicie la pelea.");
+    if (onlineState.role === "host") {
+      sendOnlineSetup();
+      sendOnlineSnapshot(true);
+    } else {
+      sendLocalOnlineInput(true);
+    }
+  };
+  channel.onmessage = (event) => {
+    try {
+      handleOnlineMessage(JSON.parse(event.data));
+    } catch {
+      setOnlineStatus("Llego un mensaje online que no se pudo leer.");
+    }
+  };
+  channel.onclose = () => {
+    onlineState.connected = false;
+    setOnlineStatus("La conexion online se cerro.");
+  };
+  channel.onerror = () => {
+    onlineState.connected = false;
+    setOnlineStatus("Hubo un error en la conexion online.");
+  };
+}
+
+async function createOnlineRoom() {
+  if (!onlineSupported()) {
+    setOnlineStatus("Este navegador no soporta WebRTC.");
+    return;
+  }
+  try {
+    resetOnlineConnection();
+    setCpuMode(false);
+    onlineState.role = "host";
+    onlineState.localSide = "left";
+    onlineState.remoteSide = "right";
+    onlineState.remoteInput = emptyInput();
+    onlineState.pc = createOnlinePeerConnection();
+    setupOnlineChannel(onlineState.pc.createDataChannel("mini-kombat-input"));
+    const offer = await onlineState.pc.createOffer();
+    await onlineState.pc.setLocalDescription(offer);
+    setOnlineStatus("Creando codigo de sala...");
+    await waitForIceGathering(onlineState.pc);
+    onlineState.offerCode = encodeOnlineSignal(onlineState.pc.localDescription);
+    setOnlineStatus("Sala creada. Compartile el codigo al invitado.");
+  } catch (error) {
+    resetOnlineConnection(true);
+    setOnlineStatus(`No pude crear la sala: ${error.message}`);
+  }
+}
+
+async function joinOnlineRoom(code) {
+  if (!onlineSupported()) {
+    setOnlineStatus("Este navegador no soporta WebRTC.");
+    return;
+  }
+  if (!code.trim()) {
+    setOnlineStatus("Pegá el codigo de sala para unirte.");
+    return;
+  }
+  try {
+    const offer = decodeOnlineSignal(code);
+    resetOnlineConnection(true);
+    setCpuMode(false);
+    onlineState.role = "guest";
+    onlineState.localSide = "right";
+    onlineState.remoteSide = "left";
+    onlineState.pc = createOnlinePeerConnection();
+    onlineState.pc.ondatachannel = (event) => setupOnlineChannel(event.channel);
+    await onlineState.pc.setRemoteDescription(offer);
+    const answer = await onlineState.pc.createAnswer();
+    await onlineState.pc.setLocalDescription(answer);
+    setOnlineStatus("Generando respuesta para el anfitrion...");
+    await waitForIceGathering(onlineState.pc);
+    onlineState.answerCode = encodeOnlineSignal(onlineState.pc.localDescription);
+    setOnlineStatus("Respuesta lista. Enviale este codigo al anfitrion.");
+  } catch (error) {
+    resetOnlineConnection(true);
+    setOnlineStatus(`No pude unirme: ${error.message}`);
+  }
+}
+
+async function acceptOnlineAnswer(code) {
+  if (onlineState.role !== "host" || !onlineState.pc) {
+    setOnlineStatus("Primero creá una sala.");
+    return;
+  }
+  if (!code.trim()) {
+    setOnlineStatus("Pegá la respuesta del invitado.");
+    return;
+  }
+  try {
+    await onlineState.pc.setRemoteDescription(decodeOnlineSignal(code));
+    setOnlineStatus("Respuesta recibida. Conectando...");
+  } catch (error) {
+    setOnlineStatus(`No pude aceptar la respuesta: ${error.message}`);
+  }
+}
+
+function sendOnlineMessage(message) {
+  if (!onlineState.channel || onlineState.channel.readyState !== "open") return false;
+  try {
+    onlineState.channel.send(JSON.stringify(message));
+    return true;
+  } catch {
+    onlineState.connected = false;
+    setOnlineStatus("No pude enviar datos online.");
+    return false;
+  }
+}
+
+function handleOnlineMessage(message) {
+  if (!message || typeof message !== "object") return;
+  if (message.type === "input" && onlineState.role === "host") {
+    onlineState.remoteInput = normalizeInput(message.input);
+    return;
+  }
+  if (message.type === "setup" && onlineState.role === "guest") {
+    applyOnlineSetup(message);
+    return;
+  }
+  if (message.type === "snapshot" && onlineState.role === "guest") {
+    applyOnlineSnapshot(message);
+  }
+}
+
+function sendOnlineSetup() {
+  if (!onlineHostActive()) return;
+  sendOnlineMessage({
+    type: "setup",
+    leftId: selectedLeftId,
+    rightId: selectedRightId,
+    roundNumber,
+  });
+}
+
+function applyOnlineSetup(message) {
+  selectedLeftId = fighterProfiles[message.leftId] ? message.leftId : selectedLeftId;
+  selectedRightId = fighterProfiles[message.rightId] ? message.rightId : selectedRightId;
+  tournamentMode = false;
+  tournamentActive = false;
+  cpuEnabled = false;
+  fighters = buildFighters();
+  roundNumber = message.roundNumber || 1;
+  updateFighterLabels();
+  setCpuMode(false);
+}
+
+function serializeFighter(f) {
+  const data = {};
+  for (const [key, value] of Object.entries(f)) {
+    if (value === null || ["number", "string", "boolean"].includes(typeof value)) data[key] = value;
+  }
+  data.attack = f.attack ? { ...f.attack } : null;
+  return data;
+}
+
+function applyFighterSnapshot(f, data) {
+  const attack = data.attack ? { ...data.attack } : null;
+  for (const [key, value] of Object.entries(data)) {
+    if (key !== "attack") f[key] = value;
+  }
+  f.attack = attack;
+  f.specialStyle = SPECIAL_STYLES[f.profileId] ?? SPECIAL_STYLES.p1;
+  f.outfit = normalizeOutfit(f.color, f.trim, f.outfit);
+  f.onlinePrevInput = f.onlinePrevInput ?? emptyInput();
+}
+
+function serializeProjectiles() {
+  return projectiles.map((p) => ({
+    owner: p.owner,
+    x: p.x,
+    y: p.y,
+    vx: p.vx,
+    life: p.life,
+    r: p.r,
+    damage: p.damage,
+    color: p.color,
+    profileId: p.profileId,
+    dir: p.dir,
+    trail: Array.isArray(p.trail) ? p.trail.slice(-8).map((point) => ({ x: point.x, y: point.y })) : [],
+  }));
+}
+
+function sendOnlineSnapshot(force = false) {
+  if (!onlineHostActive()) return;
+  onlineState.snapshotTick += 1;
+  if (!force && onlineState.snapshotTick % ONLINE_SYNC_EVERY !== 0) return;
+  sendOnlineMessage({
+    type: "snapshot",
+    leftId: selectedLeftId,
+    rightId: selectedRightId,
+    roundNumber,
+    running,
+    paused,
+    winner,
+    matchOver,
+    roundWinnerId,
+    matchWinnerId,
+    countdownFrames,
+    koFreeze,
+    roundFrame,
+    resultFrame,
+    flash,
+    shake,
+    hitStopFrames,
+    cameraZoom,
+    cameraPan,
+    cameraLift,
+    cameraImpactPulse,
+    cameraImpactMax,
+    cameraImpactDir,
+    cameraImpactStrength,
+    cinematicHitPulse,
+    cinematicHitMax,
+    cinematicHitDir,
+    cinematicHitColor,
+    cinematicHitStrength,
+    cinematicHitZoom,
+    cinematicHitPan,
+    cinematicHitLift,
+    cinematicHitRoll,
+    cinematicHitBand,
+    fighters: fighters.map(serializeFighter),
+    projectiles: serializeProjectiles(),
+  });
+}
+
+function applyOnlineSnapshot(snapshot) {
+  if (fighterProfiles[snapshot.leftId] && fighterProfiles[snapshot.rightId] && (snapshot.leftId !== selectedLeftId || snapshot.rightId !== selectedRightId)) {
+    selectedLeftId = snapshot.leftId;
+    selectedRightId = snapshot.rightId;
+    fighters = buildFighters();
+    updateFighterLabels();
+  }
+
+  running = Boolean(snapshot.running);
+  paused = Boolean(snapshot.paused);
+  winner = snapshot.winner || "";
+  matchOver = Boolean(snapshot.matchOver);
+  roundWinnerId = snapshot.roundWinnerId || "";
+  matchWinnerId = snapshot.matchWinnerId || "";
+  roundNumber = snapshot.roundNumber || roundNumber;
+  countdownFrames = Math.max(0, snapshot.countdownFrames || 0);
+  koFreeze = Math.max(0, snapshot.koFreeze || 0);
+  roundFrame = snapshot.roundFrame || 0;
+  resultFrame = snapshot.resultFrame || 0;
+  flash = snapshot.flash || 0;
+  shake = snapshot.shake || 0;
+  hitStopFrames = snapshot.hitStopFrames || 0;
+  cameraZoom = snapshot.cameraZoom || 1;
+  cameraPan = snapshot.cameraPan || 0;
+  cameraLift = snapshot.cameraLift ?? 8;
+  cameraImpactPulse = snapshot.cameraImpactPulse || 0;
+  cameraImpactMax = snapshot.cameraImpactMax || 1;
+  cameraImpactDir = snapshot.cameraImpactDir || 1;
+  cameraImpactStrength = snapshot.cameraImpactStrength || 0;
+  cinematicHitPulse = snapshot.cinematicHitPulse || 0;
+  cinematicHitMax = snapshot.cinematicHitMax || 1;
+  cinematicHitDir = snapshot.cinematicHitDir || 1;
+  cinematicHitColor = snapshot.cinematicHitColor || "#fff1bd";
+  cinematicHitStrength = snapshot.cinematicHitStrength || 0;
+  cinematicHitZoom = snapshot.cinematicHitZoom || 0.022;
+  cinematicHitPan = snapshot.cinematicHitPan || 6.4;
+  cinematicHitLift = snapshot.cinematicHitLift || 2.6;
+  cinematicHitRoll = snapshot.cinematicHitRoll || 0;
+  cinematicHitBand = snapshot.cinematicHitBand || 1;
+
+  if (Array.isArray(snapshot.fighters)) {
+    for (const fighterData of snapshot.fighters) {
+      const fighter = fighters.find((f) => f.id === fighterData.id);
+      if (fighter) applyFighterSnapshot(fighter, fighterData);
+    }
+  }
+
+  projectiles.length = 0;
+  if (Array.isArray(snapshot.projectiles)) {
+    for (const p of snapshot.projectiles) {
+      projectiles.push({
+        ...p,
+        style: SPECIAL_STYLES[p.profileId] ?? SPECIAL_STYLES.p1,
+        trail: Array.isArray(p.trail) ? p.trail : [],
+      });
+    }
+  }
+
+  if (running || winner) overlay.classList.add("hidden");
+  syncShellState();
+}
+
+function sendLocalOnlineInput(force = false) {
+  if (!onlineGuestActive()) return;
+  const fighter = fighters.find((f) => f.id === onlineLocalFighterId()) ?? fighters[1];
+  const input = normalizeInput(readHumanInputForFighter(fighter));
+  const payload = JSON.stringify(input);
+  if (!force && payload === onlineState.lastInputPayload) return;
+  onlineState.lastInputPayload = payload;
+  sendOnlineMessage({ type: "input", input });
+}
+
+function updateOnlineGuestView() {
+  sendLocalOnlineInput();
+  updateCameraImpactPulse();
+  updateParticles();
+  updateFloatingTexts();
+  if (flash > 0) flash -= 1;
+  if (shake > 0) shake -= 1;
+}
+
+function startOnlineMatch() {
+  if (!onlineHostActive()) {
+    setOnlineStatus("Todavia falta conectar al invitado.");
+    return;
+  }
+  tournamentMode = false;
+  tournamentActive = false;
+  setCpuMode(false);
+  fighters = buildFighters();
+  fighters[0].wins = 0;
+  fighters[1].wins = 0;
+  roundNumber = 1;
+  matchOver = false;
+  roundWinnerId = "";
+  matchWinnerId = "";
+  sendOnlineSetup();
+  resetRound();
+  sendOnlineSnapshot(true);
+  setOnlineStatus("Pelea online iniciada.");
+}
+
+function makeOnlineButton(label, className, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  if (className) button.className = className;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function makeOnlineTextarea(id, value, placeholder, readOnly = false) {
+  const textarea = document.createElement("textarea");
+  textarea.id = id;
+  textarea.value = value || "";
+  textarea.placeholder = placeholder;
+  textarea.readOnly = readOnly;
+  textarea.spellcheck = false;
+  return textarea;
+}
+
+function copyOnlineCode(code) {
+  if (!code) {
+    setOnlineStatus("Todavia no hay codigo para copiar.");
+    return;
+  }
+  const write = navigator.clipboard?.writeText?.(code);
+  if (!write) {
+    setOnlineStatus("Seleccioná el codigo y copialo manualmente.");
+    return;
+  }
+  write
+    .then(() => setOnlineStatus("Codigo copiado."))
+    .catch(() => setOnlineStatus("No pude copiarlo automaticamente. Seleccionalo y copialo manualmente."));
+}
+
+function renderOnlinePanel() {
+  fighterSelect.innerHTML = "";
+  fighterSelect.classList.remove("versus-panel");
+  fighterSelect.classList.add("online-panel");
+
+  const panel = document.createElement("section");
+  panel.className = "online-card";
+
+  const status = document.createElement("div");
+  status.className = `online-status ${onlineConnected() ? "is-connected" : ""}`;
+  status.textContent = onlineState.status;
+  panel.append(status);
+
+  const role = document.createElement("div");
+  role.className = "online-role";
+  role.innerHTML = onlineState.role
+    ? `<strong>${onlineState.role === "host" ? "Anfitrion" : "Invitado"}</strong><span>${onlineState.localSide === "left" ? "Controlas izquierda" : "Controlas derecha"}</span>`
+    : "<strong>Modo experimental</strong><span>Funciona gratis con codigos WebRTC. Puede fallar en algunas redes estrictas.</span>";
+  panel.append(role);
+
+  const actions = document.createElement("div");
+  actions.className = "online-action-grid";
+  actions.append(
+    makeOnlineButton("CREAR SALA", "", () => createOnlineRoom()),
+    makeOnlineButton("UNIRME", "", () => {
+      const code = document.querySelector("#online-offer-input")?.value ?? "";
+      joinOnlineRoom(code);
+    }),
+  );
+  if (onlineState.role === "host" && onlineState.offerCode && !onlineConnected()) {
+    actions.append(makeOnlineButton("CONECTAR RESPUESTA", "", () => {
+      const code = document.querySelector("#online-answer-input")?.value ?? "";
+      acceptOnlineAnswer(code);
+    }));
+  }
+  if (onlineHostActive()) actions.append(makeOnlineButton("INICIAR PELEA", "primary-online", startOnlineMatch));
+  if (onlineState.role || onlineConnected()) actions.append(makeOnlineButton("CORTAR", "danger-online", () => resetOnlineConnection()));
+  panel.append(actions);
+
+  if (onlineState.role !== "guest") {
+    const offerWrap = document.createElement("label");
+    offerWrap.className = "online-code-block";
+    offerWrap.append(document.createElement("span"));
+    offerWrap.querySelector("span").textContent = onlineState.offerCode ? "Codigo para enviar al invitado" : "Codigo de sala del anfitrion";
+    offerWrap.append(makeOnlineTextarea("online-offer-input", onlineState.offerCode, "Si sos invitado, pega aca el codigo de sala.", Boolean(onlineState.offerCode)));
+    if (onlineState.offerCode) offerWrap.append(makeOnlineButton("COPIAR CODIGO", "", () => copyOnlineCode(onlineState.offerCode)));
+    panel.append(offerWrap);
+  }
+
+  if (onlineState.role !== "guest" || onlineState.answerCode) {
+    const answerWrap = document.createElement("label");
+    answerWrap.className = "online-code-block";
+    answerWrap.append(document.createElement("span"));
+    answerWrap.querySelector("span").textContent = onlineState.answerCode ? "Respuesta para enviar al anfitrion" : "Respuesta del invitado";
+    answerWrap.append(makeOnlineTextarea("online-answer-input", onlineState.answerCode, "Si sos anfitrion, pega aca la respuesta del invitado.", onlineState.role === "guest" && Boolean(onlineState.answerCode)));
+    if (onlineState.answerCode) answerWrap.append(makeOnlineButton("COPIAR RESPUESTA", "", () => copyOnlineCode(onlineState.answerCode)));
+    panel.append(answerWrap);
+  }
+
+  const note = document.createElement("p");
+  note.className = "online-note";
+  note.textContent = "Flujo: el anfitrion crea sala, manda codigo; el invitado pega ese codigo, genera respuesta y se la manda al anfitrion.";
+  panel.append(note);
+  fighterSelect.append(panel);
+}
+
 function showOnlineOverlay() {
   overlayMode = "online";
   overlay.dataset.screen = "online";
   paused = running && !winner;
   overlay.querySelector("h1").textContent = "Online";
   overlayCopy.textContent =
-    "Mini Kombat III ya tiene el acceso preparado para salas online. Para activarlo falta pegar la configuracion gratis de Firebase del proyecto.";
-  fighterSelect.innerHTML = "";
-  fighterSelect.classList.remove("hidden", "versus-panel");
-  const status = document.createElement("div");
-  status.className = "online-status";
-  status.textContent = "Proximo paso: crear Firebase Realtime Database, pegar firebaseConfig y habilitar Crear sala / Unirse con codigo.";
-  fighterSelect.append(status);
-  startButton.textContent = paused ? "SEGUIR" : "VOLVER";
+    "Crea una sala o unite con codigo. El anfitrion controla izquierda y el invitado controla derecha.";
+  fighterSelect.classList.remove("hidden");
+  renderOnlinePanel();
+  startButton.textContent = onlineHostActive() ? "INICIAR ONLINE" : paused ? "SEGUIR" : "VOLVER";
   overlay.classList.remove("hidden");
   syncShellState();
-  onlineButton.setAttribute("aria-pressed", "true");
-  onlineMenuButton.setAttribute("aria-pressed", "true");
+  syncOnlineButtons();
 }
 
 window.addEventListener("keydown", (event) => {
@@ -12661,12 +13318,14 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   keys.add(key);
+  if (onlineGuestActive()) sendLocalOnlineInput(true);
   if (freshPress && running && koFreeze <= 0 && countdownFrames <= 0) handleActionKey(key);
   if (freshPress && (key === "enter" || key === " ") && (!running || paused)) advanceOverlay();
 });
 
 window.addEventListener("keyup", (event) => {
   keys.delete(event.key.toLowerCase());
+  if (onlineGuestActive()) sendLocalOnlineInput(true);
 });
 
 startButton.addEventListener("click", advanceOverlay);
@@ -12721,8 +13380,12 @@ onlineMenuButton.addEventListener("click", () => {
 updateFighterLabels();
 
 function handleActionKey(key) {
+  if (onlineGuestActive()) {
+    sendLocalOnlineInput(true);
+    return;
+  }
   for (const f of fighters) {
-    if (cpuEnabled && f.id === cpuFighterId) continue;
+    if (!canStartLocalActionFor(f)) continue;
     const c = f.controls;
     if (key === c.special || (key === c.punch && keys.has(c.block))) startSpecial(f);
     else if (key === c.grab) startAttack(f, "grab");
@@ -12742,9 +13405,13 @@ function setTouchControl(button, pressed) {
     button.classList.add("is-tapped");
   }
   touchInput[action] = pressed;
+  if (onlineGuestActive()) {
+    sendLocalOnlineInput(true);
+    return;
+  }
   if (!pressed || !running || koFreeze > 0 || countdownFrames > 0) return;
-  const player = fighters.find((f) => f.id === "right");
-  if (!player) return;
+  const player = fighters.find((f) => f.id === touchControlsFighterId());
+  if (!player || !canStartLocalActionFor(player)) return;
   if (action === "special" || (action === "punch" && touchInput.block)) startSpecial(player);
   else if (action === "kick" && touchInput.block) startAttack(player, "sweep");
   else if (action === "punch") startAttack(player, player.grounded ? "punch" : "airPunch");
@@ -12760,6 +13427,7 @@ function setStickState(x = 0, y = 0) {
   if (mobileStickKnob) {
     mobileStickKnob.style.transform = `translate(calc(-50% + ${Math.round(x * 34)}px), calc(-50% + ${Math.round(y * 34)}px))`;
   }
+  if (onlineGuestActive()) sendLocalOnlineInput();
 }
 
 function updateStickFromEvent(event) {
