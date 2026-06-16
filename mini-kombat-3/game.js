@@ -5730,7 +5730,7 @@ function spriteFrameIndexForPoseState(state) {
   return frames[0];
 }
 
-function drawSpritePoseTransitionBlend(f, image, currentFrameIndex, crouch) {
+function drawSpritePoseTransitionBlend(f, image, currentFrameIndex, crouch, compact = false) {
   const poseShift = poseTransitionProfile(f);
   if (poseShift.t <= 0.045 || !image?.complete || !image.naturalWidth) return;
 
@@ -5745,30 +5745,32 @@ function drawSpritePoseTransitionBlend(f, image, currentFrameIndex, crouch) {
   const lag = poseShift.t * (poseShift.intoAttack ? 4.4 : 3.1);
   const lift = poseShift.wave * (poseShift.fromAttack ? 1.2 : 0.7);
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(-BODY_SPRITE_ANCHOR_X - 24, bodyClipTop, BODY_SPRITE_FRAME_W + 48, bodyClipHeight);
-  ctx.clip();
-  ctx.globalAlpha = alpha;
-  ctx.translate(-poseShift.dir * lag, lift);
-  ctx.rotate(-poseShift.dir * poseShift.wave * 0.008);
-  ctx.drawImage(
-    image,
-    previousIndex * BODY_SPRITE_FRAME_W,
-    0,
-    BODY_SPRITE_FRAME_W,
-    BODY_SPRITE_FRAME_H,
-    -BODY_SPRITE_ANCHOR_X,
-    -BODY_SPRITE_ANCHOR_Y + crouch * 0.18,
-    BODY_SPRITE_FRAME_W,
-    BODY_SPRITE_FRAME_H
-  );
-  ctx.restore();
+  if (!compact) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-BODY_SPRITE_ANCHOR_X - 24, bodyClipTop, BODY_SPRITE_FRAME_W + 48, bodyClipHeight);
+    ctx.clip();
+    ctx.globalAlpha = alpha;
+    ctx.translate(-poseShift.dir * lag, lift);
+    ctx.rotate(-poseShift.dir * poseShift.wave * 0.008);
+    ctx.drawImage(
+      image,
+      previousIndex * BODY_SPRITE_FRAME_W,
+      0,
+      BODY_SPRITE_FRAME_W,
+      BODY_SPRITE_FRAME_H,
+      -BODY_SPRITE_ANCHOR_X,
+      -BODY_SPRITE_ANCHOR_Y + crouch * 0.18,
+      BODY_SPRITE_FRAME_W,
+      BODY_SPRITE_FRAME_H
+    );
+    ctx.restore();
+  }
 
   if ((poseShift.intoAttack || poseShift.fromAttack) && poseShift.wave > 0.15) {
     ctx.save();
     ctx.globalCompositeOperation = "screen";
-    ctx.globalAlpha = clamp(poseShift.wave * 0.045, 0, 0.065);
+    ctx.globalAlpha = compact ? clamp(poseShift.wave * 0.055, 0, 0.08) : clamp(poseShift.wave * 0.045, 0, 0.065);
     ctx.strokeStyle = colorWithAlpha(f.trim, 0.9);
     ctx.lineWidth = 1.2;
     ctx.lineCap = "round";
@@ -5785,7 +5787,8 @@ function drawSpritePoseTransitionBlend(f, image, currentFrameIndex, crouch) {
   }
 }
 
-function drawSpriteFrameBlend(f, image, frameName, currentFrameIndex, crouch, walking, avoidHead = false) {
+function drawSpriteFrameBlend(f, image, frameName, currentFrameIndex, crouch, walking, avoidHead = false, compact = false) {
+  if (compact) return;
   const blend = rasterBodyFrameBlend(f, frameName, currentFrameIndex, walking);
   if (!blend || blend.alpha <= 0.01 || !image?.complete || !image.naturalWidth) return;
 
@@ -5868,10 +5871,9 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
   const frameX = frameIndex * BODY_SPRITE_FRAME_W;
   if (unifiedSheet?.complete && unifiedSheet.naturalWidth) {
     if ((transition?.afterimage ?? 0) > 0.035) {
-      const phase = attackPhase(f.attack);
-      const echoCount = f.attack && (phase.snap > 0.05 || phase.strike > 0.35) ? 2 : 1;
+      const echoCount = 1;
       for (let i = echoCount; i >= 1; i -= 1) {
-        const ghostAlpha = clamp(transition.afterimage * (i === 1 ? 1 : 0.56), 0, 0.24);
+        const ghostAlpha = clamp(transition.afterimage * (i === 1 ? 0.7 : 0.36), 0, 0.12);
         const ghostOffset = -9 - transition.afterimage * (18 + i * 18) - i * 4;
         ctx.save();
         ctx.globalCompositeOperation = "screen";
@@ -5918,19 +5920,18 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
     );
     ctx.restore();
 
-    drawSpriteFrameBlend(f, unifiedSheet, frameName, frameIndex, crouch, walking, true);
-    drawSpritePoseTransitionBlend(f, unifiedSheet, frameIndex, crouch);
+    drawSpriteFrameBlend(f, unifiedSheet, frameName, frameIndex, crouch, walking, true, true);
+    drawSpritePoseTransitionBlend(f, unifiedSheet, frameIndex, crouch, true);
     drawSpriteContactOcclusion(f, crouch, frameName, walking ? stride : 0);
     drawSpriteLayeredContactShadows(f, crouch, frameName, walking ? stride : 0);
     drawSpriteHeadActingWarp(f, crouch, walking ? stride : 0);
     drawSpriteGuardPoseOverlay(f, crouch, frameName);
-    drawSpriteAttackFrameWarp(f, unifiedSheet, frameX, crouch);
-    drawSpriteAttackSilhouetteExtension(f, crouch, frameName);
+    drawSpriteAttackFrameWarp(f, unifiedSheet, frameX, crouch, true);
+    drawSpriteAttackSilhouetteExtension(f, crouch, frameName, true);
     drawSpriteImpactWarp(f, unifiedSheet, frameX, crouch);
     drawSpriteReactionPoseWarp(f, unifiedSheet, frameX, crouch);
     drawSpritePremiumDetails(f, crouch, frameName, walking ? stride : 0);
-    drawSpriteExtremityDetails(f, crouch, frameName, walking ? stride : 0);
-    drawSpriteSecondaryMotion(f, crouch, frameName, walking ? stride : 0);
+    drawSpriteExtremityDetails(f, crouch, frameName, walking ? stride : 0, { unified: true });
     drawFighterStageLighting(f, crouch);
     drawSpriteCinematicFinish(f, crouch, frameName);
     return true;
@@ -6428,7 +6429,8 @@ function drawVectorContactOcclusion(f, crouch, stride) {
   ctx.restore();
 }
 
-function drawSpriteExtremityDetails(f, crouch, frameName, stride) {
+function drawSpriteExtremityDetails(f, crouch, frameName, stride, options = {}) {
+  if (options.unified && (f.attack || !f.grounded || frameName === "walk")) return;
   const localCrouch = crouch * 0.18;
   const phase = attackPhase(f.attack);
   const action = f.attack ? Math.max(phase.strike, phase.snap, phase.followThrough * 0.5) : 0;
@@ -6842,7 +6844,7 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
   ctx.restore();
 }
 
-function drawSpriteAttackFrameWarp(f, image, frameX, crouch) {
+function drawSpriteAttackFrameWarp(f, image, frameX, crouch, compact = false) {
   if (!f.attack || f.hurt > 0) return;
   const frame = attackFrameProfile(f);
   if (frame.bandT <= 0.04) return;
@@ -6859,37 +6861,41 @@ function drawSpriteAttackFrameWarp(f, image, frameX, crouch) {
   const centerY = localY + zone.h * 0.5;
   const alpha = clamp(0.07 + frame.bandT * 0.13 + readability.snap * 0.035 + bodyWeight.drive * 0.018, 0.06, 0.26);
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(-BODY_SPRITE_ANCHOR_X - zone.pad, localY - zone.pad, BODY_SPRITE_FRAME_W + zone.pad * 2, zone.h + zone.pad * 2);
-  ctx.clip();
-  ctx.globalAlpha = alpha;
-  ctx.globalCompositeOperation = "source-over";
-  ctx.translate(
-    frame.bandShiftX + bodyWeight.drive * 1.2 - bodyWeight.recoil * 0.7,
-    centerY + frame.bandShiftY + bodyWeight.compression * 1.1 - bodyWeight.lift * 0.65
-  );
-  ctx.rotate(frame.bandRotate + bodyWeight.drive * 0.004 - bodyWeight.recoil * 0.003);
-  ctx.scale(frame.bandScaleX + bodyWeight.drive * 0.01, frame.bandScaleY - bodyWeight.compression * 0.005);
-  ctx.translate(0, -centerY);
-  ctx.drawImage(
-    image,
-    frameX,
-    0,
-    BODY_SPRITE_FRAME_W,
-    BODY_SPRITE_FRAME_H,
-    -BODY_SPRITE_ANCHOR_X,
-    -BODY_SPRITE_ANCHOR_Y + crouch * 0.18,
-    BODY_SPRITE_FRAME_W,
-    BODY_SPRITE_FRAME_H
-  );
-  ctx.restore();
+  if (!compact) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-BODY_SPRITE_ANCHOR_X - zone.pad, localY - zone.pad, BODY_SPRITE_FRAME_W + zone.pad * 2, zone.h + zone.pad * 2);
+    ctx.clip();
+    ctx.globalAlpha = alpha;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.translate(
+      frame.bandShiftX + bodyWeight.drive * 1.2 - bodyWeight.recoil * 0.7,
+      centerY + frame.bandShiftY + bodyWeight.compression * 1.1 - bodyWeight.lift * 0.65
+    );
+    ctx.rotate(frame.bandRotate + bodyWeight.drive * 0.004 - bodyWeight.recoil * 0.003);
+    ctx.scale(frame.bandScaleX + bodyWeight.drive * 0.01, frame.bandScaleY - bodyWeight.compression * 0.005);
+    ctx.translate(0, -centerY);
+    ctx.drawImage(
+      image,
+      frameX,
+      0,
+      BODY_SPRITE_FRAME_W,
+      BODY_SPRITE_FRAME_H,
+      -BODY_SPRITE_ANCHOR_X,
+      -BODY_SPRITE_ANCHOR_Y + crouch * 0.18,
+      BODY_SPRITE_FRAME_W,
+      BODY_SPRITE_FRAME_H
+    );
+    ctx.restore();
+  }
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  ctx.globalAlpha = clamp(0.1 + frame.arcFan * 0.2 + readability.clarity * 0.06, 0.08, 0.4);
+  ctx.globalAlpha = compact
+    ? clamp(0.055 + frame.arcFan * 0.12 + readability.clarity * 0.035, 0.04, 0.22)
+    : clamp(0.1 + frame.arcFan * 0.2 + readability.clarity * 0.06, 0.08, 0.4);
   ctx.strokeStyle = colorWithAlpha(f.trim, 0.62);
-  ctx.lineWidth = 1.5 + frame.arcFan * 2 + readability.snap * 1.2;
+  ctx.lineWidth = compact ? 1.15 + frame.arcFan * 1.35 + readability.snap * 0.75 : 1.5 + frame.arcFan * 2 + readability.snap * 1.2;
   ctx.lineCap = "round";
   const lineBaseY = zone.lineY + crouch * 0.18;
   for (let i = 0; i < 3; i += 1) {
@@ -6907,7 +6913,64 @@ function drawSpriteAttackFrameWarp(f, image, frameX, crouch) {
   ctx.restore();
 }
 
-function drawSpriteAttackSilhouetteExtension(f, crouch, frameName) {
+function drawSpriteAttackMotionTrace(f, crouch, type, power, read, phase) {
+  const localCrouch = crouch * 0.18;
+  const trim = f.trim ?? "#fff1bd";
+  const special = type === "special";
+  const kick = type === "kick" || type === "airKick";
+  const sweep = type === "sweep";
+  const punch = type === "punch" || type === "airPunch" || type === "grab";
+  const clarity = clamp(read.clarity, 0, 1.4);
+  const snap = clamp(Math.max(phase.snap, phase.strike * 0.72), 0, 1.2);
+  const alpha = clamp(0.09 + power * 0.2 + clarity * 0.045, 0.08, 0.32);
+  const baseY = sweep ? -18 + localCrouch : kick ? -67 + localCrouch - power * 15 : special ? -126 + localCrouch - power * 8 : -132 + localCrouch - power * 5;
+  const startX = punch || special ? 54 : 44;
+  const endX = sweep ? 158 + power * 28 : kick ? 164 + power * 34 : special ? 144 + power * 20 : 152 + power * 26;
+  const arcY = sweep ? -24 + localCrouch : kick ? -105 + localCrouch - snap * 8 : special ? -154 + localCrouch - snap * 10 : -152 + localCrouch - snap * 7;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  for (let i = 0; i < 4; i += 1) {
+    const lane = i - 1.5;
+    const laneAlpha = alpha * (1 - i * 0.12);
+    ctx.globalAlpha = laneAlpha;
+    ctx.strokeStyle = colorWithAlpha(i === 0 && special ? f.specialStyle?.rim ?? trim : trim, 0.82);
+    ctx.lineWidth = 1.2 + power * 1.15 + (3 - i) * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(startX - power * 12, baseY + lane * (kick || sweep ? 9 : 7));
+    ctx.quadraticCurveTo(
+      92 + power * 22,
+      arcY + lane * (kick || sweep ? 8 : 6),
+      endX,
+      baseY + lane * (sweep ? 5 : kick ? 4 : 3)
+    );
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = clamp(alpha * 0.72, 0.06, 0.22);
+  ctx.strokeStyle = colorWithAlpha(special ? f.specialStyle?.core ?? trim : "#fff6c9", 0.92);
+  ctx.lineWidth = 1.1 + snap * 1.25;
+  ctx.beginPath();
+  ctx.moveTo(startX + 12, baseY - (kick ? 15 : 8));
+  ctx.quadraticCurveTo(112 + power * 16, arcY - 10, endX + 22, baseY - (sweep ? 3 : 10));
+  ctx.stroke();
+
+  if (special) {
+    ctx.globalAlpha = clamp(0.08 + snap * 0.18, 0.08, 0.28);
+    ctx.strokeStyle = colorWithAlpha(f.specialStyle?.rim ?? trim, 0.95);
+    ctx.lineWidth = 1.8 + snap * 1.4;
+    ctx.beginPath();
+    ctx.ellipse(endX - 3, baseY - 2, 22 + snap * 9, 9 + snap * 4, -0.08, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawSpriteAttackSilhouetteExtension(f, crouch, frameName, compact = false) {
   if (!f.attack || f.hurt > 0) return;
   const type = f.attack.type;
   const phase = attackPhase(f.attack);
@@ -6922,6 +6985,10 @@ function drawSpriteAttackSilhouetteExtension(f, crouch, frameName) {
   const sweep = type === "sweep";
   const special = type === "special";
   if (!punch && !kick && !sweep && !special) return;
+  if (compact) {
+    drawSpriteAttackMotionTrace(f, crouch, type, power, read, phase);
+    return;
+  }
 
   const outfit = outfitSpec(f) ?? {};
   const sleeve = outfit.sleeve ?? f.color ?? "#497ac4";
@@ -7367,7 +7434,7 @@ function strokeSecondaryRibbon(points, color, width, alpha = 1) {
   ctx.restore();
 }
 
-function drawSpriteSecondaryMotion(f, crouch, frameName, stride) {
+function drawSpriteSecondaryMotion(f, crouch, frameName, stride, options = {}) {
   const motion = secondaryMotionProfile(f, stride);
   const active = Math.max(motion.flutter, Math.abs(motion.x) / 10, Math.abs(stride) * 0.4);
   if (active <= 0.1 && frameName !== "idle") return;
@@ -7452,8 +7519,8 @@ function drawSpriteSecondaryMotion(f, crouch, frameName, stride) {
   ctx.stroke();
   ctx.restore();
 
-  if (f.profileId === "p1") drawPchanSpriteBandanaSecondary(motion, localCrouch);
-  if (f.profileId === "p2") drawAkaneSpriteHairSecondary(motion, localCrouch);
+  if (!options.skipHeadAccessories && f.profileId === "p1") drawPchanSpriteBandanaSecondary(motion, localCrouch);
+  if (!options.skipHeadAccessories && f.profileId === "p2") drawAkaneSpriteHairSecondary(motion, localCrouch);
 }
 
 function drawPchanSpriteBandanaSecondary(motion, localCrouch) {
