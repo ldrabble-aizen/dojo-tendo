@@ -462,6 +462,19 @@ canvas {
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
+.game-shell[data-screen="home"] .topbar {
+  top: -6px;
+  opacity: 0.72;
+  transform: scale(0.6);
+  transform-origin: top center;
+}
+
+.game-shell[data-screen="home"] .topbar:hover,
+.game-shell[data-screen="home"] .topbar:focus-within {
+  opacity: 1;
+  transform: scale(0.72);
+}
+
 .game-shell.is-fighting .topbar {
   opacity: 0.18;
   transform: translateY(-6px);
@@ -752,6 +765,10 @@ canvas {
     0 0 12px rgba(255, 197, 58, 0.32);
 }
 
+.fighter-select-heading h2 {
+  text-align: left;
+}
+
 .fighter-choice-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -778,7 +795,7 @@ canvas {
   color: #f7ead0;
   background:
     linear-gradient(180deg, rgba(58, 61, 66, 0.95), rgba(18, 16, 15, 0.98)),
-    radial-gradient(circle at 20% 0%, rgba(255, 214, 93, 0.14), transparent 48%);
+    radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--choice-trim, #ffd65d) 16%, transparent), transparent 48%);
   border-color: rgba(255, 207, 92, 0.34);
   box-shadow:
     0 6px 0 #130908,
@@ -809,12 +826,12 @@ canvas {
 .overlay[data-screen="home"] .fighter-choice[aria-pressed="true"] {
   color: #fff7d6;
   background:
-    linear-gradient(180deg, #7d1912, #c83b22 45%, #48100d),
+    linear-gradient(180deg, color-mix(in srgb, var(--choice-color, #7d1912) 72%, #2b0a08), color-mix(in srgb, var(--choice-trim, #c83b22) 72%, #8c1c12) 45%, #48100d),
     radial-gradient(circle at 24% 18%, rgba(255, 234, 139, 0.36), transparent 42%);
-  border-color: #ffe483;
+  border-color: color-mix(in srgb, var(--choice-trim, #ffe483) 72%, #fff1bd);
   box-shadow:
     0 6px 0 #2a0908,
-    0 0 22px rgba(236, 56, 26, 0.52),
+    0 0 22px color-mix(in srgb, var(--choice-trim, #ec381a) 46%, transparent),
     inset 0 1px 0 rgba(255,255,255,0.34);
 }
 
@@ -943,42 +960,64 @@ canvas {
 }
 
 .overlay[data-screen="home"] .fighter-select {
-  grid-template-columns: minmax(280px, 1fr) 74px minmax(280px, 1fr);
+  grid-template-columns: minmax(300px, 1fr) 86px minmax(300px, 1fr);
   align-items: stretch;
-  width: min(1040px, calc(100% - 24px));
-  gap: 12px;
+  width: min(1120px, calc(100% - 24px));
+  gap: 14px;
 }
 
 .fighter-select-versus {
   align-self: center;
   display: grid;
-  place-items: center;
-  width: 74px;
-  height: 74px;
+  justify-items: center;
+  align-content: center;
+  gap: 6px;
+  width: 86px;
+  min-height: 118px;
+  padding: 10px 6px;
   color: #fff1bd;
   border: 1px solid rgba(255, 228, 131, 0.72);
-  border-radius: 50%;
+  border-radius: 999px;
   background:
-    radial-gradient(circle at 50% 32%, rgba(255, 239, 164, 0.28), transparent 40%),
+    radial-gradient(circle at 50% 35%, rgba(255, 239, 164, 0.32), transparent 42%),
+    radial-gradient(circle at 50% 100%, rgba(200, 59, 34, 0.45), transparent 52%),
     linear-gradient(180deg, rgba(109, 24, 17, 0.96), rgba(20, 7, 6, 0.98));
   box-shadow:
     0 0 0 6px rgba(0, 0, 0, 0.34),
     0 0 28px rgba(255, 193, 62, 0.28),
     inset 0 2px 0 rgba(255,255,255,0.2);
-  font: 900 30px/1 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
   text-shadow: 0 3px 0 #260706, 0 0 14px rgba(255, 216, 97, 0.5);
+}
+
+.fighter-select-versus strong {
+  font: 900 34px/0.9 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+}
+
+.fighter-select-versus span,
+.fighter-select-versus em {
+  display: block;
+  color: rgba(255, 233, 166, 0.88);
+  font: 900 9px/1 system-ui, sans-serif;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.82);
+}
+
+.fighter-select-versus em {
+  color: #75f0cb;
+  font-style: normal;
 }
 
 .overlay[data-screen="home"] .fighter-select-column {
   position: relative;
   overflow: hidden;
-  grid-template-rows: auto minmax(128px, auto) auto;
-  min-height: 260px;
-  padding: 12px;
+  grid-template-rows: auto minmax(150px, auto) auto;
+  min-height: 292px;
+  padding: 13px;
   border-color: color-mix(in srgb, var(--fighter-trim) 58%, #2a100b);
   background:
-    radial-gradient(circle at 50% -8%, color-mix(in srgb, var(--fighter-trim) 24%, transparent), transparent 38%),
-    linear-gradient(180deg, rgba(40, 22, 18, 0.9), rgba(8, 8, 10, 0.95));
+    radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--fighter-trim) 30%, transparent), transparent 40%),
+    radial-gradient(circle at 18% 38%, color-mix(in srgb, var(--fighter-color) 18%, transparent), transparent 34%),
+    linear-gradient(180deg, rgba(40, 22, 18, 0.92), rgba(8, 8, 10, 0.96));
 }
 
 .overlay[data-screen="home"] .fighter-select-column::before {
@@ -992,6 +1031,18 @@ canvas {
   opacity: 0.78;
 }
 
+.overlay[data-screen="home"] .fighter-select-column::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid color-mix(in srgb, var(--fighter-trim) 38%, transparent);
+  border-radius: 7px;
+  box-shadow:
+    inset 0 0 34px color-mix(in srgb, var(--fighter-color) 14%, transparent),
+    0 0 18px rgba(0,0,0,0.24);
+  pointer-events: none;
+}
+
 .fighter-select-column[data-side="left"] {
   transform-origin: right center;
 }
@@ -1000,7 +1051,47 @@ canvas {
   transform-origin: left center;
 }
 
+.fighter-select-heading {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 3px 5px 8px;
+}
+
+.fighter-select-heading::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--fighter-trim), transparent);
+  opacity: 0.72;
+}
+
+.fighter-select-side-tag {
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  min-height: 24px;
+  padding: 0 8px;
+  color: #1b1007;
+  border: 1px solid rgba(255,255,255,0.58);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff1bd, var(--fighter-trim));
+  box-shadow:
+    0 4px 10px rgba(0,0,0,0.34),
+    inset 0 1px 0 rgba(255,255,255,0.46);
+  font: 950 11px/1 system-ui, sans-serif;
+  text-transform: uppercase;
+}
+
 .overlay[data-screen="home"] .fighter-select-column h2,
+.fighter-select-heading,
 .fighter-showcase,
 .fighter-choice-grid {
   position: relative;
@@ -1011,14 +1102,15 @@ canvas {
   position: relative;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 118px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 134px minmax(0, 1fr);
+  gap: 16px;
   align-items: center;
-  min-height: 138px;
-  padding: 11px;
+  min-height: 154px;
+  padding: 12px;
   border: 1px solid rgba(255, 241, 189, 0.2);
   border-radius: 8px;
   background:
+    radial-gradient(circle at 10% 40%, color-mix(in srgb, var(--fighter-trim) 28%, transparent), transparent 34%),
     linear-gradient(90deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.12)),
     radial-gradient(circle at 20% 24%, color-mix(in srgb, var(--fighter-trim) 22%, transparent), transparent 44%);
   box-shadow:
@@ -1040,21 +1132,32 @@ canvas {
   position: relative;
   display: grid;
   place-items: center;
-  width: 118px;
-  height: 118px;
+  width: 134px;
+  height: 134px;
   border: 1px solid rgba(255, 228, 131, 0.56);
-  border-radius: 8px;
+  border-radius: 10px;
   background:
-    radial-gradient(circle at 50% 28%, rgba(255, 241, 189, 0.26), transparent 45%),
+    radial-gradient(circle at 50% 28%, rgba(255, 241, 189, 0.3), transparent 44%),
+    radial-gradient(circle at 50% 82%, color-mix(in srgb, var(--fighter-trim) 32%, transparent), transparent 46%),
     linear-gradient(180deg, color-mix(in srgb, var(--fighter-color) 32%, #111216), #111216);
   box-shadow:
     0 10px 18px rgba(0,0,0,0.42),
     inset 0 1px 0 rgba(255,255,255,0.16);
 }
 
+.fighter-showcase-portrait::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid color-mix(in srgb, var(--fighter-trim) 58%, transparent);
+  border-radius: 8px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
 .fighter-showcase-portrait img {
-  width: 98px;
-  height: 98px;
+  width: 112px;
+  height: 112px;
   object-fit: contain;
   filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.62));
 }
@@ -1155,25 +1258,42 @@ canvas {
 }
 
 .overlay[data-screen="home"] .fighter-choice-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 9px;
 }
 
 .overlay[data-screen="home"] .fighter-choice {
+  position: relative;
+  overflow: hidden;
   grid-template-columns: 1fr;
   justify-items: center;
   gap: 5px;
-  min-height: 82px;
+  min-height: 86px;
   padding: 7px 5px;
   border-radius: 7px;
 }
 
+.overlay[data-screen="home"] .fighter-choice::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.1), transparent 45%),
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--choice-trim, var(--fighter-trim)) 18%, transparent), transparent 46%);
+  opacity: 0.58;
+  pointer-events: none;
+}
+
 .overlay[data-screen="home"] .fighter-choice img {
-  width: 45px;
-  height: 45px;
+  position: relative;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
 }
 
 .overlay[data-screen="home"] .fighter-choice span {
+  position: relative;
+  z-index: 1;
   max-width: 100%;
   font-size: 10px;
   text-align: center;
@@ -1445,14 +1565,30 @@ canvas {
   .fighter-select-versus {
     width: 46px;
     height: 32px;
+    min-height: 32px;
+    padding: 3px 5px;
+    gap: 0;
     justify-self: center;
     border-radius: 6px;
+  }
+
+  .fighter-select-versus span,
+  .fighter-select-versus em {
+    display: none;
+  }
+
+  .fighter-select-versus strong {
     font-size: 18px;
   }
 
   .overlay[data-screen="home"] .fighter-select-column {
     min-height: 0;
     padding: 9px;
+  }
+
+  .fighter-select-heading {
+    min-height: 24px;
+    padding: 1px 3px 6px;
   }
 
   .fighter-showcase {
@@ -1512,8 +1648,9 @@ canvas {
     height: 5px;
   }
 
+  .overlay[data-screen="home"] .fighter-choice-grid,
   .fighter-choice-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
   }
 
@@ -1700,6 +1837,19 @@ canvas {
     font-size: 10px;
   }
 
+  .fighter-select-heading {
+    min-height: 18px;
+    padding: 0 2px 3px;
+    gap: 4px;
+  }
+
+  .fighter-select-side-tag {
+    min-width: 24px;
+    min-height: 16px;
+    padding: 0 5px;
+    font-size: 8px;
+  }
+
   .fighter-showcase {
     grid-template-columns: 48px minmax(0, 1fr);
     min-height: 54px;
@@ -1771,7 +1921,18 @@ canvas {
   .fighter-select-versus {
     width: 42px;
     height: 42px;
+    min-height: 42px;
+    padding: 4px;
     align-self: center;
+    gap: 0;
+  }
+
+  .fighter-select-versus span,
+  .fighter-select-versus em {
+    display: none;
+  }
+
+  .fighter-select-versus strong {
     font-size: 16px;
   }
 

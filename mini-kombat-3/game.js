@@ -8880,25 +8880,6 @@ function drawResultPoseEffect(f, crouch) {
     ctx.ellipse(0, -96 + crouch, 78, 130, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    const glints = fxCount(isMobileFightView() ? 3 : 5);
-    for (let i = 0; i < glints; i += 1) {
-      const angle = clock * 0.035 + i * 1.26;
-      const x = Math.cos(angle) * 44;
-      const y = -148 + crouch + Math.sin(angle * 1.4) * 18;
-      ctx.fillStyle = colorWithAlpha(f.trim, 0.45);
-      ctx.beginPath();
-      ctx.moveTo(x, y - 8);
-      ctx.lineTo(x + 4, y - 2);
-      ctx.lineTo(x + 10, y);
-      ctx.lineTo(x + 4, y + 3);
-      ctx.lineTo(x, y + 10);
-      ctx.lineTo(x - 4, y + 3);
-      ctx.lineTo(x - 10, y);
-      ctx.lineTo(x - 4, y - 2);
-      ctx.closePath();
-      ctx.fill();
-    }
-
     if (f.profileId === "p2") {
       ctx.strokeStyle = "rgba(95, 240, 199, 0.22)";
       ctx.lineWidth = 2.2;
@@ -8946,6 +8927,44 @@ function drawResultPoseEffect(f, crouch) {
       ctx.beginPath();
       ctx.ellipse(-18 + i * 18, -52 + crouch + Math.sin(clock * 0.08 + i) * 3, 5, 2.6, 0.1, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    const dizzy = smoothStep01(clamp((resultFrame - 8) / 36, 0, 1));
+    const fade = 1 - smoothStep01(clamp((resultFrame - 190) / 70, 0, 1));
+    const starAlpha = dizzy * fade;
+    if (starAlpha > 0.03) {
+      const stars = fxCount(isMobileFightView() ? 3 : 4);
+      const orbitX = 36 + fall * 8;
+      const orbitY = 10 + fall * 2;
+      const centerY = -142 + crouch + fall * 18;
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = starAlpha;
+      for (let i = 0; i < stars; i += 1) {
+        const angle = clock * 0.08 + i * ((Math.PI * 2) / stars);
+        const x = Math.cos(angle) * orbitX;
+        const y = centerY + Math.sin(angle) * orbitY;
+        const scale = 0.78 + Math.sin(angle + clock * 0.05) * 0.18;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle * 1.7);
+        ctx.fillStyle = "rgba(255, 238, 124, 0.82)";
+        ctx.strokeStyle = colorWithAlpha(f.trim, 0.58);
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        for (let point = 0; point < 10; point += 1) {
+          const radius = (point % 2 === 0 ? 7.5 : 3.2) * scale;
+          const a = -Math.PI / 2 + point * Math.PI / 5;
+          const px = Math.cos(a) * radius;
+          const py = Math.sin(a) * radius;
+          if (point === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
     }
   }
   ctx.restore();
@@ -12475,6 +12494,7 @@ function fxCount(count, minimum = 1) {
 function syncShellState() {
   const fighting = running && !paused && !winner && overlay.classList.contains("hidden");
   gameShell.classList.toggle("is-fighting", fighting);
+  gameShell.dataset.screen = overlay.classList.contains("hidden") ? "fight" : overlay.dataset.screen;
 }
 
 function setCpuMode(enabled) {
@@ -12520,7 +12540,13 @@ function renderFighterSelect() {
 
   const versus = document.createElement("div");
   versus.className = "fighter-select-versus";
-  versus.textContent = "VS";
+  const mode = document.createElement("span");
+  mode.textContent = tournamentMode ? "TORNEO" : cpuEnabled ? "CPU" : "2P";
+  const mark = document.createElement("strong");
+  mark.textContent = "VS";
+  const rounds = document.createElement("em");
+  rounds.textContent = "MEJOR DE III";
+  versus.append(mode, mark, rounds);
   fighterSelect.append(versus);
 
   fighterSelect.append(makeSelectColumn("right", "Derecha", selectedRightId));
@@ -12580,13 +12606,21 @@ function makeSelectColumn(side, title, selectedId) {
   column.style.setProperty("--fighter-trim", fighterProfiles[selectedId].trim);
   column.style.setProperty("--fighter-accent", fighterProfiles[selectedId].outfit.accent);
 
+  const headingWrap = document.createElement("div");
+  headingWrap.className = "fighter-select-heading";
   const heading = document.createElement("h2");
-  heading.textContent = side === "left" && cpuEnabled ? `${title} / CPU` : title;
-  column.append(heading);
+  heading.textContent = title;
+  headingWrap.append(heading);
+  const sideTag = document.createElement("span");
+  sideTag.className = "fighter-select-side-tag";
+  sideTag.textContent = side === "left" && cpuEnabled ? "CPU" : side === "left" ? "J1" : "J2";
+  headingWrap.append(sideTag);
+  column.append(headingWrap);
 
   const selectedProfile = fighterProfiles[selectedId];
   const showcase = document.createElement("div");
   showcase.className = "fighter-showcase";
+  showcase.dataset.fighter = selectedId;
 
   const portraitWrap = document.createElement("div");
   portraitWrap.className = "fighter-showcase-portrait";
@@ -12626,6 +12660,8 @@ function makeSelectColumn(side, title, selectedId) {
     button.className = "fighter-choice";
     button.dataset.side = side;
     button.dataset.fighter = id;
+    button.style.setProperty("--choice-color", profile.color);
+    button.style.setProperty("--choice-trim", profile.trim);
     button.setAttribute("aria-pressed", String(id === selectedId));
     button.addEventListener("click", () => setSelectedFighter(side, id));
 
