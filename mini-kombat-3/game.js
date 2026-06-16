@@ -1244,10 +1244,10 @@ function showVersusOverlay(startKind = "match") {
   overlay.dataset.screen = "versus";
   overlay.dataset.mode = tournamentActive ? "tournament" : "match";
   const roundLabel = startKind === "round" ? `ROUND ${toRoman(roundNumber)}` : tournamentActive ? `RIVAL ${tournamentIndex + 1}/${tournamentOpponents.length}` : `ROUND ${toRoman(roundNumber)}`;
-  overlay.querySelector("h1").textContent = `${fighters[0].name} VS ${fighters[1].name}`;
+  overlay.querySelector("h1").textContent = roundLabel;
   overlayCopy.textContent = tournamentActive
-    ? `Torneo Dojo Tendo. ${roundLabel}. ${fighters[1].name} busca avanzar en la escalera.`
-    : `${roundLabel}. Preparados para pelear.`;
+    ? `Torneo Dojo Tendo. ${fighters[0].name} VS ${fighters[1].name}. ${fighters[1].name} busca avanzar en la escalera.`
+    : `${fighters[0].name} VS ${fighters[1].name}. Preparados para pelear.`;
   renderVersusPanel(roundLabel);
   startButton.textContent = "COMENZAR";
   fighterSelect.classList.remove("hidden");
@@ -12558,7 +12558,7 @@ function renderVersusPanel(roundLabel) {
   fighterSelect.classList.add("versus-panel");
   const leftRole = tournamentActive ? "Rival" : cpuEnabled ? "CPU" : "Jugador 1";
   const rightRole = tournamentActive ? "Jugador" : "Jugador 2";
-  fighterSelect.append(makeVersusCard(fighters[0], leftRole));
+  fighterSelect.append(makeVersusCard(fighters[0], leftRole, "left"));
 
   const center = document.createElement("div");
   center.className = "versus-panel-center";
@@ -12568,33 +12568,45 @@ function renderVersusPanel(roundLabel) {
   const mark = document.createElement("strong");
   mark.textContent = "VS";
   center.append(mark);
+  const caption = document.createElement("em");
+  caption.textContent = tournamentActive ? "TORNEO" : cpuEnabled ? "CPU" : "2P";
+  center.append(caption);
   fighterSelect.append(center);
 
-  fighterSelect.append(makeVersusCard(fighters[1], rightRole));
+  fighterSelect.append(makeVersusCard(fighters[1], rightRole, "right"));
 }
 
-function makeVersusCard(fighter, role) {
+function makeVersusCard(fighter, role, side) {
   const card = document.createElement("section");
   card.className = "versus-card";
+  card.dataset.side = side;
   card.style.setProperty("--fighter-color", fighter.color);
   card.style.setProperty("--fighter-trim", fighter.trim);
 
+  const roleTag = document.createElement("span");
+  roleTag.className = "versus-card-role";
+  roleTag.textContent = role;
+  card.append(roleTag);
+
+  const portraitStage = document.createElement("div");
+  portraitStage.className = "versus-card-portrait";
   const image = document.createElement("img");
   image.src = fighter.face.src;
   image.alt = fighter.name;
-  card.append(image);
+  portraitStage.append(image);
+  card.append(portraitStage);
 
+  const info = document.createElement("div");
+  info.className = "versus-card-info";
   const name = document.createElement("strong");
   name.textContent = fighter.name;
-  card.append(name);
-
-  const caption = document.createElement("span");
-  caption.textContent = role;
-  card.append(caption);
+  info.append(name);
 
   const trait = document.createElement("em");
   trait.textContent = fighterTrait(fighter);
-  card.append(trait);
+  info.append(trait);
+  info.append(makeMenuStats(fighter));
+  card.append(info);
   return card;
 }
 
