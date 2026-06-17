@@ -67,9 +67,12 @@ const bodySpriteSheets = {
   p2: loadImage("assets/sprite-akane-body.svg?v=58"),
 };
 const unifiedSpriteSheets = {
-  p1: loadImage("assets/sprite-pchan-unified.svg?v=58"),
-  p2: loadImage("assets/sprite-akane-unified.svg?v=58"),
+  p1: loadImage("assets/sprite-pchan-unified.svg?v=59"),
+  p2: loadImage("assets/sprite-akane-unified.svg?v=59"),
 };
+function usesUnifiedSprite(f) {
+  return f?.profileId === "p1" || f?.profileId === "p2";
+}
 const stageArt = loadImage("assets/dojo-premium-bg.webp", "assets/dojo-premium-bg.png");
 const wallPortraits = {
   akane: loadImage("assets/wall-portrait-akane-tendo.webp", "assets/wall-portrait-akane-tendo.png"),
@@ -248,7 +251,7 @@ const CHARACTER_MOTION = {
     rotation: 0.82,
     stretchX: 1.08,
     stretchY: 0.9,
-    afterimage: 0.46,
+    afterimage: 0.18,
     arcFan: 0.86,
     headDrive: 0.78,
     headPrep: 0.82,
@@ -280,7 +283,7 @@ const CHARACTER_MOTION = {
     rotation: 1.25,
     stretchX: 1.16,
     stretchY: 1.08,
-    afterimage: 0.54,
+    afterimage: 0.2,
     arcFan: 1.24,
     headDrive: 1.22,
     headPrep: 1.18,
@@ -5340,7 +5343,7 @@ function fighterTransitionMotion(f, walking) {
     }
   }
 
-  motion.afterimage = clamp(motion.afterimage * style.afterimage, 0, f.profileId === "p1" || f.profileId === "p2" ? 0.18 : 0.3);
+  motion.afterimage = clamp(motion.afterimage * style.afterimage, 0, usesUnifiedSprite(f) ? 0.055 : 0.3);
 
   return motion;
 }
@@ -5627,7 +5630,7 @@ function drawFighter(f) {
   if (f.attack) drawAttackAnticipationCue(f, crouch);
   if (f.attack) drawAttackBodyGlow(f, crouch);
   if (f.attack) drawAttackKineticFX(f, crouch, "back");
-  if (f.energy >= 45 && f.hurt <= 0) drawEnergyAura(f.trim, crouch);
+  if (f.energy >= 45 && f.hurt <= 0 && !(usesUnifiedSprite(f) && f.attack)) drawEnergyAura(f, crouch);
   drawSpriteUnderlay(f, pose, crouch);
 
   if (drawRasterBodySprite(f, crouch, walking ? stride : 0, walking, transition)) {
@@ -5779,25 +5782,31 @@ function drawAttackAnticipationCue(f, crouch) {
   ctx.restore();
 }
 
-function drawEnergyAura(color, crouch) {
+function drawEnergyAura(f, crouch) {
+  const color = f.trim ?? "#fff1bd";
+  const cleanSprite = usesUnifiedSprite(f);
+  const auraAlpha = cleanSprite ? 0.34 : 1;
+  const auraScale = cleanSprite ? 0.82 : 1;
   const pulse = 0.45 + Math.sin(roundFrame * 0.08) * 0.16;
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.strokeStyle = color;
-  ctx.globalAlpha = 0.012 + pulse * 0.014;
-  ctx.lineWidth = 0.8;
+  ctx.globalAlpha = (0.012 + pulse * 0.014) * auraAlpha;
+  ctx.lineWidth = cleanSprite ? 0.5 : 0.8;
   ctx.beginPath();
-  ctx.ellipse(0, -88 + crouch, 48, 72, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -88 + crouch, 48 * auraScale, 72 * auraScale, 0, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.globalAlpha = 0.008 + pulse * 0.01;
+  ctx.globalAlpha = (0.008 + pulse * 0.01) * auraAlpha;
   ctx.beginPath();
-  ctx.ellipse(0, -93 + crouch, 58, 84, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -93 + crouch, 58 * auraScale, 84 * auraScale, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }
 
 function drawFighterRimLight(f, crouch) {
-  const alpha = f.hurt > 0 ? 0.1 : f.energy >= 45 ? 0.045 : 0.035;
+  const cleanSprite = usesUnifiedSprite(f);
+  const alphaBase = f.hurt > 0 ? 0.1 : f.energy >= 45 ? 0.045 : 0.035;
+  const alpha = alphaBase * (cleanSprite ? 0.42 : 1);
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   const rim = ctx.createRadialGradient(-18, -124 + crouch, 12, 0, -96 + crouch, 96);
@@ -5812,11 +5821,13 @@ function drawFighterRimLight(f, crouch) {
 }
 
 function drawFighterStageLighting(f, crouch) {
+  const cleanSprite = usesUnifiedSprite(f);
+  const lightFactor = cleanSprite ? 0.45 : 1;
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   const warm = ctx.createLinearGradient(-58, -185 + crouch, 34, -42 + crouch);
-  warm.addColorStop(0, "rgba(255, 224, 150, 0.08)");
-  warm.addColorStop(0.36, colorWithAlpha(f.trim, 0.03));
+  warm.addColorStop(0, `rgba(255, 224, 150, ${0.08 * lightFactor})`);
+  warm.addColorStop(0.36, colorWithAlpha(f.trim, 0.03 * lightFactor));
   warm.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = warm;
   ctx.beginPath();
@@ -5824,7 +5835,7 @@ function drawFighterStageLighting(f, crouch) {
   ctx.fill();
 
   const coolRim = ctx.createLinearGradient(38, -172 + crouch, 72, -56 + crouch);
-  coolRim.addColorStop(0, "rgba(120, 217, 255, 0.07)");
+  coolRim.addColorStop(0, `rgba(120, 217, 255, ${0.07 * lightFactor})`);
   coolRim.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = coolRim;
   ctx.beginPath();
@@ -5835,7 +5846,7 @@ function drawFighterStageLighting(f, crouch) {
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
-  ctx.fillStyle = "rgba(34, 17, 10, 0.055)";
+  ctx.fillStyle = `rgba(34, 17, 10, ${0.055 * (cleanSprite ? 0.38 : 1)})`;
   ctx.beginPath();
   ctx.ellipse(14, -82 + crouch, 58, 98, 0.05, 0, Math.PI * 2);
   ctx.fill();
@@ -5843,8 +5854,9 @@ function drawFighterStageLighting(f, crouch) {
 }
 
 function dynamicLightProfile(f) {
+  const cleanSprite = usesUnifiedSprite(f);
   const raw = clamp((f.dynamicLightPulse ?? 0) / Math.max(1, f.dynamicLightMax ?? 1), 0, 1);
-  const hitLight = smoothStep01(raw) * clamp(f.dynamicLightStrength ?? 0, 0, 1.5);
+  const hitLight = smoothStep01(raw) * clamp(f.dynamicLightStrength ?? 0, 0, 1.5) * (cleanSprite ? 0.62 : 1);
   const guard = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
   const specialPhase = f.attack?.type === "special" ? attackPhase(f.attack) : null;
   const special = specialPhase ? Math.max(specialPhase.anticipation * 0.7, specialPhase.strike, specialPhase.snap) : 0;
@@ -5853,21 +5865,23 @@ function dynamicLightProfile(f) {
   let zone = f.dynamicLightZone ?? "torso";
   let dir = f.dynamicLightDir ?? f.impactDir ?? f.dir ?? 1;
 
-  if (guard * 0.82 > active) {
-    active = guard * 0.82;
+  const guardWeight = cleanSprite ? 0.44 : 0.82;
+  if (guard * guardWeight > active) {
+    active = guard * guardWeight;
     color = "#bdeaff";
     zone = "guard";
     dir = f.dir ?? 1;
   }
 
-  if (special * 0.92 > active) {
-    active = special * 0.92;
+  const specialWeight = cleanSprite ? 0.32 : 0.92;
+  if (special * specialWeight > active) {
+    active = special * specialWeight;
     color = f.specialStyle?.rim ?? "#fff1bd";
     zone = "torso";
     dir = f.dir ?? 1;
   }
 
-  return { active: clamp(active, 0, 1.45), color, zone, dir };
+  return { active: clamp(active, 0, cleanSprite ? 0.48 : 1.45), color, zone, dir };
 }
 
 function drawDynamicFighterLighting(f, crouch) {
@@ -5913,9 +5927,10 @@ function drawDynamicFighterLighting(f, crouch) {
 
 function drawSpriteUnderlay(f, pose, crouch) {
   const spec = bodySpec(f);
-  const shoulder = spec.shoulder + 12;
-  const hip = spec.hip + 12;
-  const alpha = f.hurt > 0 ? 0.18 : 0.1;
+  const cleanSprite = usesUnifiedSprite(f);
+  const shoulder = spec.shoulder + (cleanSprite ? 4 : 12);
+  const hip = spec.hip + (cleanSprite ? 4 : 12);
+  const alpha = cleanSprite ? (f.hurt > 0 ? 0.055 : 0.022) : (f.hurt > 0 ? 0.18 : 0.1);
 
   ctx.save();
   ctx.fillStyle = `rgba(20, 11, 9, ${alpha})`;
