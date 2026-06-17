@@ -3269,8 +3269,8 @@ function attackVisualSpec(type = "") {
     color: special ? "#fff1bd" : kick || sweep ? "#ffe87a" : grab ? "#ffd7a8" : "#9be7ff",
     core: special ? "#8fe2ff" : kick || sweep ? "#fff6bf" : grab ? "#fff0d0" : "#e8fbff",
     trailY: sweep ? -38 : kick ? -84 : special ? -118 : grab ? -112 : -126,
-    trailReach: sweep ? 142 : kick ? 132 : special ? 104 : grab ? 94 : 98,
-    trailHeight: sweep ? 20 : kick ? 30 : special ? 44 : grab ? 26 : 22,
+    trailReach: sweep ? 142 : kick ? 118 : special ? 104 : grab ? 94 : 98,
+    trailHeight: sweep ? 20 : kick ? 22 : special ? 44 : grab ? 26 : 22,
     windupPull: sweep ? 9.5 : kick ? 8.4 : special ? 7.2 : grab ? 7.6 : 8.8,
     snapDrive: sweep ? 13.2 : kick ? 15.4 : special ? 10.8 : grab ? 11.2 : 12.6,
     followDrag: sweep ? 2.2 : kick ? 2.9 : special ? 2.5 : grab ? 2.6 : 2.3,
@@ -9115,6 +9115,7 @@ function drawAttackArc(f, box) {
   const motion = characterMotion(f);
   const read = attackReadabilityProfile(f);
   const isKick = spec.kick || spec.sweep;
+  const kickArcScale = spec.kick ? 0.68 : 1;
   const progress = Math.max(phase.strike, phase.snap * 0.9, phase.anticipation * 0.35, phase.followThrough * 0.28, phase.recovery * 0.22);
   const outfit = outfitSpec(f);
   const x = f.dir > 0 ? box.x + box.w * 0.28 : box.x + box.w * 0.72;
@@ -9125,65 +9126,66 @@ function drawAttackArc(f, box) {
   ctx.scale(f.dir * FIGHTER_SCALE, FIGHTER_SCALE);
   ctx.rotate((spec.sweep ? 0.02 : isKick ? -0.16 : -0.06) * motion.rotation);
 
-  const arcReach = (isKick ? 106 : spec.special ? 96 : 82) * motion.reach * (0.96 + read.clarity * 0.06);
-  const arcHeight = isKick ? 29 * motion.lift : 21 * motion.lift;
+  const arcReach = (spec.kick ? 92 : isKick ? 106 : spec.special ? 96 : 82) * motion.reach * (0.96 + read.clarity * 0.06);
+  const arcHeight = (spec.kick ? 19 : isKick ? 29 : 21) * motion.lift;
   const glow = ctx.createRadialGradient(24, 0, 4, 24, 0, arcReach);
   glow.addColorStop(
     0,
     spec.heavy
-      ? `rgba(255, 231, 122, ${0.34 + motion.force * 0.04})`
+      ? `rgba(255, 231, 122, ${(0.34 + motion.force * 0.04) * kickArcScale})`
       : `rgba(155, 231, 255, ${0.28 + motion.afterimage * 0.08})`
   );
   glow.addColorStop(0.38, colorWithAlpha(outfit.accent, 0.18 + phase.snap * 0.08));
   glow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(22 + phase.snap * 8, 0, isKick ? 100 * motion.reach : 78 * motion.reach, arcHeight, 0, 0, Math.PI * 2);
+  ctx.ellipse(22 + phase.snap * 8, 0, spec.kick ? 82 * motion.reach : isKick ? 100 * motion.reach : 78 * motion.reach, arcHeight, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = colorWithAlpha(outfit.accent, 0.78);
   ctx.globalAlpha = (0.18 + phase.anticipation * 0.06 + phase.strike * 0.34 + phase.recovery * 0.1)
-    * clamp(0.9 + motion.afterimage * 0.12, 0.85, 1.18);
-  ctx.lineWidth = ((isKick ? 12 : 9) + phase.strike * 2.2 + phase.snap * 2.4) * (f.profileId === "p1" ? 1.16 : 0.88);
+    * clamp(0.9 + motion.afterimage * 0.12, 0.85, 1.18)
+    * kickArcScale;
+  ctx.lineWidth = ((spec.kick ? 8 : isKick ? 12 : 9) + phase.strike * 2.2 + phase.snap * 2.4) * (f.profileId === "p1" ? 1.16 : 0.88);
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(-12 - phase.anticipation * 12, 13 + phase.anticipation * 5);
   ctx.quadraticCurveTo(
     32,
     (-34 - phase.strike * 8 - phase.snap * 8) * motion.lift,
-    isKick ? 134 * motion.reach + phase.strike * 18 + phase.snap * 18 : 96 * motion.reach + phase.strike * 14 + phase.snap * 12,
+    spec.kick ? 112 * motion.reach + phase.strike * 14 + phase.snap * 14 : isKick ? 134 * motion.reach + phase.strike * 18 + phase.snap * 18 : 96 * motion.reach + phase.strike * 14 + phase.snap * 12,
     -10 * motion.lift
   );
   ctx.stroke();
 
   ctx.strokeStyle = spec.color;
-  ctx.globalAlpha = 0.24 + phase.strike * 0.42 + phase.snap * 0.22 + phase.recovery * 0.1;
-  ctx.lineWidth = ((isKick ? 7 : 5) + phase.strike * 1.4) * (f.profileId === "p1" ? 1.12 : 0.88);
+  ctx.globalAlpha = (0.24 + phase.strike * 0.42 + phase.snap * 0.22 + phase.recovery * 0.1) * kickArcScale;
+  ctx.lineWidth = ((spec.kick ? 5 : isKick ? 7 : 5) + phase.strike * 1.4) * (f.profileId === "p1" ? 1.12 : 0.88);
   ctx.beginPath();
   ctx.moveTo(-10 - phase.anticipation * 10, 8 + phase.anticipation * 4);
   ctx.quadraticCurveTo(
     34,
     (-28 - phase.strike * 8 - phase.snap * 6) * motion.lift,
-    isKick ? 126 * motion.reach + phase.strike * 16 + phase.snap * 16 : 88 * motion.reach + phase.strike * 12 + phase.snap * 10,
+    spec.kick ? 106 * motion.reach + phase.strike * 12 + phase.snap * 12 : isKick ? 126 * motion.reach + phase.strike * 16 + phase.snap * 16 : 88 * motion.reach + phase.strike * 12 + phase.snap * 10,
     -8 * motion.lift
   );
   ctx.stroke();
 
   if (phase.snap > 0.05) {
-    ctx.fillStyle = `rgba(255,255,255,${0.18 + phase.snap * 0.28})`;
+    ctx.fillStyle = `rgba(255,255,255,${(0.18 + phase.snap * 0.28) * kickArcScale})`;
     ctx.beginPath();
-    ctx.ellipse(isKick ? 118 : 82, -9, 16 + phase.snap * 12, 5 + phase.snap * 3, -0.08, 0, Math.PI * 2);
+    ctx.ellipse(spec.kick ? 102 : isKick ? 118 : 82, -9, 16 + phase.snap * (spec.kick ? 8 : 12), 5 + phase.snap * 3, -0.08, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  const pointAlpha = clamp(phase.strike * 0.28 + phase.snap * 0.3 + phase.followThrough * 0.1, 0, 0.5);
+  const pointAlpha = clamp((phase.strike * 0.28 + phase.snap * 0.3 + phase.followThrough * 0.1) * kickArcScale, 0, 0.5);
   if (pointAlpha > 0.05) {
-    const tipX = isKick ? 126 + phase.snap * 18 : spec.special ? 108 + phase.snap * 16 : 88 + phase.snap * 12;
+    const tipX = spec.kick ? 108 + phase.snap * 12 : isKick ? 126 + phase.snap * 18 : spec.special ? 108 + phase.snap * 16 : 88 + phase.snap * 12;
     const tipY = isKick ? -11 : spec.special ? -16 : -10;
     ctx.globalAlpha = pointAlpha;
     ctx.fillStyle = colorWithAlpha(spec.core, 0.95);
     ctx.beginPath();
-    ctx.ellipse(tipX, tipY, isKick ? 18 + read.clarity * 8 : 13 + read.clarity * 5, isKick ? 5.6 + read.clarity * 2 : 4.2 + read.clarity * 1.5, -0.08, 0, Math.PI * 2);
+    ctx.ellipse(tipX, tipY, spec.kick ? 13 + read.clarity * 5 : isKick ? 18 + read.clarity * 8 : 13 + read.clarity * 5, isKick ? 5.6 + read.clarity * 2 : 4.2 + read.clarity * 1.5, -0.08, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = colorWithAlpha("#ffffff", 0.6);
     ctx.lineWidth = 1.6 + read.clarity * 0.8;
@@ -9840,38 +9842,71 @@ function getPose(f, stride) {
     }
   } else if (attackType === "kick" || attackType === "airKick") {
     const mass = attackMass ?? attackMassProfile(null);
-    const drive = mass.drive + mass.snap * 0.42;
+    const snap = mass.snap ?? phase.snap;
+    const drive = mass.drive + snap * 0.42;
     const load = mass.load;
-    base.frontLeg.knee = { x: 35 - windup * 13 + activePulse * 48 - recovery * 8, y: -43 - windup * 5 - activePulse * 23 + crouch + recovery * 8 };
-    base.frontLeg.foot = { x: 49 - windup * 22 + activePulse * 92 + recovery * 4, y: -19 + windup * 4 - activePulse * 39 + recovery * 14 };
-    base.backLeg.knee = { x: -29 - activePulse * 7 - windup * 5, y: -31 + crouch + recovery * 3 };
-    base.backLeg.foot = { x: -42 - activePulse * 13 - windup * 8 + recovery * 6, y: -1 };
-    base.frontArm.elbow = { x: 36 - windup * 5 - activePulse * 10, y: -86 + crouch + activePulse * 8 + recovery * 5 };
-    base.frontArm.hand = { x: 47 - windup * 7 - activePulse * 12, y: -63 + crouch + activePulse * 4 + recovery * 5 };
-    base.backArm.elbow = { x: -42 - windup * 11 - activePulse * 9, y: -108 + crouch - windup * 7 - activePulse * 7 + recovery * 6 };
-    base.backArm.hand = { x: -24 - windup * 15 - activePulse * 16, y: -90 + crouch - windup * 9 - activePulse * 8 + recovery * 7 };
-    base.torsoTilt += -load * 0.04 + drive * 0.052 - recovery * 0.014;
-    base.frontLeg.knee.x += drive * 8 * spec.stance;
-    base.frontLeg.foot.x += drive * 16 * spec.stance;
-    base.frontLeg.foot.y -= drive * 4;
-    base.backLeg.knee.y += load * 4.5 + drive * 3.4;
-    base.backLeg.foot.x -= load * 8 * spec.stance + drive * 9 * spec.stance;
-    base.backLeg.foot.y += load * 1.4 + drive * 1.2;
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 0.82);
+    const chamber = clamp(load * 0.78 + windup * 0.92 + phase.anticipation * 0.28, 0, 1.22);
+    const extension = clamp(activePulse * 0.9 + snap * 0.46 + drive * 0.18, 0, 1.3);
+    const retract = clamp(recovery * 0.9 + phase.followThrough * 0.28, 0, 1.16);
+    const airborneKick = attackType === "airKick" ? 1 : 0;
+    const footLift = f.profileId === "p2" ? 1.12 : f.profileId === "p1" ? 0.78 : 1;
+    const supportWeight = clamp(chamber * 0.55 + extension * 0.86 + retract * 0.25, 0, 1.45);
+
+    base.frontLeg.knee = {
+      x: (29 + chamber * 18 + extension * 30 - retract * 13) * spec.stance,
+      y: -42 + crouch - chamber * 28 - extension * 18 + retract * 22 - airborneKick * 8,
+    };
+    base.frontLeg.foot = {
+      x: (39 + chamber * 8 + extension * 84 - retract * 18) * spec.stance,
+      y: -8 - chamber * 35 - extension * 44 * footLift + retract * 46 - airborneKick * 12,
+    };
+    base.frontLeg.lift = clamp(chamber * 0.62 + extension * 0.95, 0, 1);
+    base.frontLeg.extension = extension;
+    base.frontLeg.footAngle = -0.12 + chamber * 0.18 - extension * 0.05 + retract * 0.14;
+    base.backLeg.knee = {
+      x: (-28 - chamber * 6 - extension * 9 + retract * 5) * spec.stance,
+      y: -30 + crouch + supportWeight * 9 + recovery * 3,
+    };
+    base.backLeg.foot = {
+      x: (-42 - chamber * 12 - extension * 18 + retract * 8) * spec.stance,
+      y: -1 + supportWeight * 1.6 - airborneKick * 3,
+    };
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.58 + supportWeight * 0.42, 0, 1));
+    base.backLeg.footAngle = -0.05 - supportWeight * 0.04;
+    base.frontArm.elbow = {
+      x: (35 - chamber * 6 - extension * 13 + retract * 5) * spec.stance,
+      y: -88 + crouch + extension * 11 + retract * 5,
+    };
+    base.frontArm.hand = {
+      x: (46 - chamber * 7 - extension * 16 + retract * 5) * spec.stance,
+      y: -65 + crouch + extension * 8 + retract * 5,
+    };
+    base.backArm.elbow = {
+      x: (-41 - chamber * 13 - extension * 11 + retract * 7) * spec.stance,
+      y: -110 + crouch - chamber * 7 - extension * 8 + retract * 7,
+    };
+    base.backArm.hand = {
+      x: (-24 - chamber * 17 - extension * 16 + retract * 8) * spec.stance,
+      y: -91 + crouch - chamber * 9 - extension * 9 + retract * 8,
+    };
+    base.torsoTilt += -load * 0.042 - chamber * 0.03 + drive * 0.044 - recovery * 0.012;
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 0.9, supportWeight * 0.82);
     if (f.profileId === "p1") {
-      base.torsoTilt += drive * 0.02;
-      base.frontLeg.foot.x += drive * 7 * spec.stance;
-      base.frontLeg.foot.y += drive * 3;
-      base.backLeg.knee.y += load * 5 + drive * 4;
-      base.backLeg.foot.x -= (load * 8 + drive * 7) * spec.stance;
-      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 1.08);
+      base.torsoTilt += extension * 0.016;
+      base.frontLeg.foot.x += extension * 5 * spec.stance;
+      base.frontLeg.foot.y += extension * 7;
+      base.frontLeg.footAngle += 0.03;
+      base.backLeg.knee.y += load * 5 + extension * 5;
+      base.backLeg.foot.x -= (load * 8 + extension * 8) * spec.stance;
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 1.12);
     } else if (f.profileId === "p2") {
-      base.torsoTilt -= drive * 0.028;
-      base.frontLeg.knee.y -= drive * 7;
-      base.frontLeg.foot.x += drive * 13 * spec.stance;
-      base.frontLeg.foot.y -= drive * 12;
-      base.frontArm.hand.y -= drive * 7;
-      base.backArm.hand.y -= drive * 9;
+      base.torsoTilt -= extension * 0.03;
+      base.frontLeg.knee.y -= extension * 7;
+      base.frontLeg.foot.x += extension * 12 * spec.stance;
+      base.frontLeg.foot.y -= extension * 7;
+      base.frontLeg.footAngle -= 0.05;
+      base.frontArm.hand.y -= extension * 7;
+      base.backArm.hand.y -= extension * 9;
       base.backLeg.foot.y -= load * 2;
     }
   } else if (attackType === "sweep") {
@@ -9999,6 +10034,9 @@ function getPose(f, stride) {
       base.frontLeg.knee.y += framePose.bandShiftY * 0.55;
       base.frontLeg.foot.x += framePose.bandShiftX * 0.58 * spec.stance;
       base.frontLeg.foot.y += framePose.bandShiftY * 0.86;
+      base.frontLeg.extension = Math.max(base.frontLeg.extension ?? 0, clamp(framePose.bandT * 0.94, 0, 1.18));
+      base.frontLeg.lift = Math.max(base.frontLeg.lift ?? 0, clamp(framePose.bandT * 0.8, 0, 1));
+      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + framePose.bandRotate * 0.32 - framePose.bandT * 0.025;
       base.backLeg.knee.y += framePose.bandT * 5;
       base.backLeg.foot.x -= framePose.bandT * 8 * spec.stance;
       base.frontArm.hand.x -= framePose.bandT * 8 * spec.stance;
@@ -10426,12 +10464,13 @@ function solveTwoBoneLimb(limb, rootKey, jointKey, endKey, upperLen, lowerLen, b
   const dx = targetEnd.x - root.x;
   const dy = targetEnd.y - root.y;
   const rawDistance = Math.max(0.001, Math.hypot(dx, dy));
-  const maxReach = upperLen + lowerLen - 0.5;
+  const maxReach = upperLen + lowerLen - clamp((upperLen + lowerLen) * 0.06, 3.2, 5.4);
   const minReach = Math.max(2, Math.abs(upperLen - lowerLen) + 0.5);
   const distance = clamp(rawDistance, minReach, maxReach);
   const ux = dx / rawDistance;
   const uy = dy / rawDistance;
   const end = {
+    ...targetEnd,
     x: root.x + ux * distance,
     y: root.y + uy * distance,
   };
@@ -11448,11 +11487,13 @@ function drawLeg(f, leg, front) {
   const calfWidth = (spec.calfWidth ?? spec.limb ?? 1);
   const hipAngle = Math.atan2(leg.knee.y - leg.hip.y, leg.knee.x - leg.hip.x);
   const kneeAngle = Math.atan2(leg.foot.y - leg.knee.y, leg.foot.x - leg.knee.x);
+  const legExtension = clamp(leg.extension ?? 0, 0, 1.2);
+  const legLift = clamp(leg.lift ?? 0, 0, 1);
 
-  drawLimbSegment(leg.hip, leg.knee, pant, 24 * thighWidth, 16 * thighWidth);
-  drawLimbSegment(leg.knee, leg.foot, pant, 19 * calfWidth, 10 * calfWidth);
+  drawLimbSegment(leg.hip, leg.knee, pant, 24 * thighWidth, 16 * thighWidth, 1 + legExtension * 0.08);
+  drawLimbSegment(leg.knee, leg.foot, pant, 19 * calfWidth, 10 * calfWidth, 1 + legExtension * 0.05);
   drawSpriteJointCover(leg.hip, pant, 12 * thighWidth, 9 * thighWidth, hipAngle, front ? 0.96 : 0.82);
-  drawSpriteJointCover(leg.knee, pant, 9 * calfWidth, 7 * calfWidth, kneeAngle, front ? 1 : 0.84);
+  drawSpriteJointCover(leg.knee, pant, (9 + legExtension * 1.3) * calfWidth, (7 + legExtension * 0.7) * calfWidth, kneeAngle, front ? 1 : 0.84);
   drawSpriteCuff(leg.knee, leg.foot, pant, 16 * calfWidth, 0.82);
 
   ctx.fillStyle = front ? outfit.accent : "rgba(255,255,255,0.14)";
@@ -11465,50 +11506,64 @@ function drawLeg(f, leg, front) {
 
   if (front) {
     ctx.strokeStyle = `${outfit.belt}`;
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.2 + legExtension * 0.7;
     ctx.beginPath();
     ctx.moveTo(leg.hip.x + 4, leg.hip.y + 5);
     ctx.quadraticCurveTo(leg.knee.x + 6, leg.knee.y - 3, leg.foot.x + 4, leg.foot.y - 9);
     ctx.stroke();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.strokeStyle = `rgba(28, 17, 13, ${0.14 + legExtension * 0.08})`;
+    ctx.lineWidth = 1.35 + legExtension * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(leg.knee.x - 2, leg.knee.y + 4);
+    ctx.quadraticCurveTo(leg.knee.x + 9, leg.knee.y + 12, leg.foot.x + 3, leg.foot.y - 3);
+    ctx.stroke();
+    ctx.restore();
   }
 
   ctx.save();
   ctx.translate(leg.foot.x, leg.foot.y);
   const plant = clamp(leg.plant ?? 0, 0, 1);
-  const lift = clamp(leg.lift ?? 0, 0, 1);
-  ctx.rotate((leg.foot.x - leg.knee.x) * 0.012 * (1 - plant * 0.5) - lift * 0.08);
-  ctx.scale(1 + plant * 0.045, 1 - plant * 0.04 + lift * 0.025);
-  const footGrad = ctx.createLinearGradient(-15, -9, 27 * spec.foot, 7);
+  const lift = legLift;
+  const computedFootAngle = (leg.foot.x - leg.knee.x) * 0.012 * (1 - plant * 0.5) - lift * 0.08;
+  const footAngle = Number.isFinite(leg.footAngle) ? leg.footAngle : computedFootAngle;
+  const footLength = 43 * spec.foot + legExtension * 9;
+  const footHeight = 16 - legExtension * 1.7;
+  ctx.rotate(footAngle);
+  ctx.scale(1 + plant * 0.045 + legExtension * 0.08, 1 - plant * 0.04 + lift * 0.025 - legExtension * 0.045);
+  const footGrad = ctx.createLinearGradient(-15, -9, 27 * spec.foot + legExtension * 7, 7);
   footGrad.addColorStop(0, darken(outfit.shoe, 26));
   footGrad.addColorStop(0.38, outfit.shoe);
   footGrad.addColorStop(1, lighten(outfit.shoe, 16));
   ctx.fillStyle = footGrad;
   ctx.beginPath();
-  ctx.roundRect(-16, -9, 43 * spec.foot, 16, 7);
+  ctx.roundRect(-16 - legExtension * 1.5, -9, footLength, footHeight, 7);
   ctx.fill();
   ctx.strokeStyle = "rgba(35, 21, 17, 0.48)";
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.fillStyle = "rgba(9, 10, 12, 0.28)";
   ctx.beginPath();
-  ctx.roundRect(-16, 2, 43 * spec.foot, 5, 3);
+  ctx.roundRect(-16 - legExtension * 1.5, 2, footLength, 5, 3);
   ctx.fill();
   ctx.fillStyle = "rgba(255,255,255,0.18)";
   ctx.beginPath();
-  ctx.roundRect(8 * spec.foot, -8, 12 * spec.foot, 4, 3);
+  ctx.roundRect(8 * spec.foot + legExtension * 3, -8, 12 * spec.foot + legExtension * 2, 4, 3);
   ctx.fill();
   ctx.fillStyle = "rgba(255,255,255,0.22)";
-  ctx.fillRect(1, -7, 15 * spec.foot, 4);
+  ctx.fillRect(1, -7, 15 * spec.foot + legExtension * 4, 4);
   ctx.strokeStyle = "rgba(35, 21, 17, 0.34)";
   ctx.lineWidth = 1.5;
   for (let i = 0; i < 3; i += 1) {
-    const x = 13 + i * 5 * spec.foot;
+    const x = 13 + i * 5 * spec.foot + legExtension * 2.2;
     ctx.beginPath();
     ctx.moveTo(x, -6);
     ctx.lineTo(x + 2, 4);
     ctx.stroke();
   }
-  drawVectorFootAnatomy(spec, outfit, plant, lift);
+  drawVectorFootAnatomy(spec, outfit, plant, lift, legExtension);
   ctx.restore();
 }
 
@@ -11588,21 +11643,21 @@ function drawArm(f, arm, front) {
   }
 }
 
-function drawVectorFootAnatomy(spec, outfit, plant, lift) {
+function drawVectorFootAnatomy(spec, outfit, plant, lift, extension = 0) {
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
   ctx.strokeStyle = "rgba(20, 12, 9, 0.32)";
-  ctx.lineWidth = 1.45;
+  ctx.lineWidth = 1.45 + extension * 0.28;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(-13, 4.8);
-  ctx.quadraticCurveTo(2 * spec.foot, 8 + plant * 1.4, 25 * spec.foot, 3.8);
+  ctx.quadraticCurveTo(2 * spec.foot + extension * 2, 8 + plant * 1.4, 25 * spec.foot + extension * 5, 3.8);
   ctx.stroke();
 
   ctx.strokeStyle = "rgba(20, 12, 9, 0.22)";
   ctx.lineWidth = 1.1;
   for (let i = 0; i < 4; i += 1) {
-    const x = 3 + i * 5.2 * spec.foot;
+    const x = 3 + i * 5.2 * spec.foot + extension * 1.4;
     ctx.beginPath();
     ctx.moveTo(x, -5.8 + lift * 1.2);
     ctx.quadraticCurveTo(x + 1.2, -0.4, x + 2.4, 4.6);
@@ -11616,7 +11671,7 @@ function drawVectorFootAnatomy(spec, outfit, plant, lift) {
   ctx.lineWidth = 1.25;
   ctx.beginPath();
   ctx.moveTo(-9, -7.2);
-  ctx.quadraticCurveTo(4 * spec.foot, -11, 23 * spec.foot, -5.5);
+  ctx.quadraticCurveTo(4 * spec.foot + extension * 2, -11 - extension * 0.8, 23 * spec.foot + extension * 5, -5.5);
   ctx.stroke();
   ctx.restore();
 }
@@ -11664,13 +11719,13 @@ function drawVectorHandAnatomy(f, arm, spec, front) {
   ctx.restore();
 }
 
-function drawLimbSegment(a, b, color, widthA, widthB) {
+function drawLimbSegment(a, b, color, widthA, widthB, volume = 1) {
   const angle = Math.atan2(b.y - a.y, b.x - a.x);
   const nx = Math.cos(angle + Math.PI / 2);
   const ny = Math.sin(angle + Math.PI / 2);
   const length = Math.hypot(b.y - a.y, b.x - a.x);
-  const startW = widthA;
-  const endW = widthB;
+  const startW = widthA * volume;
+  const endW = widthB * volume;
   const width = (startW + endW) * 0.5;
   const dx = b.x - a.x;
   const dy = b.y - a.y;
