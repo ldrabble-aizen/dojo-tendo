@@ -4136,17 +4136,50 @@ function drawHud() {
   const panelY = compact ? 12 : 16;
   const panelW = compact ? 332 : 390;
   const sideInset = compact ? 18 : 22;
+  drawHudBackdrop(compact);
   drawHudPanel(sideInset, panelY, panelW, fighters[0], false, compact);
   drawHudPanel(W - sideInset - panelW, panelY, panelW, fighters[1], true, compact);
   drawHudCenter(compact);
 }
 
+function drawHudBackdrop(compact = false) {
+  const height = compact ? 86 : 112;
+  const fade = ctx.createLinearGradient(0, 0, 0, height);
+  fade.addColorStop(0, "rgba(0, 0, 0, 0.58)");
+  fade.addColorStop(0.58, "rgba(0, 0, 0, 0.18)");
+  fade.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = fade;
+  ctx.fillRect(0, 0, W, height);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  const left = ctx.createLinearGradient(0, 0, W * 0.4, 0);
+  left.addColorStop(0, colorWithAlpha(fighters[0].trim, compact ? 0.12 : 0.16));
+  left.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = left;
+  ctx.fillRect(0, 0, W * 0.48, height);
+
+  const right = ctx.createLinearGradient(W, 0, W * 0.6, 0);
+  right.addColorStop(0, colorWithAlpha(fighters[1].trim, compact ? 0.12 : 0.16));
+  right.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = right;
+  ctx.fillRect(W * 0.52, 0, W * 0.48, height);
+
+  ctx.strokeStyle = "rgba(255, 232, 164, 0.16)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(compact ? 16 : 24, height - 10);
+  ctx.lineTo(W - (compact ? 16 : 24), height - 10);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawHudCenter(compact = false) {
   const cx = W / 2;
-  const width = compact ? 76 : 108;
-  const height = compact ? 48 : 68;
+  const width = compact ? 84 : 120;
+  const height = compact ? 52 : 72;
   const x = cx - width / 2;
-  const y = compact ? 13 : 18;
+  const y = compact ? 11 : 15;
   const centerPanel = ctx.createLinearGradient(x, y, x + width, y + height);
   centerPanel.addColorStop(0, "rgba(99, 34, 21, 0.96)");
   centerPanel.addColorStop(0.42, "rgba(20, 13, 12, 0.96)");
@@ -4176,9 +4209,9 @@ function drawHudCenter(compact = false) {
   ctx.fillRect(x + 12, y + 11, width - 24, compact ? 4 : 6);
   ctx.fillStyle = "rgba(255, 205, 85, 0.14)";
   ctx.beginPath();
-  ctx.moveTo(cx - (compact ? 30 : 44), y + height - 9);
+  ctx.moveTo(cx - (compact ? 33 : 48), y + height - 9);
   ctx.lineTo(cx, y + 10);
-  ctx.lineTo(cx + (compact ? 30 : 44), y + height - 9);
+  ctx.lineTo(cx + (compact ? 33 : 48), y + height - 9);
   ctx.closePath();
   ctx.fill();
 
@@ -4187,12 +4220,14 @@ function drawHudCenter(compact = false) {
   ctx.shadowBlur = 8;
   ctx.shadowOffsetY = 2;
   ctx.fillStyle = "#fff1bd";
-  ctx.font = `900 ${compact ? 25 : 34}px system-ui, sans-serif`;
+  ctx.font = `900 ${compact ? 9 : 12}px system-ui, sans-serif`;
   ctx.textAlign = "center";
-  ctx.fillText(winner ? "KO" : "VS", cx, y + (compact ? 31 : 45));
-  ctx.font = `900 ${compact ? 9 : 13}px system-ui, sans-serif`;
+  ctx.fillText(matchOver ? "MATCH" : "ROUND", cx, y + (compact ? 18 : 22));
+  ctx.font = `900 ${compact ? 25 : 36}px Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif`;
+  ctx.fillText(winner ? "KO" : toRoman(roundNumber), cx, y + (compact ? 39 : 52));
+  ctx.font = `900 ${compact ? 8 : 10}px system-ui, sans-serif`;
   ctx.fillStyle = "rgba(255, 244, 205, 0.9)";
-  ctx.fillText(matchOver ? "MATCH" : `R${toRoman(roundNumber)}`, cx, y + (compact ? 44 : 65));
+  ctx.fillText(winner ? "FINAL" : "MEJOR DE III", cx, y + (compact ? 49 : 66));
   ctx.restore();
 }
 
@@ -4285,7 +4320,7 @@ function drawComboCounters() {
 }
 
 function drawHudPanel(x, y, width, f, reverse, compact = false) {
-  const height = compact ? 56 : 76;
+  const height = compact ? 58 : 80;
   const corner = compact ? 7 : 8;
   const panel = ctx.createLinearGradient(x, y, x + width, y + height);
   panel.addColorStop(0, reverse ? "rgba(23, 50, 42, 0.88)" : "rgba(64, 38, 18, 0.88)");
@@ -4382,9 +4417,9 @@ function drawHudPanel(x, y, width, f, reverse, compact = false) {
   ctx.fillText(f.name.toUpperCase(), nameX, y + (compact ? 16 : 20));
   ctx.restore();
 
-  drawHealth(barX, healthY, healthW, f, reverse, compact ? 21 : 28);
-  drawEnergy(energyX, y + (compact ? 43 : 60), energyW, f, reverse, compact ? 9 : 12);
-  drawWins(reverse ? x + 38 : x + width - 58, y + (compact ? 39 : 58), f, reverse, compact);
+  drawHealth(barX, healthY, healthW, f, reverse, compact ? 21 : 29);
+  drawEnergy(energyX, y + (compact ? 45 : 63), energyW, f, reverse, compact ? 9 : 12);
+  drawWins(reverse ? x + 38 : x + width - 58, y + (compact ? 39 : 59), f, reverse, compact);
 }
 
 function drawHudPortrait(x, y, f, reverse, size = 52) {
@@ -4575,12 +4610,31 @@ function drawEnergy(x, y, width, f, reverse, height = 12) {
   ctx.beginPath();
   ctx.roundRect(x + 1, y + 1, width - 2, height - 2, 4);
   ctx.stroke();
+
+  if (ready) {
+    ctx.save();
+    ctx.shadowColor = colorWithAlpha(f.trim, 0.55);
+    ctx.shadowBlur = 5;
+    ctx.fillStyle = "#fff1bd";
+    ctx.font = `900 ${height <= 9 ? 7 : 8}px system-ui, sans-serif`;
+    ctx.textAlign = reverse ? "left" : "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText("SPECIAL", reverse ? x + 4 : x + width - 4, y + height / 2 + 0.5);
+    ctx.restore();
+    ctx.textBaseline = "alphabetic";
+  }
 }
 
 function drawWins(x, y, f, reverse, compact = false) {
   const gap = compact ? 14 : 18;
   const glowRadius = compact ? 8 : 11;
   const pointRadius = compact ? 5.5 : 7;
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 247, 214, 0.66)";
+  ctx.font = `900 ${compact ? 7 : 8}px system-ui, sans-serif`;
+  ctx.textAlign = reverse ? "left" : "right";
+  ctx.fillText("WINS", reverse ? x + 6 : x - 6, y + 9);
+  ctx.restore();
   for (let i = 0; i < 2; i += 1) {
     const px = reverse ? x - i * gap : x + i * gap;
     const won = i < f.wins;

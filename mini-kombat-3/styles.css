@@ -476,14 +476,9 @@ canvas {
 }
 
 .game-shell.is-fighting .topbar {
-  opacity: 0.18;
-  transform: translateY(-6px);
-}
-
-.game-shell.is-fighting .topbar:hover,
-.game-shell.is-fighting .topbar:focus-within {
-  opacity: 1;
-  transform: translateY(0);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-28px) scale(0.92);
 }
 
 .fighter-label {
