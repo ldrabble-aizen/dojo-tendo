@@ -820,6 +820,10 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     jumpDir: dir,
     landingDir: dir,
     airFrames: 0,
+    airKickPulse: 0,
+    airKickRecoverPulse: 0,
+    airKickLandingPulse: 0,
+    airKickDir: dir,
     moveIntent: 0,
     poseState: "idle",
     previousPoseState: "idle",
@@ -1045,6 +1049,10 @@ function resetRound() {
     jumpDir: 1,
     landingDir: 1,
     airFrames: 0,
+    airKickPulse: 0,
+    airKickRecoverPulse: 0,
+    airKickLandingPulse: 0,
+    airKickDir: 1,
     moveIntent: 0,
     poseState: "idle",
     previousPoseState: "idle",
@@ -1148,6 +1156,10 @@ function resetRound() {
     jumpDir: -1,
     landingDir: -1,
     airFrames: 0,
+    airKickPulse: 0,
+    airKickRecoverPulse: 0,
+    airKickLandingPulse: 0,
+    airKickDir: -1,
     moveIntent: 0,
     poseState: "idle",
     previousPoseState: "idle",
@@ -1516,6 +1528,12 @@ function startAttack(f, type) {
   f.attackChainPulse = flowReady ? chainMax : 0;
   f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, Math.round(timing.entry * (flowReady ? 0.58 : 1)));
   f.guardExitPulse = Math.max(f.guardExitPulse ?? 0, (f.guardPulse ?? 0) > 2 ? 8 : 0);
+  if (type === "airKick") {
+    f.airKickPulse = Math.max(f.airKickPulse ?? 0, timing.duration);
+    f.airKickRecoverPulse = Math.max(f.airKickRecoverPulse ?? 0, Math.round(timing.recover * 0.6));
+    f.airKickLandingPulse = 0;
+    f.airKickDir = f.dir || f.jumpDir || 1;
+  }
   if (f.grounded && (heavy || sweep)) {
     const supportSide = sweep ? 1 : -1;
     f.footPlantSide = supportSide;
@@ -1867,6 +1885,9 @@ function updateFighter(f, opponent) {
   if (f.jumpStrength > 0) f.jumpStrength *= 0.9;
   if (f.landingPulse > 0) f.landingPulse -= 1;
   if ((f.landingPulse ?? 0) <= 0 && f.landingStrength > 0) f.landingStrength *= 0.84;
+  if (f.airKickPulse > 0) f.airKickPulse -= 1;
+  if (f.airKickRecoverPulse > 0) f.airKickRecoverPulse -= 1;
+  if (f.airKickLandingPulse > 0) f.airKickLandingPulse -= 1;
   if (f.stepPulse > 0) f.stepPulse -= 1;
   if (f.stepCooldown > 0) f.stepCooldown -= 1;
   if (f.footPlantPulse > 0) f.footPlantPulse -= 1;
@@ -1952,11 +1973,17 @@ function updateFighter(f, opponent) {
     f.vy = 0;
     f.airFrames = 0;
     if (!wasGrounded && landingSpeed > 2.1) {
-      const landingStrength = clamp(landingSpeed / 11.5, 0.34, 1.5) * (characterMotion(f).walkWeight ?? 1);
-      f.landingPulse = Math.min(16, 7 + landingSpeed * 0.56);
+      const fromAirKick = (f.airKickPulse ?? 0) > 0 || (f.airKickRecoverPulse ?? 0) > 0 || f.attack?.type === "airKick";
+      const landingStrength = clamp(landingSpeed / 11.5, 0.34, 1.5) * (characterMotion(f).walkWeight ?? 1) * (fromAirKick ? 1.16 : 1);
+      f.landingPulse = Math.min(16, 7 + landingSpeed * (fromAirKick ? 0.66 : 0.56));
       f.landingStrength = Math.max(f.landingStrength ?? 0, landingStrength);
       f.stepPulse = Math.max(f.stepPulse, 6);
       f.landingDir = Math.sign(f.vx) || f.jumpDir || f.dir;
+      if (fromAirKick) {
+        f.airKickLandingPulse = Math.max(f.airKickLandingPulse ?? 0, Math.round(9 + landingStrength * 5));
+        f.airKickDir = f.dir || f.jumpDir || f.landingDir || 1;
+        f.airKickRecoverPulse = 0;
+      }
       f.walkWeight = Math.max(f.walkWeight ?? 0, clamp(landingSpeed / 13, 0.18, 0.58));
       f.footPlantPulse = Math.max(f.footPlantPulse ?? 0, Math.round(8 + landingStrength * 4));
       f.walkAnchorPulse = Math.max(f.walkAnchorPulse ?? 0, Math.round(9 + landingStrength * 5));
@@ -2040,6 +2067,10 @@ function updateFighter(f, opponent) {
       const endedType = f.attack.type;
       const timing = attackTiming(endedType);
       f.attackRecoverPulse = Math.max(f.attackRecoverPulse ?? 0, timing.recover);
+      if (endedType === "airKick") {
+        f.airKickRecoverPulse = Math.max(f.airKickRecoverPulse ?? 0, Math.round(timing.recover * 1.35));
+        f.airKickDir = f.dir || f.jumpDir || 1;
+      }
       const recoveryCooldown = Math.max(
         4,
         Math.round(timing.recover * (endedType === "special" ? 0.62 : endedType === "kick" || endedType === "airKick" || endedType === "sweep" ? 0.54 : 0.48))
@@ -5063,6 +5094,21 @@ function fighterTransitionMotion(f, walking) {
     motion.scaleY *= 1 + rise * (0.033 + liftStyle * 0.009) - fall * (0.018 + weightStyle * 0.004);
   }
 
+  const airKickRecoverT = smoothStep01(clamp((f.airKickRecoverPulse ?? 0) / 24, 0, 1));
+  if (!f.grounded && f.hurt <= 0 && (f.attack?.type === "airKick" || airKickRecoverT > 0.025)) {
+    const phase = f.attack?.type === "airKick" ? attackPhase(f.attack) : null;
+    const strike = phase ? Math.max(phase.strike, phase.snap * 0.82) : 0;
+    const fold = phase ? Math.max(phase.followThrough, phase.recovery, airKickRecoverT * 0.82) : airKickRecoverT;
+    const fall = clamp(f.vy / 13, 0, 1);
+    const airKickDir = f.airKickDir || f.jumpDir || dir;
+    motion.x += airKickDir * (strike * 1.15 - fold * 0.62);
+    motion.y += fall * fold * (1.05 + (style.walkWeight ?? 1) * 0.28) - strike * 0.32;
+    motion.rotation += airKickDir * (strike * 0.018 + fold * (0.024 + fall * 0.012));
+    motion.scaleX *= 1 + strike * 0.01 + fold * 0.006;
+    motion.scaleY *= 1 - strike * 0.006 - fold * 0.012;
+    motion.afterimage = Math.max(motion.afterimage, strike * 0.018 + fold * 0.012);
+  }
+
   const jumpT = clamp((f.jumpPulse ?? 0) / 12, 0, 1);
   if (jumpT > 0) {
     const jumpStrength = clamp(f.jumpStrength ?? 1, 0.65, 1.42);
@@ -5086,6 +5132,17 @@ function fighterTransitionMotion(f, walking) {
     motion.rotation += landingDir * settle * (0.014 + landingStrength * 0.014);
     motion.scaleX *= 1 + settle * (0.036 + landingStrength * 0.026) - rebound * 0.005;
     motion.scaleY *= 1 - settle * (0.04 + landingStrength * 0.03) + rebound * 0.012;
+  }
+
+  const airKickLandingT = clamp((f.airKickLandingPulse ?? 0) / 16, 0, 1);
+  if (airKickLandingT > 0.025) {
+    const settle = smoothStep01(airKickLandingT);
+    const landingDir = f.airKickDir || f.landingDir || dir;
+    motion.x -= landingDir * settle * 0.55;
+    motion.y += settle * 1.25;
+    motion.rotation += landingDir * settle * 0.012;
+    motion.scaleX *= 1 + settle * 0.012;
+    motion.scaleY *= 1 - settle * 0.016;
   }
 
   const stepPulse = clamp((f.stepPulse ?? 0) / 7, 0, 1);
@@ -6372,6 +6429,165 @@ function drawSpriteFrameBlend(f, image, frameName, currentFrameIndex, crouch, wa
   ctx.restore();
 }
 
+function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walking, stride) {
+  if (f.profileId !== "p1" && f.profileId !== "p2") return;
+
+  const localCrouch = crouch * 0.18;
+  const motion = secondaryMotionProfile(f, walking ? stride : 0);
+  const acting = headActingProfile(f, walking ? stride : 0);
+  const phase = attackPhase(f.attack);
+  const type = f.attack?.type ?? "";
+  const kick = type === "kick" || type === "airKick";
+  const landing = smoothStep01(clamp((f.airKickLandingPulse ?? f.landingPulse ?? 0) / 16, 0, 1));
+  const action = f.attack ? Math.max(phase.strike, phase.snap * 0.8, phase.followThrough * 0.55) : 0;
+  const hurt = clamp((f.hurt ?? 0) / 24, 0, 1);
+  const lean = clamp(acting.rotation * 11, -2.4, 2.4);
+  const headX = clamp(acting.x * 0.08, -1.8, 1.8);
+  const neckY = -186 + localCrouch + clamp(acting.y * 0.08, -1.2, 1.2);
+  const trim = f.trim ?? "#fff1bd";
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(23, 11, 8, ${0.12 + hurt * 0.045 + action * 0.035 + landing * 0.025})`;
+  ctx.beginPath();
+  ctx.ellipse(headX, neckY + 2, f.profileId === "p2" ? 24 : 29, f.profileId === "p2" ? 7 : 8.5, lean * 0.02, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(32, 17, 12, ${0.08 + hurt * 0.035 + landing * 0.025})`;
+  ctx.beginPath();
+  ctx.moveTo(-27 + headX * 0.35, neckY + 4);
+  ctx.quadraticCurveTo(0 + lean * 0.45, neckY + 15 + landing * 2, 27 + headX * 0.35, neckY + 4);
+  ctx.quadraticCurveTo(16, neckY + 21, -16, neckY + 21, -27 + headX * 0.35, neckY + 4);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(trim, f.profileId === "p2" ? 0.12 : 0.1);
+  ctx.lineWidth = 1.1;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-31 + headX * 0.25, neckY + 10);
+  ctx.quadraticCurveTo(-13 + lean * 0.25, neckY + 17, -2, neckY + 14);
+  ctx.moveTo(31 + headX * 0.25, neckY + 10);
+  ctx.quadraticCurveTo(13 + lean * 0.25, neckY + 17, 2, neckY + 14);
+  ctx.stroke();
+  ctx.restore();
+
+  drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase);
+  drawUnifiedHeadAccessoryPolish(f, localCrouch, motion, acting);
+}
+
+function drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase) {
+  const airKick = f.attack?.type === "airKick";
+  const groundedKick = kick && f.grounded;
+  const landingPress = f.grounded ? landing : 0;
+  const strike = f.attack ? Math.max(phase.strike, phase.snap * 0.84) : 0;
+  const retract = f.attack ? Math.max(phase.followThrough, phase.recovery * 0.88) : 0;
+  const active = Math.max(groundedKick ? strike : 0, landingPress * 0.92);
+  const profileWeight = f.profileId === "p1" ? 1.12 : f.profileId === "p2" ? 0.84 : 1;
+  const supportX = f.profileId === "p2" ? -33 : -39;
+  const freeX = f.profileId === "p2" ? 45 : 48;
+  const footY = -2 + localCrouch;
+
+  if (active > 0.035) {
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = `rgba(36, 21, 12, ${0.08 + active * 0.08 * profileWeight})`;
+    ctx.beginPath();
+    ctx.ellipse(supportX - active * 5, footY + 4, 25 + active * 14, 5.2 + active * 2.4, -0.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (landingPress > 0.04) {
+      ctx.fillStyle = `rgba(42, 25, 13, ${0.05 + landingPress * 0.055})`;
+      ctx.beginPath();
+      ctx.ellipse(freeX + landingPress * 4, footY + 4, 20 + landingPress * 11, 4.8 + landingPress * 1.8, 0.04, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = `rgba(255, 232, 156, ${0.08 + active * 0.07})`;
+    ctx.lineWidth = 1.15 + active * 0.7;
+    ctx.beginPath();
+    ctx.ellipse(supportX - active * 4, footY + 2, 18 + active * 10, 3.6 + active * 1.3, -0.05, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  if (airKick && !f.grounded && Math.max(strike, retract) > 0.08) {
+    const fold = clamp(retract + clamp(f.vy / 13, 0, 1) * 0.28, 0, 1.15);
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.strokeStyle = `rgba(26, 13, 10, ${0.055 + fold * 0.05})`;
+    ctx.lineWidth = 2.4 + fold * 1.1;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-30, -76 + localCrouch + fold * 5);
+    ctx.quadraticCurveTo(-43 - fold * 6, -51 + localCrouch + fold * 15, -36 - fold * 8, -23 + localCrouch + fold * 18);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawUnifiedHeadAccessoryPolish(f, localCrouch, motion, acting) {
+  const drama = clamp(Math.max(motion.drama ?? 0, acting.shock ?? 0, acting.strain ?? 0), 0, 1.8);
+  const active = Math.max(motion.flutter, Math.abs(motion.x) / 9, drama * 0.72, f.attack ? 0.35 : 0);
+  if (active <= 0.12 && f.hurt <= 0) return;
+
+  const compactMotion = {
+    ...motion,
+    drama,
+    flutter: motion.flutter * 0.72,
+    x: motion.x * 0.78,
+    y: motion.y * 0.62,
+    whip: motion.whip * 0.72,
+    wave: motion.wave * 0.82,
+    afterWave: motion.afterWave * 0.82,
+  };
+
+  if (f.profileId === "p1") {
+    drawUnifiedPchanBandanaFlutterPolish(localCrouch, compactMotion, acting);
+  } else if (f.profileId === "p2") {
+    drawAkaneSpriteHairSecondary(compactMotion, localCrouch, { alphaScale: 0.62, strandScale: 0.76 });
+  }
+}
+
+function drawUnifiedPchanBandanaFlutterPolish(localCrouch, motion, acting) {
+  const flutter = clamp(motion.flutter * 0.55 + Math.abs(motion.whip) * 0.16 + (acting.bandanaFlutter ?? 0) * 0.2, 0, 1.2);
+  const drama = clamp(motion.drama ?? 0, 0, 1.6);
+  if (flutter <= 0.08 && drama <= 0.08) return;
+
+  const baseX = 29 + clamp(acting.x * 0.06 + motion.x * 0.08, -1.6, 1.6);
+  const baseY = -228 + localCrouch + clamp(acting.y * 0.04 + motion.y * 0.08, -1.2, 1.2);
+  const sway = clamp(motion.whip * 1.2 + motion.wave * 2.2 - (acting.snapDir ?? 0) * drama * 2.2, -5.2, 5.2);
+  const lift = clamp(-motion.attackDrive * 0.9 + motion.y * 0.12 - drama * 0.7, -4.2, 3.2);
+  const alpha = clamp(0.045 + flutter * 0.055 + drama * 0.018, 0.035, 0.13);
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = `rgba(255, 241, 189, ${alpha})`;
+  ctx.lineWidth = 1.2 + flutter * 0.45;
+  ctx.beginPath();
+  ctx.moveTo(baseX - 5, baseY + 2);
+  ctx.quadraticCurveTo(baseX + 6 + sway * 0.5, baseY - 3 + lift, baseX + 15 + sway, baseY + 1 + lift * 0.7);
+  ctx.moveTo(baseX - 2, baseY + 7);
+  ctx.quadraticCurveTo(baseX + 5 + sway * 0.34, baseY + 12 + lift * 0.45, baseX + 10 + sway * 0.52, baseY + 17 + lift * 0.38);
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "multiply";
+  ctx.strokeStyle = `rgba(83, 54, 14, ${alpha * 0.62})`;
+  ctx.lineWidth = 0.9 + flutter * 0.24;
+  ctx.beginPath();
+  ctx.moveTo(baseX + 2, baseY + 4);
+  ctx.quadraticCurveTo(baseX + 9 + sway * 0.35, baseY + lift * 0.55, baseX + 14 + sway * 0.74, baseY + 4 + lift * 0.45);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function rasterHeadPose(f, frameName, frameIndex) {
   const pose = {
     x: 0,
@@ -6447,6 +6663,7 @@ function drawRasterBodySprite(f, crouch, stride, walking, transition = null) {
     // Unified sprites already contain their own limb shading and clothing lines.
     // Extra body overlays read as detached duplicate arms/shoulders while moving.
     drawSpriteGuardPoseOverlay(f, crouch, frameName);
+    drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walking, stride);
     drawFighterStageLighting(f, crouch);
     if (winner) drawSpriteCinematicFinish(f, crouch, frameName);
     return true;
@@ -8045,14 +8262,16 @@ function drawSpriteSecondaryMotion(f, crouch, frameName, stride, options = {}) {
   if (!options.skipHeadAccessories && f.profileId === "p2") drawAkaneSpriteHairSecondary(motion, localCrouch);
 }
 
-function drawPchanSpriteBandanaSecondary(motion, localCrouch) {
+function drawPchanSpriteBandanaSecondary(motion, localCrouch, options = {}) {
   const yellow = "#f7dc63";
   const knotX = 30;
   const drama = clamp(motion.drama ?? 0, 0, 1.85);
   const knotY = -230 + localCrouch + motion.y * 0.1 - drama * 0.35;
-  const tailX = clamp(motion.x * 0.42 + motion.whip * (3.6 + drama * 0.55), -10, 14);
-  const tailY = motion.y * 0.34 + motion.wave * (1.5 + drama * 0.35) - motion.attackDrive * 1.2 - drama * 0.8;
-  const alpha = clamp(0.44 + motion.flutter * 0.16 + drama * 0.045, 0.38, 0.8);
+  const tailScale = options.tailScale ?? 1;
+  const alphaScale = options.alphaScale ?? 1;
+  const tailX = clamp(motion.x * 0.42 + motion.whip * (3.6 + drama * 0.55), -10, 14) * tailScale;
+  const tailY = (motion.y * 0.34 + motion.wave * (1.5 + drama * 0.35) - motion.attackDrive * 1.2 - drama * 0.8) * tailScale;
+  const alpha = clamp((0.44 + motion.flutter * 0.16 + drama * 0.045) * alphaScale, 0.18, 0.8);
 
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -8102,16 +8321,18 @@ function drawPchanSpriteBandanaSecondary(motion, localCrouch) {
   ctx.restore();
 }
 
-function drawAkaneSpriteHairSecondary(motion, localCrouch) {
+function drawAkaneSpriteHairSecondary(motion, localCrouch, options = {}) {
   const hair = "#211417";
   const drama = clamp(motion.drama ?? 0, 0, 1.85);
+  const strandScale = options.strandScale ?? 1;
+  const alphaScale = options.alphaScale ?? 1;
   const roots = [
     { side: -1, rootX: -35, rootY: -232, lowY: -166, length: 1.05 },
     { side: 1, rootX: 35, rootY: -231, lowY: -166, length: 0.96 },
     { side: -1, rootX: -18, rootY: -244, lowY: -204, length: 0.72 },
     { side: 1, rootX: 18, rootY: -244, lowY: -205, length: 0.68 },
   ];
-  const alpha = clamp(0.22 + motion.flutter * 0.18 + drama * 0.04, 0.18, 0.55);
+  const alpha = clamp((0.22 + motion.flutter * 0.18 + drama * 0.04) * alphaScale, 0.1, 0.55);
 
   ctx.save();
   ctx.lineCap = "round";
@@ -8120,9 +8341,9 @@ function drawAkaneSpriteHairSecondary(motion, localCrouch) {
   ctx.strokeStyle = colorWithAlpha(hair, 0.62);
   ctx.lineWidth = 3.4 + drama * 0.26;
   for (const lock of roots) {
-    const sway = motion.x * (0.28 + lock.length * 0.12) + motion.whip * lock.side * (2.2 + drama * 0.58) + motion.wave * lock.side * (2.4 + drama * 0.45);
+    const sway = (motion.x * (0.28 + lock.length * 0.12) + motion.whip * lock.side * (2.2 + drama * 0.58) + motion.wave * lock.side * (2.4 + drama * 0.45)) * strandScale;
     const rootY = lock.rootY + localCrouch;
-    const lowY = lock.lowY + localCrouch + motion.y * 0.28 + motion.afterWave * lock.length * 1.2 + drama * lock.length * 1.4;
+    const lowY = lock.lowY + localCrouch + (motion.y * 0.28 + motion.afterWave * lock.length * 1.2 + drama * lock.length * 1.4) * strandScale;
     ctx.globalAlpha = alpha * lock.length;
     ctx.beginPath();
     ctx.moveTo(lock.rootX, rootY);
@@ -8144,7 +8365,7 @@ function drawAkaneSpriteHairSecondary(motion, localCrouch) {
   ctx.strokeStyle = "rgba(255, 236, 215, 0.8)";
   ctx.lineWidth = 1.2;
   for (const side of [-1, 1]) {
-    const sway = motion.x * 0.22 + motion.wave * side * 1.6;
+    const sway = (motion.x * 0.22 + motion.wave * side * 1.6) * strandScale;
     ctx.beginPath();
     ctx.moveTo(side * 29, -223 + localCrouch);
     ctx.bezierCurveTo(side * 35 + sway, -202 + localCrouch, side * 32 + sway * 0.7, -179 + localCrouch, side * 28 + sway * 0.5, -164 + localCrouch);
@@ -9926,6 +10147,21 @@ function getPose(f, stride) {
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, braceT * 0.82);
   }
 
+  const airKickLandingPose = f.grounded ? smoothStep01(clamp((f.airKickLandingPulse ?? 0) / 16, 0, 1)) : 0;
+  if (airKickLandingPose > 0.03 && f.hurt <= 0 && !f.attack && !winner) {
+    const press = airKickLandingPose * (f.profileId === "p1" ? 1.12 : f.profileId === "p2" ? 0.84 : 1);
+    const landingDir = (f.airKickDir || f.landingDir || f.dir || 1) === (f.dir || 1) ? 1 : -1;
+    base.torsoTilt += landingDir * press * 0.028;
+    base.frontLeg.knee.y += press * 6.5;
+    base.frontLeg.foot.x += landingDir * press * 5 * spec.stance;
+    base.backLeg.knee.y += press * 8.5;
+    base.backLeg.foot.x -= landingDir * press * 9 * spec.stance;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, press * 0.72);
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, press * 0.94);
+    base.frontArm.hand.y += press * 5;
+    base.backArm.hand.y += press * 3;
+  }
+
   const attackEntryT = clamp((f.attackEntryPulse ?? 0) / 14, 0, 1);
   const attackRecoverT = clamp((f.attackRecoverPulse ?? 0) / 16, 0, 1);
   const guardEntryT = clamp((f.guardEntryPulse ?? 0) / 12, 0, 1);
@@ -10026,48 +10262,58 @@ function getPose(f, stride) {
     const extension = clamp(activePulse * 0.9 + snap * 0.46 + drive * 0.18, 0, 1.3);
     const retract = clamp(recovery * 0.9 + phase.followThrough * 0.28, 0, 1.16);
     const airborneKick = attackType === "airKick" ? 1 : 0;
+    const fall = airborneKick ? clamp(f.vy / 13, 0, 1) : 0;
+    const airRecover = airborneKick ? smoothStep01(clamp((f.airKickRecoverPulse ?? 0) / 24, 0, 1)) : 0;
+    const airTuck = airborneKick * clamp(chamber * 0.42 + retract * 0.52 + airRecover * 0.72 + fall * 0.34, 0, 1.28);
     const footLift = f.profileId === "p2" ? 1.12 : f.profileId === "p1" ? 0.78 : 1;
-    const supportWeight = clamp(chamber * 0.55 + extension * 0.86 + retract * 0.25, 0, 1.45);
+    const supportWeight = clamp(chamber * 0.55 + extension * 0.86 + retract * 0.25, 0, 1.45) * (airborneKick ? 0.58 : 1);
+    const supportPlant = !airborneKick ? clamp(supportWeight * 0.7 + load * 0.32 + extension * 0.28, 0, 1.22) : 0;
 
     base.frontLeg.knee = {
-      x: (29 + chamber * 18 + extension * 30 - retract * 13) * spec.stance,
-      y: -42 + crouch - chamber * 28 - extension * 18 + retract * 22 - airborneKick * 8,
+      x: (29 + chamber * 18 + extension * 30 - retract * 13 - airTuck * 7) * spec.stance,
+      y: -42 + crouch - chamber * 28 - extension * 18 + retract * 22 - airborneKick * (8 + extension * 5) + airTuck * 6,
     };
     base.frontLeg.foot = {
-      x: (39 + chamber * 8 + extension * 84 - retract * 18) * spec.stance,
-      y: -8 - chamber * 35 - extension * 44 * footLift + retract * 46 - airborneKick * 12,
+      x: (39 + chamber * 8 + extension * 84 - retract * 18 - airTuck * 18) * spec.stance,
+      y: -8 - chamber * 35 - extension * 44 * footLift + retract * 46 - airborneKick * (12 + extension * 7) + airTuck * 18 + fall * 5,
     };
     base.frontLeg.lift = clamp(chamber * 0.62 + extension * 0.95, 0, 1);
     base.frontLeg.extension = extension;
     base.frontLeg.footAngle = -0.12 + chamber * 0.18 - extension * 0.05 + retract * 0.14;
     base.backLeg.knee = {
-      x: (-28 - chamber * 6 - extension * 9 + retract * 5) * spec.stance,
-      y: -30 + crouch + supportWeight * 9 + recovery * 3,
+      x: (-28 - chamber * 6 - extension * 9 + retract * 5 + airTuck * 6) * spec.stance,
+      y: -30 + crouch + supportWeight * 9 + recovery * 3 - airborneKick * (8 + chamber * 7) + airTuck * 11 + fall * 4,
     };
     base.backLeg.foot = {
-      x: (-42 - chamber * 12 - extension * 18 + retract * 8) * spec.stance,
-      y: -1 + supportWeight * 1.6 - airborneKick * 3,
+      x: (-42 - chamber * 12 - extension * 18 + retract * 8 + airTuck * 14) * spec.stance,
+      y: -1 + supportWeight * 1.6 - airborneKick * (8 + chamber * 9) + airTuck * 13 + fall * 6,
     };
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.58 + supportWeight * 0.42, 0, 1));
-    base.backLeg.footAngle = -0.05 - supportWeight * 0.04;
+    if (airborneKick) base.backLeg.plant = 0;
+    else base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.58 + supportWeight * 0.42, 0, 1));
+    base.backLeg.footAngle = -0.05 - supportWeight * 0.04 - supportPlant * 0.035;
     base.frontArm.elbow = {
       x: (35 - chamber * 6 - extension * 13 + retract * 5) * spec.stance,
-      y: -88 + crouch + extension * 11 + retract * 5,
+      y: -88 + crouch + extension * 11 + retract * 5 + airTuck * 5,
     };
     base.frontArm.hand = {
       x: (46 - chamber * 7 - extension * 16 + retract * 5) * spec.stance,
-      y: -65 + crouch + extension * 8 + retract * 5,
+      y: -65 + crouch + extension * 8 + retract * 5 + airTuck * 7,
     };
     base.backArm.elbow = {
       x: (-41 - chamber * 13 - extension * 11 + retract * 7) * spec.stance,
-      y: -110 + crouch - chamber * 7 - extension * 8 + retract * 7,
+      y: -110 + crouch - chamber * 7 - extension * 8 + retract * 7 - airborneKick * extension * 5 + airTuck * 3,
     };
     base.backArm.hand = {
       x: (-24 - chamber * 17 - extension * 16 + retract * 8) * spec.stance,
-      y: -91 + crouch - chamber * 9 - extension * 9 + retract * 8,
+      y: -91 + crouch - chamber * 9 - extension * 9 + retract * 8 - airborneKick * extension * 6 + airTuck * 5,
     };
-    base.torsoTilt += -load * 0.042 - chamber * 0.03 + drive * 0.044 - recovery * 0.012;
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 0.9, supportWeight * 0.82);
+    base.torsoTilt += -load * 0.042 - chamber * 0.03 + drive * 0.044 - recovery * 0.012 + airborneKick * (extension * 0.018 + fall * 0.018 - airRecover * 0.012);
+    if (!airborneKick) {
+      base.backLeg.knee.y += supportPlant * 4.4;
+      base.backLeg.foot.y += supportPlant * 0.7;
+      base.backLeg.foot.x -= supportPlant * 4.8 * spec.stance;
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 0.9, supportWeight * 0.82, supportPlant);
+    }
     if (f.profileId === "p1") {
       base.torsoTilt += extension * 0.016;
       base.frontLeg.foot.x += extension * 5 * spec.stance;
@@ -10075,7 +10321,7 @@ function getPose(f, stride) {
       base.frontLeg.footAngle += 0.03;
       base.backLeg.knee.y += load * 5 + extension * 5;
       base.backLeg.foot.x -= (load * 8 + extension * 8) * spec.stance;
-      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 1.12);
+      if (!airborneKick) base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 1.12);
     } else if (f.profileId === "p2") {
       base.torsoTilt -= extension * 0.03;
       base.frontLeg.knee.y -= extension * 7;
@@ -10537,6 +10783,24 @@ function getPose(f, stride) {
       base.frontLeg.knee.y += floor * 4 * liftStyle;
       base.backLeg.knee.y += floor * 4.5 * liftStyle;
     }
+  }
+
+  const airKickRecoverPose = airborne && !f.attack ? smoothStep01(clamp((f.airKickRecoverPulse ?? 0) / 24, 0, 1)) : 0;
+  if (airKickRecoverPose > 0.03 && f.hurt <= 0 && !winner) {
+    const fall = clamp(f.vy / 13, 0, 1);
+    const fold = clamp(airKickRecoverPose + fall * 0.28, 0, 1.2);
+    const localDir = (f.airKickDir || f.jumpDir || f.dir || 1) === (f.dir || 1) ? 1 : -1;
+    base.torsoTilt += localDir * fold * 0.024;
+    base.frontLeg.knee.x -= fold * 14 * spec.stance;
+    base.frontLeg.knee.y += fold * 10;
+    base.frontLeg.foot.x -= fold * 28 * spec.stance;
+    base.frontLeg.foot.y += fold * 16;
+    base.backLeg.knee.x += fold * 8 * spec.stance;
+    base.backLeg.knee.y -= fold * 5;
+    base.backLeg.foot.x += fold * 13 * spec.stance;
+    base.backLeg.foot.y -= fold * 4;
+    base.frontArm.hand.y += fold * 7;
+    base.backArm.hand.y -= fold * 5;
   }
 
   if (airborne) {
@@ -11108,12 +11372,13 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     const neckH = spec.neckH ?? 20;
     const neckTop = -118 + crouch;
     const neckBottom = neckTop + neckH;
+    const neckLean = clamp((f.vx ?? 0) * 0.08 + (f.attack ? attackPhase(f.attack).strike * (f.dir || 1) * 1.5 : 0), -2.6, 2.6);
     const neckGrad = ctx.createLinearGradient(0, neckTop, 0, neckBottom);
     neckGrad.addColorStop(0, lighten(skin, 16));
     neckGrad.addColorStop(1, darken(skin, 18));
     ctx.fillStyle = neckGrad;
     ctx.beginPath();
-    ctx.roundRect(-neckW / 2, neckTop, neckW, neckH, 9);
+    ctx.roundRect(-neckW / 2 + neckLean * 0.3, neckTop, neckW, neckH, 9);
     ctx.fill();
     ctx.strokeStyle = "rgba(43, 24, 18, 0.35)";
     ctx.lineWidth = 2;
@@ -11121,8 +11386,29 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
 
     ctx.fillStyle = "rgba(39, 20, 15, 0.28)";
     ctx.beginPath();
-    ctx.ellipse(0, neckTop - 2, neckW * 0.6, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(neckLean * 0.16, neckTop - 2, neckW * 0.6, 6, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = "rgba(36, 18, 13, 0.14)";
+    ctx.beginPath();
+    ctx.ellipse(neckLean * 0.2, neckBottom + 2, neckW * 0.9, 6.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = colorWithAlpha(f.trim ?? "#fff1bd", f.profileId === "p2" ? 0.16 : 0.13);
+    ctx.lineWidth = 1.4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-neckW * 0.8, neckBottom + 3);
+    ctx.quadraticCurveTo(-neckW * 0.25 + neckLean * 0.15, neckBottom + 8, -2, neckBottom + 6);
+    ctx.moveTo(neckW * 0.8, neckBottom + 3);
+    ctx.quadraticCurveTo(neckW * 0.25 + neckLean * 0.15, neckBottom + 8, 2, neckBottom + 6);
+    ctx.stroke();
+    ctx.restore();
   }
 
   ctx.save();
