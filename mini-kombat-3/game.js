@@ -15122,7 +15122,8 @@ function setStickState(x = 0, y = 0) {
   touchInput.jump = y < -0.42;
   touchInput.block = y > 0.42;
   if (mobileStickKnob) {
-    mobileStickKnob.style.transform = `translate(calc(-50% + ${Math.round(x * 34)}px), calc(-50% + ${Math.round(y * 34)}px))`;
+    const travel = mobileStickBase ? Math.min(34, Math.round(Math.min(mobileStickBase.offsetWidth, mobileStickBase.offsetHeight) * 0.34)) : 34;
+    mobileStickKnob.style.transform = `translate(calc(-50% + ${Math.round(x * travel)}px), calc(-50% + ${Math.round(y * travel)}px))`;
   }
   if (onlineGuestActive()) sendLocalOnlineInput();
 }

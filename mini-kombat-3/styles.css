@@ -103,7 +103,13 @@ canvas {
   justify-content: space-between;
   align-items: end;
   gap: 18px;
+  opacity: 0.96;
   pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.game-shell.is-fighting .mobile-controls {
+  opacity: 0.84;
 }
 
 .mobile-stick,
@@ -2258,45 +2264,63 @@ canvas {
   }
 
   .mobile-controls {
-    inset: auto 14px 10px;
-    grid-template-columns: 130px max-content;
+    inset: auto max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    grid-template-columns: 108px max-content;
+    gap: 8px;
+  }
+
+  .game-shell.is-fighting .mobile-controls {
+    opacity: 0.78;
   }
 
   .mobile-actions {
-    grid-template-columns: repeat(3, 46px);
+    grid-template-columns: repeat(3, 42px);
     gap: 6px;
   }
 
   .mobile-controls button {
-    width: 46px;
-    height: 46px;
-    min-width: 46px;
-    min-height: 46px;
-    font-size: 13px;
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    min-height: 42px;
+    font-size: 12px;
+    box-shadow:
+      0 4px 0 rgba(63, 22, 14, 0.76),
+      0 0 10px rgba(255, 198, 64, 0.11),
+      inset 0 1px 0 rgba(255,255,255,0.18);
   }
 
   .mobile-stick {
-    width: 130px;
+    width: 108px;
+    gap: 3px;
   }
 
   .mobile-stick-base {
-    width: 98px;
-    height: 98px;
+    width: 82px;
+    height: 82px;
+    box-shadow:
+      0 5px 0 rgba(63, 22, 14, 0.72),
+      0 0 16px rgba(255, 198, 64, 0.14),
+      inset 0 2px 0 rgba(255,255,255,0.14);
   }
 
   .mobile-stick-base::before,
   .mobile-stick-base::after {
-    width: 70px;
+    width: 58px;
   }
 
   .mobile-stick-knob {
-    width: 42px;
-    height: 42px;
+    width: 34px;
+    height: 34px;
   }
 
   .mobile-stick span {
-    max-width: 118px;
-    font-size: 8px;
+    max-width: 104px;
+    font-size: 7px;
+  }
+
+  .game-shell.is-fighting .mobile-stick span {
+    display: none;
   }
 }
 
