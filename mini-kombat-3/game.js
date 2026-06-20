@@ -302,6 +302,38 @@ const CHARACTER_MOTION = {
     hurtRecover: 1.18,
     damageFx: 1.16,
   },
+  p3: {
+    force: 1.18,
+    load: 1.26,
+    drive: 0.94,
+    recover: 0.78,
+    plant: 1.34,
+    brace: 1.28,
+    lift: 0.58,
+    crush: 1.34,
+    reach: 1.02,
+    rotation: 0.72,
+    stretchX: 0.96,
+    stretchY: 0.84,
+    afterimage: 0.14,
+    arcFan: 0.82,
+    headDrive: 0.68,
+    headPrep: 0.76,
+    headRecover: 0.74,
+    headSway: 0.6,
+    walkWeight: 1.24,
+    walkLift: 0.62,
+    walkPush: 1.16,
+    accessory: 0.72,
+    impactSnap: 0.72,
+    impactRebound: 0.64,
+    impactShake: 0.66,
+    impactFloor: 1.48,
+    impactSkid: 0.58,
+    impactTime: 0.82,
+    hurtRecover: 0.7,
+    damageFx: 0.92,
+  },
 };
 
 function characterMotion(f) {
@@ -347,6 +379,19 @@ const CHARACTER_GUARD = {
     handLift: 1.22,
     counter: 1.18,
     color: "#aef7df",
+  },
+  p3: {
+    brace: 1.34,
+    recoil: 0.62,
+    crouch: 1.28,
+    shieldScale: 1.18,
+    shieldWidth: 1.22,
+    shieldAlpha: 0.95,
+    spark: 0.82,
+    arc: 1.18,
+    handLift: 0.84,
+    counter: 0.9,
+    color: "#d9f7ff",
   },
 };
 
@@ -465,19 +510,19 @@ const BODY_SPECS = {
     stance: 1.12,
   },
   racingHeavy: {
-    shoulder: 55,
-    chest: 56,
-    waist: 42,
-    hip: 47,
-    limb: 1.1,
-    armScale: 1.04,
-    legScale: 0.98,
-    upperArmWidth: 1.18,
-    forearmWidth: 1.08,
-    thighWidth: 1.16,
-    calfWidth: 1.04,
-    hand: 1.13,
-    foot: 1.1,
+    shoulder: 56,
+    chest: 58,
+    waist: 41,
+    hip: 49,
+    limb: 1.12,
+    armScale: 1.06,
+    legScale: 1.08,
+    upperArmWidth: 1.2,
+    forearmWidth: 1.1,
+    thighWidth: 1.18,
+    calfWidth: 1.07,
+    hand: 1.15,
+    foot: 1.15,
     headW: 98,
     headH: 102,
     headY: 14,
@@ -486,7 +531,7 @@ const BODY_SPECS = {
     shoulderSlope: 6,
     facePad: 3,
     stance: 1.18,
-    belly: 1.22,
+    belly: 1.16,
   },
   lean: {
     shoulder: 39,
@@ -5430,8 +5475,8 @@ function fighterTransitionMotion(f, walking) {
     const legHit = f.hitZone === "legs" ? zoneT : 0;
     const shakePulse = Math.sin((roundFrame + resultFrame) * 1.75) * hurtT * style.impactShake;
     const impactDir = f.impactDir ?? dir;
-    const absorbStyle = f.profileId === "p1" ? 0.82 : f.profileId === "p2" ? 1.12 : 1;
-    const liftStyle = f.profileId === "p1" ? 0.72 : f.profileId === "p2" ? 1.18 : 1;
+    const absorbStyle = f.profileId === "p1" ? 0.82 : f.profileId === "p2" ? 1.12 : f.profileId === "p3" ? 0.68 : 1;
+    const liftStyle = f.profileId === "p1" ? 0.72 : f.profileId === "p2" ? 1.18 : f.profileId === "p3" ? 0.58 : 1;
     motion.x += impactDir * (impactT * (2.4 + strength * 3.1) * style.impactSnap + hurtT * (0.8 + strength * 0.9) * absorbStyle + headHit * 2.4 + bodyHit * 1.2 + legHit * 1.7) + shakePulse * 0.9;
     motion.y += Math.sin(effectiveHurt * 0.82) * hurtT * 0.8 * liftStyle - impactT * (0.35 + strength * 0.45) * style.impactRebound + contactT * 0.8 - headHit * 1.3 * liftStyle + legHit * 2.4 * liftStyle;
     motion.rotation += impactDir * (impactT * (0.016 + strength * 0.023) * absorbStyle + hurtT * 0.012 + headHit * 0.046 * liftStyle + bodyHit * 0.022 - legHit * 0.024 * liftStyle) + shakePulse * 0.005;
@@ -5446,8 +5491,8 @@ function fighterTransitionMotion(f, walking) {
     const worldDir = reaction.worldDir || dir;
     const kindBoost = reaction.kind === "finish" ? 1.3 : reaction.kind === "counter" || reaction.kind === "blast" ? 1.14 : reaction.kind === "heavy" ? 1.05 : 0.86;
     const zone = reaction.zone === "head" || reaction.zone === "legs" ? reaction.zone : "torso";
-    const liftStyle = f.profileId === "p1" ? 0.74 : f.profileId === "p2" ? 1.18 : 1;
-    const absorbStyle = f.profileId === "p1" ? 0.86 : f.profileId === "p2" ? 1.1 : 1;
+    const liftStyle = f.profileId === "p1" ? 0.74 : f.profileId === "p2" ? 1.18 : f.profileId === "p3" ? 0.6 : 1;
+    const absorbStyle = f.profileId === "p1" ? 0.86 : f.profileId === "p2" ? 1.1 : f.profileId === "p3" ? 0.7 : 1;
 
     if (zone === "head") {
       motion.x += worldDir * (snap * 4.2 + rebound * 2.2) * kindBoost;
@@ -5478,8 +5523,8 @@ function fighterTransitionMotion(f, walking) {
     const skidEase = smoothStep01(hitMass.skid);
     const snapEase = clamp(hitMass.snap, 0, 1.85);
     const zoneLift = hitMass.zone === "head" ? -1 : hitMass.zone === "legs" ? 1 : 0.15;
-    const absorbStyle = f.profileId === "p1" ? 0.86 : f.profileId === "p2" ? 1.12 : 1;
-    const liftStyle = f.profileId === "p1" ? 0.76 : f.profileId === "p2" ? 1.18 : 1;
+    const absorbStyle = f.profileId === "p1" ? 0.86 : f.profileId === "p2" ? 1.12 : f.profileId === "p3" ? 0.7 : 1;
+    const liftStyle = f.profileId === "p1" ? 0.76 : f.profileId === "p2" ? 1.18 : f.profileId === "p3" ? 0.62 : 1;
     motion.x += hitMass.worldDir * (skidEase * 2.9 + snapEase * 1.15) * absorbStyle;
     motion.y += hitMass.floor * 1.05 + zoneLift * snapEase * 0.85 * liftStyle - hitMass.lift * snapEase * liftStyle;
     motion.rotation += hitMass.worldDir * (hitMass.fold * snapEase * 0.042 + hitMass.rebound * 0.011) * absorbStyle;
@@ -5899,6 +5944,7 @@ function drawFighter(f) {
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
   drawVectorContactOcclusion(f, crouch, walking ? stride : 0);
+  drawMaguilaHeavyGroundPolish(f, pose, crouch, walking, stride);
   drawHead(f, crouch, walking ? stride : 0);
   if (f.attack) drawAttackKineticFX(f, crouch, "front");
   drawFighterStageLighting(f, crouch);
@@ -7305,6 +7351,87 @@ function drawVectorContactOcclusion(f, crouch, stride) {
   ctx.moveTo(shoulder - 9, collarY);
   ctx.quadraticCurveTo(20, collarY - 7, 4, collarY - 2);
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawMaguilaHeavyGroundPolish(f, pose, crouch, walking, stride) {
+  if (f.profileId !== "p3" || usesUnifiedSprite(f)) return;
+  if (isMobileFightView()) return;
+
+  const phase = attackPhase(f.attack);
+  const attackMass = f.attack ? attackMassProfile(f) : null;
+  const attackWeight = f.attack ? attackBodyWeightProfile(f) : null;
+  const hitMass = f.hurt > 0 || (f.reactionPulse ?? 0) > 0 ? hitReactionMassProfile(f) : null;
+  const guard = f.blocking ? clamp((f.guardPulse ?? 0) / 18, 0, 1) : 0;
+  const guardHit = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
+  const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1) * clamp(f.landingStrength ?? 1, 0.6, 1.8);
+  const walk = walking ? clamp((f.walkWeight ?? 0) * Math.abs(stride || 0), 0, 1.2) : 0;
+  const attackPlant = attackMass ? clamp(Math.max(attackMass.plant, attackWeight?.plant ?? 0), 0, 1.8) : 0;
+  const attackDrive = attackMass ? clamp(Math.max(attackMass.drive, attackWeight?.drive ?? 0, phase.snap * 0.9), 0, 1.8) : 0;
+  const reactionFloor = hitMass ? clamp(hitMass.floor, 0, 1.8) : 0;
+  const reactionSkid = hitMass ? clamp(hitMass.skid, 0, 1.8) : 0;
+  const pressure = clamp(Math.max(guard * 0.72, guardHit, landing, walk * 0.72, attackPlant, attackDrive * 0.6, reactionFloor), 0, 1.85);
+  if (pressure <= 0.035 && reactionSkid <= 0.04) return;
+
+  const outfit = outfitSpec(f);
+  const trim = f.trim ?? "#ffffff";
+  const feet = [
+    { foot: pose.backLeg.foot, side: -1, plant: pose.backLeg.plant ?? 0.68 },
+    { foot: pose.frontLeg.foot, side: 1, plant: pose.frontLeg.plant ?? 0.74 },
+  ];
+  const supportSide = hitMass && reactionFloor > attackPlant
+    ? (hitMass.worldDir === (f.dir || 1) ? -1 : 1)
+    : attackWeight ? attackWeight.footSide : attackMass ? attackMass.footSide : f.walkAnchorSide || f.footPlantSide || 1;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  for (const item of feet) {
+    const support = item.side === supportSide ? 1 : 0.52;
+    const plant = clamp(item.plant + pressure * support * 0.42, 0, 1.35);
+    ctx.fillStyle = `rgba(24, 13, 8, ${0.075 + plant * 0.085 + pressure * support * 0.05})`;
+    ctx.beginPath();
+    ctx.ellipse(
+      item.foot.x - (f.dir || 1) * reactionSkid * 4 * item.side,
+      item.foot.y + 9 + pressure * support * 0.8,
+      31 + plant * 13 + reactionSkid * 5,
+      5.8 + plant * 2.2,
+      item.side * 0.04 - (f.dir || 1) * attackDrive * 0.035,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+  }
+
+  if (pressure > 0.08) {
+    ctx.fillStyle = `rgba(31, 18, 10, ${0.04 + pressure * 0.055})`;
+    ctx.beginPath();
+    ctx.ellipse(0, -41 + crouch + pressure * 2, 54 + pressure * 10, 10 + pressure * 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.strokeStyle = colorWithAlpha(trim, 0.06 + pressure * 0.085);
+  ctx.lineWidth = 1.3 + pressure * 0.9;
+  for (const item of feet) {
+    const support = item.side === supportSide ? 1 : 0.42;
+    if (pressure * support <= 0.04) continue;
+    ctx.beginPath();
+    ctx.ellipse(item.foot.x, item.foot.y + 2, 22 + pressure * 9, 3.8 + pressure * 1.4, item.side * 0.04, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  if (attackDrive > 0.08 || guardHit > 0.08) {
+    const dir = f.dir || 1;
+    ctx.strokeStyle = colorWithAlpha(outfit.accent ?? "#ffffff", 0.08 + Math.max(attackDrive, guardHit) * 0.12);
+    ctx.lineWidth = 1.4 + Math.max(attackDrive, guardHit) * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-38, -84 + crouch + guard * 3);
+    ctx.quadraticCurveTo(-8 - dir * attackDrive * 5, -72 + crouch + pressure * 2, 35 - dir * guardHit * 4, -81 + crouch + guard * 5);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -9886,8 +10013,8 @@ function attackBodyWeightProfile(f) {
   const spec = attackVisualSpec(attack.type);
   const motion = characterMotion(f);
   const grounded = f?.grounded ? 1 : 0.48;
-  const profileMass = f?.profileId === "p1" ? 1.12 : f?.profileId === "p2" ? 0.88 : 1;
-  const recoveryStyle = f?.profileId === "p2" ? 0.86 : f?.profileId === "p1" ? 1.08 : 1;
+  const profileMass = f?.profileId === "p1" ? 1.12 : f?.profileId === "p2" ? 0.88 : f?.profileId === "p3" ? 1.24 : 1;
+  const recoveryStyle = f?.profileId === "p2" ? 0.86 : f?.profileId === "p1" ? 1.08 : f?.profileId === "p3" ? 1.18 : 1;
   const attackWeight = spec.special ? 1.18 : spec.sweep ? 1.14 : spec.kick ? 1.1 : spec.grab ? 1.04 : 0.94;
   const launchWeight = spec.sweep ? 0.88 : spec.kick ? 1.08 : spec.special ? 1.02 : 0.96;
   const load = clamp((mass.load * 0.82 + phase.anticipation * 0.22) * profileMass * attackWeight * grounded, 0, 1.75);
@@ -10399,6 +10526,16 @@ function getPose(f, stride) {
       base.backArm.hand.y -= windup * 6;
       base.frontLeg.foot.y -= drive * 2.4;
       base.backLeg.foot.x -= load * 3 * spec.stance;
+    } else if (f.profileId === "p3") {
+      base.torsoTilt += drive * 0.018 - load * 0.012;
+      base.frontArm.hand.x += drive * 10 * spec.stance;
+      base.frontArm.elbow.x += drive * 5 * spec.stance;
+      base.frontArm.hand.y += drive * 2;
+      base.backArm.hand.y += load * 4;
+      base.backLeg.knee.y += load * 6 + drive * 4;
+      base.backLeg.foot.x -= (load * 8 + drive * 6) * spec.stance;
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 1.18);
+      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, drive * 0.42);
     }
   } else if (attackType === "kick" || attackType === "airKick") {
     const mass = attackMass ?? attackMassProfile(null);
@@ -10478,6 +10615,19 @@ function getPose(f, stride) {
       base.frontArm.hand.y -= extension * 7;
       base.backArm.hand.y -= extension * 9;
       base.backLeg.foot.y -= load * 2;
+    } else if (f.profileId === "p3") {
+      base.torsoTilt += extension * 0.018 - load * 0.022;
+      base.frontLeg.knee.x += extension * 4 * spec.stance;
+      base.frontLeg.knee.y += extension * 4;
+      base.frontLeg.foot.x += extension * 3 * spec.stance;
+      base.frontLeg.foot.y += extension * 10;
+      base.frontLeg.footAngle += 0.04;
+      base.backLeg.knee.y += load * 8 + extension * 7;
+      base.backLeg.foot.x -= (load * 10 + extension * 7) * spec.stance;
+      base.backLeg.foot.y += load * 1.4;
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 1.22, supportPlant * 1.08);
+      base.frontArm.hand.y += extension * 5;
+      base.backArm.hand.y += load * 3;
     }
   } else if (attackType === "sweep") {
     const mass = attackMass ?? attackMassProfile(null);
@@ -10507,6 +10657,15 @@ function getPose(f, stride) {
       base.frontLeg.foot.y -= drive * 3;
       base.frontArm.hand.y -= drive * 7;
       base.backArm.hand.y -= drive * 6;
+    } else if (f.profileId === "p3") {
+      base.torsoTilt += drive * 0.02 + load * 0.015;
+      base.frontLeg.foot.x += drive * 9 * spec.stance;
+      base.frontLeg.foot.y += drive * 3;
+      base.backLeg.knee.y += load * 7 + drive * 5;
+      base.backLeg.foot.x -= (load * 8 + drive * 7) * spec.stance;
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 1.22);
+      base.frontArm.hand.y += drive * 5;
+      base.backArm.hand.y += drive * 3;
     }
   } else if (attackType === "grab") {
     const mass = attackMass ?? attackMassProfile(null);
@@ -10543,6 +10702,17 @@ function getPose(f, stride) {
       base.frontLeg.knee.x += 7 * activePulse;
       base.frontLeg.foot.x += 11 * activePulse - 4 * windup;
       base.backLeg.foot.x -= 12 * activePulse + 5 * windup;
+    } else if (f.profileId === "p3") {
+      base.torsoTilt = -0.065 * activePulse + 0.045 * windup;
+      base.frontArm.elbow = { x: 39 - windup * 10 + activePulse * 27, y: -126 + crouch - windup * 5 - activePulse * 10 };
+      base.frontArm.hand = { x: 59 - windup * 16 + activePulse * 48, y: -110 + crouch - windup * 6 - activePulse * 6 };
+      base.backArm.elbow = { x: -32 - windup * 9 + activePulse * 8, y: -116 + crouch + activePulse * 2 };
+      base.backArm.hand = { x: -20 - windup * 12 + activePulse * 20, y: -96 + crouch + activePulse * 4 };
+      base.frontLeg.knee.y += windup * 5;
+      base.frontLeg.foot.x += 7 * activePulse - 3 * windup;
+      base.backLeg.foot.x -= 14 * activePulse + 8 * windup;
+      base.backLeg.knee.y += windup * 7 + activePulse * 5;
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, 0.9);
     } else {
       base.frontArm.elbow = { x: 42 - windup * 7 + activePulse * 20, y: -121 + crouch - windup * 4 - activePulse * 8 };
       base.frontArm.hand = { x: 66 - windup * 12 + activePulse * 36, y: -106 + crouch - windup * 5 - activePulse * 5 };
@@ -10800,8 +10970,8 @@ function getPose(f, stride) {
     const snap = localizedImpact.snap;
     const recoil = localizedImpact.rebound;
     const localDir = localizedImpact.localDir;
-    const absorbStyle = f.profileId === "p1" ? 0.78 : f.profileId === "p2" ? 1.16 : 1;
-    const liftStyle = f.profileId === "p1" ? 0.72 : f.profileId === "p2" ? 1.18 : 1;
+    const absorbStyle = f.profileId === "p1" ? 0.78 : f.profileId === "p2" ? 1.16 : f.profileId === "p3" ? 0.66 : 1;
+    const liftStyle = f.profileId === "p1" ? 0.72 : f.profileId === "p2" ? 1.18 : f.profileId === "p3" ? 0.56 : 1;
 
     if (localizedImpact.zone === "head") {
       base.torsoTilt -= localDir * (0.035 + recoil * 0.028) * absorbStyle;
@@ -10884,8 +11054,8 @@ function getPose(f, stride) {
     const recoil = clamp(hitMass.rebound, 0, 1.85);
     const floor = clamp(hitMass.floor, 0, 1.7);
     const skid = clamp(hitMass.skid, 0, 1.85);
-    const absorbStyle = f.profileId === "p1" ? 0.82 : f.profileId === "p2" ? 1.12 : 1;
-    const liftStyle = f.profileId === "p1" ? 0.74 : f.profileId === "p2" ? 1.18 : 1;
+    const absorbStyle = f.profileId === "p1" ? 0.82 : f.profileId === "p2" ? 1.12 : f.profileId === "p3" ? 0.68 : 1;
+    const liftStyle = f.profileId === "p1" ? 0.74 : f.profileId === "p2" ? 1.18 : f.profileId === "p3" ? 0.58 : 1;
     const braceFoot = worldLocal > 0 ? "backLeg" : "frontLeg";
     const freeFoot = braceFoot === "backLeg" ? "frontLeg" : "backLeg";
 
@@ -11194,6 +11364,7 @@ function drawTorso(f, crouch) {
   drawOutfitPattern(f, outfit, shoulder, waist, hip, top, bottom, crouch);
   drawOutfitMaterial(f, outfit, shoulder, waist, hip, top, bottom, crouch);
   drawSpriteTorsoVolume(f, outfit, shoulder, chest, waist, hip, top, bottom, crouch);
+  if (f.profileId === "p3") drawMaguilaRacingTorsoDetails(f, outfit, shoulder, chest, waist, hip, top, bottom, crouch);
 
   ctx.fillStyle = outfit.belt;
   ctx.beginPath();
@@ -11316,10 +11487,10 @@ function drawOutfitPattern(f, outfit, shoulder, waist, hip, top, bottom, crouch)
     ctx.quadraticCurveTo(0, -122 + crouch, shoulder - 12, top + 15);
     ctx.stroke();
 
-    ctx.fillStyle = "rgba(22, 43, 82, 0.72)";
-    ctx.font = "900 11px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("RACING", 0, -91 + crouch);
+    ctx.fillStyle = "rgba(22, 43, 82, 0.22)";
+    ctx.beginPath();
+    ctx.roundRect(-20, -98 + crouch, 40, 9, 4);
+    ctx.fill();
   } else if (outfit.pattern === "stripe") {
     ctx.strokeStyle = outfit.sleeve;
     ctx.lineWidth = 7;
@@ -11502,6 +11673,105 @@ function drawSpriteTorsoVolume(f, outfit, shoulder, chest, waist, hip, top, bott
   ctx.moveTo(-shoulder + 16, top + shoulderSlope + 7);
   ctx.quadraticCurveTo(0, top - 10, shoulder - 16, top + shoulderSlope + 7);
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawMaguilaRacingTorsoDetails(f, outfit, shoulder, chest, waist, hip, top, bottom, crouch) {
+  const spec = bodySpec(f);
+  const mobileLite = isMobileFightView();
+  if (mobileLite) {
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.beginPath();
+    ctx.roundRect(-30, top + 20, 8, bottom - top - 20, 5);
+    ctx.roundRect(-4, top + 21, 8, bottom - top - 21, 5);
+    ctx.roundRect(22, top + 20, 8, bottom - top - 20, 5);
+    ctx.fill();
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(12, 31, 63, 0.82)";
+    ctx.beginPath();
+    ctx.roundRect(-20, -101 + crouch, 40, 14, 5);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.88)";
+    ctx.beginPath();
+    ctx.roundRect(-14, -96 + crouch, 28, 2.4, 2);
+    ctx.roundRect(-14, -91 + crouch, 28, 2.4, 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  const phase = attackPhase(f.attack);
+  const impact = localizedImpactProfile(f);
+  const guard = f.blocking ? clamp((f.guardPulse ?? 0) / 18, 0, 1) : 0;
+  const guardHit = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
+  const attack = f.attack ? Math.max(phase.strike, phase.snap * 0.9, phase.followThrough * 0.48) : 0;
+  const load = f.attack ? phase.anticipation : 0;
+  const belly = spec.belly ?? 1;
+  const lowerWaist = waist * belly;
+  const lowerHip = hip * 1.08;
+  const pressure = clamp(Math.max(attack * 0.72, load * 0.55, guard * 0.48, guardHit, impact.t * 0.72), 0, 1.65);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(13, 25, 42, ${0.07 + pressure * 0.045})`;
+  ctx.beginPath();
+  ctx.ellipse(0, -73 + crouch + pressure * 1.7, lowerWaist * 0.86, 25 + pressure * 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(9, 26, 55, 0.2)";
+  ctx.lineWidth = 1.6 + pressure * 0.55;
+  for (let y = -96 + crouch; y <= -62 + crouch; y += 17) {
+    ctx.beginPath();
+    ctx.moveTo(-lowerWaist + 1, y);
+    ctx.bezierCurveTo(-waist * 0.35, y + 5 + pressure, waist * 0.35, y + 5 + pressure, lowerWaist - 1, y);
+    ctx.stroke();
+  }
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.beginPath();
+  ctx.roundRect(-33, top + 18, 9, bottom - top - 17, 5);
+  ctx.roundRect(-5, top + 19, 10, bottom - top - 18, 5);
+  ctx.roundRect(24, top + 18, 9, bottom - top - 17, 5);
+  ctx.fill();
+
+  ctx.strokeStyle = colorWithAlpha(outfit.accent ?? "#ffffff", 0.16 + pressure * 0.06);
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(-lowerWaist + 11, -74 + crouch);
+  ctx.bezierCurveTo(-waist * 0.32, -64 + crouch + pressure, waist * 0.32, -64 + crouch + pressure, lowerWaist - 11, -74 + crouch);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(12, 31, 63, 0.88)";
+  ctx.beginPath();
+  ctx.roundRect(-23, -102 + crouch, 46, 16, 5);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.74)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.beginPath();
+  ctx.roundRect(-16, -97 + crouch, 32, 3, 2);
+  ctx.roundRect(-16, -91 + crouch, 32, 3, 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.beginPath();
+  ctx.roundRect(waist - 16, -123 + crouch, 22, 17, 5);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(12, 31, 63, 0.72)";
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(12, 31, 63, 0.92)";
+  ctx.beginPath();
+  ctx.arc(waist - 5, -114 + crouch, 4.2, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
