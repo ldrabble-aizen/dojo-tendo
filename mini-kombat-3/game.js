@@ -366,6 +366,38 @@ const CHARACTER_MOTION = {
     hurtRecover: 1.14,
     damageFx: 1.04,
   },
+  p5: {
+    force: 0.88,
+    load: 0.82,
+    drive: 1.08,
+    recover: 1.22,
+    plant: 0.72,
+    brace: 0.78,
+    lift: 1.18,
+    crush: 0.7,
+    reach: 1.22,
+    rotation: 1.28,
+    stretchX: 1.2,
+    stretchY: 1.12,
+    afterimage: 0.22,
+    arcFan: 1.3,
+    headDrive: 1.16,
+    headPrep: 1.12,
+    headRecover: 1.22,
+    headSway: 1.34,
+    walkWeight: 0.76,
+    walkLift: 1.34,
+    walkPush: 0.82,
+    accessory: 1.16,
+    impactSnap: 1.14,
+    impactRebound: 1.2,
+    impactShake: 1.08,
+    impactFloor: 0.72,
+    impactSkid: 1.28,
+    impactTime: 1.14,
+    hurtRecover: 1.2,
+    damageFx: 1.08,
+  },
 };
 
 function characterMotion(f) {
@@ -437,6 +469,19 @@ const CHARACTER_GUARD = {
     handLift: 1.12,
     counter: 1.16,
     color: "#c8ff9d",
+  },
+  p5: {
+    brace: 0.76,
+    recoil: 1.18,
+    crouch: 0.74,
+    shieldScale: 0.88,
+    shieldWidth: 0.78,
+    shieldAlpha: 1.08,
+    spark: 1.16,
+    arc: 0.78,
+    handLift: 1.2,
+    counter: 1.2,
+    color: "#aeefff",
   },
 };
 
@@ -604,27 +649,28 @@ const BODY_SPECS = {
     stance: 0.9,
   },
   tallLean: {
-    shoulder: 36,
-    chest: 35,
-    waist: 24,
-    hip: 30,
-    limb: 1.04,
-    armScale: 1.08,
-    legScale: 1.16,
-    upperArmWidth: 0.78,
-    forearmWidth: 0.72,
-    thighWidth: 0.78,
-    calfWidth: 0.7,
+    shoulder: 32,
+    chest: 31,
+    waist: 21,
+    hip: 27,
+    limb: 1.16,
+    armScale: 1.2,
+    legScale: 1.42,
+    upperArmWidth: 0.66,
+    forearmWidth: 0.6,
+    thighWidth: 0.66,
+    calfWidth: 0.58,
     hand: 0.88,
-    foot: 0.94,
+    foot: 0.92,
     headW: 82,
     headH: 92,
-    headY: 22,
+    headScale: 0.74,
+    headY: 31,
     neckW: 21,
     neckH: 21,
     shoulderSlope: 11,
-    facePad: 5,
-    stance: 0.82,
+    facePad: 6,
+    stance: 0.72,
   },
 };
 
@@ -737,7 +783,7 @@ const fighterProfiles = {
   },
   p5: {
     id: "p5",
-    name: "Lucas",
+    name: "Simiolin",
     color: "#d9682d",
     trim: "#47d5ff",
     face: faces.p5,
@@ -5916,6 +5962,8 @@ function drawFighter(f) {
   const attackStretch = f.attack ? attackProgress(f.attack) * 0.012 : 0;
   const breathing = f.grounded && effectiveHurt <= 0 ? Math.sin(t * 2.7 + f.x * 0.02) * 0.012 + idlePulse * 0.006 : 0;
   const hurtSquash = effectiveHurt > 0 ? Math.sin((effectiveHurt + resultFrame) * 0.7) * 0.012 + impactEase * 0.014 : impactEase * 0.005;
+  const visualScaleX = f.profileId === "p5" ? 0.82 : 1;
+  const visualScaleY = f.profileId === "p5" ? 1.38 : 1;
 
   drawWorldContactShadow(f, baseX, walking, stride, impactEase);
 
@@ -5923,8 +5971,8 @@ function drawFighter(f) {
   ctx.translate(baseX, baseY);
   ctx.rotate(impactLean + transition.rotation);
   ctx.scale(
-    f.dir * (1 + attackStretch + hurtSquash) * transition.scaleX,
-    (1 + breathing - attackStretch * 0.28) * transition.scaleY
+    f.dir * (1 + attackStretch + hurtSquash) * transition.scaleX * visualScaleX,
+    (1 + breathing - attackStretch * 0.28) * transition.scaleY * visualScaleY
   );
   ctx.scale(FIGHTER_SCALE, FIGHTER_SCALE);
 
@@ -5995,6 +6043,7 @@ function drawFighter(f) {
   drawVectorContactOcclusion(f, crouch, walking ? stride : 0);
   drawMaguilaHeavyGroundPolish(f, pose, crouch, walking, stride);
   drawPinoReflexPolish(f, pose, crouch, walking, stride);
+  drawSimiolinReachPolish(f, pose, crouch, walking, stride);
   drawHead(f, crouch, walking ? stride : 0);
   if (f.attack) drawAttackKineticFX(f, crouch, "front");
   drawFighterStageLighting(f, crouch);
@@ -7540,6 +7589,65 @@ function drawPinoReflexPolish(f, pose, crouch, walking, stride) {
     for (const leg of [pose.backLeg, pose.frontLeg]) {
       ctx.beginPath();
       ctx.ellipse(leg.foot.x, leg.foot.y + 2, 17 + footPulse * 8, 3.2 + footPulse, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawSimiolinReachPolish(f, pose, crouch, walking, stride) {
+  if (f.profileId !== "p5" || usesUnifiedSprite(f)) return;
+
+  const mobileLite = isMobileFightView();
+  const phase = attackPhase(f.attack);
+  const attack = f.attack ? Math.max(phase.strike, phase.snap, phase.followThrough * 0.38) : 0;
+  const prep = f.attack ? phase.anticipation : 0;
+  const guard = f.blocking ? clamp((f.guardPulse ?? 0) / 18, 0, 1) : 0;
+  const counter = clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
+  const impact = localizedImpactProfile(f);
+  const walk = walking ? clamp(Math.abs(stride || 0) * (f.walkWeight ?? 0.78), 0, 1.1) : 0;
+  const active = clamp(Math.max(attack, prep * 0.56, guard * 0.44, counter * 0.56, impact.t * 0.44, walk * 0.62), 0, 1.45);
+  if (active <= 0.035) return;
+
+  const trim = f.trim ?? "#47d5ff";
+  const accent = outfitSpec(f)?.accent ?? "#ffe2b0";
+  const dir = f.dir || 1;
+  const reach = clamp(Math.max(attack, phase.snap * 1.05, counter * 0.5), 0, 1.35);
+  const sway = Math.sin(roundFrame * 0.08 + f.x * 0.012) * (walking ? 0.85 : 0.36);
+  const chestY = -126 + crouch;
+  const hipY = -50 + crouch;
+  const footPulse = Math.max(attack * 0.62, walk * 0.55, counter * 0.4);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = colorWithAlpha(trim, mobileLite ? 0.08 + active * 0.08 : 0.11 + active * 0.13);
+  ctx.lineWidth = mobileLite ? 1.1 + active * 0.42 : 1.35 + active * 0.62;
+  ctx.beginPath();
+  ctx.moveTo(-21 + sway - dir * reach * 2, chestY);
+  ctx.quadraticCurveTo(-27 + dir * reach * 6, -94 + crouch - active * 5, -18 + dir * reach * 8, hipY);
+  ctx.moveTo(21 - sway * 0.5 + dir * reach * 2, chestY + 1);
+  ctx.quadraticCurveTo(27 + dir * reach * 8, -93 + crouch - active * 5, 18 + dir * reach * 10, hipY + 1);
+  ctx.stroke();
+
+  if (!mobileLite && (attack > 0.08 || counter > 0.08)) {
+    const hand = pose.frontArm.hand;
+    const elbow = pose.frontArm.elbow;
+    ctx.strokeStyle = colorWithAlpha(accent, 0.07 + active * 0.12);
+    ctx.lineWidth = 1 + active * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(elbow.x - dir * 2, elbow.y);
+    ctx.quadraticCurveTo(hand.x + dir * (14 + reach * 16), hand.y - 9 * active, hand.x + dir * (34 + reach * 24), hand.y - 8 * reach);
+    ctx.stroke();
+  }
+
+  if (footPulse > 0.05) {
+    ctx.strokeStyle = colorWithAlpha(trim, mobileLite ? 0.07 + footPulse * 0.07 : 0.08 + footPulse * 0.1);
+    ctx.lineWidth = 1 + footPulse * 0.62;
+    for (const leg of [pose.backLeg, pose.frontLeg]) {
+      ctx.beginPath();
+      ctx.ellipse(leg.foot.x, leg.foot.y + 2, 18 + footPulse * 11, 3 + footPulse * 0.8, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
   }
@@ -10657,6 +10765,17 @@ function getPose(f, stride) {
       base.frontLeg.foot.y -= drive * 2;
       base.backLeg.foot.x -= load * 4 * spec.stance;
       base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 0.68);
+    } else if (f.profileId === "p5") {
+      base.torsoTilt -= drive * 0.024 - load * 0.004;
+      base.frontArm.hand.x += drive * 20 * spec.stance;
+      base.frontArm.hand.y -= drive * 8;
+      base.frontArm.elbow.x += drive * 10 * spec.stance;
+      base.backArm.hand.x -= windup * 6 * spec.stance;
+      base.backArm.hand.y -= windup * 7;
+      base.frontLeg.foot.x += drive * 4 * spec.stance;
+      base.frontLeg.foot.y -= drive * 3;
+      base.backLeg.foot.x -= load * 5 * spec.stance;
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 0.58);
     }
   } else if (attackType === "kick" || attackType === "airKick") {
     const mass = attackMass ?? attackMassProfile(null);
@@ -10760,6 +10879,17 @@ function getPose(f, stride) {
       base.backLeg.foot.y -= load * 1.5;
       base.frontArm.hand.y -= extension * 5;
       base.backArm.hand.y -= extension * 7;
+    } else if (f.profileId === "p5") {
+      base.torsoTilt -= extension * 0.036 + load * 0.006;
+      base.frontLeg.knee.x += extension * 15 * spec.stance;
+      base.frontLeg.knee.y -= extension * 8;
+      base.frontLeg.foot.x += extension * 23 * spec.stance;
+      base.frontLeg.foot.y -= extension * 12;
+      base.frontLeg.footAngle -= 0.075;
+      base.backLeg.foot.x -= load * 5 * spec.stance;
+      base.backLeg.foot.y -= load * 1.2;
+      base.frontArm.hand.y -= extension * 8;
+      base.backArm.hand.y -= extension * 10;
     }
   } else if (attackType === "sweep") {
     const mass = attackMass ?? attackMassProfile(null);
@@ -10805,6 +10935,13 @@ function getPose(f, stride) {
       base.backLeg.foot.x -= load * 4 * spec.stance;
       base.frontArm.hand.y -= drive * 4;
       base.backArm.hand.y -= drive * 5;
+    } else if (f.profileId === "p5") {
+      base.torsoTilt -= drive * 0.026;
+      base.frontLeg.foot.x += drive * 24 * spec.stance;
+      base.frontLeg.foot.y -= drive * 2.2;
+      base.backLeg.foot.x -= load * 5 * spec.stance;
+      base.frontArm.hand.y -= drive * 5;
+      base.backArm.hand.y -= drive * 6;
     }
   } else if (attackType === "grab") {
     const mass = attackMass ?? attackMassProfile(null);
@@ -10861,6 +10998,15 @@ function getPose(f, stride) {
       base.frontLeg.foot.x += 12 * activePulse - 4 * windup;
       base.frontLeg.foot.y -= activePulse * 2;
       base.backLeg.foot.x -= 8 * activePulse + 3 * windup;
+    } else if (f.profileId === "p5") {
+      base.torsoTilt = -0.118 * activePulse + 0.028 * windup;
+      base.frontArm.elbow = { x: 43 - windup * 13 + activePulse * 42, y: -132 + crouch - windup * 7 - activePulse * 13 };
+      base.frontArm.hand = { x: 66 - windup * 20 + activePulse * 72, y: -128 + crouch - windup * 10 - activePulse * 10 };
+      base.backArm.elbow = { x: -32 - windup * 9 - activePulse * 6, y: -132 + crouch - activePulse * 11 };
+      base.backArm.hand = { x: -42 - windup * 12 - activePulse * 11, y: -151 + crouch - activePulse * 14 };
+      base.frontLeg.foot.x += 16 * activePulse - 4 * windup;
+      base.frontLeg.foot.y -= activePulse * 3;
+      base.backLeg.foot.x -= 9 * activePulse + 3 * windup;
     } else {
       base.frontArm.elbow = { x: 42 - windup * 7 + activePulse * 20, y: -121 + crouch - windup * 4 - activePulse * 8 };
       base.frontArm.hand = { x: 66 - windup * 12 + activePulse * 36, y: -106 + crouch - windup * 5 - activePulse * 5 };
@@ -13847,6 +13993,7 @@ function makeMenuStats(profile) {
     balanced: [80, 76, 82],
     heavy: [92, 62, 88],
     lean: [68, 92, 72],
+    tallLean: [64, 90, 74],
   }[profile.build] ?? [75, 75, 75];
   const labels = ["FUE", "VEL", "ENE"];
   const list = document.createElement("div");
