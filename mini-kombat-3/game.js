@@ -6474,8 +6474,155 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
   ctx.stroke();
   ctx.restore();
 
+  drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting);
   drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase);
   drawUnifiedHeadAccessoryPolish(f, localCrouch, motion, acting);
+}
+
+function drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting) {
+  const impact = localizedImpactProfile(f);
+  const reaction = impactReactionProfile(f);
+  const phase = attackPhase(f.attack);
+  const attackType = f.attack?.type ?? "";
+  const strike = f.attack ? Math.max(phase.strike, phase.snap * 0.9, phase.followThrough * 0.48) : 0;
+  const prep = f.attack ? phase.anticipation : 0;
+  const kick = attackType === "kick" || attackType === "airKick" || attackType === "sweep";
+  const guardHit = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
+  const damage = Math.max(
+    impact.t * 0.94,
+    reaction.kind === "guard" ? 0 : reaction.t * 0.72,
+    clamp((f.hurt ?? 0) / 30, 0, 1) * 0.42,
+  );
+  const active = Math.max(damage, guardHit * 0.6, strike * 0.42);
+  if (active <= 0.035) return;
+
+  const trim = f.trim ?? "#fff1bd";
+  const profileMass = f.profileId === "p1" ? 1.12 : 0.84;
+  const profileSnap = f.profileId === "p2" ? 1.18 : 0.88;
+  const zone = impact.zone === "head" || impact.zone === "legs" ? impact.zone : "torso";
+  const dir = impact.localDir || reaction.localDir || 1;
+  const recoil = clamp(Math.max(impact.snap, reaction.snap * 0.74) * profileSnap, 0, 1.7);
+  const rebound = clamp(Math.max(impact.rebound, reaction.rebound * 0.72), 0, 1.7);
+  const zoneY = zone === "head" ? -158 : zone === "legs" ? -47 : -104;
+  const zoneX = -dir * (zone === "head" ? 17 : zone === "legs" ? 9 : 13);
+  const zoneRx = zone === "legs" ? 40 : zone === "head" ? 29 : 35;
+  const zoneRy = zone === "legs" ? 15 : zone === "head" ? 18 : 22;
+
+  if (damage > 0.045) {
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = `rgba(24, 12, 9, ${0.045 + damage * 0.082 * profileMass})`;
+    ctx.beginPath();
+    ctx.ellipse(
+      zoneX - dir * recoil * 5,
+      zoneY + localCrouch + impact.shake * 0.9,
+      zoneRx + recoil * 7,
+      zoneRy + rebound * 2.6,
+      -dir * (0.12 + recoil * 0.04),
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+
+    if (zone !== "legs") {
+      ctx.fillStyle = `rgba(20, 10, 8, ${0.036 + damage * 0.054})`;
+      ctx.beginPath();
+      ctx.ellipse(-33 - dir * recoil * 2, -145 + localCrouch + rebound * 2, 19 + damage * 7, 7.2, -0.22, 0, Math.PI * 2);
+      ctx.ellipse(35 - dir * recoil * 4, -143 + localCrouch + rebound * 2, 20 + damage * 8, 7.8, 0.22, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = `rgba(22, 11, 8, ${0.05 + damage * 0.06})`;
+      ctx.beginPath();
+      ctx.ellipse(-38 + dir * recoil * 4, -4 + localCrouch, 31 + damage * 8, 5.4 + damage * 1.7, -0.08, 0, Math.PI * 2);
+      ctx.ellipse(42 + dir * recoil * 3, -3 + localCrouch, 30 + damage * 8, 5.2 + damage * 1.7, 0.08, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.lineCap = "round";
+    ctx.strokeStyle = colorWithAlpha(trim, 0.08 + damage * 0.11);
+    ctx.lineWidth = 1.15 + recoil * 0.65;
+    ctx.beginPath();
+    ctx.moveTo(zoneX - dir * (zoneRx * 0.54 + recoil * 8), zoneY + localCrouch - zoneRy * 0.48);
+    ctx.quadraticCurveTo(
+      zoneX - dir * 4,
+      zoneY + localCrouch - zoneRy * 0.92 - rebound * 3,
+      zoneX + dir * (zoneRx * 0.48 + recoil * 5),
+      zoneY + localCrouch - zoneRy * 0.18
+    );
+    ctx.moveTo(zoneX - dir * (zoneRx * 0.42 + recoil * 5), zoneY + localCrouch + zoneRy * 0.44);
+    ctx.quadraticCurveTo(
+      zoneX - dir * 2,
+      zoneY + localCrouch + zoneRy * 0.72 + rebound * 2,
+      zoneX + dir * (zoneRx * 0.38 + recoil * 4),
+      zoneY + localCrouch + zoneRy * 0.28
+    );
+    ctx.stroke();
+
+    if (f.profileId === "p2" && zone !== "legs") {
+      ctx.globalAlpha = clamp(0.035 + damage * 0.12, 0.035, 0.2);
+      ctx.strokeStyle = "rgba(255, 239, 220, 0.9)";
+      ctx.lineWidth = 1.05;
+      ctx.beginPath();
+      ctx.moveTo(-25 - dir * recoil * 2, -169 + localCrouch);
+      ctx.quadraticCurveTo(-2 - dir * recoil * 4, -152 + localCrouch + rebound * 2, 27 - dir * recoil * 3, -135 + localCrouch);
+      ctx.stroke();
+    } else if (f.profileId === "p1") {
+      ctx.globalAlpha = clamp(0.034 + damage * 0.09, 0.03, 0.17);
+      ctx.strokeStyle = colorWithAlpha(trim, 0.82);
+      ctx.lineWidth = 2.4 + damage * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-43 + dir * recoil * 2, -63 + localCrouch);
+      ctx.quadraticCurveTo(-9 + dir * recoil * 3, -55 + localCrouch + rebound * 2, 36 + dir * recoil * 2, -62 + localCrouch);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  if (strike > 0.055 && f.hurt <= 0) {
+    const drive = clamp(strike + prep * 0.4, 0, 1.35);
+    const shoulderY = kick ? -118 : -141;
+    const hipY = kick ? -69 : -78;
+    const reach = kick ? 70 : 58;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = `rgba(24, 12, 9, ${0.035 + drive * 0.052 * profileMass})`;
+    ctx.beginPath();
+    ctx.ellipse(-22 - drive * 2, hipY + localCrouch, 27 + drive * 10, 9 + drive * 2.8, -0.08, 0, Math.PI * 2);
+    ctx.ellipse(27 + drive * 4, shoulderY + localCrouch, 24 + drive * 8, 8 + drive * 2, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.lineCap = "round";
+    ctx.strokeStyle = colorWithAlpha(trim, 0.07 + drive * (f.profileId === "p2" ? 0.1 : 0.075));
+    ctx.lineWidth = 1.2 + drive * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-18 - motion.x * 0.06, -151 + localCrouch + acting.y * 0.04);
+    ctx.quadraticCurveTo(18 + drive * 15, -136 + localCrouch - drive * 5, reach + drive * (kick ? 23 : 16), -118 + localCrouch - drive * (kick ? 6 : 3));
+    ctx.stroke();
+
+    if (f.profileId === "p2") {
+      ctx.globalAlpha = clamp(0.04 + drive * 0.1, 0.04, 0.18);
+      ctx.lineWidth = 0.9 + drive * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(6, -86 + localCrouch);
+      ctx.quadraticCurveTo(31 + drive * 9, -80 + localCrouch - drive * 5, 67 + drive * 16, -70 + localCrouch - drive * 9);
+      ctx.stroke();
+    } else {
+      ctx.globalAlpha = clamp(0.035 + drive * 0.08, 0.035, 0.15);
+      ctx.lineWidth = 2 + drive * 1.1;
+      ctx.beginPath();
+      ctx.moveTo(-48, -4 + localCrouch);
+      ctx.quadraticCurveTo(-20 + drive * 8, -12 + localCrouch, 18 + drive * 18, -7 + localCrouch);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 }
 
 function drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase) {
