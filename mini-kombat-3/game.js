@@ -50,11 +50,15 @@ const MOBILE_MAX_PARTICLES = 155;
 const GUARD_IMPACT_FRAMES = 18;
 const COUNTER_WINDOW_FRAMES = 42;
 const ONLINE_SYNC_EVERY = 3;
+const ONLINE_PING_EVERY_MS = 2400;
 const ONLINE_ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
 ];
-const PEERJS_CDN_URL = "https://unpkg.com/peerjs@1/dist/peerjs.min.js";
+const PEERJS_CDN_URLS = [
+  "https://unpkg.com/peerjs@1/dist/peerjs.min.js",
+  "https://cdn.jsdelivr.net/npm/peerjs@1/dist/peerjs.min.js",
+];
 const faces = {
   p1: loadImage("assets/fighter-1-face.png"),
   p2: loadImage("assets/fighter-2-face.png"),
@@ -131,9 +135,14 @@ const onlineState = {
   offerCode: "",
   answerCode: "",
   inviteLink: "",
+  inviteReady: false,
   roomId: "",
   manualVisible: false,
   signaling: "",
+  localReady: false,
+  remoteReady: false,
+  lastPingAt: 0,
+  latencyMs: 0,
   lastInputPayload: "",
   lastSnapshotFrame: -1,
   snapshotTick: 0,
@@ -2042,6 +2051,18 @@ function onlineRemoteFighterId() {
   return onlineState.remoteSide || "";
 }
 
+function onlineHostReady() {
+  return onlineState.role === "host" ? onlineState.localReady : onlineState.remoteReady;
+}
+
+function onlineGuestReady() {
+  return onlineState.role === "guest" ? onlineState.localReady : onlineState.remoteReady;
+}
+
+function onlineBothReady() {
+  return onlineConnected() && onlineState.localReady && onlineState.remoteReady;
+}
+
 function touchControlsFighterId() {
   return onlineConnected() ? onlineLocalFighterId() : "right";
 }
@@ -2379,6 +2400,7 @@ function updateCameraImpactPulse() {
 }
 
 function update() {
+  tickOnlineHeartbeat();
   if (onlineGuestActive()) {
     updateOnlineGuestView();
     return;
@@ -15003,17 +15025,33 @@ function advanceOverlay() {
     advanceTournament();
     return;
   }
+  if (matchOver && onlineConnected()) {
+    prepareOnlineRematchLobby();
+    return;
+  }
   if (overlayMode === "help") {
     showHomeOverlay();
     return;
   }
   if (overlayMode === "online") {
     if (onlineHostActive()) {
-      startOnlineMatch();
+      if (!onlineState.localReady) {
+        setOnlineLocalReady(true);
+        return;
+      }
+      if (onlineBothReady()) {
+        startOnlineMatch();
+        return;
+      }
+      setOnlineStatus(onlineReadyStatusText());
       return;
     }
     if (onlineGuestActive()) {
-      setOnlineStatus("Esperando que el anfitrion inicie la pelea.");
+      if (!onlineState.localReady) {
+        setOnlineLocalReady(true);
+        return;
+      }
+      setOnlineStatus(onlineReadyStatusText());
       return;
     }
     if (paused) {
@@ -15086,12 +15124,25 @@ function loadPeerJs() {
   if (window.Peer) return Promise.resolve(window.Peer);
   if (loadPeerJs.promise) return loadPeerJs.promise;
   loadPeerJs.promise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = PEERJS_CDN_URL;
-    script.async = true;
-    script.onload = () => window.Peer ? resolve(window.Peer) : reject(new Error("PeerJS no quedo disponible."));
-    script.onerror = () => reject(new Error("No pude cargar el conector online gratuito."));
-    document.head.append(script);
+    let cdnIndex = 0;
+    const tryNextCdn = () => {
+      const src = PEERJS_CDN_URLS[cdnIndex];
+      cdnIndex += 1;
+      if (!src) {
+        reject(new Error("No pude cargar el conector online gratuito."));
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.onload = () => window.Peer ? resolve(window.Peer) : tryNextCdn();
+      script.onerror = () => {
+        script.remove();
+        tryNextCdn();
+      };
+      document.head.append(script);
+    };
+    tryNextCdn();
   });
   return loadPeerJs.promise;
 }
@@ -15111,9 +15162,41 @@ function setOnlineStatus(status) {
   }
 }
 
+function onlineReadyStatusText() {
+  if (!onlineConnected()) {
+    if (onlineState.role === "host") return "Compartí el link y espera al invitado.";
+    if (onlineState.role === "guest") return "Conectando con el anfitrion...";
+    return "Crea un link para invitar o unite con codigo.";
+  }
+  if (onlineBothReady()) {
+    return onlineState.role === "host"
+      ? "Ambos jugadores listos. Ya podes iniciar la pelea online."
+      : "Ambos jugadores listos. Esperando que el anfitrion inicie.";
+  }
+  if (onlineState.localReady) return "Listo. Esperando que el otro jugador confirme.";
+  if (onlineState.remoteReady) return "El otro jugador ya esta listo. Marca LISTO para empezar.";
+  return "Elijan luchador y marquen LISTO cuando esten preparados.";
+}
+
+function onlineLatencyLabel() {
+  if (!onlineConnected()) return "Sin conexion";
+  if (!onlineState.latencyMs) return "Midiendo";
+  if (onlineState.latencyMs < 90) return `Fluida ${onlineState.latencyMs} ms`;
+  if (onlineState.latencyMs < 170) return `Buena ${onlineState.latencyMs} ms`;
+  if (onlineState.latencyMs < 280) return `Media ${onlineState.latencyMs} ms`;
+  return `Lenta ${onlineState.latencyMs} ms`;
+}
+
+function onlineReadyLabel(ready) {
+  return ready ? "LISTO" : "FALTA LISTO";
+}
+
 function onlinePrimaryActionLabel() {
-  if (onlineHostActive()) return "INICIAR ONLINE";
-  if (onlineGuestActive()) return paused ? "PEDIR SEGUIR" : "ESPERANDO";
+  if (onlineHostActive()) {
+    if (onlineBothReady()) return "INICIAR ONLINE";
+    return onlineState.localReady ? "ESPERANDO LISTOS" : "MARCAR LISTO";
+  }
+  if (onlineGuestActive()) return onlineState.localReady ? "LISTO" : "MARCAR LISTO";
   return paused ? "SEGUIR" : "VOLVER";
 }
 
@@ -15152,6 +15235,11 @@ function resetOnlineConnection(keepCodes = false) {
   onlineState.peer = null;
   onlineState.channel = null;
   onlineState.connected = false;
+  onlineState.inviteReady = false;
+  onlineState.localReady = false;
+  onlineState.remoteReady = false;
+  onlineState.lastPingAt = 0;
+  onlineState.latencyMs = 0;
   onlineState.lastInputPayload = "";
   onlineState.lastSnapshotFrame = -1;
   onlineState.snapshotTick = 0;
@@ -15173,6 +15261,8 @@ function createOnlinePeerConnection() {
     if (state === "connected") setOnlineStatus("Conexion online establecida.");
     else if (state === "failed" || state === "disconnected" || state === "closed") {
       onlineState.connected = false;
+      onlineState.localReady = false;
+      onlineState.remoteReady = false;
       setOnlineStatus("La conexion online se corto. Podés crear una sala nueva.");
     }
   };
@@ -15202,11 +15292,16 @@ function waitForIceGathering(pc) {
 
 function handleOnlineChannelOpen() {
   onlineState.connected = true;
+  onlineState.localReady = false;
+  onlineState.remoteReady = false;
+  onlineState.lastPingAt = 0;
+  onlineState.latencyMs = 0;
   onlineState.remoteInput = emptyInput();
   setCpuMode(false);
   setOnlineStatus(onlineState.role === "host"
-    ? "Invitado conectado. Ya podés iniciar la pelea online."
-    : "Conectado. Esperando que el anfitrion inicie la pelea.");
+    ? "Invitado conectado. Elijan luchador y marquen LISTO."
+    : "Conectado. Elegi tu luchador y marca LISTO.");
+  tickOnlineHeartbeat(true);
   if (onlineState.role === "host") {
     sendOnlineSetup();
     sendOnlineSnapshot(true);
@@ -15228,10 +15323,14 @@ function setupOnlineChannel(channel) {
   };
   channel.onclose = () => {
     onlineState.connected = false;
+    onlineState.localReady = false;
+    onlineState.remoteReady = false;
     setOnlineStatus("La conexion online se cerro.");
   };
   channel.onerror = () => {
     onlineState.connected = false;
+    onlineState.localReady = false;
+    onlineState.remoteReady = false;
     setOnlineStatus("Hubo un error en la conexion online.");
   };
 }
@@ -15248,10 +15347,14 @@ function setupOnlinePeerChannel(connection) {
   });
   connection.on("close", () => {
     onlineState.connected = false;
+    onlineState.localReady = false;
+    onlineState.remoteReady = false;
     setOnlineStatus("La conexion online se cerro.");
   });
   connection.on("error", () => {
     onlineState.connected = false;
+    onlineState.localReady = false;
+    onlineState.remoteReady = false;
     setOnlineStatus("Hubo un error en la conexion online.");
   });
 }
@@ -15270,26 +15373,43 @@ async function createOnlineInviteLink() {
     onlineState.signaling = "link";
     onlineState.roomId = makeRoomId();
     onlineState.inviteLink = buildInviteLink(onlineState.roomId);
+    onlineState.inviteReady = false;
     onlineState.remoteInput = emptyInput();
-    setOnlineStatus("Creando link online...");
+    const roomId = onlineState.roomId;
+    setOnlineStatus("Preparando sala online. Esperá a que diga Link listo.");
     const Peer = await loadPeerJs();
-    onlineState.peer = new Peer(onlineState.roomId, { debug: 0 });
+    if (onlineState.role !== "host" || onlineState.roomId !== roomId) return;
+    onlineState.peer = new Peer(roomId, { debug: 0 });
     onlineState.peer.on("open", () => {
-      setOnlineStatus("Link listo. Compartilo con el invitado.");
+      onlineState.inviteReady = true;
+      setOnlineStatus("Link listo. Compartilo y dejá esta pantalla abierta.");
     });
     onlineState.peer.on("connection", (connection) => {
       setupOnlinePeerChannel(connection);
     });
     onlineState.peer.on("error", (error) => {
-      resetOnlineConnection(true);
+      onlineState.peer = null;
+      onlineState.channel = null;
+      onlineState.connected = false;
+      onlineState.inviteReady = false;
+      onlineState.inviteLink = "";
+      onlineState.roomId = "";
       onlineState.manualVisible = true;
-      setOnlineStatus(`No pude abrir la sala automatica: ${error.message}`);
+      setOnlineStatus(`No pude preparar el link automatico: ${error.message}. Usa codigos manuales o reintenta.`);
     });
     renderOnlinePanel();
   } catch (error) {
-    resetOnlineConnection(true);
-    onlineState.manualVisible = true;
-    setOnlineStatus(`${error.message} Usá el modo manual como respaldo.`);
+    if (onlineState.role === "host" && onlineState.inviteLink) {
+      onlineState.inviteReady = false;
+      onlineState.inviteLink = "";
+      onlineState.roomId = "";
+      onlineState.manualVisible = true;
+      setOnlineStatus(`${error.message} Usa codigos manuales o reintenta el link.`);
+    } else {
+      resetOnlineConnection(true);
+      onlineState.manualVisible = true;
+      setOnlineStatus(`${error.message} Usa el modo manual como respaldo.`);
+    }
   }
 }
 
@@ -15311,6 +15431,7 @@ async function joinOnlineInviteRoom(roomId) {
     onlineState.signaling = "link";
     onlineState.roomId = roomId;
     onlineState.inviteLink = buildInviteLink(roomId);
+    onlineState.inviteReady = false;
     setOnlineStatus("Uniendote a la sala online...");
     const Peer = await loadPeerJs();
     onlineState.peer = new Peer(undefined, { debug: 0 });
@@ -15322,12 +15443,12 @@ async function joinOnlineInviteRoom(roomId) {
     onlineState.peer.on("error", (error) => {
       resetOnlineConnection(true);
       onlineState.manualVisible = true;
-      setOnlineStatus(`No pude unirme automaticamente: ${error.message}`);
+      setOnlineStatus(`No encontre al anfitrion online. En la compu espera "Link listo" y deja esa pantalla abierta. Si sigue fallando, usen codigos manuales.`);
     });
     renderOnlinePanel();
   } catch (error) {
     resetOnlineConnection(true);
-    setOnlineStatus(`${error.message} Pedile al anfitrion usar el modo manual.`);
+    setOnlineStatus(`${error.message} Pedile al anfitrion usar codigos manuales.`);
   }
 }
 
@@ -15418,8 +15539,79 @@ function sendOnlineMessage(message) {
   }
 }
 
+function tickOnlineHeartbeat(force = false) {
+  if (!onlineConnected()) return;
+  const now = performance.now();
+  if (!force && now - onlineState.lastPingAt < ONLINE_PING_EVERY_MS) return;
+  onlineState.lastPingAt = now;
+  sendOnlineMessage({ type: "ping", at: now });
+}
+
+function applyOnlinePong(message) {
+  if (typeof message.at !== "number") return;
+  onlineState.latencyMs = Math.round(Math.max(0, performance.now() - message.at));
+  if (overlayMode === "online") renderOnlinePanel();
+}
+
+function sendOnlineReady() {
+  if (onlineState.role === "host") {
+    sendOnlineSetup();
+    return;
+  }
+  if (onlineState.role === "guest") {
+    sendOnlineMessage({
+      type: "ready",
+      ready: onlineState.localReady,
+      fighterId: selectedRightId,
+    });
+  }
+}
+
+function setOnlineLocalReady(nextReady) {
+  if (!onlineConnected()) {
+    setOnlineStatus("Todavia falta completar la conexion online.");
+    return;
+  }
+  if (running && !winner) return;
+  onlineState.localReady = Boolean(nextReady);
+  sendOnlineReady();
+  playSound(onlineState.localReady ? "menu" : "select");
+  setOnlineStatus(onlineReadyStatusText());
+}
+
+function applyOnlineReady(message) {
+  if (onlineState.role === "host") {
+    const nextId = fighterProfiles[message.fighterId] ? message.fighterId : "";
+    if (nextId && (!running || winner)) {
+      selectedRightId = nextId;
+      fighters = buildFighters();
+      updateFighterLabels();
+    }
+    onlineState.remoteReady = Boolean(message.ready);
+    setOnlineStatus(onlineReadyStatusText());
+    sendOnlineSetup();
+    return;
+  }
+  if (onlineState.role === "guest") {
+    onlineState.remoteReady = Boolean(message.ready);
+    setOnlineStatus(onlineReadyStatusText());
+  }
+}
+
 function handleOnlineMessage(message) {
   if (!message || typeof message !== "object") return;
+  if (message.type === "ping") {
+    sendOnlineMessage({ type: "pong", at: message.at });
+    return;
+  }
+  if (message.type === "pong") {
+    applyOnlinePong(message);
+    return;
+  }
+  if (message.type === "ready") {
+    applyOnlineReady(message);
+    return;
+  }
   if (message.type === "input" && onlineState.role === "host") {
     onlineState.remoteInput = normalizeInput(message.input);
     return;
@@ -15448,12 +15640,16 @@ function sendOnlineSetup() {
     leftId: selectedLeftId,
     rightId: selectedRightId,
     roundNumber,
+    hostReady: onlineHostReady(),
+    guestReady: onlineGuestReady(),
   });
 }
 
 function applyOnlineSetup(message) {
   selectedLeftId = fighterProfiles[message.leftId] ? message.leftId : selectedLeftId;
   selectedRightId = fighterProfiles[message.rightId] ? message.rightId : selectedRightId;
+  onlineState.remoteReady = Boolean(message.hostReady);
+  onlineState.localReady = Boolean(message.guestReady);
   tournamentMode = false;
   tournamentActive = false;
   cpuEnabled = false;
@@ -15461,6 +15657,10 @@ function applyOnlineSetup(message) {
   roundNumber = message.roundNumber || 1;
   updateFighterLabels();
   setCpuMode(false);
+  if (overlayMode === "online") {
+    startButton.textContent = onlinePrimaryActionLabel();
+    onlineState.status = onlineReadyStatusText();
+  }
   if (overlayMode === "online") renderOnlinePanel();
 }
 
@@ -15470,6 +15670,7 @@ function sendOnlineSelection() {
     type: "select",
     side: "right",
     fighterId: selectedRightId,
+    ready: onlineState.localReady,
   });
 }
 
@@ -15478,9 +15679,10 @@ function applyOnlineGuestSelection(message) {
   const nextId = fighterProfiles[message.fighterId] ? message.fighterId : "";
   if (!nextId) return;
   selectedRightId = nextId;
+  onlineState.remoteReady = Boolean(message.ready);
   fighters = buildFighters();
   updateFighterLabels();
-  setOnlineStatus(`Invitado eligio ${fighterProfiles[nextId].name}. Ya podes iniciar la pelea online.`);
+  setOnlineStatus(onlineReadyStatusText());
   sendOnlineSetup();
 }
 
@@ -15489,19 +15691,21 @@ function setOnlineLocalFighter(nextId) {
   ensureAudio();
   if (onlineState.role === "host") {
     selectedLeftId = nextId;
+    onlineState.localReady = false;
     fighters = buildFighters();
     updateFighterLabels();
     sendOnlineSetup();
     setOnlineStatus(onlineConnected()
-      ? `${fighterProfiles[nextId].name} listo. Esperando o confirmando al invitado.`
+      ? onlineReadyStatusText()
       : `${fighterProfiles[nextId].name} listo. Comparti el link cuando quieras.`);
   } else if (onlineState.role === "guest") {
     selectedRightId = nextId;
+    onlineState.localReady = false;
     fighters = buildFighters();
     updateFighterLabels();
     sendOnlineSelection();
     setOnlineStatus(onlineConnected()
-      ? `${fighterProfiles[nextId].name} enviado al anfitrion.`
+      ? onlineReadyStatusText()
       : `${fighterProfiles[nextId].name} listo. Se enviara al conectar.`);
   }
   playSound("select");
@@ -15683,6 +15887,10 @@ function startOnlineMatch() {
     setOnlineStatus("Todavia falta conectar al invitado.");
     return;
   }
+  if (!onlineBothReady()) {
+    setOnlineStatus(onlineReadyStatusText());
+    return;
+  }
   tournamentMode = false;
   tournamentActive = false;
   setCpuMode(false);
@@ -15699,12 +15907,63 @@ function startOnlineMatch() {
   setOnlineStatus("Pelea online iniciada.");
 }
 
-function makeOnlineButton(label, className, onClick) {
+function prepareOnlineRematchLobby() {
+  if (!onlineConnected()) {
+    resetGame();
+    return;
+  }
+  clearRoundTimers();
+  running = false;
+  paused = false;
+  winner = "";
+  matchOver = false;
+  roundWinnerId = "";
+  matchWinnerId = "";
+  roundNumber = 1;
+  flash = 0;
+  shake = 0;
+  hitStopFrames = 0;
+  koFreeze = 0;
+  resultFrame = 0;
+  roundFrame = 0;
+  countdownFrames = 0;
+  fighters = buildFighters();
+  fighters[0].wins = 0;
+  fighters[1].wins = 0;
+  projectiles.length = 0;
+  onlineState.localReady = false;
+  onlineState.remoteReady = false;
+  onlineState.lastInputPayload = "";
+  updateFighterLabels();
+  showOnlineOverlay();
+  setOnlineStatus(onlineState.role === "host"
+    ? "Revancha preparada. Marquen LISTO para volver a pelear."
+    : "Revancha preparada. Elegi luchador y marca LISTO.");
+  if (onlineState.role === "host") sendOnlineSetup();
+  else sendOnlineReady();
+}
+
+function makeOnlineButton(label, className, onClick, disabled = false) {
   const button = document.createElement("button");
   button.type = "button";
   button.textContent = label;
   if (className) button.className = className;
-  button.addEventListener("click", onClick);
+  button.disabled = disabled;
+  let lastHandledAt = 0;
+  const handlePress = (event) => {
+    if (button.disabled) return;
+    const now = Date.now();
+    if (now - lastHandledAt < 420) return;
+    lastHandledAt = now;
+    const result = onClick(event);
+    if (result?.catch) result.catch((error) => setOnlineStatus(error.message || "No pude completar la accion online."));
+  };
+  button.addEventListener("pointerup", (event) => {
+    if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+    event.preventDefault();
+    handlePress(event);
+  });
+  button.addEventListener("click", handlePress);
   return button;
 }
 
@@ -15760,6 +16019,73 @@ function makeOnlineFighterPicker(title, selectedId, editable, onPick, note = "")
   return picker;
 }
 
+function makeOnlineLobbyPlayer(title, profile, ready, local) {
+  const player = document.createElement("div");
+  player.className = `online-lobby-player ${ready ? "is-ready" : ""}`;
+  player.style.setProperty("--fighter-trim", profile.trim);
+
+  const image = document.createElement("img");
+  image.src = profile.face.src;
+  image.alt = profile.name;
+
+  const text = document.createElement("div");
+  const label = document.createElement("span");
+  label.textContent = local ? `${title} - vos` : title;
+  const name = document.createElement("strong");
+  name.textContent = profile.name;
+  const state = document.createElement("em");
+  state.textContent = onlineReadyLabel(ready);
+  text.append(label, name, state);
+
+  player.append(image, text);
+  return player;
+}
+
+function makeOnlineLobbyStatus() {
+  const lobby = document.createElement("div");
+  lobby.className = "online-lobby-state";
+  lobby.append(
+    makeOnlineLobbyPlayer("Anfitrion", fighterProfiles[selectedLeftId], onlineHostReady(), onlineState.role === "host"),
+    makeOnlineLobbyPlayer("Invitado", fighterProfiles[selectedRightId], onlineGuestReady(), onlineState.role === "guest"),
+  );
+
+  const quality = document.createElement("div");
+  quality.className = "online-connection-quality";
+  quality.innerHTML = `<strong>Conexion</strong><span>${onlineLatencyLabel()}</span>`;
+  lobby.append(quality);
+  return lobby;
+}
+
+function onlineInviteShareText() {
+  return `Unite a mi pelea de Mini Kombat III: ${onlineState.inviteLink}`;
+}
+
+function mobileSharePreferred() {
+  return /android|iphone|ipad|ipod/iu.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth <= 920);
+}
+
+function openOnlineShareFallback(text) {
+  if (!mobileSharePreferred()) return false;
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  const opened = window.open(url, "_blank");
+  if (!opened) return false;
+  opened.opener = null;
+  setOnlineStatus("Se abrio WhatsApp para compartir el link.");
+  return true;
+}
+
+function selectOnlineCode(value) {
+  const textarea = Array.from(document.querySelectorAll(".online-code-block textarea"))
+    .find((node) => node.value === value);
+  if (!textarea) return false;
+  textarea.readOnly = false;
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange?.(0, textarea.value.length);
+  textarea.readOnly = true;
+  return true;
+}
+
 function copyOnlineCode(code) {
   if (!code) {
     setOnlineStatus("Todavia no hay codigo para copiar.");
@@ -15767,12 +16093,16 @@ function copyOnlineCode(code) {
   }
   const write = navigator.clipboard?.writeText?.(code);
   if (!write) {
-    setOnlineStatus("Seleccioná el codigo y copialo manualmente.");
+    selectOnlineCode(code);
+    setOnlineStatus("No pude copiar automatico. El link quedo seleccionado para copiar manualmente.");
     return;
   }
   write
     .then(() => setOnlineStatus("Codigo copiado."))
-    .catch(() => setOnlineStatus("No pude copiarlo automaticamente. Seleccionalo y copialo manualmente."));
+    .catch(() => {
+      selectOnlineCode(code);
+      setOnlineStatus("No pude copiarlo automaticamente. El link quedo seleccionado para copiar manualmente.");
+    });
 }
 
 async function shareOnlineInviteLink() {
@@ -15780,7 +16110,12 @@ async function shareOnlineInviteLink() {
     setOnlineStatus("Todavia no hay link para compartir.");
     return;
   }
-  if (navigator.share) {
+  if (onlineState.role === "host" && !onlineState.inviteReady) {
+    setOnlineStatus("Esperá a que diga Link listo antes de compartir.");
+    return;
+  }
+  const shareText = onlineInviteShareText();
+  if (navigator.share && window.isSecureContext) {
     try {
       await navigator.share({
         title: "Mini Kombat III Online",
@@ -15789,10 +16124,14 @@ async function shareOnlineInviteLink() {
       });
       setOnlineStatus("Link compartido. Esperando invitado...");
       return;
-    } catch {
-      setOnlineStatus("No se compartio el link. Podés copiarlo.");
+    } catch (error) {
+      if (error.name === "AbortError") {
+        setOnlineStatus("No se compartio el link.");
+        return;
+      }
     }
   }
+  if (openOnlineShareFallback(shareText)) return;
   copyOnlineCode(onlineState.inviteLink);
 }
 
@@ -15816,25 +16155,38 @@ function renderOnlinePanel() {
     : "<strong>Modo experimental</strong><span>Funciona gratis con codigos WebRTC. Puede fallar en algunas redes estrictas.</span>";
   panel.append(role);
 
+  if (onlineState.role) panel.append(makeOnlineLobbyStatus());
+
   if (onlineState.role === "host") {
+    const hostCanEdit = (!running || winner) && !onlineState.localReady;
+    const guestNote = onlineConnected()
+      ? `${fighterProfiles[selectedRightId].name} - ${onlineReadyLabel(onlineGuestReady())}`
+      : "Esperando invitado";
     panel.append(
-      makeOnlineFighterPicker("Tu luchador", selectedLeftId, !running || winner, setOnlineLocalFighter),
-      makeOnlineFighterPicker("Invitado", selectedRightId, false, () => {}, onlineConnected() ? "Lo elige el invitado" : "Esperando invitado"),
+      makeOnlineFighterPicker("Tu luchador", selectedLeftId, hostCanEdit, setOnlineLocalFighter, onlineState.localReady ? "Listo confirmado" : ""),
+      makeOnlineFighterPicker("Invitado", selectedRightId, false, () => {}, guestNote),
     );
   } else if (onlineState.role === "guest") {
-    panel.append(makeOnlineFighterPicker("Elegi tu luchador", selectedRightId, !running || winner, setOnlineLocalFighter));
+    const guestCanEdit = (!running || winner) && !onlineState.localReady;
+    panel.append(makeOnlineFighterPicker("Elegi tu luchador", selectedRightId, guestCanEdit, setOnlineLocalFighter, onlineState.localReady ? "Listo confirmado" : ""));
   }
 
   const actions = document.createElement("div");
   actions.className = "online-action-grid";
   if (!onlineState.role) {
     actions.append(makeOnlineButton("CREAR LINK", "primary-online", () => createOnlineInviteLink()));
+  } else if (onlineState.role === "host" && onlineState.manualVisible && !onlineState.inviteLink && !onlineConnected()) {
+    actions.append(makeOnlineButton("REINTENTAR LINK", "primary-online", () => createOnlineInviteLink()));
   }
   if (onlineState.inviteLink && onlineState.role === "host" && !onlineConnected()) {
-    actions.append(
-      makeOnlineButton("COMPARTIR LINK", "primary-online", shareOnlineInviteLink),
-      makeOnlineButton("COPIAR LINK", "", () => copyOnlineCode(onlineState.inviteLink)),
-    );
+    if (onlineState.inviteReady) {
+      actions.append(
+        makeOnlineButton("COMPARTIR LINK", "primary-online", shareOnlineInviteLink),
+        makeOnlineButton("COPIAR LINK", "", () => copyOnlineCode(onlineState.inviteLink)),
+      );
+    } else {
+      actions.append(makeOnlineButton("PREPARANDO LINK", "", () => {}, true));
+    }
   }
   if (!onlineState.role || onlineState.manualVisible) {
     actions.append(makeOnlineButton(onlineState.manualVisible ? "OCULTAR CODIGOS" : "USAR CODIGOS", "", () => {
@@ -15857,7 +16209,10 @@ function renderOnlinePanel() {
       acceptOnlineAnswer(code);
     }));
   }
-  if (onlineHostActive()) actions.append(makeOnlineButton("INICIAR PELEA", "primary-online", startOnlineMatch));
+  if (onlineConnected()) {
+    actions.append(makeOnlineButton(onlineState.localReady ? "QUITAR LISTO" : "MARCAR LISTO", onlineState.localReady ? "" : "primary-online", () => setOnlineLocalReady(!onlineState.localReady)));
+  }
+  if (onlineHostActive() && onlineBothReady()) actions.append(makeOnlineButton("INICIAR PELEA", "primary-online", startOnlineMatch));
   if (onlineState.role || onlineConnected()) actions.append(makeOnlineButton("CORTAR", "danger-online", () => resetOnlineConnection()));
   panel.append(actions);
 
@@ -15865,7 +16220,9 @@ function renderOnlinePanel() {
     const linkWrap = document.createElement("label");
     linkWrap.className = "online-code-block online-link-block";
     linkWrap.append(document.createElement("span"));
-    linkWrap.querySelector("span").textContent = "Link para enviar al invitado";
+    linkWrap.querySelector("span").textContent = onlineState.inviteReady
+      ? "Link para enviar al invitado"
+      : "Link pendiente: espera Link listo";
     const linkInput = makeOnlineTextarea("online-invite-link", onlineState.inviteLink, "Link de invitacion online.", true);
     linkWrap.append(linkInput);
     panel.append(linkWrap);
@@ -15893,8 +16250,12 @@ function renderOnlinePanel() {
 
   const note = document.createElement("p");
   note.className = "online-note";
-  note.textContent = onlineState.manualVisible
-    ? "Modo respaldo: usa los codigos largos si el link automatico no conecta en una red estricta."
+  note.textContent = onlineConnected()
+    ? "Cuando ambos estados muestren LISTO, el anfitrion puede iniciar la pelea."
+    : onlineState.inviteLink && !onlineState.inviteReady
+    ? "Esperá a que el estado diga Link listo antes de compartirlo."
+    : onlineState.manualVisible
+    ? "Modo respaldo: anfitrion crea sala manual, invitado pega ese codigo, y devuelve la respuesta al anfitrion."
     : "Flujo recomendado: crea el link, compartilo por WhatsApp o mensaje y espera a que el invitado entre.";
   panel.append(note);
   fighterSelect.append(panel);
@@ -15906,7 +16267,7 @@ function showOnlineOverlay() {
   paused = running && !winner;
   overlay.querySelector("h1").textContent = "Online";
   overlayCopy.textContent =
-    "Crea un link, compartilo y deja que el invitado elija su luchador antes de iniciar.";
+    "Crea un link, compartilo y esperen a que ambos elijan luchador y marquen LISTO.";
   fighterSelect.classList.remove("hidden");
   renderOnlinePanel();
   startButton.textContent = onlinePrimaryActionLabel();
