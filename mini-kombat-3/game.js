@@ -1071,6 +1071,9 @@ function playSound(type) {
     punch: 0.08,
     kick: 0.1,
     hit: 0.16,
+    hitSharp: 0.13,
+    hitLow: 0.18,
+    hitHeavy: 0.21,
     block: 0.09,
     jump: 0.08,
     special: 0.34,
@@ -1087,6 +1090,9 @@ function playSound(type) {
     punch: [170, 80],
     kick: [120, 64],
     hit: [90, 42],
+    hitSharp: [150, 48],
+    hitLow: [74, 30],
+    hitHeavy: [68, 24],
     block: [360, 220],
     jump: [260, 410],
     special: [520, 160],
@@ -1102,10 +1108,10 @@ function playSound(type) {
   osc.frequency.setValueAtTime(freqs[0], now);
   osc.frequency.exponentialRampToValueAtTime(freqs[1], now + duration);
   osc.type = type === "special" || type === "vs" ? "sawtooth" : type === "victory" ? "square" : "triangle";
-  gain.gain.setValueAtTime(type === "ko" || type === "victory" || type === "vs" ? 0.18 : 0.1, now);
+  gain.gain.setValueAtTime(type === "ko" || type === "victory" || type === "vs" ? 0.18 : type === "hitHeavy" ? 0.145 : type === "hitSharp" || type === "hitLow" ? 0.12 : 0.1, now);
   gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
   filter.type = "lowpass";
-  filter.frequency.setValueAtTime(type === "block" || type === "select" || type === "menu" ? 900 : type === "victory" ? 1200 : 520, now);
+  filter.frequency.setValueAtTime(type === "block" || type === "select" || type === "menu" ? 900 : type === "hitSharp" ? 720 : type === "hitHeavy" || type === "hitLow" ? 430 : type === "victory" ? 1200 : 520, now);
 
   noise.buffer = buffer;
   noise.connect(filter);
@@ -2405,8 +2411,8 @@ function hitZoneReaction(zone, blocked, projectile, heavyImpact, finishingHit) {
       yOffset: projectile ? 120 : 124,
       hurtBonus: finishingHit ? 4 : 5,
       lift: finishingHit ? 2.25 : projectile ? 1.72 : 1.62,
-      vx: finishingHit ? 8.8 : projectile ? 6.2 : heavyImpact ? 7.25 : 6.15,
-      vy: finishingHit ? -5.7 : projectile ? -3.75 : heavyImpact ? -4.85 : -4.2,
+      vx: finishingHit ? 9.25 : projectile ? 6.7 : heavyImpact ? 7.75 : 6.35,
+      vy: finishingHit ? -6.05 : projectile ? -4.05 : heavyImpact ? -5.15 : -4.35,
       damageBonus: 0.18,
       pulse: finishingHit ? 34 : 26,
       dust: heavyImpact || projectile ? 9 : 6,
@@ -2418,8 +2424,8 @@ function hitZoneReaction(zone, blocked, projectile, heavyImpact, finishingHit) {
       yOffset: 48,
       hurtBonus: heavyImpact ? 4 : 2,
       lift: finishingHit ? 1.1 : projectile ? 0.9 : 0.62,
-      vx: finishingHit ? 8.6 : heavyImpact ? 7.6 : 6.25,
-      vy: finishingHit ? -4.3 : heavyImpact ? -2.7 : -2.2,
+      vx: finishingHit ? 9.05 : heavyImpact ? 8.05 : 6.45,
+      vy: finishingHit ? -4.65 : heavyImpact ? -3.0 : -2.35,
       damageBonus: 0.1,
       pulse: finishingHit ? 32 : 24,
       dust: heavyImpact ? 13 : 10,
@@ -2430,8 +2436,8 @@ function hitZoneReaction(zone, blocked, projectile, heavyImpact, finishingHit) {
     yOffset: projectile ? 108 : heavyImpact ? 90 : 96,
     hurtBonus: heavyImpact || projectile ? 2 : 0,
     lift: finishingHit ? 2.1 : projectile ? 1.35 : heavyImpact ? 1.48 : 1,
-    vx: finishingHit ? 8.4 : projectile ? 5.8 : heavyImpact ? 7 : 5.9,
-    vy: finishingHit ? -5.4 : projectile ? -3.45 : heavyImpact ? -4.45 : -3.75,
+    vx: finishingHit ? 8.9 : projectile ? 6.25 : heavyImpact ? 7.45 : 6.1,
+    vy: finishingHit ? -5.75 : projectile ? -3.75 : heavyImpact ? -4.7 : -3.9,
     damageBonus: 0,
     pulse: finishingHit ? 34 : heavyImpact || projectile ? 24 : 18,
     dust: heavyImpact ? 10 : 7,
@@ -2465,10 +2471,10 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
   }
 
   const profile = {
-    flash: 5,
-    shake: 7,
-    hitStop: 4,
-    cameraPulse: 10,
+    flash: 6,
+    shake: 8,
+    hitStop: 5,
+    cameraPulse: 11,
     cameraStrength: Math.max(0.86, impactStrength),
     cinematic: true,
     specialFx: false,
@@ -2483,9 +2489,9 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
 
   if (heavyImpact || kick || sweep || grab) {
     profile.flash = 9;
-    profile.shake = 9;
-    profile.hitStop = 6;
-    profile.cameraPulse = 13;
+    profile.shake = 10;
+    profile.hitStop = 7;
+    profile.cameraPulse = 14;
     profile.cameraStrength = Math.max(1.16, impactStrength);
     profile.cinematicPulse = 11;
     profile.cinematicStrength = grab ? 1.12 : sweep ? 1.02 : 1.04;
@@ -2499,9 +2505,9 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
 
   if (projectile) {
     profile.flash = 11;
-    profile.shake = 10;
-    profile.hitStop = 8;
-    profile.cameraPulse = 16;
+    profile.shake = 11;
+    profile.hitStop = 9;
+    profile.cameraPulse = 17;
     profile.cameraStrength = Math.max(1.32, impactStrength);
     profile.cinematicPulse = 15;
     profile.cinematicStrength = 1.28;
@@ -2515,9 +2521,9 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
 
   if (counter) {
     profile.flash = 12;
-    profile.shake = 12;
-    profile.hitStop = 8;
-    profile.cameraPulse = 16;
+    profile.shake = 13;
+    profile.hitStop = 9;
+    profile.cameraPulse = 17;
     profile.cameraStrength = 1.46;
     profile.cinematicPulse = 16;
     profile.cinematicStrength = 1.42;
@@ -2531,9 +2537,9 @@ function impactCinematicProfile({ blocked, heavyImpact, counter, projectile, fin
 
   if (finishingHit) {
     profile.flash = 14;
-    profile.shake = 15;
-    profile.hitStop = 10;
-    profile.cameraPulse = 19;
+    profile.shake = 16;
+    profile.hitStop = 12;
+    profile.cameraPulse = 20;
     profile.cameraStrength = 1.74;
     profile.cinematicPulse = 20;
     profile.cinematicStrength = 1.68;
@@ -2677,6 +2683,14 @@ function registerComboHit(attacker, target, damage, { blocked, projectile, heavy
   }
 }
 
+function impactSoundType({ blocked, heavyImpact, projectile, counter, finishingHit, hitZone }) {
+  if (blocked) return "block";
+  if (finishingHit || counter || projectile || heavyImpact) return "hitHeavy";
+  if (hitZone === "head") return "hitSharp";
+  if (hitZone === "legs") return "hitLow";
+  return "hit";
+}
+
 function landHit(attacker, target, damage, projectile = false, projectileInfo = null) {
   const unblockable = attacker?.attack?.type === "grab";
   const counter = attacker?.counterWindow > 0;
@@ -2699,7 +2713,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   const targetGuard = characterGuard(target);
 
   target.health = nextHealth;
-  target.hurt = finishingHit ? 38 + zone.hurtBonus : blocked ? 9 : attacker?.attack?.type === "grab" ? 30 : projectile ? 21 + zone.hurtBonus : 24 + zone.hurtBonus;
+  target.hurt = finishingHit ? 42 + zone.hurtBonus : blocked ? 9 : attacker?.attack?.type === "grab" ? 32 : projectile ? 24 + zone.hurtBonus : heavyImpact ? 27 + zone.hurtBonus : 24 + zone.hurtBonus;
   target.hitFlash = blocked ? 8 : projectile ? 20 : heavyImpact ? 17 : 14;
   target.contactFlash = blocked ? 7 : heavyImpact ? 14 : 11;
   target.impactPulse = finishingHit ? 24 : blocked ? 8 : Math.round(13 + impactStrength * 5);
@@ -2715,8 +2729,8 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   target.faceImpactZone = hitZone;
   target.faceImpactDir = impactDir;
   target.faceImpactStrength = visual.faceStrength;
-  target.damagePulse = blocked ? Math.max(target.damagePulse ?? 0, 8) : finishingHit ? 34 : Math.max(target.damagePulse ?? 0, heavyImpact || projectile || counter ? 24 : zone.pulse);
-  target.damageLevel = blocked ? 0.35 : finishingHit ? 1.65 : counter ? 1.45 : projectile ? 1.22 + zone.damageBonus : heavyImpact ? 1.08 + zone.damageBonus : 0.82 + zone.damageBonus;
+  target.damagePulse = blocked ? Math.max(target.damagePulse ?? 0, 8) : finishingHit ? 38 : Math.max(target.damagePulse ?? 0, heavyImpact || projectile || counter ? 28 : zone.pulse);
+  target.damageLevel = blocked ? 0.35 : finishingHit ? 1.72 : counter ? 1.52 : projectile ? 1.3 + zone.damageBonus : heavyImpact ? 1.18 + zone.damageBonus : 0.86 + zone.damageBonus;
   const reactionKind = blocked
     ? "guard"
     : finishingHit
@@ -2730,18 +2744,18 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
             : heavyImpact
               ? "heavy"
               : "light";
-  const baseReactionMax = blocked ? 12 : finishingHit ? 34 : counter || projectile ? 27 : heavyImpact ? 23 : 18;
+  const baseReactionMax = blocked ? 12 : finishingHit ? 38 : counter || projectile ? 30 : heavyImpact ? 26 : 20;
   const reactionMax = Math.max(1, Math.round(baseReactionMax * targetMotion.impactTime));
   target.reactionPulse = Math.max(target.reactionPulse ?? 0, reactionMax);
   target.reactionMax = Math.max(target.reactionMax ?? 1, reactionMax);
   target.reactionZone = hitZone;
   target.reactionKind = reactionKind;
   target.reactionDir = impactDir;
-  target.reactionStrength = blocked ? 0.38 : finishingHit ? 1.72 : counter ? 1.45 : projectile ? 1.28 : impactStrength;
+  target.reactionStrength = blocked ? 0.38 : finishingHit ? 1.82 : counter ? 1.56 : projectile ? 1.38 : heavyImpact ? Math.max(1.22, impactStrength + 0.12) : impactStrength;
   if (finishingHit) {
-    target.koFall = Math.max(target.koFall ?? 0, 86);
+    target.koFall = Math.max(target.koFall ?? 0, 98);
     target.koFallDir = impactDir;
-    target.koFallStrength = impactStrength;
+    target.koFallStrength = Math.max(target.koFallStrength ?? 0, impactStrength + 0.16);
   }
   const guardImpactMax = Math.round((heavyImpact || projectile ? 21 : 17) * targetGuard.recoil);
   target.guardImpact = blocked ? Math.max(target.guardImpact ?? 0, guardImpactMax) : 0;
@@ -2755,24 +2769,40 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   if (hitZone === "legs") target.crouch = Math.max(target.crouch ?? 0, heavyImpact ? 0.56 : 0.38);
   target.vx = impactDir * zone.vx;
   target.vy = target.grounded ? zone.vy : target.vy;
+  if (target.grounded) {
+    const skidPower = blocked ? 0.42 : finishingHit ? 1.65 : counter ? 1.45 : projectile ? 1.34 : heavyImpact ? 1.2 : 0.84;
+    const skidTime = Math.round((blocked ? 7 : heavyImpact || projectile || counter ? 14 : 10) * targetMotion.impactSkid);
+    target.walkStopPulse = Math.max(target.walkStopPulse ?? 0, skidTime);
+    target.walkStopDir = impactDir;
+    target.walkStopSpeed = Math.max(target.walkStopSpeed ?? 0, clamp(skidPower, 0.24, 1.8));
+    target.footPlantPulse = Math.max(target.footPlantPulse ?? 0, Math.round((blocked ? 7 : heavyImpact || projectile || counter ? 13 : 9) * targetMotion.impactFloor));
+    target.walkAnchorPulse = Math.max(target.walkAnchorPulse ?? 0, Math.round((blocked ? 8 : heavyImpact || projectile || counter ? 16 : 11) * targetMotion.impactFloor));
+    target.walkPushPulse = Math.max(target.walkPushPulse ?? 0, Math.round((blocked ? 5 : heavyImpact || projectile || counter ? 11 : 8) * targetMotion.impactSkid));
+    target.bracePulse = Math.max(target.bracePulse ?? 0, blocked ? 10 : heavyImpact || projectile || counter ? 14 : 9);
+    if (!blocked && (heavyImpact || projectile || counter || finishingHit)) {
+      target.landingPulse = Math.max(target.landingPulse ?? 0, Math.round(8 + skidPower * 5));
+      target.landingStrength = Math.max(target.landingStrength ?? 0, clamp(skidPower * 0.42, 0.28, 0.82));
+    }
+  }
   if (attacker) {
     attacker.energy = clamp(attacker.energy + (blocked ? 3 : 8), 0, 100);
-    attacker.impactPulse = Math.max(attacker.impactPulse ?? 0, blocked ? 3 : heavyImpact ? 5 : 4);
+    attacker.impactPulse = Math.max(attacker.impactPulse ?? 0, blocked ? 4 : heavyImpact || projectile ? 7 : 5);
     attacker.impactDir = impactDir;
     attacker.impactLift = 0.22;
-    attacker.impactStrength = Math.max(attacker.impactStrength ?? 0, blocked ? 0.25 : 0.4);
+    attacker.impactStrength = Math.max(attacker.impactStrength ?? 0, blocked ? 0.28 : heavyImpact || projectile ? 0.58 : 0.44);
     triggerDynamicLight(attacker, visual.core, "torso", impactDir, blocked ? 0.22 : 0.38, blocked ? 7 : 10);
     attacker.vx -= impactDir * (blocked ? 0.56 : heavyImpact || projectile ? 0.34 : 0.24);
-    attacker.bracePulse = Math.max(attacker.bracePulse ?? 0, blocked ? 9 : heavyImpact || projectile ? 8 : 6);
-    attacker.footPlantPulse = Math.max(attacker.footPlantPulse ?? 0, blocked ? 8 : 6);
-    attacker.attackRecoverPulse = Math.max(attacker.attackRecoverPulse ?? 0, blocked ? 9 : heavyImpact || projectile ? 10 : 7);
+    attacker.bracePulse = Math.max(attacker.bracePulse ?? 0, blocked ? 10 : heavyImpact || projectile ? 11 : 7);
+    attacker.footPlantPulse = Math.max(attacker.footPlantPulse ?? 0, blocked ? 9 : heavyImpact || projectile ? 8 : 6);
+    attacker.walkPushPulse = Math.max(attacker.walkPushPulse ?? 0, blocked ? 7 : heavyImpact || projectile ? 8 : 5);
+    attacker.attackRecoverPulse = Math.max(attacker.attackRecoverPulse ?? 0, blocked ? 10 : heavyImpact || projectile ? 12 : 8);
   }
   if (blocked) target.counterWindow = heavyImpact || projectile ? COUNTER_WINDOW_FRAMES + 6 : COUNTER_WINDOW_FRAMES;
   if (counter && attacker) attacker.counterWindow = 0;
   flash = Math.max(flash, cinematic.flash);
   shake = Math.max(shake, cinematic.shake);
   hitStopFrames = Math.max(hitStopFrames, cinematic.hitStop);
-  playSound(blocked ? "block" : "hit");
+  playSound(impactSoundType({ blocked, heavyImpact, projectile, counter, finishingHit, hitZone }));
   registerComboHit(attacker, target, finalDamage, { blocked, projectile, heavyImpact, counter, hitZone });
   addText(
     target.x,
@@ -2821,8 +2851,11 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
       target.y + 5,
       -impactDir,
       clamp(impactStrength + (heavyImpact ? 0.22 : 0) + (hitZone === "legs" ? 0.18 : 0), 0.65, 1.55),
-      heavyImpact || projectile || counter ? 5 : 3,
+      heavyImpact || projectile || counter || finishingHit ? 7 : 4,
     );
+    if (heavyImpact || projectile || counter || finishingHit) {
+      floorDust(target.x - impactDir * fighterScale(16), target.y + 5, Math.min(16, zone.dust + 4));
+    }
   }
 }
 
