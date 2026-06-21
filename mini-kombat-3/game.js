@@ -15,6 +15,7 @@ const soundButton = document.querySelector("#sound");
 const helpButton = document.querySelector("#help");
 const overlayCopy = document.querySelector("#overlay-copy");
 const fighterSelect = document.querySelector("#fighter-select");
+const mobilePauseButton = document.querySelector("#mobile-pause");
 const mobileControls = document.querySelector("#mobile-controls");
 const mobileStick = document.querySelector("#mobile-stick");
 const mobileStickBase = document.querySelector(".mobile-stick-base");
@@ -1518,9 +1519,10 @@ function showPauseOverlay() {
   overlayMode = "pause";
   overlay.dataset.screen = "pause";
   overlay.querySelector("h1").textContent = "Pausa";
-  overlayCopy.textContent =
-    "Esc para seguir. Reiniciar empieza el match de cero. El boton CPU alterna rival automatico o dos jugadores.";
-  startButton.textContent = "SEGUIR";
+  overlayCopy.textContent = onlineGuestActive()
+    ? "Pausa online. Toca pedir seguir para avisarle al anfitrion."
+    : "Esc o el boton de pausa para seguir. Reiniciar empieza el match de cero.";
+  startButton.textContent = onlineGuestActive() ? "PEDIR SEGUIR" : "SEGUIR";
   fighterSelect.classList.add("hidden");
   overlay.classList.remove("hidden");
   syncShellState();
@@ -14203,7 +14205,11 @@ function advanceOverlay() {
     return;
   }
   if (paused) {
-    resumeGame();
+    if (onlineGuestActive()) requestOnlinePauseToggle();
+    else {
+      resumeGame();
+      if (onlineHostActive()) sendOnlineSnapshot(true);
+    }
     return;
   }
   if (winner && !matchOver) {
@@ -14224,6 +14230,10 @@ function advanceOverlay() {
       startOnlineMatch();
       return;
     }
+    if (onlineGuestActive()) {
+      setOnlineStatus("Esperando que el anfitrion inicie la pelea.");
+      return;
+    }
     if (paused) {
       resumeGame();
       return;
@@ -14239,6 +14249,17 @@ function togglePause() {
   paused = !paused;
   if (paused) showPauseOverlay();
   else resumeGame();
+  if (onlineHostActive()) sendOnlineSnapshot(true);
+}
+
+function requestOnlinePauseToggle() {
+  if (!running || winner) return;
+  if (onlineGuestActive()) {
+    sendOnlineMessage({ type: "pause" });
+    setOnlineStatus(paused ? "Pedido para seguir enviado." : "Pedido de pausa enviado.");
+    return;
+  }
+  togglePause();
 }
 
 function showHelpOverlay() {
@@ -14303,9 +14324,15 @@ function setOnlineStatus(status) {
   onlineState.status = status;
   syncOnlineButtons();
   if (overlayMode === "online") {
-    startButton.textContent = onlineHostActive() ? "INICIAR ONLINE" : paused ? "SEGUIR" : "VOLVER";
+    startButton.textContent = onlinePrimaryActionLabel();
     renderOnlinePanel();
   }
+}
+
+function onlinePrimaryActionLabel() {
+  if (onlineHostActive()) return "INICIAR ONLINE";
+  if (onlineGuestActive()) return paused ? "PEDIR SEGUIR" : "ESPERANDO";
+  return paused ? "SEGUIR" : "VOLVER";
 }
 
 function syncOnlineButtons() {
@@ -14403,6 +14430,7 @@ function handleOnlineChannelOpen() {
     sendOnlineSnapshot(true);
   } else {
     sendLocalOnlineInput(true);
+    sendOnlineSelection();
   }
 }
 
@@ -14614,6 +14642,14 @@ function handleOnlineMessage(message) {
     onlineState.remoteInput = normalizeInput(message.input);
     return;
   }
+  if (message.type === "select" && onlineState.role === "host") {
+    applyOnlineGuestSelection(message);
+    return;
+  }
+  if (message.type === "pause" && onlineState.role === "host") {
+    applyOnlinePauseRequest();
+    return;
+  }
   if (message.type === "setup" && onlineState.role === "guest") {
     applyOnlineSetup(message);
     return;
@@ -14643,6 +14679,56 @@ function applyOnlineSetup(message) {
   roundNumber = message.roundNumber || 1;
   updateFighterLabels();
   setCpuMode(false);
+  if (overlayMode === "online") renderOnlinePanel();
+}
+
+function sendOnlineSelection() {
+  if (onlineState.role !== "guest") return;
+  sendOnlineMessage({
+    type: "select",
+    side: "right",
+    fighterId: selectedRightId,
+  });
+}
+
+function applyOnlineGuestSelection(message) {
+  if (running && !winner) return;
+  const nextId = fighterProfiles[message.fighterId] ? message.fighterId : "";
+  if (!nextId) return;
+  selectedRightId = nextId;
+  fighters = buildFighters();
+  updateFighterLabels();
+  setOnlineStatus(`Invitado eligio ${fighterProfiles[nextId].name}. Ya podes iniciar la pelea online.`);
+  sendOnlineSetup();
+}
+
+function setOnlineLocalFighter(nextId) {
+  if (!fighterProfiles[nextId] || (running && !winner)) return;
+  ensureAudio();
+  if (onlineState.role === "host") {
+    selectedLeftId = nextId;
+    fighters = buildFighters();
+    updateFighterLabels();
+    sendOnlineSetup();
+    setOnlineStatus(onlineConnected()
+      ? `${fighterProfiles[nextId].name} listo. Esperando o confirmando al invitado.`
+      : `${fighterProfiles[nextId].name} listo. Comparti el link cuando quieras.`);
+  } else if (onlineState.role === "guest") {
+    selectedRightId = nextId;
+    fighters = buildFighters();
+    updateFighterLabels();
+    sendOnlineSelection();
+    setOnlineStatus(onlineConnected()
+      ? `${fighterProfiles[nextId].name} enviado al anfitrion.`
+      : `${fighterProfiles[nextId].name} listo. Se enviara al conectar.`);
+  }
+  playSound("select");
+}
+
+function applyOnlinePauseRequest() {
+  if (!running || winner) return;
+  togglePause();
+  setOnlineStatus(paused ? "Pelea pausada por pedido del invitado." : "Pelea reanudada.");
 }
 
 function serializeFighter(f) {
@@ -14783,6 +14869,10 @@ function applyOnlineSnapshot(snapshot) {
     }
   }
 
+  if (paused && running && !winner) {
+    showPauseOverlay();
+    return;
+  }
   if (running || winner) overlay.classList.add("hidden");
   syncShellState();
 }
@@ -14846,6 +14936,48 @@ function makeOnlineTextarea(id, value, placeholder, readOnly = false) {
   return textarea;
 }
 
+function makeOnlineFighterPicker(title, selectedId, editable, onPick, note = "") {
+  const picker = document.createElement("section");
+  picker.className = "online-fighter-picker";
+  const selectedProfile = fighterProfiles[selectedId];
+  picker.style.setProperty("--fighter-color", selectedProfile.color);
+  picker.style.setProperty("--fighter-trim", selectedProfile.trim);
+
+  const header = document.createElement("div");
+  header.className = "online-fighter-picker-head";
+  const label = document.createElement("strong");
+  label.textContent = title;
+  const current = document.createElement("span");
+  current.textContent = note || selectedProfile.name;
+  header.append(label, current);
+  picker.append(header);
+
+  const grid = document.createElement("div");
+  grid.className = "online-fighter-grid";
+  for (const id of fighterIds) {
+    const profile = fighterProfiles[id];
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "fighter-choice";
+    button.dataset.fighter = id;
+    button.style.setProperty("--choice-color", profile.color);
+    button.style.setProperty("--choice-trim", profile.trim);
+    button.setAttribute("aria-pressed", String(id === selectedId));
+    button.disabled = !editable;
+
+    const image = document.createElement("img");
+    image.src = profile.face.src;
+    image.alt = profile.name;
+    const text = document.createElement("span");
+    text.textContent = profile.name;
+    button.append(image, text);
+    if (editable) button.addEventListener("click", () => onPick(id));
+    grid.append(button);
+  }
+  picker.append(grid);
+  return picker;
+}
+
 function copyOnlineCode(code) {
   if (!code) {
     setOnlineStatus("Todavia no hay codigo para copiar.");
@@ -14901,6 +15033,15 @@ function renderOnlinePanel() {
     ? `<strong>${onlineState.role === "host" ? "Anfitrion" : "Invitado"}</strong><span>${onlineState.localSide === "left" ? "Controlas izquierda" : "Controlas derecha"}</span>`
     : "<strong>Modo experimental</strong><span>Funciona gratis con codigos WebRTC. Puede fallar en algunas redes estrictas.</span>";
   panel.append(role);
+
+  if (onlineState.role === "host") {
+    panel.append(
+      makeOnlineFighterPicker("Tu luchador", selectedLeftId, !running || winner, setOnlineLocalFighter),
+      makeOnlineFighterPicker("Invitado", selectedRightId, false, () => {}, onlineConnected() ? "Lo elige el invitado" : "Esperando invitado"),
+    );
+  } else if (onlineState.role === "guest") {
+    panel.append(makeOnlineFighterPicker("Elegi tu luchador", selectedRightId, !running || winner, setOnlineLocalFighter));
+  }
 
   const actions = document.createElement("div");
   actions.className = "online-action-grid";
@@ -14983,10 +15124,10 @@ function showOnlineOverlay() {
   paused = running && !winner;
   overlay.querySelector("h1").textContent = "Online";
   overlayCopy.textContent =
-    "Crea un link, compartilo con el invitado y la conexion se arma sola. El anfitrion controla izquierda y el invitado derecha.";
+    "Crea un link, compartilo y deja que el invitado elija su luchador antes de iniciar.";
   fighterSelect.classList.remove("hidden");
   renderOnlinePanel();
-  startButton.textContent = onlineHostActive() ? "INICIAR ONLINE" : paused ? "SEGUIR" : "VOLVER";
+  startButton.textContent = onlinePrimaryActionLabel();
   overlay.classList.remove("hidden");
   syncShellState();
   syncOnlineButtons();
@@ -15011,7 +15152,7 @@ window.addEventListener("keydown", (event) => {
   const freshPress = !event.repeat && !keys.has(key);
   if (key === "escape") {
     event.preventDefault();
-    togglePause();
+    requestOnlinePauseToggle();
     return;
   }
   keys.add(key);
@@ -15187,6 +15328,16 @@ document.querySelectorAll("[data-touch]").forEach((button) => {
   button.addEventListener("animationend", () => button.classList.remove("is-tapped"));
 });
 
+if (mobilePauseButton) {
+  mobilePauseButton.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    ensureAudio();
+    mobilePauseButton.classList.add("is-tapped");
+    window.setTimeout(() => mobilePauseButton.classList.remove("is-tapped"), 220);
+    requestOnlinePauseToggle();
+  });
+}
+
 function preventZoomGesture(event) {
   if (event.cancelable) event.preventDefault();
 }
@@ -15196,7 +15347,7 @@ function preventZoomGesture(event) {
 });
 
 document.addEventListener("dblclick", (event) => {
-  if (event.target.closest("#mobile-controls")) event.preventDefault();
+  if (event.target.closest("#mobile-controls, #mobile-pause")) event.preventDefault();
 }, { passive: false });
 
 if (mobileControls) {
@@ -15206,6 +15357,11 @@ if (mobileControls) {
     if (now - lastControlTap < 450 && event.cancelable) event.preventDefault();
     lastControlTap = now;
   }, { passive: false });
+}
+
+if (mobilePauseButton) {
+  mobilePauseButton.addEventListener("touchstart", preventZoomGesture, { passive: false });
+  mobilePauseButton.addEventListener("touchend", preventZoomGesture, { passive: false });
 }
 
 setCpuMode(cpuEnabled);
