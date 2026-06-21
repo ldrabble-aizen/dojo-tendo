@@ -837,7 +837,7 @@ const fighterProfiles = {
     face: faces.p5,
     skin: "#e5aa8d",
     build: "tallLean",
-    mark: "L",
+    mark: "S",
     outfit: {
       jacket: "#d9682d",
       pants: "#93401f",
@@ -7612,8 +7612,189 @@ function drawVectorContactOcclusion(f, crouch, stride) {
   ctx.restore();
 }
 
+function drawMaguilaRacingSilhouette(f, pose, crouch, walking, stride) {
+  const outfit = outfitSpec(f);
+  const mobileLite = isMobileFightView();
+  const gait = walking ? Math.abs(stride || 0) : 0;
+  const breath = Math.sin(roundFrame * 0.05 + f.x * 0.015);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.strokeStyle = colorWithAlpha("#ffffff", mobileLite ? 0.12 : 0.18);
+  ctx.lineWidth = mobileLite ? 2.2 : 2.9;
+  ctx.beginPath();
+  ctx.moveTo(-50, -116 + crouch + breath * 0.5);
+  ctx.quadraticCurveTo(-12, -104 + crouch - gait * 1.5, 48, -115 + crouch + breath * 0.35);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(outfit.trimLine ?? "#162b52", mobileLite ? 0.12 : 0.17);
+  ctx.lineWidth = mobileLite ? 1.7 : 2.2;
+  ctx.beginPath();
+  ctx.moveTo(-49, -109 + crouch);
+  ctx.quadraticCurveTo(-4, -96 + crouch + gait, 46, -108 + crouch);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(outfit.accent ?? "#ffffff", mobileLite ? 0.11 : 0.16);
+  ctx.lineWidth = mobileLite ? 1.8 : 2.4;
+  for (const leg of [pose.backLeg, pose.frontLeg]) {
+    ctx.beginPath();
+    ctx.moveTo(leg.knee.x * 0.92, leg.knee.y + 5);
+    ctx.quadraticCurveTo((leg.knee.x + leg.foot.x) * 0.5, leg.knee.y + 22, leg.foot.x, leg.foot.y - 3);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = colorWithAlpha("#ffffff", mobileLite ? 0.16 : 0.22);
+  ctx.lineWidth = mobileLite ? 2 : 2.6;
+  for (const arm of [pose.backArm, pose.frontArm]) {
+    ctx.beginPath();
+    ctx.ellipse(arm.hand.x, arm.hand.y + 1, mobileLite ? 6 : 7.5, mobileLite ? 2.4 : 3.2, 0.14, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawPinoAgileSuitDetails(f, pose, crouch, walking, stride) {
+  const mobileLite = isMobileFightView();
+  const outfit = outfitSpec(f);
+  const gait = walking ? Math.abs(stride || 0) : 0;
+  const sway = Math.sin(roundFrame * 0.075 + f.x * 0.012) * (walking ? 0.9 : 0.32);
+  const trim = f.trim ?? "#96e06c";
+  const accent = outfit?.accent ?? "#d7c9ff";
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.strokeStyle = colorWithAlpha(trim, mobileLite ? 0.13 : 0.2);
+  ctx.lineWidth = mobileLite ? 1.6 : 2.2;
+  ctx.beginPath();
+  ctx.moveTo(-34 + sway, -116 + crouch);
+  ctx.bezierCurveTo(-18 + sway * 0.6, -101 + crouch, 6 + sway, -82 + crouch, 31 + sway * 0.35, -59 + crouch + gait);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(accent, mobileLite ? 0.1 : 0.16);
+  ctx.lineWidth = mobileLite ? 1.1 : 1.55;
+  ctx.beginPath();
+  ctx.moveTo(31 - sway * 0.4, -111 + crouch);
+  ctx.quadraticCurveTo(7 + sway, -88 + crouch, -24 + sway * 0.5, -62 + crouch);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(trim, mobileLite ? 0.1 : 0.15);
+  ctx.lineWidth = mobileLite ? 1.2 : 1.6;
+  for (const arm of [pose.backArm, pose.frontArm]) {
+    ctx.beginPath();
+    ctx.moveTo(arm.elbow.x + (arm.hand.x - arm.elbow.x) * 0.5, arm.elbow.y + (arm.hand.y - arm.elbow.y) * 0.5);
+    ctx.quadraticCurveTo(arm.hand.x, arm.hand.y - 2, arm.hand.x + Math.sign(arm.hand.x || 1) * 6, arm.hand.y - 1);
+    ctx.stroke();
+  }
+
+  for (const leg of [pose.backLeg, pose.frontLeg]) {
+    ctx.beginPath();
+    ctx.ellipse(leg.foot.x, leg.foot.y + 1, 14 + gait * 4, 2.7, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawSimiolinLongLineDetails(f, pose, crouch, walking, stride) {
+  const mobileLite = isMobileFightView();
+  const outfit = outfitSpec(f);
+  const trim = f.trim ?? "#47d5ff";
+  const accent = outfit?.accent ?? "#ffe2b0";
+  const sway = Math.sin(roundFrame * 0.065 + f.x * 0.014) * (walking ? 0.85 : 0.28);
+  const gait = walking ? Math.abs(stride || 0) : 0;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.strokeStyle = colorWithAlpha(trim, mobileLite ? 0.1 : 0.17);
+  ctx.lineWidth = mobileLite ? 1.15 : 1.55;
+  ctx.beginPath();
+  ctx.moveTo(-14 + sway, -126 + crouch);
+  ctx.bezierCurveTo(-9 + sway * 0.5, -102 + crouch, -8, -72 + crouch, -6, -43 + crouch);
+  ctx.moveTo(14 - sway * 0.4, -125 + crouch);
+  ctx.bezierCurveTo(9 - sway * 0.4, -101 + crouch, 8, -72 + crouch, 6, -43 + crouch);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(accent, mobileLite ? 0.08 : 0.13);
+  ctx.lineWidth = mobileLite ? 1 : 1.35;
+  ctx.beginPath();
+  ctx.moveTo(-22 + sway * 0.5, -116 + crouch);
+  ctx.quadraticCurveTo(0, -108 + crouch - gait * 1.2, 22 - sway * 0.5, -116 + crouch);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(trim, mobileLite ? 0.09 : 0.14);
+  ctx.lineWidth = mobileLite ? 1.1 : 1.5;
+  for (const arm of [pose.backArm, pose.frontArm]) {
+    ctx.beginPath();
+    ctx.ellipse(arm.hand.x, arm.hand.y, 6.8, 2.5, 0.08, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  for (const leg of [pose.backLeg, pose.frontLeg]) {
+    ctx.beginPath();
+    ctx.moveTo(leg.knee.x * 0.9, leg.knee.y + 3);
+    ctx.quadraticCurveTo((leg.knee.x + leg.foot.x) * 0.5, leg.knee.y + 24, leg.foot.x, leg.foot.y - 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawLiliBlackSuitDetails(f, pose, crouch, walking, stride) {
+  const mobileLite = isMobileFightView();
+  const outfit = outfitSpec(f);
+  const gait = walking ? Math.abs(stride || 0) : 0;
+  const sway = Math.sin(roundFrame * 0.07 + f.x * 0.012) * (walking ? 0.55 : 0.22);
+  const graphite = outfit?.accent ?? "#343840";
+  const sheen = "#7f8794";
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.strokeStyle = colorWithAlpha(sheen, mobileLite ? 0.1 : 0.16);
+  ctx.lineWidth = mobileLite ? 1.3 : 1.8;
+  ctx.beginPath();
+  ctx.moveTo(-33 + sway, -116 + crouch);
+  ctx.bezierCurveTo(-25 + sway * 0.5, -96 + crouch, -18, -80 + crouch, -29, -52 + crouch);
+  ctx.moveTo(33 - sway, -116 + crouch);
+  ctx.bezierCurveTo(25 - sway * 0.5, -96 + crouch, 18, -80 + crouch, 29, -52 + crouch);
+  ctx.stroke();
+
+  ctx.fillStyle = colorWithAlpha(graphite, mobileLite ? 0.12 : 0.18);
+  ctx.beginPath();
+  ctx.roundRect(-33, -66 + crouch + gait * 0.6, 66, 5, 3);
+  ctx.fill();
+
+  ctx.strokeStyle = colorWithAlpha(sheen, mobileLite ? 0.08 : 0.13);
+  ctx.lineWidth = mobileLite ? 1 : 1.35;
+  for (const arm of [pose.backArm, pose.frontArm]) {
+    ctx.beginPath();
+    ctx.ellipse(arm.hand.x, arm.hand.y + 1, 6.2, 2.3, 0.1, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  for (const leg of [pose.backLeg, pose.frontLeg]) {
+    ctx.beginPath();
+    ctx.moveTo(leg.knee.x * 0.94, leg.knee.y + 6);
+    ctx.quadraticCurveTo((leg.knee.x + leg.foot.x) * 0.5, leg.knee.y + 23, leg.foot.x - Math.sign(leg.foot.x || 1) * 2, leg.foot.y - 1);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 function drawMaguilaHeavyGroundPolish(f, pose, crouch, walking, stride) {
   if (f.profileId !== "p3" || usesUnifiedSprite(f)) return;
+  drawMaguilaRacingSilhouette(f, pose, crouch, walking, stride);
   if (isMobileFightView()) return;
 
   const phase = attackPhase(f.attack);
@@ -7695,6 +7876,7 @@ function drawMaguilaHeavyGroundPolish(f, pose, crouch, walking, stride) {
 
 function drawPinoReflexPolish(f, pose, crouch, walking, stride) {
   if (f.profileId !== "p4" || usesUnifiedSprite(f)) return;
+  drawPinoAgileSuitDetails(f, pose, crouch, walking, stride);
 
   const mobileLite = isMobileFightView();
   const phase = attackPhase(f.attack);
@@ -7756,6 +7938,7 @@ function drawPinoReflexPolish(f, pose, crouch, walking, stride) {
 
 function drawSimiolinReachPolish(f, pose, crouch, walking, stride) {
   if (f.profileId !== "p5" || usesUnifiedSprite(f)) return;
+  drawSimiolinLongLineDetails(f, pose, crouch, walking, stride);
 
   const mobileLite = isMobileFightView();
   const phase = attackPhase(f.attack);
@@ -7815,6 +7998,7 @@ function drawSimiolinReachPolish(f, pose, crouch, walking, stride) {
 
 function drawLiliGuardPolish(f, pose, crouch, walking, stride) {
   if (f.profileId !== "p6" || usesUnifiedSprite(f)) return;
+  drawLiliBlackSuitDetails(f, pose, crouch, walking, stride);
 
   const mobileLite = isMobileFightView();
   const phase = attackPhase(f.attack);
@@ -7827,8 +8011,10 @@ function drawLiliGuardPolish(f, pose, crouch, walking, stride) {
   const active = clamp(Math.max(guard * 0.9, guardHit, counter * 0.52, attack * 0.48, impact.t * 0.34, walk * 0.38), 0, 1.45);
   if (active <= 0.035) return;
 
-  const trim = f.trim ?? "#ff8ac8";
-  const accent = outfitSpec(f)?.accent ?? "#dbe6ff";
+  const outfit = outfitSpec(f);
+  const trim = "#717985";
+  const guardGlow = f.trim ?? "#ff8ac8";
+  const accent = outfit?.accent ?? "#343840";
   const sway = Math.sin(roundFrame * 0.075 + f.x * 0.01) * (walking ? 0.55 : 0.25);
   const brace = clamp(Math.max(guard, guardHit * 1.1, counter * 0.5), 0, 1.25);
   const chestY = -118 + crouch;
@@ -7855,6 +8041,13 @@ function drawLiliGuardPolish(f, pose, crouch, walking, stride) {
     ctx.quadraticCurveTo(0, -121 + crouch - brace * 5, 38, -101 + crouch);
     ctx.moveTo(-34, -60 + crouch);
     ctx.quadraticCurveTo(0, -48 + crouch + brace * 2, 34, -60 + crouch);
+    ctx.stroke();
+
+    ctx.strokeStyle = colorWithAlpha(guardGlow, 0.045 + Math.max(guard, guardHit, counter) * 0.065);
+    ctx.lineWidth = 0.9 + active * 0.38;
+    ctx.beginPath();
+    ctx.moveTo(-40, -104 + crouch);
+    ctx.quadraticCurveTo(0, -129 + crouch - brace * 4, 40, -104 + crouch);
     ctx.stroke();
   }
 
