@@ -240,20 +240,20 @@ canvas {
 }
 
 .mobile-actions {
-  grid-template-columns: repeat(3, 54px);
+  grid-template-columns: repeat(3, 60px);
   justify-self: end;
   align-self: end;
-  gap: 9px;
+  gap: 12px;
 }
 
 .mobile-controls button {
   position: relative;
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
-  min-width: 54px;
-  min-height: 54px;
+  width: 60px;
+  height: 60px;
+  min-width: 60px;
+  min-height: 60px;
   padding: 0;
   border-color: rgba(255, 241, 189, 0.58);
   border-radius: 50%;
@@ -265,7 +265,7 @@ canvas {
     0 5px 0 rgba(63, 22, 14, 0.78),
     0 0 12px rgba(255, 198, 64, 0.13),
     inset 0 1px 0 rgba(255,255,255,0.2);
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1;
   text-shadow: 0 2px 0 rgba(0,0,0,0.72);
   touch-action: none;
@@ -454,8 +454,8 @@ canvas {
 }
 
 .online-fighter-grid .fighter-choice img {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
 }
 
 .online-fighter-grid .fighter-choice span {
@@ -581,16 +581,12 @@ canvas {
 }
 
 .game-shell[data-screen="home"] .topbar {
-  top: -6px;
-  opacity: 0.72;
-  transform: scale(0.6);
-  transform-origin: top center;
+  display: none;
 }
 
 .game-shell[data-screen="home"] .topbar:hover,
 .game-shell[data-screen="home"] .topbar:focus-within {
-  opacity: 1;
-  transform: scale(0.72);
+  display: none;
 }
 
 .game-shell.is-fighting .topbar {
@@ -1380,9 +1376,10 @@ canvas {
   overflow: hidden;
   grid-template-columns: 1fr;
   justify-items: center;
-  gap: 5px;
-  min-height: 86px;
-  padding: 7px 5px;
+  align-content: center;
+  gap: 0;
+  min-height: 106px;
+  padding: 8px 6px;
   border-radius: 7px;
 }
 
@@ -1400,20 +1397,366 @@ canvas {
 .overlay[data-screen="home"] .fighter-choice img {
   position: relative;
   z-index: 1;
-  width: 48px;
-  height: 48px;
+  width: 74px;
+  height: 74px;
 }
 
 .overlay[data-screen="home"] .fighter-choice span {
-  position: relative;
+  position: absolute;
   z-index: 1;
-  max-width: 100%;
-  font-size: 10px;
-  text-align: center;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .overlay[data-screen="home"] .fighter-choice[aria-pressed="true"] {
   transform: translateY(-2px);
+}
+
+.overlay[data-screen="home"] {
+  grid-template-rows: auto auto minmax(0, auto) auto;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 50% 16%, rgba(255, 236, 168, 0.2), transparent 22%),
+    radial-gradient(circle at 13% 24%, rgba(77, 219, 202, 0.15), transparent 28%),
+    radial-gradient(circle at 88% 22%, rgba(103, 171, 255, 0.18), transparent 28%),
+    radial-gradient(circle at 19% 94%, rgba(190, 34, 22, 0.4), transparent 27%),
+    radial-gradient(circle at 79% 94%, rgba(255, 191, 70, 0.3), transparent 26%),
+    linear-gradient(180deg, rgba(2, 3, 6, 0.56), rgba(5, 5, 8, 0.87) 42%, rgba(12, 5, 4, 0.96)),
+    url("assets/dojo-premium-bg.webp") center / cover;
+}
+
+.overlay[data-screen="home"]::before {
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 222, 128, 0.2), transparent 18%, transparent 82%, rgba(116, 224, 209, 0.14)),
+    repeating-linear-gradient(90deg, rgba(255, 241, 189, 0.048) 0 1px, transparent 1px 74px),
+    repeating-linear-gradient(0deg, rgba(255, 241, 189, 0.032) 0 1px, transparent 1px 52px),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.36), transparent 32%, rgba(0, 0, 0, 0.56));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 228, 131, 0.16),
+    inset 0 0 130px rgba(0, 0, 0, 0.94);
+  opacity: 1;
+}
+
+.overlay[data-screen="home"]::after {
+  left: 0;
+  right: 0;
+  bottom: -22px;
+  height: 206px;
+  background:
+    radial-gradient(ellipse at 22% 72%, rgba(76, 231, 211, 0.24), transparent 30%),
+    radial-gradient(ellipse at 50% 92%, rgba(221, 34, 20, 0.5), transparent 38%),
+    radial-gradient(ellipse at 78% 72%, rgba(255, 209, 92, 0.38), transparent 32%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.88), transparent);
+  filter: none;
+  opacity: 0.92;
+}
+
+.overlay[data-screen="home"] h1 {
+  isolation: isolate;
+  width: min(760px, calc(100% - 28px));
+  padding: 9px 18px 6px;
+  color: transparent;
+  font-family: Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+  font-size: 76px;
+  line-height: 0.84;
+  background:
+    linear-gradient(180deg, #fffce8 0%, #ffe483 31%, #ec5a2e 61%, #8e1d12 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-stroke: 1px rgba(255, 244, 190, 0.5);
+  filter: drop-shadow(0 0 10px rgba(255, 214, 93, 0.24));
+  text-shadow:
+    0 2px 0 #160403,
+    0 5px 0 rgba(78, 13, 8, 0.88),
+    0 0 22px rgba(255, 231, 142, 0.58),
+    0 18px 34px rgba(0, 0, 0, 0.95);
+  transform: none;
+}
+
+.overlay[data-screen="home"] h1::before {
+  content: none;
+  display: none;
+}
+
+.overlay[data-screen="home"] h1::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: min(520px, 82%);
+  height: 4px;
+  transform: translateX(-50%);
+  background:
+    linear-gradient(90deg, transparent, rgba(116, 224, 209, 0.7), #fff1bd 45%, #bc311d 58%, rgba(255, 214, 93, 0.78), transparent);
+  box-shadow: 0 0 18px rgba(255, 204, 80, 0.36);
+}
+
+.overlay[data-screen="home"] .overlay-copy {
+  width: min(760px, calc(100% - 32px));
+  color: rgba(255, 238, 190, 0.92);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.28;
+  text-transform: uppercase;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.95),
+    0 0 14px rgba(255, 200, 72, 0.22);
+}
+
+.overlay[data-screen="home"] .fighter-select {
+  grid-template-columns: minmax(300px, 1fr) 82px minmax(300px, 1fr);
+  align-items: stretch;
+  width: min(1100px, calc(100% - 18px));
+  gap: 12px;
+}
+
+.overlay[data-screen="home"] .fighter-select-column {
+  min-height: 300px;
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--fighter-trim) 64%, rgba(255, 241, 189, 0.28));
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% -8%, color-mix(in srgb, var(--fighter-trim) 32%, transparent), transparent 42%),
+    radial-gradient(circle at 16% 42%, color-mix(in srgb, var(--fighter-color) 20%, transparent), transparent 34%),
+    linear-gradient(180deg, rgba(35, 23, 21, 0.94), rgba(7, 8, 11, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.14),
+    inset 0 0 32px rgba(0,0,0,0.22),
+    0 18px 36px rgba(0,0,0,0.54);
+}
+
+.overlay[data-screen="home"] .fighter-select-column h2 {
+  color: #fff1bd;
+  font-size: 15px;
+}
+
+.overlay[data-screen="home"] .fighter-select-heading {
+  padding: 3px 4px 8px;
+}
+
+.overlay[data-screen="home"] .fighter-showcase {
+  grid-template-columns: 142px minmax(0, 1fr);
+  min-height: 166px;
+  gap: 15px;
+  padding: 11px;
+  border-color: color-mix(in srgb, var(--fighter-trim) 38%, rgba(255, 241, 189, 0.22));
+  border-radius: 8px;
+  background:
+    linear-gradient(105deg, rgba(0, 0, 0, 0.44), rgba(0, 0, 0, 0.12) 58%),
+    radial-gradient(circle at 17% 26%, color-mix(in srgb, var(--fighter-trim) 34%, transparent), transparent 38%),
+    radial-gradient(circle at 86% 28%, rgba(116, 224, 209, 0.1), transparent 30%);
+}
+
+.overlay[data-screen="home"] .fighter-showcase-portrait {
+  width: 142px;
+  height: 142px;
+  border-radius: 8px;
+}
+
+.overlay[data-screen="home"] .fighter-showcase-portrait img {
+  width: 122px;
+  height: 122px;
+}
+
+.overlay[data-screen="home"] .fighter-showcase-info strong {
+  font-size: 31px;
+  line-height: 0.92;
+}
+
+.overlay[data-screen="home"] .fighter-showcase-info > span {
+  border-radius: 5px;
+}
+
+.overlay[data-screen="home"] .fighter-choice-grid {
+  gap: 8px;
+}
+
+.overlay[data-screen="home"] .fighter-choice {
+  min-height: 106px;
+  padding: 8px 6px;
+  border-color: rgba(255, 220, 126, 0.38);
+  border-radius: 7px;
+}
+
+.overlay[data-screen="home"] .fighter-choice img {
+  width: 74px;
+  height: 74px;
+  border-radius: 6px;
+}
+
+.overlay[data-screen="home"] .fighter-select-versus {
+  width: 82px;
+  min-height: 118px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 22%, rgba(255, 247, 214, 0.36), transparent 36%),
+    radial-gradient(circle at 50% 100%, rgba(116, 224, 209, 0.22), transparent 52%),
+    linear-gradient(180deg, rgba(126, 28, 18, 0.98), rgba(14, 5, 5, 0.98));
+}
+
+.overlay[data-screen="home"] .fighter-select-versus strong {
+  font-size: 33px;
+}
+
+.overlay[data-screen="home"] .overlay-actions {
+  display: grid;
+  grid-template-columns: minmax(118px, 1fr) minmax(170px, 1.35fr) minmax(118px, 1fr);
+  align-items: end;
+  width: min(620px, calc(100% - 24px));
+  gap: 10px;
+}
+
+.overlay[data-screen="home"] #tournament-menu {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.overlay[data-screen="home"] #start {
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 54px;
+  font-size: 21px;
+}
+
+.overlay[data-screen="home"] #online-menu {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.overlay[data-screen="home"] #tournament-menu,
+.overlay[data-screen="home"] #online-menu {
+  width: 100%;
+  min-width: 0;
+  min-height: 45px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+@keyframes homeTitleIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes homeCopyIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes homePanelLeftIn {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes homePanelRightIn {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes homeVsIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+
+  72% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes homeActionsIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.overlay[data-screen="home"].home-enter h1 {
+  animation: homeTitleIn 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  will-change: opacity, transform;
+}
+
+.overlay[data-screen="home"].home-enter .overlay-copy {
+  animation: homeCopyIn 430ms ease-out 90ms both;
+  will-change: opacity, transform;
+}
+
+.overlay[data-screen="home"].home-enter .fighter-select-column[data-side="left"] {
+  animation: homePanelLeftIn 520ms cubic-bezier(0.2, 0.8, 0.2, 1) 130ms both;
+  will-change: opacity, transform;
+}
+
+.overlay[data-screen="home"].home-enter .fighter-select-column[data-side="right"] {
+  animation: homePanelRightIn 520ms cubic-bezier(0.2, 0.8, 0.2, 1) 170ms both;
+  will-change: opacity, transform;
+}
+
+.overlay[data-screen="home"].home-enter .fighter-select-versus {
+  animation: homeVsIn 480ms cubic-bezier(0.18, 0.9, 0.28, 1) 220ms both;
+  will-change: opacity, transform;
+}
+
+.overlay[data-screen="home"].home-enter .overlay-actions {
+  animation: homeActionsIn 420ms ease-out 280ms both;
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay[data-screen="home"].home-enter h1,
+  .overlay[data-screen="home"].home-enter .overlay-copy,
+  .overlay[data-screen="home"].home-enter .fighter-select-column,
+  .overlay[data-screen="home"].home-enter .fighter-select-versus,
+  .overlay[data-screen="home"].home-enter .overlay-actions {
+    animation: none;
+    will-change: auto;
+  }
 }
 
 .overlay[data-screen="versus"] {
@@ -1749,6 +2092,14 @@ canvas {
     min-height: 220px;
   }
 
+  .game-shell[data-screen="home"] {
+    height: calc(100vh - 20px);
+    height: calc(100svh - 20px);
+    max-height: calc(100vh - 20px);
+    max-height: calc(100svh - 20px);
+    aspect-ratio: auto;
+  }
+
   .topbar {
     top: 8px;
     left: 8px;
@@ -1808,27 +2159,48 @@ canvas {
   }
 
   .overlay[data-screen="home"] {
+    align-content: start;
+    grid-template-rows: auto auto auto auto;
+    gap: 8px;
+    padding: 16px 10px 10px;
     overflow-y: auto;
   }
 
   .overlay h1 {
-    font-size: clamp(28px, 6vw, 48px);
+    font-size: 34px;
   }
 
   .overlay[data-screen="home"] h1 {
-    font-size: clamp(34px, 9vw, 56px);
-    transform: scaleX(1.02);
+    width: min(440px, calc(100% - 18px));
+    padding: 8px 10px 4px;
+    font-size: 40px;
+    transform: none;
+  }
+
+  .overlay[data-screen="home"] h1::before {
+    top: -9px;
+    padding: 2px 8px;
+    font-size: 8px;
+  }
+
+  .overlay[data-screen="home"] h1::after {
+    bottom: -7px;
+    height: 3px;
   }
 
   .overlay[data-screen="home"] .overlay-copy {
+    display: none;
+    width: min(430px, calc(100% - 22px));
     font-size: 10px;
+    line-height: 1.25;
   }
 
   .overlay[data-screen="home"] .fighter-select,
   .fighter-select {
     grid-template-columns: 1fr;
-    gap: 10px;
-    width: min(520px, calc(100% - 24px));
+    gap: 8px;
+    justify-items: center;
+    width: min(520px, calc(100% - 16px));
   }
 
   .fighter-select-versus {
@@ -1850,9 +2222,33 @@ canvas {
     font-size: 18px;
   }
 
+  .overlay[data-screen="home"] .fighter-select-versus {
+    width: 64px;
+    height: 38px;
+    min-height: 38px;
+    margin: -3px 0;
+    padding: 4px;
+    align-self: center;
+    justify-self: center;
+    border-radius: 8px;
+  }
+
+  .overlay[data-screen="home"] .fighter-select-versus span,
+  .overlay[data-screen="home"] .fighter-select-versus em {
+    display: none;
+  }
+
+  .overlay[data-screen="home"] .fighter-select-versus strong {
+    font-size: 21px;
+    line-height: 0.9;
+    transform: translateY(-1px);
+  }
+
   .overlay[data-screen="home"] .fighter-select-column {
+    grid-template-rows: auto auto auto;
+    width: 100%;
     min-height: 0;
-    padding: 9px;
+    padding: 8px;
   }
 
   .fighter-select-heading {
@@ -1867,14 +2263,31 @@ canvas {
     padding: 7px;
   }
 
+  .overlay[data-screen="home"] .fighter-showcase {
+    grid-template-columns: 72px minmax(0, 1fr);
+    min-height: 84px;
+    gap: 7px;
+    padding: 6px;
+  }
+
   .fighter-showcase-portrait {
     width: 66px;
     height: 66px;
   }
 
+  .overlay[data-screen="home"] .fighter-showcase-portrait {
+    width: 70px;
+    height: 70px;
+  }
+
   .fighter-showcase-portrait img {
     width: 54px;
     height: 54px;
+  }
+
+  .overlay[data-screen="home"] .fighter-showcase-portrait img {
+    width: 62px;
+    height: 62px;
   }
 
   .fighter-showcase-mark {
@@ -1884,7 +2297,11 @@ canvas {
   }
 
   .fighter-showcase-info strong {
-    font-size: clamp(18px, 6vw, 25px);
+    font-size: 22px;
+  }
+
+  .overlay[data-screen="home"] .fighter-showcase-info strong {
+    font-size: 22px;
   }
 
   .fighter-showcase-info > span {
@@ -1902,6 +2319,10 @@ canvas {
   .fighter-showcase-stats {
     gap: 3px;
     margin-top: 7px;
+  }
+
+  .overlay[data-screen="home"] .fighter-showcase-stats {
+    display: none;
   }
 
   .fighter-showcase-stat {
@@ -1932,13 +2353,14 @@ canvas {
   }
 
   .overlay[data-screen="home"] .fighter-choice {
-    min-height: 62px;
+    min-height: 74px;
+    padding: 5px;
   }
 
   .overlay[data-screen="home"] .fighter-choice img,
   .fighter-choice img {
-    width: 30px;
-    height: 30px;
+    width: 56px;
+    height: 56px;
   }
 
   .overlay[data-screen="home"] .fighter-choice span,
@@ -1949,9 +2371,42 @@ canvas {
   }
 
   .overlay[data-screen="home"] #start {
-    min-width: 144px;
-    min-height: 42px;
+    min-width: 0;
+    min-height: 38px;
     font-size: 15px;
+  }
+
+  .overlay[data-screen="home"] #tournament-menu,
+  .overlay[data-screen="home"] #online-menu {
+    min-height: 34px;
+    font-size: 11px;
+  }
+
+  .overlay[data-screen="home"] .overlay-actions {
+    grid-template-columns: 1fr 1fr;
+    width: min(430px, calc(100% - 22px));
+    gap: 7px;
+  }
+
+  .overlay[data-screen="home"] #tournament-menu,
+  .overlay[data-screen="home"] #start,
+  .overlay[data-screen="home"] #online-menu {
+    width: 100%;
+  }
+
+  .overlay[data-screen="home"] #start {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .overlay[data-screen="home"] #tournament-menu {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .overlay[data-screen="home"] #online-menu {
+    grid-column: 2;
+    grid-row: 2;
   }
 
   .versus-panel {
@@ -2112,19 +2567,36 @@ canvas {
   }
 
   .overlay[data-screen="home"] {
-    grid-template-rows: minmax(0, 1fr) 30px;
+    grid-template-rows: 26px minmax(0, 1fr) 29px;
     align-content: stretch;
-    gap: 3px;
-    padding: 36px 7px 5px;
+    gap: 4px;
+    padding: 6px 7px 0;
     overflow: hidden;
   }
 
   .overlay[data-screen="home"] h1 {
-    display: none;
+    display: block;
+    align-self: end;
+    width: min(390px, calc(100% - 110px));
+    padding: 4px 10px 1px;
+    font-size: 24px;
+    line-height: 0.86;
   }
 
   .overlay[data-screen="home"] .overlay-copy {
     display: none;
+  }
+
+  .overlay[data-screen="home"] h1::before {
+    top: -8px;
+    padding: 1px 7px;
+    font-size: 6px;
+  }
+
+  .overlay[data-screen="home"] h1::after {
+    bottom: -4px;
+    width: min(290px, 76%);
+    height: 2px;
   }
 
   .overlay[data-screen="home"] .fighter-select,
@@ -2138,7 +2610,7 @@ canvas {
   }
 
   .overlay[data-screen="home"] .fighter-select-column {
-    grid-template-rows: auto 54px minmax(0, 1fr);
+    grid-template-rows: auto 82px minmax(0, 1fr);
     min-height: 0;
     padding: 5px;
     gap: 4px;
@@ -2163,8 +2635,8 @@ canvas {
 
   .fighter-showcase {
     grid-template-columns: 48px minmax(0, 1fr);
-    min-height: 54px;
-    height: 54px;
+    min-height: 58px;
+    height: 58px;
     gap: 6px;
     padding: 5px;
   }
@@ -2186,7 +2658,7 @@ canvas {
   }
 
   .fighter-showcase-info strong {
-    font-size: clamp(17px, 3.5vw, 24px);
+    font-size: 19px;
     line-height: 0.9;
   }
 
@@ -2204,6 +2676,46 @@ canvas {
     display: none;
   }
 
+  .overlay[data-screen="home"] .fighter-showcase {
+    grid-template-columns: 76px minmax(0, 1fr);
+    min-height: 82px;
+    height: 82px;
+    gap: 8px;
+    padding: 6px;
+  }
+
+  .overlay[data-screen="home"] .fighter-showcase-portrait {
+    width: 68px;
+    height: 68px;
+  }
+
+  .overlay[data-screen="home"] .fighter-showcase-portrait img {
+    width: 60px;
+    height: 60px;
+  }
+
+  .overlay[data-screen="home"] .fighter-showcase-mark {
+    width: 17px;
+    height: 17px;
+    font-size: 8px;
+  }
+
+  .overlay[data-screen="home"] .fighter-showcase-info strong {
+    font-size: 22px;
+    line-height: 0.9;
+  }
+
+  .overlay[data-screen="home"] .fighter-showcase-info > span {
+    margin-top: 4px;
+    padding: 3px 7px;
+    font-size: 8px;
+  }
+
+  .overlay[data-screen="home"] .fighter-showcase-trait,
+  .overlay[data-screen="home"] .fighter-showcase-stats {
+    display: none;
+  }
+
   .fighter-choice-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     align-content: start;
@@ -2213,14 +2725,14 @@ canvas {
 
   .fighter-choice,
   .overlay[data-screen="home"] .fighter-choice {
-    min-height: 36px;
-    padding: 3px;
+    min-height: 60px;
+    padding: 4px;
   }
 
   .overlay[data-screen="home"] .fighter-choice img,
   .fighter-choice img {
-    width: 20px;
-    height: 20px;
+    width: 48px;
+    height: 48px;
   }
 
   .overlay[data-screen="home"] .fighter-choice span,
@@ -2229,22 +2741,30 @@ canvas {
     line-height: 1;
   }
 
+  .overlay[data-screen="home"] .fighter-select-versus,
   .fighter-select-versus {
     width: 42px;
     height: 42px;
     min-height: 42px;
     padding: 4px;
     align-self: center;
+    justify-self: center;
     gap: 0;
+    border-radius: 8px;
   }
 
+  .overlay[data-screen="home"] .fighter-select-versus span,
+  .overlay[data-screen="home"] .fighter-select-versus em,
   .fighter-select-versus span,
   .fighter-select-versus em {
     display: none;
   }
 
+  .overlay[data-screen="home"] .fighter-select-versus strong,
   .fighter-select-versus strong {
     font-size: 16px;
+    line-height: 0.9;
+    transform: translateY(-1px);
   }
 
   .overlay-actions {
@@ -2252,13 +2772,24 @@ canvas {
     gap: 6px;
   }
 
-  #tournament-menu,
-  #online-menu,
+  .overlay[data-screen="home"] .overlay-actions {
+    grid-template-columns: minmax(92px, 1fr) minmax(118px, 1.35fr) minmax(92px, 1fr);
+    width: min(520px, calc(100% - 18px));
+    gap: 6px;
+  }
+
+  .overlay[data-screen="home"] #tournament-menu,
+  .overlay[data-screen="home"] #online-menu,
   .overlay[data-screen="home"] #start {
-    min-width: 104px;
-    min-height: 28px;
+    min-width: 0;
+    min-height: 26px;
     font-size: 11px;
     box-shadow: 0 5px 0 #130908;
+  }
+
+  .overlay[data-screen="home"] #start {
+    min-height: 29px;
+    font-size: 12px;
   }
 
   .overlay[data-screen="versus"] {
@@ -2416,16 +2947,16 @@ canvas {
   }
 
   .mobile-actions {
-    grid-template-columns: repeat(3, 42px);
-    gap: 6px;
+    grid-template-columns: repeat(3, 48px);
+    gap: 8px;
   }
 
   .mobile-controls button {
-    width: 42px;
-    height: 42px;
-    min-width: 42px;
-    min-height: 42px;
-    font-size: 12px;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    font-size: 13px;
     box-shadow:
       0 4px 0 rgba(63, 22, 14, 0.76),
       0 0 10px rgba(255, 198, 64, 0.11),

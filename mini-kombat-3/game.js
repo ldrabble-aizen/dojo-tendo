@@ -115,6 +115,7 @@ let lastFrameTime = 0;
 let updateAccumulator = 0;
 let roundAdvanceTimer = null;
 let winnerOverlayTimer = null;
+let homeIntroTimer = null;
 const onlineState = {
   role: "",
   localSide: "",
@@ -857,12 +858,12 @@ const fighterProfiles = {
     build: "softFemale",
     mark: "L",
     outfit: {
-      jacket: "#263f9f",
-      pants: "#192868",
-      sleeve: "#ff8ac8",
-      belt: "#ff8ac8",
-      shoe: "#f07fb7",
-      accent: "#dbe6ff",
+      jacket: "#07080b",
+      pants: "#050506",
+      sleeve: "#0b0c10",
+      belt: "#111217",
+      shoe: "#050506",
+      accent: "#343840",
       pattern: "wrap",
     },
   },
@@ -1437,8 +1438,19 @@ function scheduleWinnerOverlay() {
 
 function homeOverlayCopy() {
   return tournamentMode
-    ? "Modo torneo: elegi tu luchador a la derecha y el primer rival a la izquierda. En telefono usa joystick, pina, patada y especial."
-    : `Elegi tus luchadores. En telefono usa joystick, pina, patada y especial. Izquierda usa A/D, W, S, F, G, R y T${cpuEnabled ? " o CPU" : ""}. Derecha usa flechas, K, L, O y P.`;
+    ? "El Dojo Tendo abre el torneo. Elegi tu campeon y subi al tatami."
+    : `El Dojo Tendo abre sus puertas. Elegi combatientes y prepara el duelo${cpuEnabled ? " contra la CPU." : "."}`;
+}
+
+function cueHomeIntro() {
+  if (homeIntroTimer) clearTimeout(homeIntroTimer);
+  overlay.classList.remove("home-enter");
+  void overlay.offsetWidth;
+  overlay.classList.add("home-enter");
+  homeIntroTimer = setTimeout(() => {
+    homeIntroTimer = null;
+    overlay.classList.remove("home-enter");
+  }, 900);
 }
 
 function showHomeOverlay() {
@@ -1452,6 +1464,7 @@ function showHomeOverlay() {
   renderFighterSelect();
   fighterSelect.classList.remove("hidden");
   overlay.classList.remove("hidden");
+  cueHomeIntro();
   syncShellState();
 }
 
@@ -4953,6 +4966,21 @@ function drawWins(x, y, f, reverse, compact = false) {
 
 function bodySpec(f) {
   return BODY_SPECS[f.build] ?? BODY_SPECS.balanced;
+}
+
+function headShapeProfile(f) {
+  if (f.profileId === "p5") {
+    return {
+      scaleX: 1.2,
+      scaleY: 0.7,
+      anchorY: 0.82,
+    };
+  }
+  return {
+    scaleX: 1,
+    scaleY: 1,
+    anchorY: 0.72,
+  };
 }
 
 function outfitSpec(f) {
@@ -12229,6 +12257,7 @@ function drawMaguilaRacingTorsoDetails(f, outfit, shoulder, chest, waist, hip, t
 
 function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
   const spec = bodySpec(f);
+  const headShape = headShapeProfile(f);
   const headScale = (spec.headScale ?? 0.94) * headScaleMultiplier;
   const headW = spec.headW * headScale;
   const headH = spec.headH * headScale;
@@ -12288,6 +12317,12 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
   ctx.translate(acting.x, acting.y);
   ctx.rotate(headAngle);
   ctx.scale(acting.scaleX, acting.scaleY);
+  if (headShape.scaleX !== 1 || headShape.scaleY !== 1) {
+    const headAnchorY = y + headH * headShape.anchorY;
+    ctx.translate(0, headAnchorY);
+    ctx.scale(headShape.scaleX, headShape.scaleY);
+    ctx.translate(0, -headAnchorY);
+  }
   ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
   ctx.beginPath();
   ctx.ellipse(0, -146 + crouch + spec.headY, 38, 14, 0, 0, Math.PI * 2);
