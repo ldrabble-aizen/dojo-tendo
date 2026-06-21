@@ -2005,17 +2005,33 @@ function update() {
     matchOver = winnerFighter.wins >= 2;
     if (matchOver) matchWinnerId = winnerFighter.id;
     running = false;
-    koFreeze = 18;
+    koFreeze = matchOver ? 34 : 28;
     resultFrame = 0;
-    loserFighter.koFall = Math.max(loserFighter.koFall ?? 0, 90);
+    loserFighter.koFall = Math.max(loserFighter.koFall ?? 0, matchOver ? 118 : 104);
     loserFighter.koFallDir = loserFighter.impactDir || winnerFighter.dir || 1;
-    loserFighter.koFallStrength = Math.max(loserFighter.koFallStrength ?? 0, loserFighter.impactStrength ?? 1);
-    loserFighter.damagePulse = Math.max(loserFighter.damagePulse ?? 0, 34);
-    loserFighter.damageLevel = Math.max(loserFighter.damageLevel ?? 0, 1.55);
-    winnerFighter.victoryPulse = 60;
-    shake = 16;
-    flash = 16;
+    loserFighter.koFallStrength = Math.max(loserFighter.koFallStrength ?? 0, (loserFighter.impactStrength ?? 1) + (matchOver ? 0.38 : 0.24));
+    loserFighter.damagePulse = Math.max(loserFighter.damagePulse ?? 0, matchOver ? 44 : 38);
+    loserFighter.damageLevel = Math.max(loserFighter.damageLevel ?? 0, matchOver ? 1.86 : 1.68);
+    loserFighter.reactionPulse = Math.max(loserFighter.reactionPulse ?? 0, matchOver ? 42 : 36);
+    loserFighter.reactionMax = Math.max(loserFighter.reactionMax ?? 1, matchOver ? 42 : 36);
+    loserFighter.reactionKind = "finish";
+    loserFighter.reactionStrength = Math.max(loserFighter.reactionStrength ?? 0, matchOver ? 1.9 : 1.72);
+    winnerFighter.victoryPulse = matchOver ? 104 : 88;
+    shake = Math.max(shake, matchOver ? 22 : 18);
+    flash = Math.max(flash, matchOver ? 22 : 18);
+    addText(loserFighter.x, loserFighter.y - 162, matchOver ? "FINAL K.O." : "K.O.", "#fff1bd");
     addText(winnerFighter.x, winnerFighter.y - 190, matchOver ? "MATCH" : "ROUND", "#fff1bd");
+    triggerCameraImpact(loserFighter.koFallDir, false, true, false, matchOver ? 1.95 : 1.72, {
+      cameraPulse: matchOver ? 26 : 22,
+      cameraStrength: matchOver ? 1.95 : 1.72,
+    });
+    triggerCinematicHit(loserFighter.koFallDir, loserFighter.trim || "#fff1bd", matchOver ? 1.84 : 1.58, matchOver ? 28 : 24, {
+      zoom: matchOver ? 0.07 : 0.06,
+      pan: matchOver ? 15.5 : 13.4,
+      lift: matchOver ? 6.2 : 5.4,
+      roll: matchOver ? 0.014 : 0.011,
+      band: matchOver ? 1.58 : 1.38,
+    });
     koCollapseFX(loserFighter, winnerFighter);
     playSound(matchOver ? tournamentActive && winnerFighter.id !== "right" ? "lose" : "victory" : "ko");
     if (matchOver) scheduleWinnerOverlay();
@@ -3661,16 +3677,17 @@ function koCollapseFX(loser, winnerFighter) {
   const dir = loser.koFallDir || loser.impactDir || winnerFighter?.dir || 1;
   const floorY = Math.min(FLOOR + 5, loser.y + 5);
   const color = loser.trim ?? "#ffd44d";
+  const matchFinish = Boolean(matchOver);
   particles.push({
     x: loser.x + dir * fighterScale(6),
     y: floorY,
     vx: dir * 0.28,
     vy: 0,
     angle: dir > 0 ? 0 : Math.PI,
-    life: 28,
-    maxLife: 28,
-    size: 58,
-    growth: 2.75,
+    life: matchFinish ? 36 : 32,
+    maxLife: matchFinish ? 36 : 32,
+    size: matchFinish ? 78 : 68,
+    growth: matchFinish ? 3.35 : 3.05,
     color: "rgba(226, 197, 135, 0.78)",
     kind: "floorShock",
   });
@@ -3680,29 +3697,61 @@ function koCollapseFX(loser, winnerFighter) {
     vx: dir * 0.25,
     vy: 0,
     angle: dir > 0 ? 0.08 : Math.PI - 0.08,
-    life: 18,
-    maxLife: 18,
-    size: 62,
+    life: matchFinish ? 24 : 20,
+    maxLife: matchFinish ? 24 : 20,
+    size: matchFinish ? 84 : 72,
     color,
-    strength: 1.35,
+    strength: matchFinish ? 1.62 : 1.44,
     kind: "contactFlash",
   });
-  const collapseDust = fxCount(12, 5);
+  particles.push({
+    x: loser.x + dir * fighterScale(12),
+    y: floorY - fighterScale(8),
+    vx: 0,
+    vy: 0,
+    angle: dir > 0 ? 0 : Math.PI,
+    life: matchFinish ? 24 : 20,
+    maxLife: matchFinish ? 24 : 20,
+    size: matchFinish ? 46 : 38,
+    growth: matchFinish ? 2.8 : 2.35,
+    color: "#fff1bd",
+    kind: "ring",
+  });
+  const collapseDust = fxCount(matchFinish ? 20 : 16, 6);
   for (let i = 0; i < collapseDust; i += 1) {
     particles.push({
       x: loser.x + (Math.random() - 0.5) * fighterScale(64),
       y: floorY + Math.random() * 4,
-      vx: -dir * (0.35 + Math.random() * 1.35),
-      vy: -0.35 - Math.random() * 0.8,
+      vx: -dir * (0.45 + Math.random() * (matchFinish ? 1.7 : 1.45)),
+      vy: -0.45 - Math.random() * (matchFinish ? 1.05 : 0.86),
       angle: (Math.random() - 0.5) * 0.18,
-      life: 18 + Math.random() * 16,
-      maxLife: 28,
-      size: 9 + Math.random() * 16,
+      life: 20 + Math.random() * (matchFinish ? 18 : 16),
+      maxLife: matchFinish ? 34 : 30,
+      size: 10 + Math.random() * (matchFinish ? 20 : 17),
       color: "rgba(214, 182, 120, 0.56)",
       kind: "dustRibbon",
     });
   }
+  const streaks = fxCount(matchFinish ? 7 : 5, 2);
+  for (let i = 0; i < streaks; i += 1) {
+    const lane = streaks === 1 ? 0 : i / (streaks - 1) - 0.5;
+    particles.push({
+      x: loser.x - dir * fighterScale(24),
+      y: loser.y - fighterScale(112) + lane * fighterScale(44),
+      vx: dir * (0.5 + Math.random() * 0.5),
+      vy: lane * 0.18,
+      angle: dir > 0 ? lane * 0.18 : Math.PI - lane * 0.18,
+      length: fighterScale((matchFinish ? 88 : 72) * (0.82 + Math.random() * 0.28)),
+      life: 16 + Math.random() * (matchFinish ? 9 : 7),
+      maxLife: matchFinish ? 24 : 20,
+      size: matchFinish ? 4.8 : 4,
+      color: i % 2 ? "#fff1bd" : color,
+      kind: "impactNeedle",
+    });
+  }
   impactShockwave(loser.x - dir * fighterScale(12), loser.y - fighterScale(96), color, false, true);
+  impactShockwave(loser.x + dir * fighterScale(8), floorY - fighterScale(6), "#fff1bd", false, true);
+  impactGlints(loser.x - dir * fighterScale(18), loser.y - fighterScale(118), "#fff1bd", false, true);
 }
 
 function floorDust(x, y, count) {
@@ -9959,21 +10008,23 @@ function drawResultPoseEffect(f, crouch) {
   ctx.save();
   if (f.id === roundWinnerId) {
     ctx.globalCompositeOperation = "screen";
-    const floorPulse = 0.5 + Math.sin(clock * 0.08) * 0.18;
+    const entrance = 1 - smoothStep01(clamp(resultFrame / 58, 0, 1));
+    const floorPulse = 0.5 + Math.sin(clock * 0.08) * 0.18 + entrance * 0.22;
     ctx.strokeStyle = colorWithAlpha(f.trim, 0.28 + floorPulse * 0.16);
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3 + entrance * 2;
     ctx.beginPath();
-    ctx.ellipse(0, -4 + crouch, 62 + floorPulse * 10, 13 + floorPulse * 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -4 + crouch, 62 + floorPulse * 18, 13 + floorPulse * 5, 0, 0, Math.PI * 2);
     ctx.stroke();
 
     ctx.lineWidth = 2;
-    for (let i = 0; i < 4; i += 1) {
-      const x = -44 + i * 29 + Math.sin(clock * 0.04 + i) * 4;
+    const rayCount = isMobileFightView() ? 4 : 5;
+    for (let i = 0; i < rayCount; i += 1) {
+      const x = -50 + i * (100 / Math.max(1, rayCount - 1)) + Math.sin(clock * 0.04 + i) * 4;
       const top = -204 + crouch + Math.cos(clock * 0.03 + i) * 8;
       const bottom = -36 + crouch;
       const ray = ctx.createLinearGradient(x, top, x + 12, bottom);
       ray.addColorStop(0, colorWithAlpha(f.trim, 0));
-      ray.addColorStop(0.44, colorWithAlpha(f.trim, 0.16));
+      ray.addColorStop(0.44, colorWithAlpha(f.trim, 0.16 + entrance * 0.08));
       ray.addColorStop(1, "rgba(255,255,255,0)");
       ctx.strokeStyle = ray;
       ctx.beginPath();
@@ -9983,8 +10034,8 @@ function drawResultPoseEffect(f, crouch) {
     }
 
     const spotlight = ctx.createRadialGradient(0, -142 + crouch, 12, 0, -96 + crouch, 126);
-    spotlight.addColorStop(0, colorWithAlpha(f.trim, 0.2));
-    spotlight.addColorStop(0.45, "rgba(255, 241, 189, 0.08)");
+    spotlight.addColorStop(0, colorWithAlpha(f.trim, 0.22 + entrance * 0.12));
+    spotlight.addColorStop(0.45, `rgba(255, 241, 189, ${0.08 + entrance * 0.08})`);
     spotlight.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = spotlight;
     ctx.beginPath();
@@ -10012,11 +10063,12 @@ function drawResultPoseEffect(f, crouch) {
     }
   } else {
     ctx.globalCompositeOperation = "source-over";
-    const fall = smoothStep01(clamp(resultFrame / 50, 0, 1));
+    const fall = smoothStep01(clamp(resultFrame / 56, 0, 1));
+    const slam = 1 - smoothStep01(clamp((resultFrame - 4) / 36, 0, 1));
     const breath = 0.5 + Math.sin(clock * 0.06) * 0.5;
-    ctx.fillStyle = `rgba(12, 8, 7, ${0.28 + fall * 0.12})`;
+    ctx.fillStyle = `rgba(12, 8, 7, ${0.3 + fall * 0.16 + slam * 0.12})`;
     ctx.beginPath();
-    ctx.ellipse(0, -2 + crouch, 58 + fall * 18, 10 + fall * 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -2 + crouch, 58 + fall * 24 + slam * 18, 10 + fall * 4 + slam * 4, 0, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.globalCompositeOperation = "screen";
@@ -10040,7 +10092,7 @@ function drawResultPoseEffect(f, crouch) {
       ctx.fill();
     }
 
-    const dizzy = smoothStep01(clamp((resultFrame - 8) / 36, 0, 1));
+    const dizzy = smoothStep01(clamp((resultFrame - 5) / 34, 0, 1));
     const fade = 1 - smoothStep01(clamp((resultFrame - 190) / 70, 0, 1));
     const starAlpha = dizzy * fade;
     if (starAlpha > 0.03) {
@@ -13836,13 +13888,14 @@ function drawKOBanner() {
   if (!winner) return;
   if (overlay.dataset.screen === "winner" && !overlay.classList.contains("hidden")) return;
   const reveal = smoothStep01(clamp(resultFrame / 24, 0, 1));
-  const panelAlpha = overlay.classList.contains("hidden") ? 0.42 : 0.2;
-  const width = matchOver ? 276 : 248;
-  const height = 54;
+  const snap = Math.max(0, 1 - resultFrame / 24);
+  const panelAlpha = overlay.classList.contains("hidden") ? 0.5 : 0.24;
+  const width = matchOver ? 336 : 278;
+  const height = matchOver ? 68 : 62;
   const x = W / 2 - width / 2;
-  const y = 92 - reveal * 6;
-  const label = matchOver ? "MATCH" : `ROUND ${toRoman(roundNumber)}`;
-  const subtitle = `${winner.toUpperCase()} GANA`;
+  const y = 84 - reveal * 7 - snap * 4;
+  const label = matchOver ? "FINAL K.O." : "K.O.";
+  const subtitle = matchOver ? `${winner.toUpperCase()} GANA MATCH` : `${winner.toUpperCase()} GANA ROUND ${toRoman(roundNumber)}`;
   const banner = ctx.createLinearGradient(x, y, x + width, y + height);
   banner.addColorStop(0, `rgba(24, 7, 6, ${panelAlpha})`);
   banner.addColorStop(0.48, `rgba(116, 25, 18, ${panelAlpha + 0.08})`);
@@ -13850,26 +13903,39 @@ function drawKOBanner() {
 
   ctx.save();
   ctx.globalAlpha = reveal;
+  ctx.translate(W / 2, y + height / 2);
+  ctx.scale(1 + snap * 0.08, 1 + snap * 0.08);
+  ctx.translate(-W / 2, -(y + height / 2));
   ctx.fillStyle = banner;
   ctx.beginPath();
   ctx.roundRect(x, y, width, height, 8);
   ctx.fill();
-  ctx.strokeStyle = `rgba(255, 226, 132, ${0.34 + panelAlpha * 0.22})`;
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = `rgba(255, 226, 132, ${0.42 + panelAlpha * 0.26})`;
+  ctx.lineWidth = 2;
   ctx.stroke();
 
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = `rgba(255, 241, 189, ${0.18 + snap * 0.28})`;
+  ctx.lineWidth = 5 + snap * 3;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(x + 18, y + height * 0.5);
+  ctx.lineTo(x + width - 18, y + height * 0.5);
+  ctx.stroke();
+  ctx.globalCompositeOperation = "source-over";
+
   ctx.fillStyle = `rgba(255, 241, 189, ${0.88 + panelAlpha * 0.08})`;
-  ctx.font = "900 24px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif";
+  ctx.font = `${matchOver ? 40 : 38}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 5;
   ctx.strokeStyle = `rgba(43, 20, 16, ${0.62 + panelAlpha * 0.14})`;
-  ctx.strokeText(label, W / 2, y + 19);
-  ctx.fillText(label, W / 2, y + 19);
+  ctx.strokeText(label, W / 2, y + (matchOver ? 28 : 26));
+  ctx.fillText(label, W / 2, y + (matchOver ? 28 : 26));
 
   ctx.font = "900 11px system-ui, sans-serif";
   ctx.fillStyle = `rgba(255, 226, 132, ${0.72 + panelAlpha * 0.12})`;
-  ctx.fillText(subtitle, W / 2, y + 39);
+  ctx.fillText(subtitle, W / 2, y + (matchOver ? 52 : 47));
   ctx.textBaseline = "alphabetic";
   ctx.restore();
 }
