@@ -102,6 +102,9 @@ let musicClock = 0;
 let particles = [];
 let floatingTexts = [];
 let audioCtx = null;
+let audioMasterGain = null;
+let audioNoiseCache = new Map();
+let audioLastPlayed = Object.create(null);
 let overlayMode = "home";
 let tournamentMode = false;
 let tournamentActive = false;
@@ -1048,100 +1051,537 @@ function normalizeOutfit(color, trim, outfit = {}) {
   };
 }
 
+const SOUND_PRESETS = {
+  menu: {
+    duration: 0.09,
+    volume: 0.07,
+    type: "triangle",
+    freq: [620, 960],
+    noise: { volume: 0.012, type: "highpass", frequency: 1800, duration: 0.04 },
+    layers: [{ type: "sine", freq: [1240, 840], volume: 0.26, delay: 0.018, duration: 0.07 }],
+    cooldown: 0.04,
+  },
+  select: {
+    duration: 0.14,
+    volume: 0.082,
+    type: "triangle",
+    freq: [360, 720],
+    noise: { volume: 0.018, type: "bandpass", frequency: 1900, q: 0.9, duration: 0.06 },
+    layers: [{ type: "sine", freq: [820, 1240], volume: 0.22, delay: 0.028, duration: 0.09 }],
+    cooldown: 0.05,
+  },
+  vs: {
+    duration: 0.52,
+    volume: 0.14,
+    type: "sawtooth",
+    freq: [118, 54],
+    noise: { volume: 0.052, type: "lowpass", frequency: 320, duration: 0.46 },
+    layers: [
+      { type: "sine", freq: [48, 36], volume: 0.72, duration: 0.5 },
+      { type: "triangle", freq: [236, 188], volume: 0.24, delay: 0.08, duration: 0.3 },
+    ],
+    cooldown: 0.24,
+  },
+  round: {
+    duration: 0.34,
+    volume: 0.128,
+    type: "square",
+    freq: [392, 196],
+    noise: { volume: 0.038, type: "lowpass", frequency: 270, duration: 0.28 },
+    layers: [{ type: "sine", freq: [92, 58], volume: 0.55, duration: 0.32 }],
+    cooldown: 0.18,
+  },
+  punch: {
+    duration: 0.105,
+    volume: 0.085,
+    type: "triangle",
+    freq: [184, 72],
+    noise: { volume: 0.058, type: "bandpass", frequency: 880, q: 0.7, duration: 0.075 },
+    cooldown: 0.036,
+  },
+  airPunch: {
+    duration: 0.12,
+    volume: 0.074,
+    type: "triangle",
+    freq: [260, 104],
+    noise: { volume: 0.052, type: "bandpass", frequency: 1320, q: 0.65, duration: 0.095 },
+    cooldown: 0.036,
+  },
+  kick: {
+    duration: 0.15,
+    volume: 0.105,
+    type: "triangle",
+    freq: [132, 46],
+    noise: { volume: 0.065, type: "bandpass", frequency: 620, q: 0.62, duration: 0.11 },
+    layers: [{ type: "sine", freq: [72, 44], volume: 0.32, duration: 0.14 }],
+    cooldown: 0.046,
+  },
+  airKick: {
+    duration: 0.17,
+    volume: 0.096,
+    type: "triangle",
+    freq: [190, 58],
+    noise: { volume: 0.07, type: "bandpass", frequency: 1040, q: 0.7, duration: 0.13 },
+    cooldown: 0.046,
+  },
+  sweep: {
+    duration: 0.17,
+    volume: 0.108,
+    type: "sawtooth",
+    freq: [96, 34],
+    noise: { volume: 0.068, type: "lowpass", frequency: 360, duration: 0.14 },
+    cooldown: 0.05,
+  },
+  grab: {
+    duration: 0.13,
+    volume: 0.088,
+    type: "triangle",
+    freq: [150, 62],
+    noise: { volume: 0.054, type: "bandpass", frequency: 520, duration: 0.08 },
+    cooldown: 0.05,
+  },
+  hit: {
+    duration: 0.17,
+    volume: 0.125,
+    type: "triangle",
+    freq: [86, 39],
+    noise: { volume: 0.092, type: "bandpass", frequency: 720, q: 0.82, duration: 0.12 },
+    layers: [{ type: "sine", freq: [55, 36], volume: 0.42, duration: 0.16 }],
+    cooldown: 0.034,
+  },
+  hitSharp: {
+    duration: 0.145,
+    volume: 0.126,
+    type: "triangle",
+    freq: [190, 54],
+    noise: { volume: 0.104, type: "highpass", frequency: 1400, duration: 0.08 },
+    layers: [{ type: "square", freq: [560, 240], volume: 0.18, duration: 0.07 }],
+    cooldown: 0.034,
+  },
+  hitLow: {
+    duration: 0.2,
+    volume: 0.135,
+    type: "triangle",
+    freq: [70, 28],
+    noise: { volume: 0.076, type: "lowpass", frequency: 280, duration: 0.16 },
+    layers: [{ type: "sine", freq: [44, 28], volume: 0.54, duration: 0.19 }],
+    cooldown: 0.042,
+  },
+  hitHeavy: {
+    duration: 0.25,
+    volume: 0.165,
+    type: "sawtooth",
+    freq: [72, 24],
+    noise: { volume: 0.098, type: "lowpass", frequency: 340, duration: 0.22 },
+    layers: [
+      { type: "sine", freq: [42, 24], volume: 0.78, duration: 0.24 },
+      { type: "triangle", freq: [160, 70], volume: 0.22, duration: 0.12 },
+    ],
+    cooldown: 0.05,
+  },
+  projectileHit: {
+    duration: 0.28,
+    volume: 0.15,
+    type: "sawtooth",
+    freq: [420, 94],
+    noise: { volume: 0.082, type: "bandpass", frequency: 1200, duration: 0.18 },
+    layers: [{ type: "sine", freq: [90, 38], volume: 0.44, duration: 0.25 }],
+    cooldown: 0.05,
+  },
+  counter: {
+    duration: 0.23,
+    volume: 0.15,
+    type: "square",
+    freq: [620, 210],
+    noise: { volume: 0.09, type: "highpass", frequency: 1450, duration: 0.11 },
+    layers: [{ type: "sine", freq: [120, 52], volume: 0.44, duration: 0.22 }],
+    cooldown: 0.06,
+  },
+  finishHit: {
+    duration: 0.34,
+    volume: 0.17,
+    type: "sawtooth",
+    freq: [86, 22],
+    noise: { volume: 0.112, type: "lowpass", frequency: 300, duration: 0.28 },
+    layers: [
+      { type: "sine", freq: [40, 20], volume: 0.86, duration: 0.32 },
+      { type: "square", freq: [260, 72], volume: 0.18, duration: 0.12 },
+    ],
+    cooldown: 0.12,
+  },
+  block: {
+    duration: 0.13,
+    volume: 0.105,
+    type: "square",
+    freq: [420, 190],
+    noise: { volume: 0.08, type: "highpass", frequency: 1700, duration: 0.08 },
+    layers: [{ type: "triangle", freq: [980, 620], volume: 0.2, duration: 0.11 }],
+    cooldown: 0.044,
+  },
+  jump: {
+    duration: 0.13,
+    volume: 0.072,
+    type: "sine",
+    freq: [240, 520],
+    noise: { volume: 0.035, type: "bandpass", frequency: 980, duration: 0.1 },
+    cooldown: 0.08,
+  },
+  land: {
+    duration: 0.14,
+    volume: 0.078,
+    type: "triangle",
+    freq: [86, 34],
+    noise: { volume: 0.052, type: "lowpass", frequency: 240, duration: 0.12 },
+    cooldown: 0.075,
+  },
+  landHeavy: {
+    duration: 0.21,
+    volume: 0.12,
+    type: "sawtooth",
+    freq: [78, 26],
+    noise: { volume: 0.074, type: "lowpass", frequency: 210, duration: 0.18 },
+    layers: [{ type: "sine", freq: [44, 24], volume: 0.58, duration: 0.2 }],
+    cooldown: 0.09,
+  },
+  step: {
+    duration: 0.055,
+    volume: 0.032,
+    type: "triangle",
+    freq: [88, 58],
+    noise: { volume: 0.027, type: "lowpass", frequency: 180, duration: 0.045 },
+    cooldown: 0.07,
+  },
+  special: {
+    duration: 0.42,
+    volume: 0.145,
+    type: "sawtooth",
+    freq: [520, 155],
+    noise: { volume: 0.052, type: "bandpass", frequency: 1400, duration: 0.22 },
+    layers: [
+      { type: "sine", freq: [1040, 520], volume: 0.22, duration: 0.2 },
+      { type: "triangle", freq: [130, 72], volume: 0.42, duration: 0.38 },
+    ],
+    cooldown: 0.14,
+  },
+  specialRelease: {
+    duration: 0.32,
+    volume: 0.142,
+    type: "sawtooth",
+    freq: [720, 120],
+    noise: { volume: 0.086, type: "bandpass", frequency: 1260, duration: 0.18 },
+    layers: [{ type: "sine", freq: [110, 42], volume: 0.42, duration: 0.3 }],
+    cooldown: 0.11,
+  },
+  combo: {
+    duration: 0.24,
+    volume: 0.09,
+    type: "triangle",
+    freq: [520, 980],
+    noise: { volume: 0.026, type: "highpass", frequency: 1600, duration: 0.08 },
+    layers: [{ type: "sine", freq: [780, 1320], volume: 0.2, delay: 0.05, duration: 0.14 }],
+    cooldown: 0.12,
+  },
+  musicPulse: {
+    duration: 0.18,
+    volume: 0.032,
+    type: "sine",
+    freq: [86, 48],
+    noise: { volume: 0.018, type: "lowpass", frequency: 180, duration: 0.14 },
+    cooldown: 0.16,
+  },
+  musicTaiko: {
+    duration: 0.28,
+    volume: 0.046,
+    type: "sine",
+    freq: [92, 42],
+    noise: { volume: 0.032, type: "lowpass", frequency: 220, duration: 0.18 },
+    layers: [{ type: "triangle", freq: [48, 32], volume: 0.32, duration: 0.26 }],
+    cooldown: 0.12,
+  },
+  musicBell: {
+    duration: 0.62,
+    volume: 0.038,
+    type: "sine",
+    freq: [440, 438],
+    noise: { volume: 0.006, type: "highpass", frequency: 2200, duration: 0.08 },
+    layers: [{ type: "triangle", freq: [880, 876], volume: 0.14, duration: 0.44 }],
+    cooldown: 0.08,
+  },
+  musicPluck: {
+    duration: 0.26,
+    volume: 0.032,
+    type: "triangle",
+    freq: [294, 220],
+    noise: { volume: 0.008, type: "bandpass", frequency: 1500, duration: 0.05 },
+    layers: [{ type: "sine", freq: [588, 440], volume: 0.1, duration: 0.2 }],
+    cooldown: 0.07,
+  },
+  musicDrone: {
+    duration: 0.9,
+    volume: 0.026,
+    type: "sine",
+    freq: [73, 73],
+    noise: { volume: 0.012, type: "lowpass", frequency: 140, duration: 0.78 },
+    layers: [{ type: "triangle", freq: [146, 145], volume: 0.12, duration: 0.72 }],
+    cooldown: 0.5,
+  },
+  musicHat: {
+    duration: 0.065,
+    volume: 0.016,
+    type: "triangle",
+    freq: [520, 340],
+    noise: { volume: 0.026, type: "highpass", frequency: 2400, duration: 0.045 },
+    cooldown: 0.08,
+  },
+  pause: {
+    duration: 0.13,
+    volume: 0.078,
+    type: "triangle",
+    freq: [420, 210],
+    noise: { volume: 0.018, type: "highpass", frequency: 1300, duration: 0.05 },
+    cooldown: 0.08,
+  },
+  resume: {
+    duration: 0.16,
+    volume: 0.08,
+    type: "triangle",
+    freq: [220, 520],
+    noise: { volume: 0.016, type: "highpass", frequency: 1400, duration: 0.05 },
+    cooldown: 0.08,
+  },
+  ko: {
+    duration: 0.78,
+    volume: 0.18,
+    type: "sawtooth",
+    freq: [78, 24],
+    noise: { volume: 0.116, type: "lowpass", frequency: 260, duration: 0.5 },
+    layers: [
+      { type: "sine", freq: [39, 22], volume: 0.88, duration: 0.72 },
+      { type: "square", freq: [156, 52], volume: 0.18, duration: 0.24 },
+    ],
+    cooldown: 0.34,
+  },
+  victory: {
+    duration: 0.72,
+    volume: 0.15,
+    type: "square",
+    freq: [330, 660],
+    noise: { volume: 0.026, type: "highpass", frequency: 1500, duration: 0.18 },
+    layers: [
+      { type: "triangle", freq: [495, 990], volume: 0.2, delay: 0.08, duration: 0.42 },
+      { type: "sine", freq: [165, 330], volume: 0.42, duration: 0.62 },
+    ],
+    cooldown: 0.34,
+  },
+  lose: {
+    duration: 0.58,
+    volume: 0.132,
+    type: "triangle",
+    freq: [190, 72],
+    noise: { volume: 0.044, type: "lowpass", frequency: 280, duration: 0.34 },
+    layers: [{ type: "sine", freq: [95, 48], volume: 0.5, duration: 0.54 }],
+    cooldown: 0.3,
+  },
+};
+
+function getNoiseBuffer(duration) {
+  const length = Math.max(1, Math.ceil(audioCtx.sampleRate * duration));
+  const key = `${audioCtx.sampleRate}:${length}`;
+  let buffer = audioNoiseCache.get(key);
+  if (!buffer) {
+    buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
+    audioNoiseCache.set(key, buffer);
+  }
+  return buffer;
+}
+
+function soundPanFromX(x) {
+  return Number.isFinite(x) ? clamp((x - W / 2) / (W / 2), -0.55, 0.55) : 0;
+}
+
+function soundPan(options) {
+  if (typeof options.pan === "number") return clamp(options.pan, -0.75, 0.75);
+  return soundPanFromX(options.x);
+}
+
+function connectSoundOutput(node, pan, now) {
+  const destination = audioMasterGain || audioCtx.destination;
+  if (typeof audioCtx.createStereoPanner === "function" && Math.abs(pan) > 0.01) {
+    const panner = audioCtx.createStereoPanner();
+    panner.pan.setValueAtTime(pan, now);
+    node.connect(panner);
+    panner.connect(destination);
+    return;
+  }
+  node.connect(destination);
+}
+
+function scheduleFrequency(freqParam, freqs, start, duration) {
+  const values = Array.isArray(freqs) ? freqs : [freqs, freqs];
+  const first = Math.max(20, values[0] ?? 120);
+  freqParam.setValueAtTime(first, start);
+  for (let i = 1; i < values.length; i += 1) {
+    const target = Math.max(20, values[i] ?? first);
+    const t = start + duration * (i / (values.length - 1));
+    freqParam.exponentialRampToValueAtTime(target, t);
+  }
+}
+
+function startSoundTone(layer, output, now, baseDuration) {
+  if (!layer.freq) return;
+  const start = now + (layer.delay ?? 0);
+  const duration = layer.duration ?? baseDuration;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = layer.type ?? "triangle";
+  if (layer.detune) osc.detune.setValueAtTime(layer.detune, start);
+  scheduleFrequency(osc.frequency, layer.freq, start, duration);
+  gain.gain.setValueAtTime(Math.max(0.001, layer.volume ?? 1), start);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+  osc.connect(gain);
+  gain.connect(output);
+  osc.start(start);
+  osc.stop(start + duration + 0.02);
+}
+
+function startSoundNoise(noiseSpec, output, now, baseDuration, intensity) {
+  if (!noiseSpec) return;
+  const spec = typeof noiseSpec === "number" ? { volume: noiseSpec } : noiseSpec;
+  const start = now + (spec.delay ?? 0);
+  const duration = spec.duration ?? baseDuration;
+  const source = audioCtx.createBufferSource();
+  const filter = audioCtx.createBiquadFilter();
+  const gain = audioCtx.createGain();
+  source.buffer = getNoiseBuffer(duration);
+  source.playbackRate.setValueAtTime((spec.playbackRate ?? 1) * (0.96 + Math.random() * 0.08), start);
+  filter.type = spec.type ?? "lowpass";
+  filter.frequency.setValueAtTime(spec.frequency ?? 600, start);
+  if (typeof spec.q === "number") filter.Q.setValueAtTime(spec.q, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.linearRampToValueAtTime((spec.volume ?? 0.05) * intensity, start + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(output);
+  source.start(start);
+  source.stop(start + duration + 0.02);
+}
+
 function ensureAudio() {
   const AudioEngine = window.AudioContext || window.webkitAudioContext;
   if (!AudioEngine) return;
   if (!audioCtx) audioCtx = new AudioEngine();
+  if (!audioMasterGain) {
+    audioMasterGain = audioCtx.createGain();
+    audioMasterGain.gain.setValueAtTime(0.86, audioCtx.currentTime);
+    audioMasterGain.connect(audioCtx.destination);
+  }
   if (audioCtx.state === "suspended") audioCtx.resume();
 }
 
-function playSound(type) {
+function playSound(type, options = {}) {
   if (!audioCtx || !soundEnabled) return;
 
+  const preset = SOUND_PRESETS[type] ?? SOUND_PRESETS.punch;
   const now = audioCtx.currentTime;
-  const gain = audioCtx.createGain();
-  const osc = audioCtx.createOscillator();
-  const noise = audioCtx.createBufferSource();
-  const filter = audioCtx.createBiquadFilter();
-  const duration = {
-    menu: 0.08,
-    select: 0.11,
-    vs: 0.42,
-    round: 0.2,
-    punch: 0.08,
-    kick: 0.1,
-    hit: 0.16,
-    hitSharp: 0.13,
-    hitLow: 0.18,
-    hitHeavy: 0.21,
-    block: 0.09,
-    jump: 0.08,
-    special: 0.34,
-    victory: 0.66,
-    lose: 0.52,
-    ko: 0.72,
-  }[type] ?? 0.1;
+  const soundKey = options.key ? `${type}:${options.key}` : type;
+  const cooldown = preset.cooldown ?? 0.035;
+  if (now - (audioLastPlayed[soundKey] ?? -Infinity) < cooldown) return;
+  audioLastPlayed[soundKey] = now;
 
-  const freqs = {
-    menu: [520, 720],
-    select: [360, 620],
-    vs: [110, 220],
-    round: [392, 588],
-    punch: [170, 80],
-    kick: [120, 64],
-    hit: [90, 42],
-    hitSharp: [150, 48],
-    hitLow: [74, 30],
-    hitHeavy: [68, 24],
-    block: [360, 220],
-    jump: [260, 410],
-    special: [520, 160],
-    victory: [330, 660],
-    lose: [180, 90],
-    ko: [78, 30],
-  }[type] ?? [200, 100];
+  const intensity = clamp(options.intensity ?? 1, 0.32, 1.85);
+  const duration = preset.duration;
+  const output = audioCtx.createGain();
+  const attack = preset.attack ?? 0.006;
+  output.gain.setValueAtTime(0.0001, now);
+  output.gain.linearRampToValueAtTime(Math.max(0.0002, preset.volume * intensity), now + attack);
+  output.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  connectSoundOutput(output, soundPan(options), now);
 
-  const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * duration, audioCtx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
+  const baseLayer = {
+    type: preset.type,
+    freq: options.freq ?? preset.freq,
+    volume: 1,
+    duration,
+    detune: (Math.random() - 0.5) * (preset.randomDetune ?? 8),
+  };
+  const toneLayers = [baseLayer, ...(options.layers ?? preset.layers ?? [])];
+  for (const layer of toneLayers) startSoundTone(layer, output, now, duration);
+  startSoundNoise(preset.noise, output, now, duration, intensity);
+}
 
-  osc.frequency.setValueAtTime(freqs[0], now);
-  osc.frequency.exponentialRampToValueAtTime(freqs[1], now + duration);
-  osc.type = type === "special" || type === "vs" ? "sawtooth" : type === "victory" ? "square" : "triangle";
-  gain.gain.setValueAtTime(type === "ko" || type === "victory" || type === "vs" ? 0.18 : type === "hitHeavy" ? 0.145 : type === "hitSharp" || type === "hitLow" ? 0.12 : 0.1, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-  filter.type = "lowpass";
-  filter.frequency.setValueAtTime(type === "block" || type === "select" || type === "menu" ? 900 : type === "hitSharp" ? 720 : type === "hitHeavy" || type === "hitLow" ? 430 : type === "victory" ? 1200 : 520, now);
+function attackStartSound(type) {
+  return {
+    airPunch: "airPunch",
+    airKick: "airKick",
+    sweep: "sweep",
+    grab: "grab",
+    kick: "kick",
+  }[type] ?? "punch";
+}
 
-  noise.buffer = buffer;
-  noise.connect(filter);
-  filter.connect(gain);
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  osc.start(now);
-  noise.start(now);
-  osc.stop(now + duration);
-  noise.stop(now + duration);
+function musicTensionLevel() {
+  if (!fighters.length) return 0;
+  const minHealth = Math.min(...fighters.map((f) => f.health));
+  const maxEnergy = Math.max(...fighters.map((f) => f.energy));
+  const distance = Math.abs((fighters[0]?.x ?? FIGHTER_START_LEFT_X) - (fighters[1]?.x ?? FIGHTER_START_RIGHT_X));
+  const lowHealth = clamp((42 - minHealth) / 42, 0, 1);
+  const specialReady = maxEnergy >= 85 ? 1 : maxEnergy >= 45 ? 0.42 : 0;
+  const closeFight = clamp(1 - distance / 320, 0, 1);
+  const roundLift = clamp((roundNumber - 1) * 0.08, 0, 0.16);
+  return clamp(lowHealth * 0.58 + specialReady * 0.18 + closeFight * 0.16 + roundLift, 0, 1.18);
 }
 
 function playMusicTick() {
-  if (!audioCtx || !soundEnabled || !running || paused || winner || roundFrame % 34 !== 0) return;
+  if (!audioCtx || !soundEnabled || !running || paused || winner || countdownFrames > 0 || roundFrame % 24 !== 0) return;
 
-  const notes = [196, 247, 294, 247, 220, 262, 330, 262];
-  const note = notes[musicClock % notes.length];
+  const step = musicClock % 16;
+  const bar = Math.floor(musicClock / 16);
+  const tension = musicTensionLevel();
+  const rootCycle = [73.42, 65.41, 82.41, 73.42];
+  const roots = rootCycle[bar % rootCycle.length];
+  const scale = [1, 1.2, 1.333, 1.5, 1.8, 2];
+  const melodyPattern = [2, 0, 3, 1, 4, 2, 5, 3, 2, 1, 3, 0, 4, 2, 1, 0];
+  const note = roots * scale[melodyPattern[(step + bar * 3) % melodyPattern.length]];
+  const pan = Math.sin((musicClock + bar) * 0.55) * 0.14;
+
+  if (step === 0 || step === 8 || (tension > 0.42 && (step === 6 || step === 14))) {
+    playSound("musicTaiko", { intensity: step === 0 ? 0.92 + tension * 0.18 : 0.62 + tension * 0.18, pan: 0, key: "taiko" });
+  }
+  if (step === 0 || step === 8) {
+    playSound("musicDrone", {
+      freq: [roots, roots * (1 + tension * 0.006)],
+      layers: [{ type: "triangle", freq: [roots * 2, roots * 2.01], volume: 0.1 + tension * 0.03, duration: 0.74 }],
+      intensity: 0.62 + tension * 0.18,
+      pan: -0.04,
+      key: "drone",
+    });
+  }
+  if (step === 2 || step === 7 || step === 11 || step === 15) {
+    playSound("musicBell", {
+      freq: [note, note * 0.996],
+      layers: [{ type: "triangle", freq: [note * 2.01, note * 1.998], volume: 0.12 + tension * 0.03, duration: 0.42 }],
+      intensity: 0.54 + tension * 0.28,
+      pan,
+      key: "bell",
+    });
+  }
+  if (tension > 0.2 && (step === 3 || step === 5 || step === 10 || step === 13)) {
+    const pluck = roots * scale[melodyPattern[(step + 5 + bar) % melodyPattern.length]] * 1.5;
+    playSound("musicPluck", {
+      freq: [pluck, pluck * 0.74],
+      layers: [{ type: "sine", freq: [pluck * 2, pluck * 1.52], volume: 0.08 + tension * 0.04, duration: 0.18 }],
+      intensity: 0.42 + tension * 0.34,
+      pan: -pan,
+      key: "pluck",
+    });
+  }
+  if (tension > 0.55 && step % 2 === 1) {
+    playSound("musicHat", { intensity: 0.32 + tension * 0.2, pan: Math.sin(step) * 0.1, key: "hat" });
+  }
   musicClock += 1;
-  const now = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(note, now);
-  gain.gain.setValueAtTime(0.018, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start(now);
-  osc.stop(now + 0.24);
 }
 
 function resetGame() {
@@ -1158,6 +1598,7 @@ function resetGame() {
 
 function resetRound() {
   clearRoundTimers();
+  musicClock = 0;
   Object.assign(fighters[0], {
     x: FIGHTER_START_LEFT_X,
     y: FLOOR,
@@ -1535,6 +1976,7 @@ function advanceTournament() {
 }
 
 function showPauseOverlay() {
+  playSound("pause");
   overlayMode = "pause";
   overlay.dataset.screen = "pause";
   overlay.querySelector("h1").textContent = "Pausa";
@@ -1548,6 +1990,7 @@ function showPauseOverlay() {
 }
 
 function resumeGame() {
+  playSound("resume");
   paused = false;
   overlay.classList.add("hidden");
   syncShellState();
@@ -1750,7 +2193,7 @@ function startAttack(f, type) {
     f.walkPushPulse = Math.max(f.walkPushPulse ?? 0, heavy ? 9 : 7);
   }
   f.cooldown = timing.cooldown;
-  playSound(heavy || sweep ? "kick" : "punch");
+  playSound(attackStartSound(type), { x: f.x, intensity: flowReady ? 1.1 : air ? 0.92 : heavy || sweep ? 1.08 : 1, key: f.id });
 }
 
 function startSpecial(f) {
@@ -1788,7 +2231,7 @@ function startSpecial(f) {
   }
   specialChargeFX(f);
   triggerCinematicHit(f.dir, f.specialStyle?.rim ?? "#fff1bd", 0.62, 10);
-  playSound("special");
+  playSound("special", { x: f.x, intensity: f.profileId === "p1" ? 1.12 : 1, key: f.id });
 }
 
 function throwSpecial(f) {
@@ -1810,6 +2253,7 @@ function throwSpecial(f) {
   burst(f.x + f.dir * fighterScale(40), f.y - fighterScale(116), style.rim, 12);
   impactGlints(f.x + f.dir * fighterScale(44), f.y - fighterScale(118), style.core, false, true);
   specialReleaseFX(f);
+  playSound("specialRelease", { x: f.x, intensity: 1.08, key: f.id });
 }
 
 function fighterSignatureStyle(f) {
@@ -2173,7 +2617,7 @@ function updateFighter(f, opponent) {
     f.walkAnchorPulse = Math.max(f.walkAnchorPulse ?? 0, 8);
     f.walkPushPulse = Math.max(f.walkPushPulse ?? 0, 7);
     movementDust(f.x - f.dir * fighterScale(8), FLOOR + 4, -f.dir, 0.9, 5);
-    playSound("jump");
+    playSound("jump", { x: f.x, intensity: f.jumpStrength, key: f.id });
   }
 
   maybeStartOnlineRemoteAction(f, input);
@@ -2216,6 +2660,7 @@ function updateFighter(f, opponent) {
         f.walkStopSpeed = Math.max(f.walkStopSpeed ?? 0, clamp(Math.abs(f.vx) / 3.35, 0, 1.15) * landingStrength);
       }
       movementDust(f.x, FLOOR + 5, f.vx >= 0 ? -1 : 1, clamp(landingSpeed / 8, 0.65, 1.45), landingSpeed > 7 ? 10 : 7);
+      playSound(fromAirKick || landingStrength > 1 ? "landHeavy" : "land", { x: f.x, intensity: landingStrength, key: f.id });
     }
     f.grounded = true;
   } else {
@@ -2248,6 +2693,7 @@ function updateFighter(f, opponent) {
       f.walkAnchorPulse = Math.round(11 + (style.walkWeight ?? 1) * 3);
       f.walkPushPulse = Math.round(8 + (style.walkPush ?? 1) * 2);
       f.stepPulse = Math.max(f.stepPulse ?? 0, 7);
+      if (walkSpeed > 0.48) playSound("step", { x: f.x, intensity: clamp(walkSpeed * (style.walkWeight ?? 1), 0.45, 1.28), key: f.id });
     }
   } else {
     f.walkWeight = (f.walkWeight ?? 0) * 0.86;
@@ -2264,6 +2710,7 @@ function updateFighter(f, opponent) {
       f.stepCooldown = cadence;
       f.stepPulse = 7;
       movementDust(f.x - Math.sign(f.vx) * fighterScale(22), FLOOR + 4, -Math.sign(f.vx), clamp(Math.abs(f.vx) / 3.5, 0.5, 1), 3);
+      playSound("step", { x: f.x, intensity: clamp(Math.abs(f.vx) / 3.35, 0.45, 1.25), key: f.id });
     }
   }
   if (f.cooldown > 0) f.cooldown -= 1;
@@ -2688,6 +3135,7 @@ function registerComboHit(attacker, target, damage, { blocked, projectile, heavy
       color,
     );
     if (attacker.comboCount === 3 || attacker.comboCount === 5 || attacker.comboCount === 7) {
+      playSound("combo", { x: target.x, intensity: clamp(0.85 + attacker.comboCount * 0.08, 0.9, 1.55), key: attacker.id });
       triggerCinematicHit(attacker.dir || 1, color, 0.42 + Math.min(attacker.comboCount, 8) * 0.045, 7, {
         zoom: 0.01 + Math.min(attacker.comboCount, 8) * 0.0015,
         pan: 3.4 + Math.min(attacker.comboCount, 8) * 0.25,
@@ -2701,7 +3149,10 @@ function registerComboHit(attacker, target, damage, { blocked, projectile, heavy
 
 function impactSoundType({ blocked, heavyImpact, projectile, counter, finishingHit, hitZone }) {
   if (blocked) return "block";
-  if (finishingHit || counter || projectile || heavyImpact) return "hitHeavy";
+  if (finishingHit) return "finishHit";
+  if (counter) return "counter";
+  if (projectile) return "projectileHit";
+  if (heavyImpact) return "hitHeavy";
   if (hitZone === "head") return "hitSharp";
   if (hitZone === "legs") return "hitLow";
   return "hit";
@@ -2818,7 +3269,11 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   flash = Math.max(flash, cinematic.flash);
   shake = Math.max(shake, cinematic.shake);
   hitStopFrames = Math.max(hitStopFrames, cinematic.hitStop);
-  playSound(impactSoundType({ blocked, heavyImpact, projectile, counter, finishingHit, hitZone }));
+  playSound(impactSoundType({ blocked, heavyImpact, projectile, counter, finishingHit, hitZone }), {
+    x: target.x,
+    intensity: impactStrength,
+    key: `${target.id}:${hitZone}`,
+  });
   registerComboHit(attacker, target, finalDamage, { blocked, projectile, heavyImpact, counter, hitZone });
   addText(
     target.x,
