@@ -2089,6 +2089,41 @@ canvas {
   text-shadow: 0 1px 0 rgba(0,0,0,0.78);
 }
 
+.versus-card-signature {
+  display: grid;
+  gap: 4px;
+  width: min(320px, 100%);
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--fighter-trim) 46%, transparent);
+  border-radius: 7px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--fighter-trim) 16%, transparent), rgba(0,0,0,0.24)),
+    rgba(0,0,0,0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 0 18px color-mix(in srgb, var(--fighter-trim) 14%, transparent);
+}
+
+.versus-card-signature b {
+  color: var(--fighter-trim);
+  font: 900 12px/1 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.78);
+}
+
+.versus-card-signature span {
+  min-width: 0;
+  color: rgba(255, 247, 214, 0.78);
+  font: 850 10px/1.22 system-ui, sans-serif;
+  text-transform: uppercase;
+}
+
+.versus-card[data-side="right"] .versus-card-signature {
+  margin-left: auto;
+  text-align: right;
+}
+
 .versus-card .fighter-dossier {
   margin-top: 12px;
 }
@@ -2174,6 +2209,36 @@ canvas {
   font-style: normal;
   text-transform: uppercase;
   text-shadow: 0 2px 0 rgba(0,0,0,0.8);
+}
+
+.versus-matchup {
+  display: grid;
+  gap: 6px;
+  width: 138px;
+  padding: 9px 8px;
+  border: 1px solid rgba(255, 228, 131, 0.26);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 241, 189, 0.08), rgba(0,0,0,0.34)),
+    rgba(0,0,0,0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 12px 24px rgba(0,0,0,0.28);
+}
+
+.versus-matchup span,
+.versus-matchup b {
+  display: block;
+  overflow-wrap: anywhere;
+  color: rgba(255, 247, 214, 0.78);
+  font: 900 9px/1.15 system-ui, sans-serif;
+  text-transform: uppercase;
+}
+
+.versus-matchup b {
+  color: #ffd44d;
+  font-size: 10px;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.78);
 }
 
 .overlay[data-screen="winner"] {
@@ -3318,6 +3383,10 @@ canvas {
     font-size: 8px;
   }
 
+  .overlay[data-screen="versus"] .versus-card-signature {
+    display: none;
+  }
+
   .overlay[data-screen="versus"] .versus-card .fighter-showcase-stats {
     display: none;
   }
@@ -3340,6 +3409,22 @@ canvas {
 
   .overlay[data-screen="versus"] .versus-panel-center em {
     display: none;
+  }
+
+  .overlay[data-screen="versus"] .versus-matchup {
+    width: 52px;
+    gap: 2px;
+    padding: 5px 3px;
+    border-radius: 6px;
+  }
+
+  .overlay[data-screen="versus"] .versus-matchup span {
+    display: none;
+  }
+
+  .overlay[data-screen="versus"] .versus-matchup b {
+    font-size: 7px;
+    line-height: 1;
   }
 
   .overlay[data-screen="versus"] #start {

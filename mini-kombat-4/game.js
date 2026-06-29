@@ -16119,6 +16119,8 @@ function renderVersusPanel(roundLabel) {
   fighterSelect.classList.add("versus-panel");
   const leftRole = tournamentActive ? "Rival" : cpuEnabled ? "CPU" : "Jugador 1";
   const rightRole = tournamentActive ? "Jugador" : "Jugador 2";
+  const leftPresentation = fighterPresentation(fighters[0]);
+  const rightPresentation = fighterPresentation(fighters[1]);
   fighterSelect.append(makeVersusCard(fighters[0], leftRole, "left"));
 
   const center = document.createElement("div");
@@ -16132,6 +16134,18 @@ function renderVersusPanel(roundLabel) {
   const caption = document.createElement("em");
   caption.textContent = tournamentActive ? "TORNEO" : cpuEnabled ? "CPU" : "2P";
   center.append(caption);
+
+  const matchup = document.createElement("div");
+  matchup.className = "versus-matchup";
+  const leftRead = document.createElement("span");
+  leftRead.textContent = leftPresentation.discipline;
+  const clash = document.createElement("b");
+  clash.textContent = "CHOQUE";
+  const rightRead = document.createElement("span");
+  rightRead.textContent = rightPresentation.discipline;
+  matchup.append(leftRead, clash, rightRead);
+  center.append(matchup);
+
   fighterSelect.append(center);
 
   fighterSelect.append(makeVersusCard(fighters[1], rightRole, "right"));
@@ -16246,6 +16260,7 @@ function makeVersusCard(fighter, role, side) {
   card.dataset.side = side;
   card.style.setProperty("--fighter-color", fighter.color);
   card.style.setProperty("--fighter-trim", fighter.trim);
+  const presentation = fighterPresentation(fighter);
 
   const roleTag = document.createElement("span");
   roleTag.className = "versus-card-role";
@@ -16269,6 +16284,16 @@ function makeVersusCard(fighter, role, side) {
   const trait = document.createElement("em");
   trait.textContent = fighterTrait(fighter);
   info.append(trait);
+
+  const signature = document.createElement("div");
+  signature.className = "versus-card-signature";
+  const signatureLabel = document.createElement("b");
+  signatureLabel.textContent = presentation.signature;
+  const signaturePlan = document.createElement("span");
+  signaturePlan.textContent = presentation.callout;
+  signature.append(signatureLabel, signaturePlan);
+  info.append(signature);
+
   info.append(makeFighterDossier(fighter, true));
   info.append(makeMenuStats(fighter));
   card.append(info);
