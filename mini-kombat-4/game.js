@@ -6597,11 +6597,7 @@ function drawStage() {
   if (!stageCacheReady || stageCacheMode !== mode) buildStageCache(premiumReady);
   ctx.drawImage(stageCache, 0, 0);
 
-  if (premiumReady) {
-    drawDynamicStageOverlays();
-  } else {
-    drawFloorContactLight();
-  }
+  drawDynamicStageOverlays(premiumReady);
 }
 
 function buildStageCache(premiumReady) {
@@ -6658,9 +6654,10 @@ function drawCoverImage(image, x, y, width, height) {
   ctx.drawImage(image, sourceX, sourceY, sourceW, sourceH, x, y, width, height);
 }
 
-function drawDynamicStageOverlays() {
+function drawDynamicStageOverlays(premiumReady = true) {
   drawAmbientLight();
   drawCinematicLightBeams();
+  drawReactiveDojoFocus(premiumReady);
   drawFloorReflections();
   drawFloorContactLight();
   drawStageAtmosphere();
@@ -6719,6 +6716,105 @@ function drawCinematicLightBeams() {
     ctx.closePath();
     ctx.fill();
   }
+  ctx.restore();
+}
+
+function stageReactiveRead() {
+  const impact = clamp(Math.max(cameraImpactPulse / Math.max(1, cameraImpactMax), cinematicHitPulse / Math.max(1, cinematicHitMax), screenTearPulse / Math.max(1, screenTearMax)), 0, 1);
+  const criticalFighter = fighters.find((fighter) => fighter.health > 0 && fighter.health <= 24);
+  const specialLeader = fighters.reduce((best, fighter) => ((fighter.energy ?? 0) > (best?.energy ?? -1) ? fighter : best), null);
+  const momentum = momentumReadState();
+  const bothLoaded = fighters.length >= 2 && fighters.every((fighter) => (fighter.energy ?? 0) >= 45);
+  const winnerFighter = winner ? fighters.find((fighter) => fighter.id === roundWinnerId) ?? fighters.find((fighter) => fighter.name === winner) : null;
+  const color =
+    winnerFighter?.trim ||
+    criticalFighter?.trim ||
+    momentum.leader?.trim ||
+    (bothLoaded ? "#75f0cb" : specialLeader?.energy >= 45 ? specialLeader.trim : "#fff1bd");
+  const focusX = winnerFighter?.x ?? criticalFighter?.x ?? momentum.leader?.x ?? specialLeader?.x ?? W / 2;
+  const critical = criticalFighter ? clamp((28 - criticalFighter.health) / 28, 0.18, 1) : 0;
+  const special = specialLeader ? clamp(((specialLeader.energy ?? 0) - 45) / 55, 0, 1) : 0;
+  const result = winner ? clamp(resultFrame / 70, 0, 1) : 0;
+  const intensity = clamp(impact * 0.58 + critical * 0.34 + special * 0.18 + (bothLoaded ? 0.16 : 0) + result * 0.42 + (momentum.amount ?? 0) * 0.08, 0, 1.35);
+  return { color, focusX, intensity, impact, critical, special, bothLoaded, result, momentum };
+}
+
+function drawReactiveDojoFocus(premiumReady = true) {
+  if (!running && !isAttractModeActive()) return;
+  const read = stageReactiveRead();
+  if (read.intensity <= 0.025) return;
+
+  const mobile = isMobileFightView();
+  const pulse = 0.5 + Math.sin(roundFrame * 0.13) * 0.5;
+  const alpha = read.intensity * (mobile ? 0.72 : 1);
+  const signY = premiumReady ? 234 : 224;
+  const signW = premiumReady ? 306 : 274;
+  const signH = premiumReady ? 74 : 62;
+  const signX = W / 2 - signW / 2;
+  const focus = clamp((read.focusX - W / 2) / (W / 2), -1, 1);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+
+  const centerGlow = ctx.createRadialGradient(W / 2 + focus * 52, signY + 20, 8, W / 2 + focus * 42, signY + 24, 260 + alpha * 110);
+  centerGlow.addColorStop(0, colorWithAlpha(read.color, 0.12 * alpha));
+  centerGlow.addColorStop(0.38, colorWithAlpha("#fff1bd", 0.045 * alpha));
+  centerGlow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = centerGlow;
+  ctx.fillRect(0, 118, W, 256);
+
+  ctx.strokeStyle = colorWithAlpha(read.color, 0.14 + alpha * 0.18 + read.impact * 0.14);
+  ctx.lineWidth = 2 + read.impact * 3.5;
+  ctx.beginPath();
+  ctx.roundRect(signX - 8 - read.impact * 8, signY - 8 - read.impact * 4, signW + 16 + read.impact * 16, signH + 16 + read.impact * 8, 8);
+  ctx.stroke();
+
+  const scanX = signX + ((roundFrame * (read.result > 0 ? 3.1 : 1.25)) % (signW + 48)) - 24;
+  ctx.strokeStyle = colorWithAlpha("#fff8d8", (0.055 + pulse * 0.035 + read.impact * 0.09) * alpha);
+  ctx.lineWidth = 3 + read.impact * 2;
+  ctx.beginPath();
+  ctx.moveTo(scanX, signY - 3);
+  ctx.lineTo(scanX + 38 + read.impact * 22, signY + signH + 3);
+  ctx.stroke();
+
+  for (let i = 0; i < (mobile ? 3 : 5); i += 1) {
+    const lane = i / Math.max(1, (mobile ? 2 : 4));
+    const y = 96 + lane * 230 + Math.sin(roundFrame * 0.035 + i) * 7;
+    const dir = i % 2 ? -1 : 1;
+    const beam = ctx.createLinearGradient(0, y, W, y + dir * 22);
+    beam.addColorStop(0, "rgba(255,255,255,0)");
+    beam.addColorStop(0.34, colorWithAlpha(read.color, 0.028 * alpha));
+    beam.addColorStop(0.5, `rgba(255, 241, 189, ${0.026 * alpha})`);
+    beam.addColorStop(0.66, colorWithAlpha(read.color, 0.024 * alpha));
+    beam.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(-40, y);
+    ctx.lineTo(W + 40, y + dir * (10 + read.impact * 10));
+    ctx.lineTo(W + 40, y + 8 + dir * (14 + read.impact * 10));
+    ctx.lineTo(-40, y + 8);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  if (read.critical > 0.03 || read.result > 0.03) {
+    ctx.strokeStyle = colorWithAlpha(read.color, 0.12 * alpha + read.critical * 0.08 + read.result * 0.1);
+    ctx.lineWidth = 2.4 + read.result * 2.2;
+    ctx.setLineDash([18, 14]);
+    ctx.lineDashOffset = -roundFrame * 1.6;
+    ctx.beginPath();
+    ctx.roundRect(78, 64, W - 156, FLOOR - 72, 10);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.globalCompositeOperation = "multiply";
+  const pressure = ctx.createLinearGradient(0, 92, 0, FLOOR + 12);
+  pressure.addColorStop(0, "rgba(0,0,0,0)");
+  pressure.addColorStop(0.42, `rgba(34, 10, 8, ${0.025 * alpha + read.critical * 0.035})`);
+  pressure.addColorStop(1, `rgba(0,0,0, ${0.035 * alpha + read.result * 0.045})`);
+  ctx.fillStyle = pressure;
+  ctx.fillRect(0, 72, W, FLOOR - 48);
   ctx.restore();
 }
 
