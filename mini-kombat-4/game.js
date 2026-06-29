@@ -1633,6 +1633,24 @@ const SOUND_PRESETS = {
     layers: [{ type: "triangle", freq: [219, 220], volume: 0.08, duration: 0.82 }],
     cooldown: 0.5,
   },
+  stageBreath: {
+    duration: 1.4,
+    volume: 0.018,
+    type: "sine",
+    freq: [92, 94],
+    noise: { volume: 0.022, type: "bandpass", frequency: 360, q: 0.42, duration: 1.1 },
+    layers: [{ type: "triangle", freq: [184, 186], volume: 0.08, duration: 1.12 }],
+    cooldown: 1.1,
+  },
+  stageChime: {
+    duration: 0.82,
+    volume: 0.034,
+    type: "triangle",
+    freq: [660, 990, 742],
+    noise: { volume: 0.006, type: "highpass", frequency: 2400, duration: 0.08 },
+    layers: [{ type: "sine", freq: [330, 495], volume: 0.12, duration: 0.48 }],
+    cooldown: 1.3,
+  },
   lose: {
     duration: 0.58,
     volume: 0.132,
@@ -2032,6 +2050,25 @@ function playMusicDirectorTick() {
       x: comboLeader.x,
       intensity: clamp(0.7 + comboCount * 0.07, 0.9, 1.45),
       key: `combo:${roundNumber}:${comboCount}`,
+    });
+  }
+}
+
+function playStageAmbienceTick() {
+  if (!audioCtx || !soundEnabled || !running || paused || winner || countdownFrames > 0) return;
+  const tension = musicTensionLevel();
+  if (roundFrame % 186 === 42) {
+    playSound("stageBreath", {
+      intensity: 0.62 + tension * 0.18,
+      pan: Math.sin(roundFrame * 0.011) * 0.16,
+      key: `breath:${Math.floor(roundFrame / 186)}`,
+    });
+  }
+  if (roundFrame % 420 === 210 && tension < 0.82) {
+    playSound("stageChime", {
+      intensity: 0.54 + tension * 0.16,
+      pan: Math.sin(roundFrame * 0.017) * 0.28,
+      key: `chime:${Math.floor(roundFrame / 420)}`,
     });
   }
 }
@@ -3271,6 +3308,7 @@ function update() {
   roundFrame += 1;
   playMusicTick();
   playMusicDirectorTick();
+  playStageAmbienceTick();
   const [a, b] = fighters;
   a.dir = a.x <= b.x ? 1 : -1;
   b.dir = b.x < a.x ? 1 : -1;
@@ -6063,15 +6101,56 @@ function drawStageAtmosphere() {
   const t = roundFrame * 0.012;
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  for (let i = 0; i < 10; i += 1) {
-    const x = (i * 103 + (roundFrame * (0.12 + (i % 3) * 0.035))) % W;
-    const y = 96 + ((i * 53 + Math.sin(t + i) * 18) % 250);
-    const alpha = 0.045 + (i % 4) * 0.01;
+
+  const tension = musicTensionLevel();
+  const airDrift = Math.sin(roundFrame * 0.006) * 18;
+  const lowHealth = fighters.some((fighter) => fighter.health > 0 && fighter.health <= 28);
+  const combatWake = clamp((Math.abs(fighters[0]?.vx ?? 0) + Math.abs(fighters[1]?.vx ?? 0)) / 13, 0, 1);
+
+  for (let i = 0; i < 18; i += 1) {
+    const speed = 0.08 + (i % 5) * 0.018 + tension * 0.025;
+    const x = (i * 73 + roundFrame * speed + airDrift * (i % 2 ? 0.32 : -0.18)) % (W + 40) - 20;
+    const y = 78 + ((i * 47 + Math.sin(t + i * 0.8) * 24) % 286);
+    const alpha = 0.028 + (i % 4) * 0.009 + tension * 0.012;
     ctx.fillStyle = `rgba(255, 235, 178, ${alpha})`;
     ctx.beginPath();
-    ctx.arc(x, y, 1.4 + (i % 3), 0, Math.PI * 2);
+    ctx.arc(x, y, 1.1 + (i % 3) * 0.72, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  for (let i = 0; i < 9; i += 1) {
+    const travel = (roundFrame * (0.34 + i * 0.025) + i * 89) % (W + 120);
+    const x = travel - 60 + Math.sin(t * 1.8 + i) * 24;
+    const y = 124 + ((i * 71 + roundFrame * (0.18 + i * 0.006)) % 270);
+    const flip = Math.sin(roundFrame * 0.038 + i * 1.7);
+    const petalAlpha = 0.08 + tension * 0.035 + (lowHealth ? 0.035 : 0);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(flip * 0.72 + i);
+    ctx.fillStyle = `rgba(255, 184, 164, ${petalAlpha})`;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 5.2 + Math.abs(flip) * 1.4, 1.7 + (i % 2) * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.globalCompositeOperation = "multiply";
+  const breath = 0.5 + Math.sin(roundFrame * 0.009) * 0.5;
+  const haze = ctx.createLinearGradient(0, 94, W, FLOOR + 8);
+  haze.addColorStop(0, `rgba(72, 40, 22, ${0.02 + breath * 0.02})`);
+  haze.addColorStop(0.5, "rgba(255,255,255,0)");
+  haze.addColorStop(1, `rgba(40, 24, 14, ${0.05 + combatWake * 0.035})`);
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, 86, W, FLOOR - 50);
+
+  ctx.globalCompositeOperation = "screen";
+  const floorWake = ctx.createRadialGradient(W / 2, FLOOR + 16, 30, W / 2, FLOOR + 18, 390);
+  floorWake.addColorStop(0, `rgba(255, 241, 189, ${0.035 + combatWake * 0.055})`);
+  floorWake.addColorStop(0.54, `rgba(255, 195, 105, ${0.018 + tension * 0.024})`);
+  floorWake.addColorStop(1, "rgba(255, 195, 105, 0)");
+  ctx.fillStyle = floorWake;
+  ctx.fillRect(0, FLOOR - 35, W, H - FLOOR + 35);
+
   ctx.restore();
 }
 
