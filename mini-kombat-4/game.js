@@ -203,6 +203,7 @@ let screenTearMax = 1;
 let screenTearDir = 1;
 let screenTearColor = "#fff1bd";
 let screenTearStrength = 0;
+let finishFreezeCue = null;
 
 const SPECIAL_STYLES = {
   p1: { shape: "wave", core: "#fff1bd", rim: "#5bd7ff", trail: "#47b5ff" },
@@ -2309,6 +2310,7 @@ function resetRound() {
   screenTearDir = 1;
   screenTearColor = "#fff1bd";
   screenTearStrength = 0;
+  finishFreezeCue = null;
   koFreeze = 0;
   roundFrame = 0;
   resultFrame = 0;
@@ -3099,6 +3101,33 @@ function decisionWinnerByTimer(a, b) {
   return centerGap <= 0 ? a : b;
 }
 
+function finishTechniqueLabel(fighter, timeOver) {
+  if (timeOver) return "DECISION";
+  const last = fighter?.lastAttackType ?? "";
+  if (last === "special") return "TECNICA FINAL";
+  if (last === "kick" || last === "airKick" || last === "sweep") return "REMATE DE PIERNA";
+  if (last === "grab") return "DERRIBO FINAL";
+  if (last === "punch" || last === "airPunch") return "GOLPE FINAL";
+  return "REMATE FINAL";
+}
+
+function triggerFinishFreezeCue(winnerFighter, loserFighter, timeOver, impactDir) {
+  if (!winnerFighter || !loserFighter) return;
+  const presentation = fighterPresentation(winnerFighter);
+  finishFreezeCue = {
+    winnerId: winnerFighter.id,
+    loserId: loserFighter.id,
+    title: timeOver ? "TIME OVER" : matchOver ? "MATCH CERRADO" : "ROUND CERRADO",
+    label: finishTechniqueLabel(winnerFighter, timeOver),
+    detail: timeOver ? "Control del tatami" : presentation.signature,
+    color: winnerFighter.trim || "#fff1bd",
+    loserColor: loserFighter.trim || "#75f0cb",
+    dir: impactDir || winnerFighter.dir || 1,
+    startFrame: resultFrame,
+    maxLife: timeOver ? 76 : matchOver ? 96 : 84,
+  };
+}
+
 function finishRound(winnerFighter, loserFighter, options = {}) {
   if (!winnerFighter || !loserFighter || winner) return;
   const timeOver = Boolean(options.timeOver);
@@ -3179,6 +3208,7 @@ function finishRound(winnerFighter, loserFighter, options = {}) {
     playSound(matchOver ? tournamentActive && winnerFighter.id !== "right" ? "lose" : "victory" : "ko");
   }
 
+  triggerFinishFreezeCue(winnerFighter, loserFighter, timeOver, impactDir);
   if (finalRound) roundTimerFrames = 0;
   if (matchOver) scheduleWinnerOverlay();
   else scheduleNextRound();
@@ -5340,6 +5370,7 @@ function draw() {
     drawRoundIntroCards();
     drawCountdown();
     drawKOBanner();
+    drawFinishFreezeFrame();
     drawAnnouncerCue();
     drawCinematicHitOverlay();
     drawScreenTearOverlay();
@@ -16158,6 +16189,178 @@ function drawKOBanner() {
   ctx.restore();
 }
 
+function drawFinishFreezeFrame() {
+  if (!finishFreezeCue || !winner) return;
+  if (overlay.dataset.screen === "winner" && !overlay.classList.contains("hidden")) return;
+
+  const age = Math.max(0, resultFrame - (finishFreezeCue.startFrame ?? 0));
+  const maxLife = finishFreezeCue.maxLife ?? 84;
+  if (age > maxLife) return;
+
+  const intro = smoothStep01(clamp(age / 14, 0, 1));
+  const outro = smoothStep01(clamp((maxLife - age) / 22, 0, 1));
+  const alpha = intro * outro;
+  if (alpha <= 0.01) return;
+
+  const winnerFighter = fighters.find((fighter) => fighter.id === finishFreezeCue.winnerId) ?? fighters.find((fighter) => fighter.name === winner) ?? fighters[0];
+  const loserFighter = fighters.find((fighter) => fighter.id === finishFreezeCue.loserId) ?? fighters.find((fighter) => fighter !== winnerFighter) ?? fighters[1];
+  const color = finishFreezeCue.color || winnerFighter?.trim || "#fff1bd";
+  const loserColor = finishFreezeCue.loserColor || loserFighter?.trim || "#75f0cb";
+  const dir = finishFreezeCue.dir || winnerFighter?.dir || 1;
+  const snap = Math.max(0, 1 - age / 18);
+  const pulse = 0.5 + Math.sin((resultFrame + age) * 0.22) * 0.5;
+  const panelW = 246 + snap * 18;
+  const panelH = 120;
+  const leftX = 26 - snap * 18;
+  const rightX = W - panelW - 26 + snap * 18;
+  const y = H - 164;
+  const winnerLeft = winnerFighter === fighters[0];
+  const winX = winnerLeft ? leftX : rightX;
+  const loseX = winnerLeft ? rightX : leftX;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = "multiply";
+  const shade = ctx.createLinearGradient(0, H * 0.18, 0, H);
+  shade.addColorStop(0, "rgba(0,0,0,0)");
+  shade.addColorStop(0.42, "rgba(34, 10, 8, 0.18)");
+  shade.addColorStop(1, "rgba(0,0,0,0.56)");
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(color, 0.2 + pulse * 0.18);
+  ctx.lineWidth = 8 + snap * 5;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 4; i += 1) {
+    const offset = (i - 1.5) * 38;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - dir * (210 + offset), 88 + i * 9);
+    ctx.lineTo(W / 2 + dir * (215 - offset), H - 72 - i * 16);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = colorWithAlpha(color, 0.08 + snap * 0.04);
+  ctx.beginPath();
+  ctx.moveTo(-40, H * 0.62);
+  ctx.lineTo(W + 40, H * 0.48 + dir * 16);
+  ctx.lineTo(W + 40, H);
+  ctx.lineTo(-40, H);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+
+  drawFinishNameplate(winX, y, panelW, panelH, winnerFighter, color, true, winnerLeft, finishFreezeCue);
+  drawFinishNameplate(loseX, y + 10, panelW, panelH - 18, loserFighter, loserColor, false, !winnerLeft, finishFreezeCue);
+
+  const centerY = y + 50 - snap * 6;
+  ctx.save();
+  ctx.translate(W / 2, centerY);
+  ctx.scale(1 + snap * 0.08, 1 + snap * 0.08);
+  ctx.shadowColor = colorWithAlpha(color, 0.66);
+  ctx.shadowBlur = 18 + snap * 18;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = "rgba(24, 8, 6, 0.86)";
+  ctx.fillStyle = "#fff1bd";
+  ctx.font = `${matchOver ? 42 : 36}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
+  ctx.strokeText(finishFreezeCue.label || "REMATE FINAL", 0, 0);
+  ctx.fillText(finishFreezeCue.label || "REMATE FINAL", 0, 0);
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = colorWithAlpha(color, 0.92);
+  ctx.font = "900 12px system-ui, sans-serif";
+  ctx.fillText((finishFreezeCue.title || "ROUND CERRADO").toUpperCase(), 0, -35);
+  ctx.fillStyle = "rgba(255, 247, 214, 0.82)";
+  ctx.font = "850 11px system-ui, sans-serif";
+  ctx.fillText((finishFreezeCue.detail || fighterPresentation(winnerFighter).signature).toUpperCase(), 0, 32);
+  ctx.restore();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = colorWithAlpha(color, 0.12 + snap * 0.08);
+  ctx.beginPath();
+  ctx.ellipse(W / 2, y + 58, 172 + snap * 24, 38 + snap * 10, -dir * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawFinishNameplate(x, y, width, height, fighter, color, winnerPlate, faceLeft, cue) {
+  if (!fighter) return;
+  const trim = color || fighter.trim || "#fff1bd";
+  const portraitSize = winnerPlate ? 78 : 62;
+  const portraitX = faceLeft ? x + 12 : x + width - portraitSize - 12;
+  const infoX = faceLeft ? x + portraitSize + 24 : x + width - portraitSize - 24;
+  const align = faceLeft ? "left" : "right";
+  const grad = ctx.createLinearGradient(x, y, x + width, y + height);
+  grad.addColorStop(0, colorWithAlpha(faceLeft ? trim : "#08090c", winnerPlate ? 0.38 : 0.22));
+  grad.addColorStop(0.46, "rgba(12, 10, 10, 0.64)");
+  grad.addColorStop(1, colorWithAlpha(faceLeft ? "#08090c" : trim, winnerPlate ? 0.38 : 0.22));
+
+  ctx.save();
+  ctx.globalAlpha *= winnerPlate ? 1 : 0.72;
+  ctx.shadowColor = winnerPlate ? colorWithAlpha(trim, 0.36) : "rgba(0,0,0,0.32)";
+  ctx.shadowBlur = winnerPlate ? 18 : 8;
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 8);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = colorWithAlpha(trim, winnerPlate ? 0.78 : 0.34);
+  ctx.lineWidth = winnerPlate ? 2 : 1.2;
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = colorWithAlpha(trim, winnerPlate ? 0.14 : 0.06);
+  ctx.beginPath();
+  if (faceLeft) {
+    ctx.moveTo(x + 18, y + 4);
+    ctx.lineTo(x + width * 0.52, y + 4);
+    ctx.lineTo(x + width * 0.35, y + height - 4);
+    ctx.lineTo(x + 8, y + height - 4);
+  } else {
+    ctx.moveTo(x + width - 18, y + 4);
+    ctx.lineTo(x + width * 0.48, y + 4);
+    ctx.lineTo(x + width * 0.65, y + height - 4);
+    ctx.lineTo(x + width - 8, y + height - 4);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+
+  ctx.fillStyle = "rgba(0,0,0,0.52)";
+  ctx.beginPath();
+  ctx.roundRect(portraitX, y + 12, portraitSize, portraitSize, 8);
+  ctx.fill();
+  ctx.strokeStyle = colorWithAlpha(trim, winnerPlate ? 0.82 : 0.42);
+  ctx.lineWidth = winnerPlate ? 2 : 1.2;
+  ctx.stroke();
+  if (fighter.face?.complete) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(portraitX + 4, y + 16, portraitSize - 8, portraitSize - 8, 6);
+    ctx.clip();
+    ctx.drawImage(fighter.face, portraitX - portraitSize * 0.06, y + 10, portraitSize * 1.12, portraitSize * 1.12);
+    ctx.restore();
+  }
+
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+  ctx.shadowColor = "rgba(0,0,0,0.78)";
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = winnerPlate ? "#fff1bd" : "rgba(255, 247, 214, 0.62)";
+  ctx.font = `900 ${winnerPlate ? 23 : 17}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
+  ctx.fillText(fighter.name.toUpperCase(), infoX, y + (winnerPlate ? 37 : 32));
+  ctx.fillStyle = colorWithAlpha(trim, winnerPlate ? 0.92 : 0.54);
+  ctx.font = `900 ${winnerPlate ? 10 : 8}px system-ui, sans-serif`;
+  ctx.fillText((winnerPlate ? cue.detail : fighterPresentation(fighter).discipline).toUpperCase(), infoX, y + (winnerPlate ? 58 : 50));
+  if (winnerPlate) {
+    ctx.fillStyle = "rgba(255, 247, 214, 0.74)";
+    ctx.font = "850 9px system-ui, sans-serif";
+    ctx.fillText(`${Math.round(fighter.roundDamage ?? 0)} DANO / ${fighter.roundMaxCombo || 0} HIT MAX`, infoX, y + 78);
+  }
+  ctx.restore();
+}
+
 function showWinner() {
   flash = 0;
   shake = 0;
@@ -17525,6 +17728,7 @@ function sendOnlineSnapshot(force = false) {
     screenTearDir,
     screenTearColor,
     screenTearStrength,
+    finishFreezeCue,
     fighters: fighters.map(serializeFighter),
     projectiles: serializeProjectiles(),
   });
@@ -17576,6 +17780,7 @@ function applyOnlineSnapshot(snapshot) {
   screenTearDir = snapshot.screenTearDir || 1;
   screenTearColor = snapshot.screenTearColor || "#fff1bd";
   screenTearStrength = snapshot.screenTearStrength || 0;
+  finishFreezeCue = snapshot.finishFreezeCue || null;
 
   if (Array.isArray(snapshot.fighters)) {
     for (const fighterData of snapshot.fighters) {
@@ -17667,6 +17872,7 @@ function prepareOnlineRematchLobby() {
   resultFrame = 0;
   roundFrame = 0;
   countdownFrames = 0;
+  finishFreezeCue = null;
   fighters = buildFighters();
   fighters[0].wins = 0;
   fighters[1].wins = 0;
