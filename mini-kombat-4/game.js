@@ -2453,24 +2453,44 @@ function startSpecial(f) {
 
 function throwSpecial(f) {
   const style = f.specialStyle ?? SPECIAL_STYLES.p1;
+  const projectile = specialProjectileProfile(f.profileId);
   projectiles.push({
     owner: f.id,
     style,
     x: f.x + f.dir * fighterScale(48),
     y: f.y - fighterScale(116),
-    vx: f.dir * 7.4,
-    life: 92,
-    r: fighterScale(16),
-    damage: 12,
+    baseY: f.y - fighterScale(116),
+    vx: f.dir * projectile.speed,
+    vy: projectile.vy,
+    life: projectile.life,
+    maxLife: projectile.life,
+    r: fighterScale(projectile.radius),
+    damage: projectile.damage,
     color: style.rim,
     profileId: f.profileId,
     dir: f.dir,
+    waveAmp: projectile.waveAmp,
+    waveRate: projectile.waveRate,
+    spinRate: projectile.spinRate,
+    pierce: projectile.pierce,
+    age: 0,
     trail: [],
   });
   burst(f.x + f.dir * fighterScale(40), f.y - fighterScale(116), style.rim, 12);
   impactGlints(f.x + f.dir * fighterScale(44), f.y - fighterScale(118), style.core, false, true);
   specialReleaseFX(f);
   playSound("specialRelease", { x: f.x, intensity: 1.08, key: f.id });
+}
+
+function specialProjectileProfile(profileId) {
+  return {
+    p1: { speed: 6.9, life: 104, radius: 18, damage: 13, vy: -0.03, waveAmp: 3.2, waveRate: 0.14, spinRate: 0.064, pierce: false },
+    p2: { speed: 8.6, life: 82, radius: 13, damage: 11, vy: 0, waveAmp: 8.4, waveRate: 0.22, spinRate: 0.14, pierce: false },
+    p3: { speed: 5.9, life: 112, radius: 21, damage: 14, vy: 0.02, waveAmp: 1.6, waveRate: 0.1, spinRate: 0.052, pierce: false },
+    p4: { speed: 9.2, life: 76, radius: 12, damage: 10, vy: -0.02, waveAmp: 10.5, waveRate: 0.28, spinRate: 0.18, pierce: false },
+    p5: { speed: 7.7, life: 98, radius: 15, damage: 12, vy: -0.08, waveAmp: 5.4, waveRate: 0.16, spinRate: 0.12, pierce: false },
+    p6: { speed: 6.4, life: 118, radius: 19, damage: 13, vy: 0.04, waveAmp: 2.2, waveRate: 0.09, spinRate: 0.04, pierce: false },
+  }[profileId] ?? { speed: 7.4, life: 92, radius: 16, damage: 12, vy: 0, waveAmp: 4, waveRate: 0.14, spinRate: 0.08, pierce: false };
 }
 
 function fighterSignatureStyle(f) {
@@ -3060,15 +3080,21 @@ function updateFighter(f, opponent) {
 function updateProjectiles() {
   for (const p of projectiles) {
     p.trail.push({ x: p.x, y: p.y });
-    if (p.trail.length > 8) p.trail.shift();
+    const trailLimit = p.profileId === "p3" || p.profileId === "p6" ? 11 : p.profileId === "p2" || p.profileId === "p4" ? 7 : 9;
+    if (p.trail.length > trailLimit) p.trail.shift();
+    p.age = (p.age ?? 0) + 1;
     p.x += p.vx;
+    p.baseY = (p.baseY ?? p.y) + (p.vy ?? 0);
+    if (p.waveAmp) p.y = p.baseY + Math.sin((p.age ?? 0) * (p.waveRate ?? 0.14)) * p.waveAmp;
+    else p.y += p.vy ?? 0;
     p.life -= 1;
 
     const target = fighters.find((f) => f.id !== p.owner);
     if (target && p.life > 0 && circleRectOverlap(p, bodyBox(target))) {
       const owner = fighters.find((f) => f.id === p.owner);
       landHit(owner, target, p.damage, true, p);
-      p.life = 0;
+      if (p.pierce) p.damage = Math.max(6, p.damage - 4);
+      else p.life = 0;
     }
   }
 
@@ -14914,33 +14940,63 @@ function drawCounterReadyFX(color, crouch, f) {
 function drawProjectiles() {
   for (const p of projectiles) {
     const style = p.style ?? SPECIAL_STYLES.p1;
+    const profile = specialProjectileProfile(p.profileId);
     for (let i = 0; i < p.trail.length; i += 1) {
       const point = p.trail[i];
       const alpha = (i + 1) / p.trail.length;
-      ctx.fillStyle = colorWithAlpha(style.trail, 0.04 + alpha * 0.16);
+      const trailAlpha = 0.035 + alpha * (p.profileId === "p3" || p.profileId === "p6" ? 0.22 : 0.16);
+      ctx.fillStyle = colorWithAlpha(style.trail, trailAlpha);
       ctx.beginPath();
-      ctx.ellipse(point.x, point.y, p.r * alpha * 1.45, p.r * alpha * 0.78, p.vx > 0 ? 0 : Math.PI, 0, Math.PI * 2);
+      ctx.ellipse(point.x, point.y, p.r * alpha * (profile.radius >= 18 ? 1.65 : 1.35), p.r * alpha * (p.profileId === "p2" || p.profileId === "p4" ? 0.52 : 0.78), p.vx > 0 ? 0 : Math.PI, 0, Math.PI * 2);
       ctx.fill();
     }
 
     const pulse = Math.sin(p.life * 0.45) * 3;
-    const glow = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, 34 + pulse);
+    const glowSize = (profile.radius >= 18 ? 38 : 31) + pulse;
+    const glow = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, glowSize);
     glow.addColorStop(0, style.core);
     glow.addColorStop(0.35, style.rim);
     glow.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 34 + pulse, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, glowSize, 0, Math.PI * 2);
     ctx.fill();
 
+    drawSpecialSatellites(p, style, pulse);
     drawSpecialCore(p, style, pulse);
   }
+}
+
+function drawSpecialSatellites(p, style, pulse) {
+  const profile = specialProjectileProfile(p.profileId);
+  const age = p.age ?? 0;
+  const dir = p.dir || (p.vx > 0 ? 1 : -1);
+  const count = p.profileId === "p2" || p.profileId === "p4" ? 3 : p.profileId === "p6" ? 5 : 4;
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  for (let i = 0; i < count; i += 1) {
+    const phase = age * (profile.spinRate || 0.08) + i * (Math.PI * 2 / count);
+    const radius = p.r * (p.profileId === "p5" ? 1.55 : p.profileId === "p3" ? 1.32 : 1.18);
+    const sx = p.x - dir * p.r * 0.22 + Math.cos(phase) * radius * 0.82;
+    const sy = p.y + Math.sin(phase) * radius * (p.profileId === "p2" || p.profileId === "p4" ? 0.42 : 0.62);
+    ctx.fillStyle = i % 2 ? colorWithAlpha(style.core, 0.68) : colorWithAlpha(style.trail, 0.58);
+    ctx.beginPath();
+    if (p.profileId === "p5") {
+      ctx.ellipse(sx, sy, 3.8 + pulse * 0.18, 8.5, phase, 0, Math.PI * 2);
+    } else if (p.profileId === "p6") {
+      ctx.roundRect(sx - 4, sy - 4, 8, 8, 2);
+    } else {
+      ctx.arc(sx, sy, 3.5 + Math.max(0, pulse) * 0.12, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawSpecialCore(p, style, pulse) {
   ctx.save();
   ctx.translate(p.x, p.y);
-  ctx.rotate(p.life * 0.08 * (p.vx > 0 ? 1 : -1));
+  ctx.rotate((p.age ?? p.life) * (p.spinRate ?? 0.08) * (p.vx > 0 ? 1 : -1));
   ctx.globalCompositeOperation = "screen";
   ctx.fillStyle = style.core;
   ctx.strokeStyle = style.rim;
@@ -16649,14 +16705,22 @@ function serializeProjectiles() {
     owner: p.owner,
     x: p.x,
     y: p.y,
+    baseY: p.baseY,
     vx: p.vx,
+    vy: p.vy,
     life: p.life,
+    maxLife: p.maxLife,
     r: p.r,
     damage: p.damage,
     color: p.color,
     profileId: p.profileId,
     dir: p.dir,
-    trail: Array.isArray(p.trail) ? p.trail.slice(-8).map((point) => ({ x: point.x, y: point.y })) : [],
+    waveAmp: p.waveAmp,
+    waveRate: p.waveRate,
+    spinRate: p.spinRate,
+    pierce: Boolean(p.pierce),
+    age: p.age ?? 0,
+    trail: Array.isArray(p.trail) ? p.trail.slice(-12).map((point) => ({ x: point.x, y: point.y })) : [],
   }));
 }
 
