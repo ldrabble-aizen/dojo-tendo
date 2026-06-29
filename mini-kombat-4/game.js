@@ -917,36 +917,54 @@ const FIGHTER_PRESENTATION = {
     signature: "Embestida del panuelito",
     temperament: "Aguanta castigo y devuelve pesado.",
     callout: "entra bajo, rompe guardia y no retrocede",
+    archetype: "Bruiser",
+    edge: "Gana si achica distancia",
+    risk: "Sufre contra velocidad",
   },
   p2: {
     discipline: "Karate rapido",
     signature: "Contra limpia",
     temperament: "Precisa, veloz y dificil de encerrar.",
     callout: "marca distancia con velocidad y castiga errores",
+    archetype: "Striker",
+    edge: "Castiga ventanas cortas",
+    risk: "No perdona trades pesados",
   },
   p3: {
     discipline: "Potencia de tribuna",
     signature: "Avalancha celeste",
     temperament: "Cuerpo grande, impacto seco y avance frontal.",
     callout: "ocupa el tatami y pega con peso de clasico",
+    archetype: "Tanque",
+    edge: "Domina choques frontales",
+    risk: "Arranque mas lento",
   },
   p4: {
     discipline: "Reflejo elastico",
     signature: "Chispa cruzada",
     temperament: "Lee huecos, entra y sale con ritmo raro.",
     callout: "flota alrededor del golpe y responde al angulo",
+    archetype: "Finta",
+    edge: "Cambia ritmo rapido",
+    risk: "Pierde si queda fijo",
   },
   p5: {
     discipline: "Alcance dominante",
     signature: "Paso largo",
     temperament: "El mas alto: controla linea y aire.",
     callout: "pelea desde lejos y convierte distancia en dano",
+    archetype: "Zoner",
+    edge: "Manda con alcance",
+    risk: "Corto rango incomodo",
   },
   p6: {
     discipline: "Defensa oscura",
     signature: "Muro negro",
     temperament: "Solida, paciente y peligrosa en respuesta.",
     callout: "cierra la puerta y espera el contragolpe",
+    archetype: "Guardia",
+    edge: "Convierte defensa en dano",
+    risk: "Necesita paciencia",
   },
 };
 
@@ -16835,7 +16853,7 @@ function renderFighterSelect() {
   mark.textContent = "VS";
   const rounds = document.createElement("em");
   rounds.textContent = "MEJOR DE III";
-  versus.append(mode, mark, rounds);
+  versus.append(mode, mark, rounds, makeFighterSelectScout(selectedLeftId, selectedRightId));
   fighterSelect.append(versus);
 
   fighterSelect.append(makeSelectColumn("right", "Derecha", selectedRightId));
@@ -17130,7 +17148,30 @@ function fighterPresentation(profile) {
     signature: "Golpe limpio",
     temperament: "Equilibrio y lectura.",
     callout: "busca el centro y responde con calma",
+    archetype: "All-rounder",
+    edge: "Se adapta al duelo",
+    risk: "Sin ventaja gratis",
   };
+}
+
+function makeIdentityList(profile, compact = false) {
+  const presentation = fighterPresentation(profile);
+  const wrap = document.createElement("div");
+  wrap.className = compact ? "fighter-identity-list compact" : "fighter-identity-list";
+  const rows = [
+    ["ARQ", presentation.archetype],
+    ["VENT", presentation.edge],
+    ["RIES", presentation.risk],
+  ];
+  for (const [label, value] of compact ? rows.slice(0, 2) : rows) {
+    const chip = document.createElement("span");
+    chip.className = "fighter-identity-chip";
+    const key = document.createElement("b");
+    key.textContent = label;
+    chip.append(key, document.createTextNode(value));
+    wrap.append(chip);
+  }
+  return wrap;
 }
 
 function makeFighterDossier(profile, compact = false) {
@@ -17152,11 +17193,12 @@ function makeFighterDossier(profile, compact = false) {
     chips.append(chip);
   }
   wrap.append(chips);
+  wrap.append(makeIdentityList(profile, compact));
   return wrap;
 }
 
-function makeMenuStats(profile) {
-  const stats = {
+function menuStatValues(profile) {
+  return {
     athletic: [78, 88, 74],
     balanced: [80, 76, 82],
     heavy: [92, 62, 88],
@@ -17166,6 +17208,55 @@ function makeMenuStats(profile) {
     softFemale: [72, 78, 86],
     tallLean: [64, 90, 74],
   }[profile.build] ?? [75, 75, 75];
+}
+
+function matchupScout(leftProfile, rightProfile) {
+  const leftStats = menuStatValues(leftProfile);
+  const rightStats = menuStatValues(rightProfile);
+  const [leftPower, leftSpeed, leftEnergy] = leftStats;
+  const [rightPower, rightSpeed, rightEnergy] = rightStats;
+  const speedGap = leftSpeed - rightSpeed;
+  const powerGap = leftPower - rightPower;
+  const energyGap = leftEnergy - rightEnergy;
+  const leftPresentation = fighterPresentation(leftProfile);
+  const rightPresentation = fighterPresentation(rightProfile);
+  let tempo = "Duelo parejo";
+  if (Math.abs(speedGap) >= 14) tempo = speedGap > 0 ? `${leftProfile.name} impone ritmo` : `${rightProfile.name} impone ritmo`;
+  else if (Math.abs(powerGap) >= 14) tempo = powerGap > 0 ? `${leftProfile.name} pega mas pesado` : `${rightProfile.name} pega mas pesado`;
+  else if (Math.abs(energyGap) >= 10) tempo = energyGap > 0 ? `${leftProfile.name} sostiene presion` : `${rightProfile.name} sostiene presion`;
+
+  return {
+    tempo,
+    leftPlan: leftPresentation.edge,
+    rightPlan: rightPresentation.edge,
+    warning: Math.abs(powerGap) >= 18
+      ? "Evitar trades limpios"
+      : Math.abs(speedGap) >= 18
+        ? "Controlar entradas"
+        : "La ventaja cambia por spacing",
+  };
+}
+
+function makeFighterSelectScout(leftId, rightId) {
+  const leftProfile = fighterProfiles[leftId];
+  const rightProfile = fighterProfiles[rightId];
+  const scout = matchupScout(leftProfile, rightProfile);
+  const panel = document.createElement("div");
+  panel.className = "fighter-select-scout";
+  const label = document.createElement("b");
+  label.textContent = "SCOUT";
+  const tempo = document.createElement("span");
+  tempo.textContent = scout.tempo;
+  const plans = document.createElement("em");
+  plans.textContent = `${leftProfile.name}: ${scout.leftPlan} / ${rightProfile.name}: ${scout.rightPlan}`;
+  const warning = document.createElement("i");
+  warning.textContent = scout.warning;
+  panel.append(label, tempo, plans, warning);
+  return panel;
+}
+
+function makeMenuStats(profile) {
+  const stats = menuStatValues(profile);
   const labels = ["FUE", "VEL", "ENE"];
   const list = document.createElement("div");
   list.className = "fighter-showcase-stats";
