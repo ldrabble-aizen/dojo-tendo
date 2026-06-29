@@ -116,6 +116,8 @@ let musicDirector = {
   comboPeak: 0,
   critical: Object.create(null),
 };
+let finalPressurePulse = 0;
+let finalPressureSecondCue = 0;
 let momentumHud = {
   leader: null,
   pulse: 0,
@@ -1599,6 +1601,18 @@ const SOUND_PRESETS = {
     ],
     cooldown: 0.36,
   },
+  timePressure: {
+    duration: 0.24,
+    volume: 0.088,
+    type: "square",
+    freq: [196, 98],
+    noise: { volume: 0.052, type: "bandpass", frequency: 720, q: 0.58, duration: 0.13 },
+    layers: [
+      { type: "sine", freq: [49, 32], volume: 0.46, duration: 0.22 },
+      { type: "triangle", freq: [392, 588], volume: 0.1, delay: 0.035, duration: 0.12 },
+    ],
+    cooldown: 0.12,
+  },
   introCard: {
     duration: 0.38,
     volume: 0.082,
@@ -2181,6 +2195,45 @@ function playStageAmbienceTick() {
   }
 }
 
+function finalPressureLevel() {
+  if (!running || winner || countdownFrames > 0 || roundTimerFrames > 10 * 60) return 0;
+  return clamp((10 * 60 - roundTimerFrames) / (10 * 60), 0.08, 1);
+}
+
+function updateFinalPressureCues() {
+  if (finalPressurePulse > 0) finalPressurePulse -= 1;
+  const pressure = finalPressureLevel();
+  if (pressure <= 0 || roundTimerFrames <= 0) {
+    finalPressureSecondCue = 0;
+    return;
+  }
+
+  const seconds = Math.ceil(roundTimerFrames / 60);
+  const beatRate = seconds <= 5 ? 30 : 60;
+  if (roundTimerFrames % beatRate === 0) {
+    finalPressurePulse = Math.max(finalPressurePulse, seconds <= 3 ? 30 : 22);
+    playSound("timePressure", {
+      intensity: clamp(0.68 + pressure * 0.62, 0.7, 1.35),
+      pan: seconds % 2 ? -0.08 : 0.08,
+      key: `pressure:${roundNumber}:${roundTimerFrames}`,
+    });
+    if (seconds <= 3) {
+      triggerScreenTear(seconds % 2 ? -1 : 1, "#ffd44d", 0.32 + pressure * 0.38, 9);
+    }
+  }
+
+  if (seconds <= 5 && seconds !== finalPressureSecondCue) {
+    finalPressureSecondCue = seconds;
+    triggerCinematicHit(seconds % 2 ? -1 : 1, "#ffd44d", 0.28 + pressure * 0.28, 8, {
+      zoom: 0.012,
+      pan: 2.4,
+      lift: 0.8,
+      roll: 0.002,
+      band: 0.46,
+    });
+  }
+}
+
 function resetGame() {
   ensureAudio();
   clearRoundTimers();
@@ -2456,6 +2509,8 @@ function resetRound() {
   screenTearColor = "#fff1bd";
   screenTearStrength = 0;
   finishFreezeCue = null;
+  finalPressurePulse = 0;
+  finalPressureSecondCue = 0;
   koFreeze = 0;
   roundFrame = 0;
   resultFrame = 0;
@@ -3448,6 +3503,7 @@ function update() {
       playSound("danger", { intensity: 0.78 + (5 - seconds) * 0.05, key: `timer:${roundNumber}:${seconds}` });
     }
   }
+  updateFinalPressureCues();
 
   if (!winner && (a.health <= 0 || b.health <= 0)) {
     const winnerFighter = a.health > b.health ? a : b;
@@ -5557,6 +5613,7 @@ function draw() {
     drawCinematicHitOverlay();
     drawScreenTearOverlay();
     drawCriticalStateOverlay();
+    drawFinalPressureOverlay();
   }
   drawDirectorGrade();
 
@@ -6180,6 +6237,62 @@ function drawCriticalStateOverlay() {
   ctx.strokeStyle = `rgba(255, 212, 77, ${0.12 + t * 0.08})`;
   ctx.lineWidth = 3;
   ctx.strokeRect(4, 4, W - 8, H - 8);
+  ctx.restore();
+}
+
+function drawFinalPressureOverlay() {
+  const pressure = finalPressureLevel();
+  if (pressure <= 0) return;
+
+  const seconds = roundTimerSeconds();
+  const pulse = clamp(finalPressurePulse / 30, 0, 1);
+  const beat = 0.5 + Math.sin(roundFrame * (seconds <= 5 ? 0.36 : 0.22)) * 0.5;
+  const mobile = isMobileFightView();
+  const alpha = clamp(0.04 + pressure * 0.09 + pulse * 0.08, 0, mobile ? 0.16 : 0.22);
+  const color = seconds <= 3 ? "#ff674d" : "#ffd44d";
+  const bandH = mobile ? 18 + pulse * 6 : 26 + pulse * 9;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(28, 3, 2, ${0.04 + pressure * 0.08})`;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.globalCompositeOperation = "screen";
+  const sideGlow = ctx.createLinearGradient(0, 0, W, 0);
+  sideGlow.addColorStop(0, colorWithAlpha(color, alpha));
+  sideGlow.addColorStop(0.16, "rgba(255,255,255,0)");
+  sideGlow.addColorStop(0.84, "rgba(255,255,255,0)");
+  sideGlow.addColorStop(1, colorWithAlpha(color, alpha));
+  ctx.fillStyle = sideGlow;
+  ctx.fillRect(0, 0, W, H);
+
+  const band = ctx.createLinearGradient(0, 0, W, 0);
+  band.addColorStop(0, "rgba(255,255,255,0)");
+  band.addColorStop(0.32, colorWithAlpha(color, alpha * 0.62));
+  band.addColorStop(0.5, `rgba(255, 241, 189, ${alpha * 0.55})`);
+  band.addColorStop(0.68, colorWithAlpha(color, alpha * 0.62));
+  band.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = band;
+  ctx.fillRect(0, 0, W, bandH);
+  ctx.fillRect(0, H - bandH, W, bandH);
+
+  ctx.strokeStyle = colorWithAlpha(color, 0.12 + pressure * 0.12 + pulse * 0.16);
+  ctx.lineWidth = 2 + pulse * 2;
+  ctx.setLineDash([14 + beat * 8, 16]);
+  ctx.lineDashOffset = -roundFrame * (seconds <= 5 ? 1.8 : 1.1);
+  ctx.strokeRect(10, 10, W - 20, H - 20);
+
+  ctx.setLineDash([]);
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = colorWithAlpha("#fff1bd", 0.08 + pulse * 0.13);
+  const lanes = mobile ? 3 : 5;
+  for (let i = 0; i < lanes; i += 1) {
+    const y = H * (0.28 + i * 0.11) + Math.sin(roundFrame * 0.12 + i) * 4;
+    ctx.beginPath();
+    ctx.moveTo(70 + i * 12, y);
+    ctx.lineTo(W - 70 - i * 18, y - 8 - pulse * 5);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -18418,6 +18531,8 @@ function sendOnlineSnapshot(force = false) {
     screenTearColor,
     screenTearStrength,
     finishFreezeCue,
+    finalPressurePulse,
+    finalPressureSecondCue,
     fighters: fighters.map(serializeFighter),
     projectiles: serializeProjectiles(),
   });
@@ -18470,6 +18585,8 @@ function applyOnlineSnapshot(snapshot) {
   screenTearColor = snapshot.screenTearColor || "#fff1bd";
   screenTearStrength = snapshot.screenTearStrength || 0;
   finishFreezeCue = snapshot.finishFreezeCue || null;
+  finalPressurePulse = snapshot.finalPressurePulse || 0;
+  finalPressureSecondCue = snapshot.finalPressureSecondCue || 0;
 
   if (Array.isArray(snapshot.fighters)) {
     for (const fighterData of snapshot.fighters) {
