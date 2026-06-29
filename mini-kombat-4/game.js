@@ -179,6 +179,11 @@ let cinematicHitPan = 6.4;
 let cinematicHitLift = 2.6;
 let cinematicHitRoll = 0;
 let cinematicHitBand = 1;
+let screenTearPulse = 0;
+let screenTearMax = 1;
+let screenTearDir = 1;
+let screenTearColor = "#fff1bd";
+let screenTearStrength = 0;
 
 const SPECIAL_STYLES = {
   p1: { shape: "wave", core: "#fff1bd", rim: "#5bd7ff", trail: "#47b5ff" },
@@ -1986,6 +1991,11 @@ function resetRound() {
   cinematicHitLift = 2.6;
   cinematicHitRoll = 0;
   cinematicHitBand = 1;
+  screenTearPulse = 0;
+  screenTearMax = 1;
+  screenTearDir = 1;
+  screenTearColor = "#fff1bd";
+  screenTearStrength = 0;
   koFreeze = 0;
   roundFrame = 0;
   resultFrame = 0;
@@ -2537,6 +2547,8 @@ function updateCameraImpactPulse() {
     cinematicHitRoll = 0;
     cinematicHitBand = 1;
   }
+  if (screenTearPulse > 0) screenTearPulse -= 1;
+  else screenTearStrength = 0;
 }
 
 function update() {
@@ -2648,6 +2660,7 @@ function update() {
       roll: matchOver ? 0.014 : 0.011,
       band: matchOver ? 1.58 : 1.38,
     });
+    triggerScreenTear(loserFighter.koFallDir, winnerFighter.trim || "#fff1bd", matchOver ? 1.68 : 1.34, matchOver ? 24 : 18);
     koCollapseFX(loserFighter, winnerFighter);
     playSound(matchOver ? tournamentActive && winnerFighter.id !== "right" ? "lose" : "victory" : "ko");
     if (matchOver) scheduleWinnerOverlay();
@@ -3460,6 +3473,14 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   if (cinematic.cinematic) {
     triggerCinematicHit(impactDir, impactColor, cinematic.cinematicStrength, cinematic.cinematicPulse, cinematic);
   }
+  if (!blocked && (counter || projectile || heavyImpact || finishingHit)) {
+    triggerScreenTear(
+      impactDir,
+      impactColor,
+      finishingHit ? 1.45 : counter ? 1.24 : projectile ? 1.12 : 0.92,
+      finishingHit ? 18 : counter ? 14 : projectile ? 12 : 10
+    );
+  }
   burst(
     target.x - target.dir * 22,
     impactY,
@@ -3525,6 +3546,19 @@ function triggerCinematicHit(dir, color, strength = 1, pulse = 12, profile = nul
   cinematicHitLift = profile?.lift ?? 2.6;
   cinematicHitRoll = profile?.roll ?? 0;
   cinematicHitBand = profile?.band ?? 1;
+}
+
+function triggerScreenTear(dir, color, strength = 1, pulse = 10) {
+  if (isMobileFightView()) {
+    strength *= 0.58;
+    pulse = Math.round(pulse * 0.74);
+  }
+  if (pulse < screenTearPulse) return;
+  screenTearPulse = Math.max(1, pulse);
+  screenTearMax = Math.max(1, pulse);
+  screenTearDir = dir || 1;
+  screenTearColor = color || "#fff1bd";
+  screenTearStrength = strength;
 }
 
 function contactFlashBurst(x, y, color, dir, blocked, heavyImpact, counter) {
@@ -4592,6 +4626,7 @@ function draw() {
   drawKOBanner();
   drawAnnouncerCue();
   drawCinematicHitOverlay();
+  drawScreenTearOverlay();
   drawCriticalStateOverlay();
   drawDirectorGrade();
 
@@ -4680,6 +4715,55 @@ function drawCinematicHitOverlay() {
   ctx.moveTo(W * 0.18 - shift, H - 28);
   ctx.lineTo(W * 0.82 - shift, H - 44);
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawScreenTearOverlay() {
+  if (screenTearPulse <= 0 || screenTearStrength <= 0) return;
+  const t = clamp(screenTearPulse / Math.max(1, screenTearMax), 0, 1);
+  const ease = t * t * screenTearStrength;
+  const color = screenTearColor || "#fff1bd";
+  const dir = screenTearDir || 1;
+  const mobile = isMobileFightView();
+  const laneCount = mobile ? 3 : 5;
+  const alpha = clamp(ease * (mobile ? 0.08 : 0.13), 0, mobile ? 0.12 : 0.2);
+  if (alpha <= 0.005) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  for (let i = 0; i < laneCount; i += 1) {
+    const lane = laneCount === 1 ? 0 : i / (laneCount - 1);
+    const y = H * (0.22 + lane * 0.58) + Math.sin(roundFrame * 0.19 + i * 1.7) * (mobile ? 3 : 6);
+    const height = (mobile ? 5 : 7) + ease * (mobile ? 5 : 8) + i * 0.7;
+    const shift = dir * ease * (mobile ? 16 : 30) * (i % 2 ? -0.55 : 1);
+    const x0 = -80 + shift;
+    const x1 = W + 80 + shift * 0.35;
+    const grad = ctx.createLinearGradient(x0, y, x1, y + height);
+    grad.addColorStop(0, "rgba(255,255,255,0)");
+    grad.addColorStop(0.22, colorWithAlpha(color, alpha * 0.72));
+    grad.addColorStop(0.5, `rgba(255,255,255,${alpha * 0.58})`);
+    grad.addColorStop(0.78, colorWithAlpha(color, alpha * 0.52));
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    ctx.lineTo(x1, y + dir * (mobile ? 3 : 5));
+    ctx.lineTo(x1, y + height + dir * (mobile ? 3 : 5));
+    ctx.lineTo(x0, y + height);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.62})`;
+    ctx.lineWidth = Math.max(1, height * 0.16);
+    ctx.beginPath();
+    ctx.moveTo(W * 0.18 + shift * 0.4, y + height * 0.5);
+    ctx.lineTo(W * 0.82 + shift * 0.2, y + height * 0.5 + dir * 4);
+    ctx.stroke();
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = `rgba(255, 247, 214, ${alpha * 0.16})`;
+  ctx.fillRect(0, 0, W, H);
   ctx.restore();
 }
 
@@ -16223,6 +16307,11 @@ function sendOnlineSnapshot(force = false) {
     cinematicHitLift,
     cinematicHitRoll,
     cinematicHitBand,
+    screenTearPulse,
+    screenTearMax,
+    screenTearDir,
+    screenTearColor,
+    screenTearStrength,
     fighters: fighters.map(serializeFighter),
     projectiles: serializeProjectiles(),
   });
@@ -16267,6 +16356,11 @@ function applyOnlineSnapshot(snapshot) {
   cinematicHitLift = snapshot.cinematicHitLift || 2.6;
   cinematicHitRoll = snapshot.cinematicHitRoll || 0;
   cinematicHitBand = snapshot.cinematicHitBand || 1;
+  screenTearPulse = snapshot.screenTearPulse || 0;
+  screenTearMax = snapshot.screenTearMax || 1;
+  screenTearDir = snapshot.screenTearDir || 1;
+  screenTearColor = snapshot.screenTearColor || "#fff1bd";
+  screenTearStrength = snapshot.screenTearStrength || 0;
 
   if (Array.isArray(snapshot.fighters)) {
     for (const fighterData of snapshot.fighters) {
