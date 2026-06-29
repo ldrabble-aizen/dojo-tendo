@@ -17140,6 +17140,99 @@ function roundResultAccolade(winnerFighter, runnerUp) {
   return { label: "VICTORIA LIMPIA", detail: `${Math.round(stats.roundDamage ?? 0)} dano aplicado`, color: winnerFighter?.trim ?? "#fff1bd" };
 }
 
+function roundResultVerdict(winnerFighter, runnerUp) {
+  const winnerDamage = Math.round(winnerFighter?.roundDamage ?? 0);
+  const runnerDamage = Math.round(runnerUp?.roundDamage ?? 0);
+  const winnerCombo = winnerFighter?.roundMaxCombo ?? 0;
+  const runnerCombo = runnerUp?.roundMaxCombo ?? 0;
+  const winnerDefense = (winnerFighter?.roundBlocks ?? 0) * 2 + (winnerFighter?.roundCounters ?? 0) * 4 + (winnerFighter?.roundSpecials ?? 0) * 3;
+  const runnerDefense = (runnerUp?.roundBlocks ?? 0) * 2 + (runnerUp?.roundCounters ?? 0) * 4 + (runnerUp?.roundSpecials ?? 0) * 3;
+  const damageGap = winnerDamage - runnerDamage;
+  const comboGap = winnerCombo - runnerCombo;
+  const defenseGap = winnerDefense - runnerDefense;
+  const totalDamage = Math.max(1, winnerDamage + runnerDamage);
+  const totalCombo = Math.max(1, winnerCombo + runnerCombo);
+  const totalDefense = Math.max(1, winnerDefense + runnerDefense);
+  let label = "VENTAJA CERRADA";
+  let detail = `${winnerFighter.name} sostuvo el round cuando el duelo se achico.`;
+
+  if (matchOver) {
+    label = "CONTROL DEL MATCH";
+    detail = `${winnerFighter.name} cerro la serie ${fighters[0].wins}-${fighters[1].wins}.`;
+  } else if (roundFinishKind === "time") {
+    label = "LECTURA DEL RELOJ";
+    detail = `${winnerFighter.name} administro la ventaja hasta el final.`;
+  } else if (damageGap >= 22) {
+    label = "PRESION SUPERIOR";
+    detail = `${winnerFighter.name} gano el intercambio por ${damageGap} de dano.`;
+  } else if (comboGap >= 3) {
+    label = "RITMO ENCADENADO";
+    detail = `${winnerFighter.name} encontro el combo mas largo del round.`;
+  } else if (defenseGap >= 5) {
+    label = "RESPUESTA LIMPIA";
+    detail = `${winnerFighter.name} convirtio defensa en oportunidad.`;
+  }
+
+  return {
+    label,
+    detail,
+    metrics: [
+      {
+        label: "DANO",
+        value: `${winnerDamage}-${runnerDamage}`,
+        fill: clamp(winnerDamage / totalDamage, 0.08, 1),
+      },
+      {
+        label: "COMBO",
+        value: `${winnerCombo || 0}-${runnerCombo || 0}`,
+        fill: clamp(winnerCombo / totalCombo, 0.08, 1),
+      },
+      {
+        label: "CTRL",
+        value: `${winnerDefense}-${runnerDefense}`,
+        fill: clamp(winnerDefense / totalDefense, 0.08, 1),
+      },
+    ],
+  };
+}
+
+function makeWinnerVerdict(winnerFighter, runnerUp) {
+  const verdict = roundResultVerdict(winnerFighter, runnerUp);
+  const panel = document.createElement("section");
+  panel.className = "winner-card-verdict";
+
+  const header = document.createElement("div");
+  header.className = "winner-verdict-head";
+  const kicker = document.createElement("span");
+  kicker.textContent = "VEREDICTO";
+  const label = document.createElement("b");
+  label.textContent = verdict.label;
+  header.append(kicker, label);
+  panel.append(header);
+
+  const detail = document.createElement("p");
+  detail.textContent = verdict.detail;
+  panel.append(detail);
+
+  const bars = document.createElement("div");
+  bars.className = "winner-verdict-bars";
+  for (const metric of verdict.metrics) {
+    const row = document.createElement("div");
+    row.className = "winner-verdict-meter";
+    row.style.setProperty("--fill", `${Math.round(metric.fill * 100)}%`);
+
+    const metricLabel = document.createElement("span");
+    metricLabel.textContent = metric.label;
+    const value = document.createElement("b");
+    value.textContent = metric.value;
+    const track = document.createElement("i");
+    row.append(metricLabel, value, track);
+    bars.append(row);
+  }
+  panel.append(bars);
+  return panel;
+}
+
 function renderWinnerPanel() {
   const winnerFighter = fighters.find((fighter) => fighter.id === roundWinnerId) ?? fighters.find((fighter) => fighter.name === winner) ?? fighters[0];
   const runnerUp = fighters.find((fighter) => fighter !== winnerFighter) ?? fighters[1];
@@ -17190,6 +17283,8 @@ function renderWinnerPanel() {
   accoladeDetail.textContent = accolade.detail;
   accoladeNode.append(accoladeLabel, accoladeDetail);
   info.append(accoladeNode);
+
+  info.append(makeWinnerVerdict(winnerFighter, runnerUp));
 
   info.append(makeFighterDossier(winnerFighter, true));
 
