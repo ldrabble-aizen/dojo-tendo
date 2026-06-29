@@ -966,6 +966,18 @@ function buildFighters() {
   ];
 }
 
+function roundStatState() {
+  return {
+    roundHits: 0,
+    roundDamage: 0,
+    roundDamageTaken: 0,
+    roundBlocks: 0,
+    roundCounters: 0,
+    roundSpecials: 0,
+    roundMaxCombo: 0,
+  };
+}
+
 function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls, skin, build, mark, headwear, outfit }) {
   return {
     id,
@@ -1008,6 +1020,7 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     comboPulse: 0,
     comboTargetId: "",
     comboWindow: 0,
+    ...roundStatState(),
     hitFlash: 0,
     impactPulse: 0,
     impactDir: dir,
@@ -2008,6 +2021,7 @@ function resetRound() {
     comboPulse: 0,
     comboTargetId: "",
     comboWindow: 0,
+    ...roundStatState(),
   });
 
   Object.assign(fighters[1], {
@@ -2118,6 +2132,7 @@ function resetRound() {
     comboPulse: 0,
     comboTargetId: "",
     comboWindow: 0,
+    ...roundStatState(),
   });
 
   fighters.forEach((fighter) => {
@@ -2543,6 +2558,7 @@ function startSpecial(f) {
   const flowReady = (f.attackRecoverPulse ?? 0) > 2 || (f.comboTimer ?? 0) > 0;
   const timing = attackTiming("special");
   f.energy -= 45;
+  f.roundSpecials = (f.roundSpecials ?? 0) + 1;
   f.specialReadyCue = f.energy >= 45;
   f.specialReadyPulse = 0;
   f.blocking = false;
@@ -3841,6 +3857,7 @@ function registerComboHit(attacker, target, damage, { blocked, projectile, heavy
   const sameTarget = attacker.comboTargetId === target.id && (attacker.comboTimer ?? 0) > 0;
   attacker.comboCount = sameTarget ? (attacker.comboCount ?? 0) + 1 : 1;
   attacker.comboDamage = sameTarget ? (attacker.comboDamage ?? 0) + damage : damage;
+  attacker.roundMaxCombo = Math.max(attacker.roundMaxCombo ?? 0, attacker.comboCount ?? 0);
   attacker.comboTargetId = target.id;
   attacker.comboTimer = Math.max(attacker.comboTimer ?? 0, heavyImpact || projectile || counter ? 112 : 96);
   attacker.comboPulse = Math.max(attacker.comboPulse ?? 0, 22);
@@ -3909,6 +3926,16 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
   const cinematicHit = cinematic.specialFx;
   const targetMotion = characterMotion(target);
   const targetGuard = characterGuard(target);
+
+  if (target) {
+    target.roundDamageTaken = (target.roundDamageTaken ?? 0) + finalDamage;
+    if (blocked) target.roundBlocks = (target.roundBlocks ?? 0) + 1;
+  }
+  if (attacker) {
+    attacker.roundDamage = (attacker.roundDamage ?? 0) + finalDamage;
+    if (!blocked) attacker.roundHits = (attacker.roundHits ?? 0) + 1;
+    if (counter) attacker.roundCounters = (attacker.roundCounters ?? 0) + 1;
+  }
 
   target.health = nextHealth;
   target.hurt = finishingHit ? 42 + zone.hurtBonus : blocked ? 9 : attacker?.attack?.type === "grab" ? 32 : projectile ? 24 + zone.hurtBonus : heavyImpact ? 27 + zone.hurtBonus : 24 + zone.hurtBonus;
@@ -16110,12 +16137,39 @@ function renderVersusPanel(roundLabel) {
   fighterSelect.append(makeVersusCard(fighters[1], rightRole, "right"));
 }
 
+function roundResultAccolade(winnerFighter, runnerUp) {
+  const stats = winnerFighter ?? {};
+  const clean = (stats.roundDamageTaken ?? 0) <= 0.5 && roundFinishKind !== "time";
+  if (clean && (winnerFighter?.health ?? 0) >= 99) {
+    return { label: "PERFECT", detail: "Sin recibir dano", color: "#fff1bd" };
+  }
+  if (roundFinishKind === "time") {
+    return { label: "DECISION", detail: "Gano por control del round", color: "#ffdf7a" };
+  }
+  if ((winnerFighter?.health ?? 0) <= 22 && (runnerUp?.health ?? 0) <= 0) {
+    return { label: "CLUTCH", detail: "Cerre con poca vida", color: "#ff8f6b" };
+  }
+  if ((stats.roundMaxCombo ?? 0) >= 7) {
+    return { label: "DOJO RUSH", detail: `${stats.roundMaxCombo} golpes encadenados`, color: "#7ef0cf" };
+  }
+  if ((stats.roundCounters ?? 0) >= 2) {
+    return { label: "COUNTER MASTER", detail: `${stats.roundCounters} contraataques limpios`, color: "#ffd44d" };
+  }
+  if ((stats.roundBlocks ?? 0) >= 6) {
+    return { label: "DEFENSA SOLIDA", detail: `${stats.roundBlocks} bloqueos`, color: "#bdeaff" };
+  }
+  if ((stats.roundSpecials ?? 0) >= 2) {
+    return { label: "TECNICA FIRME", detail: `${stats.roundSpecials} especiales usados`, color: winnerFighter?.trim ?? "#fff1bd" };
+  }
+  return { label: "VICTORIA LIMPIA", detail: `${Math.round(stats.roundDamage ?? 0)} dano aplicado`, color: winnerFighter?.trim ?? "#fff1bd" };
+}
+
 function renderWinnerPanel() {
   const winnerFighter = fighters.find((fighter) => fighter.id === roundWinnerId) ?? fighters.find((fighter) => fighter.name === winner) ?? fighters[0];
   const runnerUp = fighters.find((fighter) => fighter !== winnerFighter) ?? fighters[1];
   const presentation = fighterPresentation(winnerFighter);
   const winnerHealth = Math.max(0, Math.round(winnerFighter.health));
-  const winnerEnergy = Math.round(winnerFighter.energy ?? 0);
+  const accolade = roundResultAccolade(winnerFighter, runnerUp);
 
   fighterSelect.innerHTML = "";
   fighterSelect.classList.remove("versus-panel", "online-panel");
@@ -16150,6 +16204,17 @@ function renderWinnerPanel() {
   const trait = document.createElement("em");
   trait.textContent = `${fighterTrait(winnerFighter)} / ${presentation.signature}`;
   info.append(trait);
+
+  const accoladeNode = document.createElement("div");
+  accoladeNode.className = "winner-card-accolade";
+  accoladeNode.style.setProperty("--accolade-color", accolade.color);
+  const accoladeLabel = document.createElement("b");
+  accoladeLabel.textContent = accolade.label;
+  const accoladeDetail = document.createElement("span");
+  accoladeDetail.textContent = accolade.detail;
+  accoladeNode.append(accoladeLabel, accoladeDetail);
+  info.append(accoladeNode);
+
   info.append(makeFighterDossier(winnerFighter, true));
 
   const result = document.createElement("div");
@@ -16157,8 +16222,10 @@ function renderWinnerPanel() {
   for (const [label, value] of [
     ["Score", `${fighters[0].wins}-${fighters[1].wins}`],
     ["Salud", `${winnerHealth}%`],
-    ["Energia", `${winnerEnergy}%`],
-    ["Rival", runnerUp.name],
+    ["Dano", Math.round(winnerFighter.roundDamage ?? 0)],
+    ["Combo", winnerFighter.roundMaxCombo ? `${winnerFighter.roundMaxCombo} HIT` : "-"],
+    ["Bloq", winnerFighter.roundBlocks ?? 0],
+    ["Esp", winnerFighter.roundSpecials ?? 0],
   ]) {
     const chip = document.createElement("span");
     const chipLabel = document.createElement("b");
