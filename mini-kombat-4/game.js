@@ -105,6 +105,7 @@ let roundNumber = 1;
 let musicClock = 0;
 let particles = [];
 let floatingTexts = [];
+let announcerCue = null;
 let audioCtx = null;
 let audioMasterGain = null;
 let audioNoiseCache = new Map();
@@ -1063,6 +1064,7 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     airKickRecoverPulse: 0,
     airKickLandingPulse: 0,
     airKickDir: dir,
+    criticalCue: false,
     moveIntent: 0,
     poseState: "idle",
     previousPoseState: "idle",
@@ -1445,6 +1447,27 @@ const SOUND_PRESETS = {
     ],
     cooldown: 0.24,
   },
+  announcer: {
+    duration: 0.42,
+    volume: 0.118,
+    type: "sawtooth",
+    freq: [176, 74],
+    noise: { volume: 0.052, type: "bandpass", frequency: 760, q: 0.52, duration: 0.28 },
+    layers: [
+      { type: "sine", freq: [88, 44], volume: 0.44, duration: 0.38 },
+      { type: "triangle", freq: [352, 186], volume: 0.14, delay: 0.04, duration: 0.22 },
+    ],
+    cooldown: 0.16,
+  },
+  danger: {
+    duration: 0.28,
+    volume: 0.12,
+    type: "square",
+    freq: [300, 116, 300],
+    noise: { volume: 0.056, type: "highpass", frequency: 1300, duration: 0.12 },
+    layers: [{ type: "sine", freq: [75, 48], volume: 0.38, duration: 0.26 }],
+    cooldown: 0.22,
+  },
   musicSub: {
     duration: 0.38,
     volume: 0.048,
@@ -1805,6 +1828,7 @@ function resetRound() {
     airKickRecoverPulse: 0,
     airKickLandingPulse: 0,
     airKickDir: 1,
+    criticalCue: false,
     moveIntent: 0,
     poseState: "idle",
     previousPoseState: "idle",
@@ -1912,6 +1936,7 @@ function resetRound() {
     airKickRecoverPulse: 0,
     airKickLandingPulse: 0,
     airKickDir: -1,
+    criticalCue: false,
     moveIntent: 0,
     poseState: "idle",
     previousPoseState: "idle",
@@ -1936,6 +1961,7 @@ function resetRound() {
 
   particles = [];
   floatingTexts = [];
+  announcerCue = null;
   projectiles.length = 0;
   winner = "";
   roundWinnerId = "";
@@ -1967,6 +1993,7 @@ function resetRound() {
   paused = false;
   running = true;
   overlay.classList.add("hidden");
+  cueAnnouncer(`ROUND ${toRoman(roundNumber)}`, `${fighters[0].name}  VS  ${fighters[1].name}`, "#fff1bd", 92);
   syncShellState();
   sendOnlineSnapshot(true);
 }
@@ -2524,6 +2551,7 @@ function update() {
     updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
+    updateAnnouncerCue();
     sendOnlineSnapshot(false);
     return;
   }
@@ -2534,6 +2562,7 @@ function update() {
     updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
+    updateAnnouncerCue();
     sendOnlineSnapshot(false);
     return;
   }
@@ -2543,16 +2572,21 @@ function update() {
     updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
+    updateAnnouncerCue();
     sendOnlineSnapshot(false);
     return;
   }
 
   if (paused) return;
   if (countdownFrames > 0) {
+    if (countdownFrames === 37) {
+      cueAnnouncer("FIGHT", "El tatami queda abierto", "#ffd44d", 58);
+    }
     countdownFrames -= 1;
     updateCameraImpactPulse();
     updateParticles();
     updateFloatingTexts();
+    updateAnnouncerCue();
     sendOnlineSnapshot(false);
     return;
   }
@@ -2574,6 +2608,8 @@ function update() {
   updateProjectiles();
   updateParticles();
   updateFloatingTexts();
+  updateAnnouncerCue();
+  triggerCriticalHealthCues();
 
   if (!winner && (a.health <= 0 || b.health <= 0)) {
     const winnerFighter = a.health > b.health ? a : b;
@@ -2598,8 +2634,9 @@ function update() {
     winnerFighter.victoryPulse = matchOver ? 104 : 88;
     shake = Math.max(shake, matchOver ? 22 : 18);
     flash = Math.max(flash, matchOver ? 22 : 18);
-    addText(loserFighter.x, loserFighter.y - 162, matchOver ? "FINAL K.O." : "K.O.", "#fff1bd");
-    addText(winnerFighter.x, winnerFighter.y - 190, matchOver ? "MATCH" : "ROUND", "#fff1bd");
+    addText(loserFighter.x, loserFighter.y - 162, matchOver ? "FINAL K.O." : "K.O.", "#fff1bd", { size: matchOver ? 34 : 30, life: 76, rise: 0.34 });
+    addText(winnerFighter.x, winnerFighter.y - 190, matchOver ? "MATCH" : "ROUND", "#fff1bd", { size: 24, life: 68, rise: 0.42 });
+    cueAnnouncer(matchOver ? "FINAL K.O." : "K.O.", `${winnerFighter.name} gana ${matchOver ? "el match" : `round ${toRoman(roundNumber)}`}`, winnerFighter.trim || "#fff1bd", matchOver ? 112 : 92);
     triggerCameraImpact(loserFighter.koFallDir, false, true, false, matchOver ? 1.95 : 1.72, {
       cameraPulse: matchOver ? 26 : 22,
       cameraStrength: matchOver ? 1.95 : 1.72,
@@ -2621,6 +2658,7 @@ function update() {
   if (flash > 0) flash -= 1;
   if (shake > 0) shake -= 1;
   updateCameraImpactPulse();
+  updateAnnouncerCue();
   sendOnlineSnapshot(false);
 }
 
@@ -4406,16 +4444,64 @@ function updateParticles() {
   if (particles.length > budget) particles.splice(0, particles.length - budget);
 }
 
-function addText(x, y, text, color) {
-  floatingTexts.push({ x, y, text, color, life: 54 });
+function addText(x, y, text, color, options = {}) {
+  const life = options.life ?? 54;
+  floatingTexts.push({
+    x,
+    y,
+    text,
+    color,
+    life,
+    maxLife: life,
+    size: options.size ?? 18,
+    rise: options.rise ?? 0.6,
+    drift: options.drift ?? 0,
+  });
 }
 
 function updateFloatingTexts() {
   floatingTexts = floatingTexts.filter((t) => {
-    t.y -= 0.6;
+    t.y -= t.rise ?? 0.6;
+    t.x += t.drift ?? 0;
     t.life -= 1;
     return t.life > 0;
   });
+}
+
+function cueAnnouncer(title, subtitle = "", color = "#fff1bd", life = 76) {
+  announcerCue = {
+    title,
+    subtitle,
+    color,
+    life,
+    maxLife: life,
+  };
+  playSound("announcer", { intensity: title.includes("K.O.") ? 1.28 : 0.92, key: `announcer:${title}` });
+}
+
+function updateAnnouncerCue() {
+  if (!announcerCue) return;
+  announcerCue.life -= 1;
+  if (announcerCue.life <= 0) announcerCue = null;
+}
+
+function triggerCriticalHealthCues() {
+  if (!running || winner || countdownFrames > 0) return;
+  for (const fighter of fighters) {
+    if (fighter.criticalCue || fighter.health <= 0 || fighter.health > 24) continue;
+    fighter.criticalCue = true;
+    const color = fighter.trim || "#ffd44d";
+    cueAnnouncer("DANGER", `${fighter.name} esta al limite`, color, 64);
+    addText(fighter.x, fighter.y - fighterScale(178), "DANGER", color, { size: 22, life: 62, rise: 0.42, drift: fighter.dir * 0.08 });
+    playSound("danger", { x: fighter.x, intensity: 1.08, key: `danger:${fighter.id}:${roundNumber}` });
+    triggerCinematicHit(fighter.dir || 1, color, 0.82, 18, {
+      zoom: 0.032,
+      pan: 6,
+      lift: 2.6,
+      roll: 0.004,
+      band: 0.9,
+    });
+  }
 }
 
 function isMobileFightView() {
@@ -4504,7 +4590,9 @@ function draw() {
   drawComboCounters();
   drawCountdown();
   drawKOBanner();
+  drawAnnouncerCue();
   drawCinematicHitOverlay();
+  drawCriticalStateOverlay();
   drawDirectorGrade();
 
   if (flash > 0) {
@@ -4597,14 +4685,21 @@ function drawCinematicHitOverlay() {
 
 function drawFloatingTexts() {
   for (const t of floatingTexts) {
-    ctx.globalAlpha = clamp(t.life / 24, 0, 1);
+    const maxLife = t.maxLife ?? 54;
+    const progress = 1 - clamp(t.life / Math.max(1, maxLife), 0, 1);
+    const pop = Math.sin(Math.min(1, progress * 2.4) * Math.PI) * 0.08;
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    ctx.scale(1 + pop, 1 + pop * 0.6);
+    ctx.globalAlpha = clamp(t.life / Math.min(28, maxLife), 0, 1);
     ctx.fillStyle = t.color;
-    ctx.font = "900 18px system-ui, sans-serif";
+    ctx.font = `900 ${t.size ?? 18}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.strokeStyle = "rgba(45, 21, 14, 0.85)";
-    ctx.lineWidth = 4;
-    ctx.strokeText(t.text, t.x, t.y);
-    ctx.fillText(t.text, t.x, t.y);
+    ctx.lineWidth = Math.max(4, (t.size ?? 18) * 0.24);
+    ctx.strokeText(t.text, 0, 0);
+    ctx.fillText(t.text, 0, 0);
+    ctx.restore();
   }
   ctx.globalAlpha = 1;
 }
@@ -4652,6 +4747,97 @@ function drawCountdown() {
   ctx.font = "900 19px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255, 247, 214, 0.92)";
   ctx.fillText(`${fighters[0].name.toUpperCase()}  VS  ${fighters[1].name.toUpperCase()}`, 0, 48);
+  ctx.restore();
+}
+
+function drawAnnouncerCue() {
+  if (!announcerCue) return;
+  const t = clamp(announcerCue.life / Math.max(1, announcerCue.maxLife), 0, 1);
+  const intro = smoothStep01(clamp((announcerCue.maxLife - announcerCue.life) / 12, 0, 1));
+  const outro = smoothStep01(clamp(announcerCue.life / 18, 0, 1));
+  const alpha = intro * outro;
+  if (alpha <= 0.01) return;
+
+  const title = announcerCue.title;
+  const subtitle = announcerCue.subtitle;
+  const color = announcerCue.color || "#fff1bd";
+  const danger = title === "DANGER";
+  const ko = title.includes("K.O.");
+  const y = ko ? 160 : danger ? 138 : 126;
+  const width = ko ? 430 : danger ? 360 : 330;
+  const height = subtitle ? 92 : 70;
+  const snap = Math.sin(Math.min(1, (announcerCue.maxLife - announcerCue.life) / 15) * Math.PI) * 0.08;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(W / 2, y);
+  ctx.scale(1 + snap, 1 + snap * 0.55);
+  ctx.translate(-W / 2, -y);
+
+  const x = W / 2 - width / 2;
+  const panelY = y - height / 2;
+  const panel = ctx.createLinearGradient(x, panelY, x + width, panelY + height);
+  panel.addColorStop(0, "rgba(5, 5, 8, 0)");
+  panel.addColorStop(0.18, danger ? "rgba(98, 18, 16, 0.66)" : "rgba(18, 10, 9, 0.66)");
+  panel.addColorStop(0.5, ko ? "rgba(132, 29, 18, 0.78)" : "rgba(45, 22, 16, 0.72)");
+  panel.addColorStop(0.82, danger ? "rgba(98, 18, 16, 0.66)" : "rgba(18, 10, 9, 0.66)");
+  panel.addColorStop(1, "rgba(5, 5, 8, 0)");
+  ctx.fillStyle = panel;
+  ctx.fillRect(x, panelY, width, height);
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(color, danger ? 0.42 : 0.34);
+  ctx.lineWidth = danger ? 4 : 3;
+  ctx.beginPath();
+  ctx.moveTo(x + 34, panelY + height * 0.5);
+  ctx.lineTo(x + width - 34, panelY + height * 0.5);
+  ctx.stroke();
+
+  const glow = ctx.createRadialGradient(W / 2, y, 8, W / 2, y, width * 0.55);
+  glow.addColorStop(0, colorWithAlpha(color, danger ? 0.22 : 0.18));
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(x, panelY - 18, width, height + 36);
+  ctx.globalCompositeOperation = "source-over";
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `${ko ? 62 : danger ? 50 : 48}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
+  ctx.lineWidth = ko ? 8 : 7;
+  ctx.strokeStyle = "rgba(22, 6, 5, 0.94)";
+  ctx.fillStyle = ko ? "#fff1bd" : danger ? "#ffd44d" : "#fff7d6";
+  ctx.strokeText(title, W / 2, y - (subtitle ? 10 : 0));
+  ctx.fillText(title, W / 2, y - (subtitle ? 10 : 0));
+
+  if (subtitle) {
+    ctx.font = "900 12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(255, 239, 184, 0.88)";
+    ctx.fillText(subtitle.toUpperCase(), W / 2, y + 31);
+  }
+  ctx.restore();
+}
+
+function drawCriticalStateOverlay() {
+  if (!running || winner || countdownFrames > 0) return;
+  const dangerFighters = fighters.filter((f) => f.health > 0 && f.health <= 24);
+  if (!dangerFighters.length) return;
+  const t = 0.5 + Math.sin(roundFrame * 0.12) * 0.5;
+  const strength = clamp(Math.max(...dangerFighters.map((f) => (24 - f.health) / 24)), 0.08, 1);
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  for (const f of dangerFighters) {
+    const sideX = f.x < W / 2 ? 0 : W;
+    const grad = ctx.createLinearGradient(sideX, 0, W / 2, H);
+    grad.addColorStop(0, colorWithAlpha(f.trim || "#ffd44d", (0.09 + t * 0.05) * strength));
+    grad.addColorStop(0.42, "rgba(255,255,255,0)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = `rgba(255, 212, 77, ${0.12 + t * 0.08})`;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(4, 4, W - 8, H - 8);
   ctx.restore();
 }
 
