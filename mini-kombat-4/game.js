@@ -7025,6 +7025,7 @@ function drawStageForegroundDepth() {
   const lowHealth = fighters.some((fighter) => fighter.health > 0 && fighter.health <= 24);
   const specialHeat = clamp(Math.max(...fighters.map((fighter) => fighter.energy ?? 0)) / 100, 0, 1);
   const flicker = 0.5 + Math.sin(roundFrame * 0.082) * 0.32 + Math.sin(roundFrame * 0.19) * 0.18;
+  const stageRead = stageReactiveRead();
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -7050,6 +7051,8 @@ function drawStageForegroundDepth() {
     ctx.fillRect(-post.w / 2, -H * 0.52, post.w, H * 1.1);
     ctx.restore();
   }
+
+  drawDojoCrowdForeground(stageRead, tension, impact);
 
   ctx.globalCompositeOperation = "screen";
   const floorEdge = ctx.createLinearGradient(60, FLOOR + 58, W - 60, FLOOR + 58);
@@ -7112,6 +7115,128 @@ function drawStageForegroundDepth() {
     ctx.fill();
   }
 
+  ctx.restore();
+}
+
+function drawDojoCrowdForeground(read, tension, impact) {
+  if (!fighters.length) return;
+
+  const mobile = isMobileFightView();
+  const response = clamp((read?.intensity ?? 0) * 0.68 + tension * 0.38 + impact * 0.46 + (read?.result ?? 0) * 0.58, 0, 1.35);
+  const comboSurge = clamp(((read?.momentum?.leader?.comboCount ?? 0) - 2) / 6, 0, 1);
+  const cheer = clamp(response + comboSurge * 0.36, 0, 1.45);
+  const focus = clamp(((read?.focusX ?? W / 2) - W / 2) / (W / 2), -1, 1);
+  const color = read?.color || "#fff1bd";
+  const spectatorSet = mobile
+    ? [
+        { x: 42, y: FLOOR + 95, s: 0.74, side: -1, phase: 0.1 },
+        { x: W - 48, y: FLOOR + 96, s: 0.76, side: 1, phase: 1.8 },
+        { x: 146, y: FLOOR + 118, s: 0.58, side: -1, phase: 2.9 },
+        { x: W - 150, y: FLOOR + 118, s: 0.6, side: 1, phase: 4.1 },
+      ]
+    : [
+        { x: 34, y: FLOOR + 78, s: 0.8, side: -1, phase: 0.1 },
+        { x: 104, y: FLOOR + 103, s: 0.66, side: -1, phase: 1.3 },
+        { x: 184, y: FLOOR + 122, s: 0.56, side: -1, phase: 2.6 },
+        { x: W - 36, y: FLOOR + 78, s: 0.82, side: 1, phase: 3.4 },
+        { x: W - 112, y: FLOOR + 104, s: 0.67, side: 1, phase: 4.6 },
+        { x: W - 196, y: FLOOR + 122, s: 0.55, side: 1, phase: 5.8 },
+        { x: 294, y: FLOOR + 137, s: 0.46, side: -1, phase: 6.7 },
+        { x: W - 294, y: FLOOR + 137, s: 0.46, side: 1, phase: 7.6 },
+      ];
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  const crowdShade = ctx.createLinearGradient(0, FLOOR + 38, 0, H);
+  crowdShade.addColorStop(0, "rgba(0,0,0,0)");
+  crowdShade.addColorStop(0.45, `rgba(10, 6, 6, ${0.08 + cheer * 0.035})`);
+  crowdShade.addColorStop(1, `rgba(0,0,0, ${0.26 + cheer * 0.08})`);
+  ctx.fillStyle = crowdShade;
+  ctx.fillRect(0, FLOOR + 26, W, H - FLOOR);
+
+  for (const spec of spectatorSet) {
+    drawDojoSpectatorSilhouette(spec, cheer, focus, color);
+  }
+
+  ctx.globalCompositeOperation = "screen";
+  const waveY = FLOOR + 92 + Math.sin(roundFrame * 0.022) * 3;
+  const wave = ctx.createLinearGradient(42, waveY, W - 42, waveY);
+  wave.addColorStop(0, "rgba(255, 241, 189, 0)");
+  wave.addColorStop(0.22, colorWithAlpha(color, 0.035 + cheer * 0.026));
+  wave.addColorStop(0.5, `rgba(255, 241, 189, ${0.028 + cheer * 0.024})`);
+  wave.addColorStop(0.78, colorWithAlpha(color, 0.035 + cheer * 0.026));
+  wave.addColorStop(1, "rgba(255, 241, 189, 0)");
+  ctx.strokeStyle = wave;
+  ctx.lineWidth = 2 + cheer * 1.6;
+  ctx.beginPath();
+  ctx.moveTo(48, waveY);
+  ctx.quadraticCurveTo(W / 2 + focus * 28, waveY + 16 + impact * 8, W - 48, waveY);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawDojoSpectatorSilhouette(spec, cheer, focus, color) {
+  const breathe = Math.sin(roundFrame * 0.026 + spec.phase) * 0.5 + 0.5;
+  const hop = Math.max(0, Math.sin(roundFrame * (0.05 + cheer * 0.012) + spec.phase * 1.7)) * cheer;
+  const lean = spec.side * (0.08 + focus * 0.035) + Math.sin(roundFrame * 0.015 + spec.phase) * 0.025;
+  const lift = hop * (7 + spec.s * 5) + cheer * 2.4;
+  const armLift = clamp(cheer * 0.95 + hop * 0.34 + (spec.phase % 2) * 0.08, 0, 1.2);
+  const s = spec.s;
+
+  ctx.save();
+  ctx.translate(spec.x, spec.y - lift);
+  ctx.rotate(lean);
+  ctx.scale(spec.side * s, s);
+
+  ctx.fillStyle = `rgba(10, 7, 6, ${0.56 + cheer * 0.12})`;
+  ctx.strokeStyle = `rgba(10, 7, 6, ${0.62 + cheer * 0.18})`;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 8;
+
+  ctx.beginPath();
+  ctx.ellipse(0, -90 - breathe * 2, 15, 17, -0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(-18, -70);
+  ctx.quadraticCurveTo(0, -83 - breathe * 2, 20, -70);
+  ctx.lineTo(29, -18);
+  ctx.quadraticCurveTo(0, -5 + cheer * 2, -30, -18);
+  ctx.closePath();
+  ctx.fill();
+
+  const leftRaise = armLift * (spec.phase % 3 === 0 ? 1.1 : 0.72);
+  const rightRaise = armLift * (spec.phase % 3 === 1 ? 1.08 : 0.78);
+  ctx.beginPath();
+  ctx.moveTo(-17, -62);
+  ctx.quadraticCurveTo(-43, -72 - leftRaise * 18, -48, -42 - leftRaise * 44);
+  ctx.moveTo(17, -62);
+  ctx.quadraticCurveTo(42, -74 - rightRaise * 20, 50, -42 - rightRaise * 46);
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(0,0,0,${0.18 + cheer * 0.06})`;
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 38, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(color, 0.045 + cheer * 0.06);
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(-13, -73);
+  ctx.quadraticCurveTo(0, -80, 15, -73);
+  ctx.stroke();
+  if (cheer > 0.45) {
+    ctx.strokeStyle = colorWithAlpha("#fff1bd", 0.05 + cheer * 0.04);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(-45, -42 - leftRaise * 42);
+    ctx.lineTo(-54, -47 - leftRaise * 46);
+    ctx.moveTo(47, -42 - rightRaise * 42);
+    ctx.lineTo(57, -48 - rightRaise * 46);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
