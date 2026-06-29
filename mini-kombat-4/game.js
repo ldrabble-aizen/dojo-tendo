@@ -7353,6 +7353,44 @@ function drawHealth(x, y, width, f, reverse, height = 28) {
   ctx.beginPath();
   ctx.roundRect(innerX, innerY, innerW, innerH, 4);
   ctx.stroke();
+
+  const counterReady = clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
+  if (counterReady > 0.025 && !winner) {
+    const counterW = innerW * counterReady;
+    const counterX = reverse ? innerX + innerW - counterW : innerX;
+    const spark = 0.72 + Math.sin(roundFrame * 0.38) * 0.28;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.shadowColor = colorWithAlpha(f.trim, 0.34 + counterReady * 0.28);
+    ctx.shadowBlur = 5 + counterReady * 8;
+    const counterFill = ctx.createLinearGradient(reverse ? innerX + innerW : innerX, y, reverse ? innerX : innerX + innerW, y);
+    counterFill.addColorStop(0, colorWithAlpha("#fff8d8", 0.9));
+    counterFill.addColorStop(0.52, colorWithAlpha("#ffe06f", 0.84));
+    counterFill.addColorStop(1, colorWithAlpha(f.trim, 0.82));
+    ctx.fillStyle = counterFill;
+    ctx.beginPath();
+    ctx.roundRect(counterX, innerY + innerH - 4, counterW, 4, 3);
+    ctx.fill();
+
+    ctx.strokeStyle = colorWithAlpha("#fff8d8", 0.26 + counterReady * 0.35);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(counterX + (reverse ? counterW : 0), innerY + innerH - 8);
+    ctx.lineTo(counterX + (reverse ? counterW - 14 * spark : 14 * spark), innerY + innerH + 1);
+    ctx.stroke();
+
+    if (width >= 220 && counterReady > 0.18) {
+      ctx.shadowBlur = 4;
+      ctx.fillStyle = colorWithAlpha("#fff1bd", 0.68 + counterReady * 0.28);
+      ctx.font = "900 8px system-ui, sans-serif";
+      ctx.textAlign = reverse ? "left" : "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText("COUNTER", reverse ? innerX + 7 : innerX + innerW - 7, innerY + innerH - 9);
+      ctx.textBaseline = "alphabetic";
+    }
+    ctx.restore();
+  }
 }
 
 function drawEnergy(x, y, width, f, reverse, height = 12) {
@@ -7389,6 +7427,7 @@ function drawEnergy(x, y, width, f, reverse, height = 12) {
   const gap = 4;
   const segmentW = (width - 4 - gap * (segments - 1)) / segments;
   const pct = clamp(f.energy / 100, 0, 1);
+  const readyMark = 0.45;
   const energy = ctx.createLinearGradient(reverse ? x + width : x, y, reverse ? x : x + width, y);
   energy.addColorStop(0, ready ? "#fff0a6" : "#69c8ff");
   energy.addColorStop(1, ready ? f.trim : "#3f7fb4");
@@ -7410,8 +7449,41 @@ function drawEnergy(x, y, width, f, reverse, height = 12) {
       ctx.beginPath();
       ctx.roundRect(fx, y + 3, fillW, height - 6, 3);
       ctx.fill();
+
+      if (ready && filled > 0.58) {
+        const glintX = reverse ? fx + 3 : fx + fillW - 3;
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        ctx.strokeStyle = colorWithAlpha("#fff8df", 0.1 + readyPulse * 0.22 + Math.sin(roundFrame * 0.18 + i) * 0.04);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(glintX, y + 3);
+        ctx.lineTo(glintX + (reverse ? -5 : 5), y + height - 3);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
   }
+
+  const markX = reverse ? x + width - width * readyMark : x + width * readyMark;
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = ready ? colorWithAlpha("#fff8df", 0.36 + readyPulse * 0.22) : "rgba(255,255,255,0.22)";
+  ctx.lineWidth = ready ? 1.6 : 1;
+  ctx.beginPath();
+  ctx.moveTo(markX, y - 1);
+  ctx.lineTo(markX, y + height + 1);
+  ctx.stroke();
+  if (ready) {
+    ctx.fillStyle = colorWithAlpha("#fff8df", 0.2 + readyPulse * 0.28);
+    ctx.beginPath();
+    ctx.moveTo(markX + (reverse ? 4 : -4), y - 2);
+    ctx.lineTo(markX, y + 3);
+    ctx.lineTo(markX + (reverse ? 4 : -4), y + 8);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
 
   ctx.strokeStyle = ready ? "rgba(255, 239, 168, 0.82)" : "rgba(255,255,255,0.18)";
   ctx.lineWidth = 1;
@@ -7427,7 +7499,7 @@ function drawEnergy(x, y, width, f, reverse, height = 12) {
     ctx.font = `900 ${height <= 9 ? 7 : 8}px system-ui, sans-serif`;
     ctx.textAlign = reverse ? "left" : "right";
     ctx.textBaseline = "middle";
-    ctx.fillText("SPECIAL", reverse ? x + 4 : x + width - 4, y + height / 2 + 0.5);
+    ctx.fillText(width >= 170 ? "SPECIAL READY" : "READY", reverse ? x + 4 : x + width - 4, y + height / 2 + 0.5);
     ctx.restore();
     ctx.textBaseline = "alphabetic";
   }
