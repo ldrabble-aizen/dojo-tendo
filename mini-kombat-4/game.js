@@ -1691,6 +1691,18 @@ const SOUND_PRESETS = {
     ],
     cooldown: 0.55,
   },
+  introClash: {
+    duration: 0.46,
+    volume: 0.074,
+    type: "triangle",
+    freq: [196, 392, 294],
+    noise: { volume: 0.026, type: "bandpass", frequency: 1100, q: 0.72, duration: 0.14 },
+    layers: [
+      { type: "sine", freq: [65, 43], volume: 0.34, duration: 0.42 },
+      { type: "triangle", freq: [588, 784], volume: 0.12, delay: 0.08, duration: 0.16 },
+    ],
+    cooldown: 0.38,
+  },
   musicBreath: {
     duration: 0.92,
     volume: 0.018,
@@ -2460,6 +2472,7 @@ function resetRound() {
     fighter.bracePulse = Math.max(fighter.bracePulse ?? 0, 18);
     playSound("introCard", { x: fighter.x, intensity: index === 0 ? 0.92 : 1.02, key: `${fighter.id}:${roundNumber}` });
   });
+  playSound("introClash", { intensity: 0.82, key: `round:${roundNumber}` });
   syncShellState();
   sendOnlineSnapshot(true);
 }
@@ -5536,6 +5549,7 @@ function draw() {
     drawHud();
     drawComboCounters();
     drawRoundIntroCards();
+    drawRoundClashSlate();
     drawCountdown();
     drawKOBanner();
     drawFinishFreezeFrame();
@@ -5900,6 +5914,136 @@ function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
   ctx.fillText(compactIntroText(presentation.signature, 30).toUpperCase(), textAnchor, y + 86);
 
   ctx.restore();
+}
+
+function drawRoundClashSlate() {
+  if (countdownFrames <= 36 || countdownFrames > 132 || !running || paused || winner) return;
+  if (isMobileFightView()) return;
+
+  const age = 132 - countdownFrames;
+  const intro = smoothStep01(clamp(age / 15, 0, 1));
+  const outro = smoothStep01(clamp((countdownFrames - 36) / 24, 0, 1));
+  const alpha = intro * outro;
+  if (alpha <= 0.01) return;
+
+  const mobile = false;
+  const y = H - 116;
+  const panelW = 312;
+  const panelH = 72;
+  const gap = 18;
+  const slide = (1 - intro) * 76;
+  const leftX = W / 2 - panelW - gap - slide;
+  const rightX = W / 2 + gap + slide;
+  const pulse = 0.5 + Math.sin((132 - countdownFrames) * 0.15) * 0.5;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  drawClashFighterPlate(fighters[0], leftX, y, panelW, panelH, false, pulse, mobile);
+  drawClashFighterPlate(fighters[1], rightX, y, panelW, panelH, true, pulse, mobile);
+
+  const centerW = mobile ? 66 : 82;
+  const centerH = mobile ? 52 : 62;
+  const centerX = W / 2 - centerW / 2;
+  const centerY = y + panelH / 2 - centerH / 2;
+  const centerGrad = ctx.createLinearGradient(centerX, centerY, centerX + centerW, centerY + centerH);
+  centerGrad.addColorStop(0, "rgba(72, 16, 12, 0.92)");
+  centerGrad.addColorStop(0.5, "rgba(14, 10, 10, 0.94)");
+  centerGrad.addColorStop(1, "rgba(72, 16, 12, 0.92)");
+  ctx.fillStyle = centerGrad;
+  ctx.beginPath();
+  ctx.roundRect(centerX, centerY, centerW, centerH, 7);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(255, 241, 189, ${0.34 + pulse * 0.2})`;
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = `rgba(255, 212, 77, ${0.22 + pulse * 0.18})`;
+  ctx.lineWidth = mobile ? 2 : 3;
+  ctx.beginPath();
+  ctx.moveTo(centerX + 8, centerY + centerH / 2);
+  ctx.lineTo(centerX + centerW - 8, centerY + centerH / 2);
+  ctx.stroke();
+  ctx.globalCompositeOperation = "source-over";
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#fff1bd";
+  ctx.strokeStyle = "rgba(38, 10, 7, 0.88)";
+  ctx.lineWidth = mobile ? 4 : 5;
+  ctx.font = `900 ${mobile ? 24 : 30}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
+  ctx.strokeText("CLASH", W / 2, centerY + centerH / 2 - (mobile ? 2 : 3));
+  ctx.fillText("CLASH", W / 2, centerY + centerH / 2 - (mobile ? 2 : 3));
+  ctx.fillStyle = "rgba(126, 240, 207, 0.84)";
+  ctx.font = `900 ${mobile ? 7 : 8}px system-ui, sans-serif`;
+  ctx.fillText("PLAN DE ROUND", W / 2, centerY + centerH - 10);
+  ctx.restore();
+}
+
+function drawClashFighterPlate(fighter, x, y, width, height, reverse, pulse, mobile) {
+  if (!fighter) return;
+  const presentation = fighterPresentation(fighter);
+  const trim = fighter.trim || "#fff1bd";
+  const color = fighter.color || "#111216";
+  const textX = reverse ? x + width - 13 : x + 13;
+  const align = reverse ? "right" : "left";
+  const tag = compactIntroText(presentation.archetype || fighterTrait(fighter), mobile ? 13 : 16).toUpperCase();
+  const signature = compactIntroText(presentation.signature, mobile ? 20 : 27).toUpperCase();
+  const edge = compactIntroText(presentation.edge || presentation.callout, mobile ? 24 : 36).toUpperCase();
+
+  const panel = ctx.createLinearGradient(x, y, x + width, y + height);
+  panel.addColorStop(0, colorWithAlpha(reverse ? "#090a0d" : color, 0.76));
+  panel.addColorStop(0.5, "rgba(10, 9, 10, 0.82)");
+  panel.addColorStop(1, colorWithAlpha(reverse ? color : "#090a0d", 0.74));
+  ctx.fillStyle = panel;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 8);
+  ctx.fill();
+  ctx.strokeStyle = colorWithAlpha(trim, 0.38 + pulse * 0.16);
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "screen";
+  const beam = ctx.createLinearGradient(reverse ? x + width : x, y, reverse ? x : x + width, y + height);
+  beam.addColorStop(0, colorWithAlpha(trim, 0.16 + pulse * 0.08));
+  beam.addColorStop(0.42, "rgba(255,255,255,0)");
+  beam.addColorStop(1, colorWithAlpha(color, 0.06));
+  ctx.fillStyle = beam;
+  ctx.beginPath();
+  if (reverse) {
+    ctx.moveTo(x + width - 8, y + 5);
+    ctx.lineTo(x + width * 0.22, y + 5);
+    ctx.lineTo(x + width * 0.42, y + height - 5);
+    ctx.lineTo(x + width - 4, y + height - 5);
+  } else {
+    ctx.moveTo(x + 8, y + 5);
+    ctx.lineTo(x + width * 0.78, y + 5);
+    ctx.lineTo(x + width * 0.58, y + height - 5);
+    ctx.lineTo(x + 4, y + height - 5);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = colorWithAlpha(trim, 0.94);
+  ctx.font = `900 ${mobile ? 8 : 9}px system-ui, sans-serif`;
+  ctx.fillText(tag, textX, y + (mobile ? 13 : 15));
+  ctx.fillStyle = "#fff1bd";
+  ctx.strokeStyle = "rgba(29, 8, 6, 0.88)";
+  ctx.lineWidth = mobile ? 3 : 4;
+  ctx.font = `900 ${mobile ? 20 : 25}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
+  ctx.strokeText(fighter.name.toUpperCase(), textX, y + (mobile ? 34 : 40));
+  ctx.fillText(fighter.name.toUpperCase(), textX, y + (mobile ? 34 : 40));
+  ctx.fillStyle = colorWithAlpha(trim, 0.9);
+  ctx.font = `900 ${mobile ? 7 : 8}px system-ui, sans-serif`;
+  ctx.fillText(signature, textX, y + (mobile ? 47 : 55));
+  if (!mobile) {
+    ctx.fillStyle = "rgba(255, 247, 214, 0.72)";
+    ctx.font = "850 8px system-ui, sans-serif";
+    ctx.fillText(edge, textX, y + 66);
+  }
 }
 
 function drawCountdown() {
