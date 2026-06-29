@@ -18305,6 +18305,7 @@ function makeHomePremierePanel(leftId, rightId) {
     stats.append(row);
   }
   panel.append(stats);
+  panel.append(makeHomeFightBill(leftProfile, rightProfile, scout));
   return panel;
 }
 
@@ -18322,6 +18323,45 @@ function makePremiereFighterRead(profile, presentation, plan, side) {
   edge.textContent = plan;
   read.append(name, discipline, signature, edge);
   return read;
+}
+
+function makeHomeFightBill(leftProfile, rightProfile, scout) {
+  const leftStats = menuStatValues(leftProfile);
+  const rightStats = menuStatValues(rightProfile);
+  const leftPressure = Math.round(leftStats[0] * 0.42 + leftStats[1] * 0.35 + leftStats[2] * 0.23);
+  const rightPressure = Math.round(rightStats[0] * 0.42 + rightStats[1] * 0.35 + rightStats[2] * 0.23);
+  const pressureTotal = Math.max(1, leftPressure + rightPressure);
+  const pressureFill = clamp(leftPressure / pressureTotal, 0.18, 0.82);
+  const leftPresentation = fighterPresentation(leftProfile);
+  const rightPresentation = fighterPresentation(rightProfile);
+  const bill = document.createElement("div");
+  bill.className = "home-fight-bill";
+  bill.style.setProperty("--left-pressure", `${Math.round(pressureFill * 100)}%`);
+
+  const rows = [
+    ["RITMO", scout.tempo],
+    ["CONDICION", `${leftProfile.name}: ${leftPresentation.edge}`],
+    ["RESPUESTA", `${rightProfile.name}: ${rightPresentation.edge}`],
+    ["RIESGO", scout.warning],
+  ];
+  for (const [label, value] of rows) {
+    const chip = document.createElement("span");
+    const key = document.createElement("b");
+    key.textContent = label;
+    chip.append(key, document.createTextNode(value));
+    bill.append(chip);
+  }
+
+  const meter = document.createElement("div");
+  meter.className = "home-fight-bill-meter";
+  const left = document.createElement("b");
+  left.textContent = `${leftProfile.name} ${leftPressure}`;
+  const rail = document.createElement("i");
+  const right = document.createElement("b");
+  right.textContent = `${rightPressure} ${rightProfile.name}`;
+  meter.append(left, rail, right);
+  bill.append(meter);
+  return bill;
 }
 
 function renderVersusPanel(roundLabel) {

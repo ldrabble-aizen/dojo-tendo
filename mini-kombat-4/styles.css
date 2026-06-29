@@ -1371,6 +1371,91 @@ canvas {
   background: linear-gradient(90deg, var(--right-trim, #5ee0b4), var(--right-color, #cc3a3f));
 }
 
+.home-fight-bill {
+  position: relative;
+  z-index: 1;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(255, 241, 189, 0.18);
+  border-radius: 7px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--left-trim, #ffd44d) 12%, transparent), transparent 34%, transparent 66%, color-mix(in srgb, var(--right-trim, #5ee0b4) 12%, transparent)),
+    rgba(0, 0, 0, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  text-transform: uppercase;
+}
+
+.home-fight-bill span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  color: rgba(255, 247, 214, 0.72);
+  font: 850 8px/1.16 system-ui, sans-serif;
+}
+
+.home-fight-bill span b {
+  color: rgba(126, 240, 207, 0.92);
+  font: 950 8px/1 system-ui, sans-serif;
+}
+
+.home-fight-bill span:nth-child(3) b {
+  color: rgba(255, 212, 77, 0.92);
+}
+
+.home-fight-bill-meter {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr) minmax(72px, auto);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.home-fight-bill-meter b {
+  overflow: hidden;
+  color: rgba(255, 247, 214, 0.74);
+  font: 900 8px/1 system-ui, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-fight-bill-meter b:last-child {
+  text-align: right;
+}
+
+.home-fight-bill-meter i {
+  position: relative;
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 241, 189, 0.16);
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0.18));
+}
+
+.home-fight-bill-meter i::before,
+.home-fight-bill-meter i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.home-fight-bill-meter i::before {
+  width: var(--left-pressure, 50%);
+  background: linear-gradient(90deg, var(--left-color, #2677bf), var(--left-trim, #ffd44d));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--left-trim, #ffd44d) 48%, transparent);
+}
+
+.home-fight-bill-meter i::after {
+  left: var(--left-pressure, 50%);
+  background: linear-gradient(90deg, var(--right-trim, #5ee0b4), var(--right-color, #cc3a3f));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--right-trim, #5ee0b4) 44%, transparent);
+}
+
 .fighter-select-versus {
   align-self: center;
   display: grid;
@@ -1752,8 +1837,8 @@ canvas {
   grid-template-rows: auto auto minmax(0, auto) auto;
   align-content: center;
   justify-items: center;
-  gap: 10px;
-  padding: 18px;
+  gap: 8px;
+  padding: 12px 18px;
   background:
     radial-gradient(circle at 50% 16%, rgba(255, 236, 168, 0.2), transparent 22%),
     radial-gradient(circle at 13% 24%, rgba(77, 219, 202, 0.15), transparent 28%),
@@ -1794,10 +1879,10 @@ canvas {
 .overlay[data-screen="home"] h1 {
   isolation: isolate;
   width: min(760px, calc(100% - 28px));
-  padding: 9px 18px 6px;
+  padding: 7px 18px 4px;
   color: transparent;
   font-family: Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
-  font-size: 76px;
+  font-size: 64px;
   line-height: 0.84;
   background:
     linear-gradient(180deg, #fffce8 0%, #ffe483 31%, #ec5a2e 61%, #8e1d12 100%);
@@ -1851,8 +1936,8 @@ canvas {
 }
 
 .overlay[data-screen="home"] .fighter-select-column {
-  min-height: 300px;
-  padding: 12px;
+  min-height: 270px;
+  padding: 10px;
   border-color: color-mix(in srgb, var(--fighter-trim) 64%, rgba(255, 241, 189, 0.28));
   border-radius: 8px;
   background:
@@ -1871,14 +1956,14 @@ canvas {
 }
 
 .overlay[data-screen="home"] .fighter-select-heading {
-  padding: 3px 4px 8px;
+  padding: 2px 4px 6px;
 }
 
 .overlay[data-screen="home"] .fighter-showcase {
-  grid-template-columns: 142px minmax(0, 1fr);
-  min-height: 166px;
-  gap: 15px;
-  padding: 11px;
+  grid-template-columns: 124px minmax(0, 1fr);
+  min-height: 142px;
+  gap: 12px;
+  padding: 9px;
   border-color: color-mix(in srgb, var(--fighter-trim) 38%, rgba(255, 241, 189, 0.22));
   border-radius: 8px;
   background:
@@ -1888,19 +1973,19 @@ canvas {
 }
 
 .overlay[data-screen="home"] .fighter-showcase-portrait {
-  width: 142px;
-  height: 142px;
+  width: 124px;
+  height: 124px;
   border-radius: 8px;
 }
 
 .overlay[data-screen="home"] .fighter-showcase-portrait img {
-  width: 122px;
-  height: 122px;
+  width: 106px;
+  height: 106px;
 }
 
 .overlay[data-screen="home"] .fighter-showcase-info strong {
-  font-size: 31px;
-  line-height: 1.36;
+  font-size: 28px;
+  line-height: 1.24;
 }
 
 .overlay[data-screen="home"] .fighter-showcase-info > span {
@@ -1945,19 +2030,19 @@ canvas {
 }
 
 .overlay[data-screen="home"] .fighter-choice-grid {
-  gap: 8px;
+  gap: 6px;
 }
 
 .overlay[data-screen="home"] .fighter-choice {
-  min-height: 106px;
-  padding: 8px 6px;
+  min-height: 88px;
+  padding: 6px 5px;
   border-color: rgba(255, 220, 126, 0.38);
   border-radius: 7px;
 }
 
 .overlay[data-screen="home"] .fighter-choice img {
-  width: 74px;
-  height: 74px;
+  width: 62px;
+  height: 62px;
   border-radius: 6px;
 }
 
@@ -3050,6 +3135,28 @@ canvas {
     display: none;
   }
 
+  .home-fight-bill {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 6px;
+    gap: 5px;
+  }
+
+  .home-fight-bill span {
+    font-size: 7px;
+  }
+
+  .home-fight-bill span:nth-child(n+3) {
+    display: none;
+  }
+
+  .home-fight-bill-meter {
+    gap: 5px;
+  }
+
+  .home-fight-bill-meter b {
+    font-size: 7px;
+  }
+
   .online-panel {
     width: min(520px, calc(100% - 10px));
   }
@@ -3677,6 +3784,10 @@ canvas {
     display: none;
   }
 
+  .overlay[data-screen="home"] .home-fight-bill {
+    display: none;
+  }
+
   .fighter-choice-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     align-content: start;
@@ -4093,8 +4204,8 @@ canvas {
 
 .overlay[data-screen="home"] h1 {
   max-width: min(820px, calc(100% - 18px));
-  padding-top: 22px;
-  font-size: clamp(48px, 8.6vw, 100px);
+  padding-top: 15px;
+  font-size: clamp(44px, 6.2vw, 76px);
   background:
     linear-gradient(180deg, #fffdf0 0%, #ffe690 25%, #ef6a38 55%, #8c1c12 78%, #2a0706 100%);
   -webkit-background-clip: text;
