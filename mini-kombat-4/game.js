@@ -108,6 +108,8 @@ let roundNumber = 1;
 let roundTimerFrames = ROUND_TIMER_FRAMES;
 let roundFinishKind = "ko";
 let musicClock = 0;
+let attractMusicClock = 0;
+let attractMusicLastScreen = "";
 let musicDirector = {
   round: 0,
   matchPoint: false,
@@ -1726,6 +1728,44 @@ const SOUND_PRESETS = {
     layers: [{ type: "triangle", freq: [219, 220], volume: 0.08, duration: 0.82 }],
     cooldown: 0.5,
   },
+  menuDrone: {
+    duration: 1.35,
+    volume: 0.022,
+    type: "sine",
+    freq: [73, 73.2],
+    noise: { volume: 0.018, type: "bandpass", frequency: 310, q: 0.46, duration: 1.1 },
+    layers: [
+      { type: "triangle", freq: [146, 146.4], volume: 0.12, duration: 1.12 },
+      { type: "sine", freq: [36.5, 36.6], volume: 0.34, duration: 1.28 },
+    ],
+    cooldown: 0.86,
+  },
+  menuPulse: {
+    duration: 0.28,
+    volume: 0.036,
+    type: "sine",
+    freq: [86, 48],
+    noise: { volume: 0.02, type: "lowpass", frequency: 170, duration: 0.18 },
+    layers: [{ type: "triangle", freq: [172, 96], volume: 0.1, duration: 0.18 }],
+    cooldown: 0.16,
+  },
+  menuBell: {
+    duration: 0.7,
+    volume: 0.034,
+    type: "triangle",
+    freq: [438, 584],
+    noise: { volume: 0.006, type: "highpass", frequency: 2200, duration: 0.08 },
+    layers: [{ type: "sine", freq: [876, 1168], volume: 0.12, duration: 0.46 }],
+    cooldown: 0.14,
+  },
+  menuShimmer: {
+    duration: 0.22,
+    volume: 0.02,
+    type: "triangle",
+    freq: [660, 990],
+    noise: { volume: 0.022, type: "highpass", frequency: 2600, duration: 0.08 },
+    cooldown: 0.1,
+  },
   stageBreath: {
     duration: 1.4,
     volume: 0.018,
@@ -2195,6 +2235,98 @@ function playStageAmbienceTick() {
   }
 }
 
+function attractMusicTensionLevel() {
+  const leftProfile = fighterProfiles[selectedLeftId] ?? fighters[0];
+  const rightProfile = fighterProfiles[selectedRightId] ?? fighters[1];
+  if (!leftProfile || !rightProfile) return 0.24;
+
+  const leftStats = menuStatValues(leftProfile);
+  const rightStats = menuStatValues(rightProfile);
+  const gap = Math.max(
+    Math.abs(leftStats[0] - rightStats[0]),
+    Math.abs(leftStats[1] - rightStats[1]),
+    Math.abs(leftStats[2] - rightStats[2])
+  );
+  const screenLift = overlay.dataset.screen === "versus" ? 0.28 : 0;
+  const tournamentLift = tournamentMode || tournamentActive ? 0.12 : 0;
+  return clamp(0.2 + gap / 85 + screenLift + tournamentLift, 0.2, 1.05);
+}
+
+function playAttractMusicTick() {
+  if (!audioCtx || !soundEnabled || !isAttractModeActive()) return;
+
+  const screen = overlay.dataset.screen || "home";
+  if (screen !== attractMusicLastScreen) {
+    attractMusicLastScreen = screen;
+    attractMusicClock = 0;
+  }
+  if (attractFrame % 30 !== 0) return;
+
+  const step = attractMusicClock % 16;
+  const bar = Math.floor(attractMusicClock / 16);
+  const tension = attractMusicTensionLevel();
+  const homeRoots = [73.42, 65.41, 82.41, 55];
+  const versusRoots = [65.41, 73.42, 49, 82.41];
+  const rootCycle = screen === "versus" ? versusRoots : homeRoots;
+  const root = rootCycle[bar % rootCycle.length];
+  const scale = [1, 1.125, 1.25, 1.5, 1.6875, 2];
+  const melody = [3, 1, 4, 2, 5, 3, 4, 0, 3, 2, 4, 1, 5, 4, 2, 0];
+  const note = root * scale[melody[(step + bar * 2) % melody.length]];
+  const pan = Math.sin((attractMusicClock + bar) * 0.66) * 0.18;
+
+  if (step === 0 || step === 8) {
+    playSound("menuDrone", {
+      freq: [root, root * (1.002 + tension * 0.003)],
+      layers: [
+        { type: "triangle", freq: [root * 2, root * (2.004 + tension * 0.003)], volume: 0.1 + tension * 0.035, duration: 1.06 },
+        { type: "sine", freq: [root * 0.5, root * 0.502], volume: 0.32 + tension * 0.08, duration: 1.24 },
+      ],
+      intensity: screen === "versus" ? 0.78 + tension * 0.16 : 0.58 + tension * 0.18,
+      pan: 0,
+      key: `${screen}:drone`,
+    });
+  }
+
+  if (step === 0 || step === 4 || step === 8 || step === 12) {
+    playSound("menuPulse", {
+      freq: [root * (step === 0 || step === 8 ? 0.72 : 0.86), root * 0.42],
+      intensity: 0.54 + tension * 0.26,
+      pan: step === 4 ? -0.08 : step === 12 ? 0.08 : 0,
+      key: `${screen}:pulse:${step}`,
+    });
+  }
+
+  if (step === 2 || step === 6 || step === 11 || step === 15) {
+    playSound("menuBell", {
+      freq: [note, note * 1.333],
+      layers: [{ type: "sine", freq: [note * 2, note * 2.01], volume: 0.1 + tension * 0.03, duration: 0.42 }],
+      intensity: 0.44 + tension * 0.28,
+      pan,
+      key: `${screen}:bell:${step}`,
+    });
+  }
+
+  if ((screen === "versus" && (step === 3 || step === 10 || step === 14)) || (screen === "home" && tension > 0.48 && (step === 7 || step === 13))) {
+    playSound("menuShimmer", {
+      freq: [note * 1.5, note * 2.25],
+      intensity: screen === "versus" ? 0.58 + tension * 0.22 : 0.42 + tension * 0.18,
+      pan: -pan,
+      key: `${screen}:shimmer:${step}`,
+    });
+  }
+
+  if (screen === "versus" && (step === 0 || step === 8)) {
+    playSound("introClash", {
+      freq: [root * 2, root * 3, root * 2.25],
+      intensity: 0.38 + tension * 0.2,
+      pan: 0,
+      key: `attract:${bar}:${step}`,
+    });
+  }
+
+  attractMusicClock += 1;
+}
+
 function finalPressureLevel() {
   if (!running || winner || countdownFrames > 0 || roundTimerFrames > 10 * 60) return 0;
   return clamp((10 * 60 - roundTimerFrames) / (10 * 60), 0.08, 1);
@@ -2580,6 +2712,8 @@ function cueHomeIntro() {
 
 function showHomeOverlay() {
   if (!running) attractFrame = 0;
+  attractMusicClock = 0;
+  attractMusicLastScreen = "";
   overlayMode = "home";
   overlay.dataset.screen = "home";
   overlay.dataset.mode = tournamentMode ? "tournament" : "match";
@@ -2597,6 +2731,8 @@ function showHomeOverlay() {
 
 function showVersusOverlay(startKind = "match") {
   attractFrame = 0;
+  attractMusicClock = 0;
+  attractMusicLastScreen = "";
   pendingFightStart = startKind;
   overlayMode = "versus";
   overlay.dataset.screen = "versus";
@@ -3279,6 +3415,7 @@ function updateAttractMode() {
   cameraZoom += (1.055 - cameraZoom) * 0.06;
   cameraPan += (Math.sin(attractFrame * 0.012) * 10 - cameraPan) * 0.04;
   cameraLift += (5 + Math.sin(attractFrame * 0.018) * 3 - cameraLift) * 0.06;
+  playAttractMusicTick();
 
   if (attractFrame % 54 === 0 && particles.length < particleBudget() * 0.45) {
     const f = fighters[(attractFrame / 54) % 2 | 0];
