@@ -92,6 +92,7 @@ let hitStopFrames = 0;
 let koFreeze = 0;
 let roundFrame = 0;
 let resultFrame = 0;
+let attractFrame = 0;
 let cpuEnabled = true;
 let cpuFighterId = "p1";
 let selectedLeftId = "p1";
@@ -2204,6 +2205,7 @@ function cueHomeIntro() {
 }
 
 function showHomeOverlay() {
+  if (!running) attractFrame = 0;
   overlayMode = "home";
   overlay.dataset.screen = "home";
   overlay.dataset.mode = tournamentMode ? "tournament" : "match";
@@ -2220,6 +2222,7 @@ function showHomeOverlay() {
 }
 
 function showVersusOverlay(startKind = "match") {
+  attractFrame = 0;
   pendingFightStart = startKind;
   overlayMode = "versus";
   overlay.dataset.screen = "versus";
@@ -2788,6 +2791,131 @@ function updateCameraImpactPulse() {
   else screenTearStrength = 0;
 }
 
+function isAttractModeActive() {
+  if (running || winner || overlay.classList.contains("hidden")) return false;
+  return overlay.dataset.screen === "home" || overlay.dataset.screen === "versus";
+}
+
+function makeAttractAttack(type, frame) {
+  const timing = attackTiming(type);
+  const heavy = type === "kick" || type === "airKick";
+  const sweep = type === "sweep";
+  const grab = type === "grab";
+  const air = type === "airPunch" || type === "airKick";
+  return {
+    type,
+    frame: clamp(frame, 0, timing.duration - 1),
+    activeStart: timing.activeStart,
+    activeEnd: timing.activeEnd,
+    duration: timing.duration,
+    damage: grab ? 12 : sweep ? 8 : air ? 9 : heavy ? 11 : 7,
+    reach: grab ? 48 : sweep ? 88 : heavy ? 84 : 58,
+    height: grab ? 70 : sweep ? 34 : heavy ? 70 : 50,
+    hit: true,
+    whoosh: true,
+  };
+}
+
+function updateAttractFighter(f, index) {
+  const side = index === 0 ? -1 : 1;
+  const facing = index === 0 ? 1 : -1;
+  const screen = overlay.dataset.screen;
+  const t = attractFrame + index * 52;
+  const cycle = t % 360;
+  const centerX = W / 2 + side * (screen === "versus" ? 250 : 276);
+  const drift = Math.sin(t * 0.018) * (screen === "versus" ? 16 : 28);
+  const stance = Math.sin(t * 0.052);
+  const walking = cycle < 106 || (cycle > 274 && cycle < 326);
+  const bracing = cycle >= 172 && cycle < 230;
+  const special = cycle >= 230 && cycle < 274;
+  const attackType = special ? "special" : index === 0 ? (cycle < 142 ? "punch" : "kick") : (cycle < 142 ? "kick" : "punch");
+  const attackStart = special ? 230 : 106;
+  const attackFrame = cycle >= attackStart && cycle < attackStart + attackTiming(attackType).duration
+    ? cycle - attackStart
+    : -1;
+
+  f.x = clamp(centerX + drift, FIGHTER_EDGE_PAD + 32, W - FIGHTER_EDGE_PAD - 32);
+  f.y = FLOOR;
+  f.dir = facing;
+  f.vx = walking ? facing * (0.76 + Math.abs(stance) * 0.58) : 0;
+  f.vy = 0;
+  f.grounded = true;
+  f.health = 100;
+  f.healthLag = 100;
+  f.energy = special ? 98 : 72 + Math.sin(t * 0.021) * 8;
+  f.blocking = bracing;
+  f.crouch += ((bracing ? 0.74 : 0) - f.crouch) * 0.16;
+  f.hurt = 0;
+  f.cooldown = 0;
+  f.specialCooldown = 0;
+  f.attack = attackFrame >= 0 ? makeAttractAttack(attackType, attackFrame) : null;
+  f.attackEntryPulse = f.attack ? Math.max(f.attackEntryPulse ?? 0, 10) : Math.max(0, (f.attackEntryPulse ?? 0) - 1);
+  f.attackRecoverPulse = f.attack ? 0 : Math.max(0, (f.attackRecoverPulse ?? 0) - 1);
+  f.attackChainPulse = f.attack ? Math.max(f.attackChainPulse ?? 0, 8) : Math.max(0, (f.attackChainPulse ?? 0) - 1);
+  f.attackChainMax = Math.max(f.attackChainMax ?? 1, 8);
+  f.attackChainFrom = f.attack ? (special ? "kick" : "") : "";
+  f.attackChainTo = f.attack?.type ?? "";
+  f.guardPulse = bracing ? Math.min(18, (f.guardPulse ?? 0) + 1) : (f.guardPulse ?? 0) * 0.74;
+  f.guardEntryPulse = bracing ? Math.max(f.guardEntryPulse ?? 0, 8) : Math.max(0, (f.guardEntryPulse ?? 0) - 1);
+  f.guardExitPulse = bracing ? 0 : Math.max(0, (f.guardExitPulse ?? 0) - 1);
+  f.specialReadyPulse = special ? Math.max(f.specialReadyPulse ?? 0, 40) : Math.max(0, (f.specialReadyPulse ?? 0) - 1);
+  f.dynamicLightPulse = special ? Math.max(f.dynamicLightPulse ?? 0, 24) : Math.max(0, (f.dynamicLightPulse ?? 0) - 1);
+  f.dynamicLightMax = Math.max(f.dynamicLightMax ?? 1, special ? 24 : 12);
+  f.dynamicLightColor = special ? (f.specialStyle?.rim ?? f.trim) : f.trim;
+  f.dynamicLightZone = special ? "torso" : "head";
+  f.dynamicLightDir = f.dir;
+  f.dynamicLightStrength = special ? 0.86 : 0.34;
+  f.bracePulse = bracing ? Math.max(f.bracePulse ?? 0, 12) : Math.max(0, (f.bracePulse ?? 0) - 1);
+  f.moveIntent = walking ? f.dir : 0;
+  f.rangePressure = bracing ? 0.6 : 0.18 + Math.abs(stance) * 0.18;
+  f.rangeSide = f.dir;
+  f.comboCount = 0;
+  f.comboTimer = 0;
+  f.comboPulse = 0;
+  f.pigMorph = 0;
+  f.koFall = 0;
+  f.victoryPulse = cycle > 326 ? Math.max(f.victoryPulse ?? 0, 34) : Math.max(0, (f.victoryPulse ?? 0) - 1);
+
+  if (walking) {
+    f.walkCycle = (f.walkCycle ?? 0) + f.dir * 0.16;
+    const stride = Math.sin(f.walkCycle);
+    f.walkStrideSmooth = stride;
+    f.walkPlant = smoothStep01(Math.abs(Math.cos(f.walkCycle)));
+    f.walkSwing = Math.abs(stride);
+    f.walkWeight = 0.56 + Math.abs(stance) * 0.18;
+    f.footPlantPulse = Math.max(f.footPlantPulse ?? 0, 5);
+    f.walkAnchorPulse = Math.max(f.walkAnchorPulse ?? 0, 7);
+    f.walkPushPulse = Math.max(f.walkPushPulse ?? 0, 5);
+  } else {
+    f.walkWeight = (f.walkWeight ?? 0) * 0.84;
+    f.walkPlant = (f.walkPlant ?? 0) * 0.72;
+    f.walkSwing = (f.walkSwing ?? 0) * 0.72;
+    f.walkStrideSmooth = (f.walkStrideSmooth ?? 0) * 0.72;
+  }
+
+  updatePoseTransition(f);
+}
+
+function updateAttractMode() {
+  if (!isAttractModeActive()) return;
+  attractFrame += 1;
+  roundFrame += 1;
+  for (let i = 0; i < fighters.length; i += 1) updateAttractFighter(fighters[i], i);
+  cameraZoom += (1.055 - cameraZoom) * 0.06;
+  cameraPan += (Math.sin(attractFrame * 0.012) * 10 - cameraPan) * 0.04;
+  cameraLift += (5 + Math.sin(attractFrame * 0.018) * 3 - cameraLift) * 0.06;
+
+  if (attractFrame % 54 === 0 && particles.length < particleBudget() * 0.45) {
+    const f = fighters[(attractFrame / 54) % 2 | 0];
+    addText(f.x, FLOOR - 188, fighterPresentation(f).signature.toUpperCase(), f.trim, {
+      size: 17,
+      life: 58,
+      rise: 0.22,
+      drift: -f.dir * 0.05,
+    });
+  }
+}
+
 function update() {
   tickOnlineHeartbeat();
   if (onlineGuestActive()) {
@@ -2817,6 +2945,7 @@ function update() {
   }
 
   if (!running) {
+    updateAttractMode();
     if (winner) resultFrame += 1;
     updateCameraImpactPulse();
     updateParticles();
@@ -4929,6 +5058,7 @@ function applyCamera() {
 }
 
 function draw() {
+  const attractActive = isAttractModeActive();
   ctx.save();
   if (shake > 0) {
     const amount = shake * (isMobileFightView() ? 0.14 : 0.22);
@@ -4944,15 +5074,19 @@ function draw() {
   drawFloatingTexts();
   ctx.restore();
 
-  drawHud();
-  drawComboCounters();
-  drawRoundIntroCards();
-  drawCountdown();
-  drawKOBanner();
-  drawAnnouncerCue();
-  drawCinematicHitOverlay();
-  drawScreenTearOverlay();
-  drawCriticalStateOverlay();
+  if (attractActive) {
+    drawAttractModeOverlay();
+  } else {
+    drawHud();
+    drawComboCounters();
+    drawRoundIntroCards();
+    drawCountdown();
+    drawKOBanner();
+    drawAnnouncerCue();
+    drawCinematicHitOverlay();
+    drawScreenTearOverlay();
+    drawCriticalStateOverlay();
+  }
   drawDirectorGrade();
 
   if (flash > 0) {
@@ -4960,6 +5094,81 @@ function draw() {
     ctx.fillRect(0, 0, W, H);
   }
 
+}
+
+function drawAttractModeOverlay() {
+  const t = attractFrame;
+  const titleAlpha = overlay.dataset.screen === "versus" ? 0.16 : 0.22;
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  const shade = ctx.createLinearGradient(0, 0, 0, H);
+  shade.addColorStop(0, "rgba(8, 6, 7, 0.46)");
+  shade.addColorStop(0.44, "rgba(18, 10, 9, 0.18)");
+  shade.addColorStop(1, "rgba(8, 6, 7, 0.58)");
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.globalCompositeOperation = "screen";
+  const beam = ctx.createLinearGradient(0, H * 0.2, W, H * 0.74);
+  beam.addColorStop(0, colorWithAlpha(fighters[0]?.trim ?? "#ffd44d", 0.08));
+  beam.addColorStop(0.5, "rgba(255, 241, 189, 0.055)");
+  beam.addColorStop(1, colorWithAlpha(fighters[1]?.trim ?? "#5bd7ff", 0.08));
+  ctx.fillStyle = beam;
+  ctx.beginPath();
+  ctx.moveTo(-40, H * 0.28 + Math.sin(t * 0.018) * 10);
+  ctx.lineTo(W + 40, H * 0.18 + Math.cos(t * 0.014) * 10);
+  ctx.lineTo(W + 40, H * 0.78);
+  ctx.lineTo(-40, H * 0.88);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fillRect(0, 0, W, 46);
+  ctx.fillRect(0, H - 48, W, 48);
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.font = "900 74px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = `rgba(255, 241, 189, ${titleAlpha * 0.52})`;
+  ctx.fillStyle = `rgba(255, 226, 132, ${titleAlpha})`;
+  const y = overlay.dataset.screen === "versus" ? 292 : 250;
+  ctx.strokeText("MINI KOMBAT IV", W / 2, y + Math.sin(t * 0.018) * 3);
+  ctx.fillText("MINI KOMBAT IV", W / 2, y + Math.sin(t * 0.018) * 3);
+
+  drawAttractNameplate(fighters[0], 34, H - 92, "left");
+  drawAttractNameplate(fighters[1], W - 34, H - 92, "right");
+  ctx.restore();
+}
+
+function drawAttractNameplate(f, x, y, side) {
+  if (!f) return;
+  const reverse = side === "right";
+  const width = 258;
+  const height = 48;
+  const px = reverse ? x - width : x;
+  const grad = ctx.createLinearGradient(px, y, px + width, y + height);
+  grad.addColorStop(0, colorWithAlpha(reverse ? "#090a0d" : f.color, 0.28));
+  grad.addColorStop(0.55, "rgba(16, 13, 12, 0.24)");
+  grad.addColorStop(1, colorWithAlpha(reverse ? f.color : "#090a0d", 0.28));
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(px, y, width, height, 7);
+  ctx.fill();
+  ctx.strokeStyle = colorWithAlpha(f.trim, 0.28);
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+
+  ctx.textAlign = reverse ? "right" : "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(255, 247, 218, 0.68)";
+  ctx.font = "900 18px system-ui, sans-serif";
+  ctx.fillText(f.name.toUpperCase(), reverse ? px + width - 15 : px + 15, y + 22);
+  ctx.fillStyle = colorWithAlpha(f.trim, 0.64);
+  ctx.font = "800 10px system-ui, sans-serif";
+  ctx.fillText(fighterPresentation(f).discipline.toUpperCase(), reverse ? px + width - 15 : px + 15, y + 38);
 }
 
 function drawDirectorGrade() {
