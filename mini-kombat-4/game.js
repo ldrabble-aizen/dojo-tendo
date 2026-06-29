@@ -5397,6 +5397,7 @@ function draw() {
   drawFighter(fighters[0]);
   drawFighter(fighters[1]);
   drawParticles();
+  drawStageForegroundDepth();
   drawFloatingTexts();
   ctx.restore();
 
@@ -6150,6 +6151,102 @@ function drawStageAtmosphere() {
   floorWake.addColorStop(1, "rgba(255, 195, 105, 0)");
   ctx.fillStyle = floorWake;
   ctx.fillRect(0, FLOOR - 35, W, H - FLOOR + 35);
+
+  ctx.restore();
+}
+
+function drawStageForegroundDepth() {
+  const tension = musicTensionLevel();
+  const impact = clamp(Math.max(cameraImpactPulse / Math.max(1, cameraImpactMax), cinematicHitPulse / Math.max(1, cinematicHitMax)), 0, 1);
+  const lowHealth = fighters.some((fighter) => fighter.health > 0 && fighter.health <= 24);
+  const specialHeat = clamp(Math.max(...fighters.map((fighter) => fighter.energy ?? 0)) / 100, 0, 1);
+  const flicker = 0.5 + Math.sin(roundFrame * 0.082) * 0.32 + Math.sin(roundFrame * 0.19) * 0.18;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  const lipShade = ctx.createLinearGradient(0, FLOOR + 28, 0, H);
+  lipShade.addColorStop(0, "rgba(0,0,0,0)");
+  lipShade.addColorStop(0.48, `rgba(20, 10, 8, ${0.18 + tension * 0.04})`);
+  lipShade.addColorStop(1, `rgba(0,0,0, ${0.56 + impact * 0.1})`);
+  ctx.fillStyle = lipShade;
+  ctx.fillRect(0, FLOOR + 14, W, H - FLOOR);
+
+  for (const post of [
+    { x: -18, w: 44, lean: -0.05, alpha: 0.34 },
+    { x: W - 28, w: 46, lean: 0.045, alpha: 0.32 },
+  ]) {
+    ctx.save();
+    ctx.translate(post.x + post.w / 2, H / 2);
+    ctx.rotate(post.lean + Math.sin(roundFrame * 0.008 + post.x) * 0.004);
+    const postGrad = ctx.createLinearGradient(-post.w / 2, 0, post.w / 2, 0);
+    postGrad.addColorStop(0, `rgba(0,0,0,${post.alpha + 0.18})`);
+    postGrad.addColorStop(0.52, `rgba(71, 35, 20,${post.alpha})`);
+    postGrad.addColorStop(1, "rgba(0,0,0,0.18)");
+    ctx.fillStyle = postGrad;
+    ctx.fillRect(-post.w / 2, -H * 0.52, post.w, H * 1.1);
+    ctx.restore();
+  }
+
+  ctx.globalCompositeOperation = "screen";
+  const floorEdge = ctx.createLinearGradient(60, FLOOR + 58, W - 60, FLOOR + 58);
+  floorEdge.addColorStop(0, "rgba(255, 214, 116, 0)");
+  floorEdge.addColorStop(0.5, `rgba(255, 232, 172, ${0.08 + tension * 0.035 + impact * 0.035})`);
+  floorEdge.addColorStop(1, "rgba(255, 214, 116, 0)");
+  ctx.strokeStyle = floorEdge;
+  ctx.lineWidth = 2.4 + impact * 2;
+  ctx.beginPath();
+  ctx.moveTo(62, FLOOR + 57 + Math.sin(roundFrame * 0.014) * 1.2);
+  ctx.quadraticCurveTo(W / 2, FLOOR + 66 + impact * 3, W - 62, FLOOR + 57 - Math.sin(roundFrame * 0.011) * 1.2);
+  ctx.stroke();
+
+  for (const f of fighters) {
+    const charge = clamp(((f.energy ?? 0) - 55) / 45, 0, 1);
+    const attackGlow = f.attack?.type === "special" ? Math.max(attackPhase(f.attack).power, attackPhase(f.attack).snap) : 0;
+    const hurtGlow = clamp((f.reactionPulse ?? 0) / Math.max(1, f.reactionMax ?? 1), 0, 1) * 0.28;
+    const glow = Math.max(charge * 0.42, attackGlow * 0.58, hurtGlow);
+    if (glow <= 0.02) continue;
+    const radius = 92 + glow * 58;
+    const aura = ctx.createRadialGradient(f.x, FLOOR + 38, 6, f.x, FLOOR + 38, radius);
+    aura.addColorStop(0, colorWithAlpha(f.trim || "#fff1bd", 0.13 * glow));
+    aura.addColorStop(0.46, colorWithAlpha(f.color || "#ffd44d", 0.055 * glow));
+    aura.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.ellipse(f.x, FLOOR + 40, radius * 1.3, 23 + glow * 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (const lamp of [
+    { x: 82, side: -1 },
+    { x: W - 82, side: 1 },
+  ]) {
+    const heat = 0.44 + flicker * 0.18 + tension * 0.08 + (lowHealth ? 0.06 : 0) + specialHeat * 0.04;
+    const y = FLOOR + 79;
+    const glow = ctx.createRadialGradient(lamp.x, y - 17, 2, lamp.x, y - 17, 58 + heat * 20);
+    glow.addColorStop(0, `rgba(255, 231, 160, ${0.2 + heat * 0.1})`);
+    glow.addColorStop(0.34, `rgba(255, 131, 67, ${0.09 + heat * 0.04})`);
+    glow.addColorStop(1, "rgba(255, 131, 67, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(lamp.x, y - 17, 64 + heat * 18, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(16, 9, 7, 0.78)";
+    ctx.beginPath();
+    ctx.ellipse(lamp.x, y, 28, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(69, 31, 18, 0.88)";
+    ctx.beginPath();
+    ctx.ellipse(lamp.x, y - 3, 22, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalCompositeOperation = "screen";
+    ctx.fillStyle = `rgba(255, 221, 139, ${0.54 + heat * 0.18})`;
+    ctx.beginPath();
+    ctx.ellipse(lamp.x + lamp.side * flicker * 2.2, y - 23 - heat * 4, 5.5 + heat * 2, 14 + heat * 5, lamp.side * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.restore();
 }
