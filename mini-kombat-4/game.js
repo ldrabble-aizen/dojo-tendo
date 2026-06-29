@@ -51,6 +51,8 @@ const GUARD_IMPACT_FRAMES = 18;
 const COUNTER_WINDOW_FRAMES = 42;
 const ONLINE_SYNC_EVERY = 3;
 const ONLINE_PING_EVERY_MS = 2400;
+const ROUND_TIME_SECONDS = 99;
+const ROUND_TIMER_FRAMES = ROUND_TIME_SECONDS * 60;
 const ONLINE_ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
@@ -103,6 +105,8 @@ let paused = false;
 let soundEnabled = true;
 let matchOver = false;
 let roundNumber = 1;
+let roundTimerFrames = ROUND_TIMER_FRAMES;
+let roundFinishKind = "ko";
 let musicClock = 0;
 let musicDirector = {
   round: 0,
@@ -1484,6 +1488,18 @@ const SOUND_PRESETS = {
     ],
     cooldown: 0.24,
   },
+  timeOver: {
+    duration: 0.74,
+    volume: 0.15,
+    type: "sawtooth",
+    freq: [330, 132, 66],
+    noise: { volume: 0.072, type: "bandpass", frequency: 760, q: 0.72, duration: 0.32 },
+    layers: [
+      { type: "sine", freq: [82, 41], volume: 0.58, duration: 0.62 },
+      { type: "triangle", freq: [660, 330], volume: 0.16, delay: 0.08, duration: 0.24 },
+    ],
+    cooldown: 0.36,
+  },
   introCard: {
     duration: 0.38,
     volume: 0.082,
@@ -2114,6 +2130,7 @@ function resetRound() {
   projectiles.length = 0;
   winner = "";
   roundWinnerId = "";
+  roundFinishKind = "ko";
   if (!matchOver) matchWinnerId = "";
   flash = 0;
   shake = 0;
@@ -2143,6 +2160,7 @@ function resetRound() {
   koFreeze = 0;
   roundFrame = 0;
   resultFrame = 0;
+  roundTimerFrames = ROUND_TIMER_FRAMES;
   countdownFrames = 180;
   resetMusicDirectorRound();
   paused = false;
@@ -2916,6 +2934,103 @@ function updateAttractMode() {
   }
 }
 
+function decisionWinnerByTimer(a, b) {
+  const healthGap = (a.health ?? 0) - (b.health ?? 0);
+  if (Math.abs(healthGap) >= 0.5) return healthGap > 0 ? a : b;
+
+  const energyGap = (a.energy ?? 0) - (b.energy ?? 0);
+  if (Math.abs(energyGap) >= 0.5) return energyGap > 0 ? a : b;
+
+  const centerGap = Math.abs(W / 2 - a.x) - Math.abs(W / 2 - b.x);
+  return centerGap <= 0 ? a : b;
+}
+
+function finishRound(winnerFighter, loserFighter, options = {}) {
+  if (!winnerFighter || !loserFighter || winner) return;
+  const timeOver = Boolean(options.timeOver);
+  const finalRound = Boolean(options.finalRound);
+  const impactDir = timeOver ? winnerFighter.dir || (winnerFighter.x <= loserFighter.x ? 1 : -1) : loserFighter.koFallDir || loserFighter.impactDir || winnerFighter.dir || 1;
+
+  winner = winnerFighter.name;
+  roundWinnerId = winnerFighter.id;
+  roundFinishKind = timeOver ? "time" : "ko";
+  winnerFighter.wins += 1;
+  matchOver = winnerFighter.wins >= 2;
+  if (matchOver) matchWinnerId = winnerFighter.id;
+  running = false;
+  koFreeze = timeOver ? 24 : matchOver ? 34 : 28;
+  resultFrame = 0;
+
+  if (timeOver) {
+    loserFighter.hurt = Math.max(loserFighter.hurt ?? 0, 18);
+    loserFighter.impactPulse = Math.max(loserFighter.impactPulse ?? 0, 15);
+    loserFighter.impactDir = -impactDir;
+    loserFighter.impactStrength = Math.max(loserFighter.impactStrength ?? 0, 0.82);
+    loserFighter.damagePulse = Math.max(loserFighter.damagePulse ?? 0, 24);
+    loserFighter.damageLevel = Math.max(loserFighter.damageLevel ?? 0, 0.95);
+    loserFighter.reactionPulse = Math.max(loserFighter.reactionPulse ?? 0, 26);
+    loserFighter.reactionMax = Math.max(loserFighter.reactionMax ?? 1, 26);
+    loserFighter.reactionKind = "heavy";
+    loserFighter.reactionStrength = Math.max(loserFighter.reactionStrength ?? 0, 1.05);
+    loserFighter.bracePulse = Math.max(loserFighter.bracePulse ?? 0, 16);
+    winnerFighter.victoryPulse = matchOver ? 102 : 82;
+    winnerFighter.bracePulse = Math.max(winnerFighter.bracePulse ?? 0, 16);
+    shake = Math.max(shake, matchOver ? 14 : 10);
+    flash = Math.max(flash, matchOver ? 16 : 12);
+    addText(W / 2, 132, "TIME OVER", "#fff1bd", { size: 34, life: 82, rise: 0.18 });
+    addText(winnerFighter.x, winnerFighter.y - 186, matchOver ? "MATCH" : "DECISION", winnerFighter.trim || "#ffd44d", { size: 24, life: 72, rise: 0.34 });
+    cueAnnouncer("TIME OVER", `${winnerFighter.name} gana por decision`, winnerFighter.trim || "#fff1bd", matchOver ? 108 : 92);
+    triggerCameraImpact(impactDir, false, true, false, matchOver ? 1.24 : 1.04, {
+      cameraPulse: matchOver ? 20 : 16,
+      cameraStrength: matchOver ? 1.24 : 1.04,
+    });
+    triggerCinematicHit(impactDir, winnerFighter.trim || "#fff1bd", matchOver ? 1.2 : 1, matchOver ? 22 : 18, {
+      zoom: matchOver ? 0.044 : 0.034,
+      pan: matchOver ? 11.4 : 8.6,
+      lift: matchOver ? 4.5 : 3.4,
+      roll: matchOver ? 0.008 : 0.006,
+      band: matchOver ? 1.18 : 1,
+    });
+    triggerScreenTear(impactDir, winnerFighter.trim || "#fff1bd", matchOver ? 1.02 : 0.78, matchOver ? 16 : 12);
+    playSound("timeOver", { intensity: matchOver ? 1.08 : 0.96, key: `time:${roundNumber}` });
+  } else {
+    loserFighter.koFall = Math.max(loserFighter.koFall ?? 0, matchOver ? 118 : 104);
+    loserFighter.koFallDir = loserFighter.impactDir || winnerFighter.dir || 1;
+    loserFighter.koFallStrength = Math.max(loserFighter.koFallStrength ?? 0, (loserFighter.impactStrength ?? 1) + (matchOver ? 0.38 : 0.24));
+    loserFighter.damagePulse = Math.max(loserFighter.damagePulse ?? 0, matchOver ? 44 : 38);
+    loserFighter.damageLevel = Math.max(loserFighter.damageLevel ?? 0, matchOver ? 1.86 : 1.68);
+    loserFighter.reactionPulse = Math.max(loserFighter.reactionPulse ?? 0, matchOver ? 42 : 36);
+    loserFighter.reactionMax = Math.max(loserFighter.reactionMax ?? 1, matchOver ? 42 : 36);
+    loserFighter.reactionKind = "finish";
+    loserFighter.reactionStrength = Math.max(loserFighter.reactionStrength ?? 0, matchOver ? 1.9 : 1.72);
+    winnerFighter.victoryPulse = matchOver ? 104 : 88;
+    shake = Math.max(shake, matchOver ? 22 : 18);
+    flash = Math.max(flash, matchOver ? 22 : 18);
+    addText(loserFighter.x, loserFighter.y - 162, matchOver ? "FINAL K.O." : "K.O.", "#fff1bd", { size: matchOver ? 34 : 30, life: 76, rise: 0.34 });
+    addText(winnerFighter.x, winnerFighter.y - 190, matchOver ? "MATCH" : "ROUND", "#fff1bd", { size: 24, life: 68, rise: 0.42 });
+    cueAnnouncer(matchOver ? "FINAL K.O." : "K.O.", `${winnerFighter.name} gana ${matchOver ? "el match" : `round ${toRoman(roundNumber)}`}`, winnerFighter.trim || "#fff1bd", matchOver ? 112 : 92);
+    triggerCameraImpact(loserFighter.koFallDir, false, true, false, matchOver ? 1.95 : 1.72, {
+      cameraPulse: matchOver ? 26 : 22,
+      cameraStrength: matchOver ? 1.95 : 1.72,
+    });
+    triggerCinematicHit(loserFighter.koFallDir, loserFighter.trim || "#fff1bd", matchOver ? 1.84 : 1.58, matchOver ? 28 : 24, {
+      zoom: matchOver ? 0.07 : 0.06,
+      pan: matchOver ? 15.5 : 13.4,
+      lift: matchOver ? 6.2 : 5.4,
+      roll: matchOver ? 0.014 : 0.011,
+      band: matchOver ? 1.58 : 1.38,
+    });
+    triggerScreenTear(loserFighter.koFallDir, winnerFighter.trim || "#fff1bd", matchOver ? 1.68 : 1.34, matchOver ? 24 : 18);
+    koCollapseFX(loserFighter, winnerFighter);
+    playSound(matchOver ? tournamentActive && winnerFighter.id !== "right" ? "lose" : "victory" : "ko");
+  }
+
+  if (finalRound) roundTimerFrames = 0;
+  if (matchOver) scheduleWinnerOverlay();
+  else scheduleNextRound();
+  sendOnlineSnapshot(true);
+}
+
 function update() {
   tickOnlineHeartbeat();
   if (onlineGuestActive()) {
@@ -2990,49 +3105,26 @@ function update() {
   updateAnnouncerCue();
   triggerCriticalHealthCues();
 
+  if (!winner && roundTimerFrames > 0) {
+    roundTimerFrames -= 1;
+    if (roundTimerFrames === 10 * 60) {
+      cueAnnouncer("10", "El tiempo se acaba", "#ffd44d", 58);
+      playSound("danger", { intensity: 0.92, key: `timer:${roundNumber}:10` });
+    } else if (roundTimerFrames > 0 && roundTimerFrames <= 5 * 60 && roundTimerFrames % 60 === 0) {
+      const seconds = Math.ceil(roundTimerFrames / 60);
+      cueAnnouncer(String(seconds), "Cuenta final", "#ffd44d", 42);
+      playSound("danger", { intensity: 0.78 + (5 - seconds) * 0.05, key: `timer:${roundNumber}:${seconds}` });
+    }
+  }
+
   if (!winner && (a.health <= 0 || b.health <= 0)) {
     const winnerFighter = a.health > b.health ? a : b;
     const loserFighter = winnerFighter === a ? b : a;
-    winner = winnerFighter.name;
-    roundWinnerId = winnerFighter.id;
-    winnerFighter.wins += 1;
-    matchOver = winnerFighter.wins >= 2;
-    if (matchOver) matchWinnerId = winnerFighter.id;
-    running = false;
-    koFreeze = matchOver ? 34 : 28;
-    resultFrame = 0;
-    loserFighter.koFall = Math.max(loserFighter.koFall ?? 0, matchOver ? 118 : 104);
-    loserFighter.koFallDir = loserFighter.impactDir || winnerFighter.dir || 1;
-    loserFighter.koFallStrength = Math.max(loserFighter.koFallStrength ?? 0, (loserFighter.impactStrength ?? 1) + (matchOver ? 0.38 : 0.24));
-    loserFighter.damagePulse = Math.max(loserFighter.damagePulse ?? 0, matchOver ? 44 : 38);
-    loserFighter.damageLevel = Math.max(loserFighter.damageLevel ?? 0, matchOver ? 1.86 : 1.68);
-    loserFighter.reactionPulse = Math.max(loserFighter.reactionPulse ?? 0, matchOver ? 42 : 36);
-    loserFighter.reactionMax = Math.max(loserFighter.reactionMax ?? 1, matchOver ? 42 : 36);
-    loserFighter.reactionKind = "finish";
-    loserFighter.reactionStrength = Math.max(loserFighter.reactionStrength ?? 0, matchOver ? 1.9 : 1.72);
-    winnerFighter.victoryPulse = matchOver ? 104 : 88;
-    shake = Math.max(shake, matchOver ? 22 : 18);
-    flash = Math.max(flash, matchOver ? 22 : 18);
-    addText(loserFighter.x, loserFighter.y - 162, matchOver ? "FINAL K.O." : "K.O.", "#fff1bd", { size: matchOver ? 34 : 30, life: 76, rise: 0.34 });
-    addText(winnerFighter.x, winnerFighter.y - 190, matchOver ? "MATCH" : "ROUND", "#fff1bd", { size: 24, life: 68, rise: 0.42 });
-    cueAnnouncer(matchOver ? "FINAL K.O." : "K.O.", `${winnerFighter.name} gana ${matchOver ? "el match" : `round ${toRoman(roundNumber)}`}`, winnerFighter.trim || "#fff1bd", matchOver ? 112 : 92);
-    triggerCameraImpact(loserFighter.koFallDir, false, true, false, matchOver ? 1.95 : 1.72, {
-      cameraPulse: matchOver ? 26 : 22,
-      cameraStrength: matchOver ? 1.95 : 1.72,
-    });
-    triggerCinematicHit(loserFighter.koFallDir, loserFighter.trim || "#fff1bd", matchOver ? 1.84 : 1.58, matchOver ? 28 : 24, {
-      zoom: matchOver ? 0.07 : 0.06,
-      pan: matchOver ? 15.5 : 13.4,
-      lift: matchOver ? 6.2 : 5.4,
-      roll: matchOver ? 0.014 : 0.011,
-      band: matchOver ? 1.58 : 1.38,
-    });
-    triggerScreenTear(loserFighter.koFallDir, winnerFighter.trim || "#fff1bd", matchOver ? 1.68 : 1.34, matchOver ? 24 : 18);
-    koCollapseFX(loserFighter, winnerFighter);
-    playSound(matchOver ? tournamentActive && winnerFighter.id !== "right" ? "lose" : "victory" : "ko");
-    if (matchOver) scheduleWinnerOverlay();
-    else scheduleNextRound();
-    sendOnlineSnapshot(true);
+    finishRound(winnerFighter, loserFighter);
+  } else if (!winner && roundTimerFrames <= 0) {
+    const winnerFighter = decisionWinnerByTimer(a, b);
+    const loserFighter = winnerFighter === a ? b : a;
+    finishRound(winnerFighter, loserFighter, { timeOver: true, finalRound: true });
   }
 
   if (flash > 0) flash -= 1;
@@ -6083,6 +6175,10 @@ function compactHudMode() {
   return window.innerWidth <= 920 || window.innerHeight <= 520 || window.matchMedia?.("(pointer: coarse)")?.matches;
 }
 
+function roundTimerSeconds() {
+  return Math.max(0, Math.ceil(roundTimerFrames / 60));
+}
+
 function drawHud() {
   const compact = compactHudMode();
   const panelY = compact ? 12 : 16;
@@ -6132,10 +6228,12 @@ function drawHudCenter(compact = false) {
   const height = compact ? 52 : 72;
   const x = cx - width / 2;
   const y = compact ? 11 : 15;
+  const seconds = roundTimerSeconds();
+  const danger = !winner && seconds <= 10;
   const centerPanel = ctx.createLinearGradient(x, y, x + width, y + height);
-  centerPanel.addColorStop(0, "rgba(99, 34, 21, 0.96)");
+  centerPanel.addColorStop(0, danger ? "rgba(142, 29, 18, 0.98)" : "rgba(99, 34, 21, 0.96)");
   centerPanel.addColorStop(0.42, "rgba(20, 13, 12, 0.96)");
-  centerPanel.addColorStop(1, "rgba(126, 72, 24, 0.94)");
+  centerPanel.addColorStop(1, danger ? "rgba(189, 64, 24, 0.96)" : "rgba(126, 72, 24, 0.94)");
   ctx.save();
   ctx.shadowColor = "rgba(0, 0, 0, 0.46)";
   ctx.shadowBlur = 18;
@@ -6146,7 +6244,7 @@ function drawHudCenter(compact = false) {
   ctx.fill();
   ctx.restore();
 
-  ctx.strokeStyle = "rgba(255, 231, 143, 0.82)";
+  ctx.strokeStyle = danger ? "rgba(255, 107, 67, 0.9)" : "rgba(255, 231, 143, 0.82)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.roundRect(x + 5, y + 5, width - 10, height - 10, 7);
@@ -6159,7 +6257,7 @@ function drawHudCenter(compact = false) {
 
   ctx.fillStyle = "rgba(255,255,255,0.1)";
   ctx.fillRect(x + 12, y + 11, width - 24, compact ? 4 : 6);
-  ctx.fillStyle = "rgba(255, 205, 85, 0.14)";
+  ctx.fillStyle = danger ? "rgba(255, 77, 40, 0.2)" : "rgba(255, 205, 85, 0.14)";
   ctx.beginPath();
   ctx.moveTo(cx - (compact ? 33 : 48), y + height - 9);
   ctx.lineTo(cx, y + 10);
@@ -6171,15 +6269,16 @@ function drawHudCenter(compact = false) {
   ctx.shadowColor = "rgba(0,0,0,0.72)";
   ctx.shadowBlur = 8;
   ctx.shadowOffsetY = 2;
-  ctx.fillStyle = "#fff1bd";
+  ctx.fillStyle = danger ? "#ffdf7a" : "#fff1bd";
   ctx.font = `900 ${compact ? 9 : 12}px system-ui, sans-serif`;
   ctx.textAlign = "center";
-  ctx.fillText(matchOver ? "MATCH" : "ROUND", cx, y + (compact ? 18 : 22));
-  ctx.font = `900 ${compact ? 25 : 36}px Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif`;
-  ctx.fillText(winner ? "KO" : toRoman(roundNumber), cx, y + (compact ? 39 : 52));
+  ctx.fillText(matchOver ? "MATCH" : `ROUND ${toRoman(roundNumber)}`, cx, y + (compact ? 18 : 22));
+  ctx.font = `900 ${compact ? 24 : 34}px Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif`;
+  ctx.fillStyle = danger && Math.floor(roundFrame / 15) % 2 === 0 ? "#ff674d" : "#fff1bd";
+  ctx.fillText(winner ? (roundFinishKind === "time" ? "TIME" : "KO") : String(seconds).padStart(2, "0"), cx, y + (compact ? 39 : 52));
   ctx.font = `900 ${compact ? 8 : 10}px system-ui, sans-serif`;
-  ctx.fillStyle = "rgba(255, 244, 205, 0.9)";
-  ctx.fillText(winner ? "FINAL" : "MEJOR DE III", cx, y + (compact ? 49 : 66));
+  ctx.fillStyle = danger ? "rgba(255, 214, 117, 0.95)" : "rgba(255, 244, 205, 0.9)";
+  ctx.fillText(winner ? (roundFinishKind === "time" ? "DECISION" : "FINAL") : danger ? "TIME" : "MEJOR DE III", cx, y + (compact ? 49 : 66));
   ctx.restore();
 }
 
@@ -15736,15 +15835,20 @@ function drawParticles() {
 function drawKOBanner() {
   if (!winner) return;
   if (overlay.dataset.screen === "winner" && !overlay.classList.contains("hidden")) return;
+  const timeOver = roundFinishKind === "time";
   const reveal = smoothStep01(clamp(resultFrame / 24, 0, 1));
   const snap = Math.max(0, 1 - resultFrame / 24);
   const panelAlpha = overlay.classList.contains("hidden") ? 0.5 : 0.24;
-  const width = matchOver ? 336 : 278;
+  const width = timeOver ? 350 : matchOver ? 336 : 278;
   const height = matchOver ? 68 : 62;
   const x = W / 2 - width / 2;
   const y = 84 - reveal * 7 - snap * 4;
-  const label = matchOver ? "FINAL K.O." : "K.O.";
-  const subtitle = matchOver ? `${winner.toUpperCase()} GANA MATCH` : `${winner.toUpperCase()} GANA ROUND ${toRoman(roundNumber)}`;
+  const label = timeOver ? "TIME OVER" : matchOver ? "FINAL K.O." : "K.O.";
+  const subtitle = timeOver
+    ? `${winner.toUpperCase()} GANA POR DECISION`
+    : matchOver
+      ? `${winner.toUpperCase()} GANA MATCH`
+      : `${winner.toUpperCase()} GANA ROUND ${toRoman(roundNumber)}`;
   const banner = ctx.createLinearGradient(x, y, x + width, y + height);
   banner.addColorStop(0, `rgba(24, 7, 6, ${panelAlpha})`);
   banner.addColorStop(0.48, `rgba(116, 25, 18, ${panelAlpha + 0.08})`);
@@ -15806,10 +15910,16 @@ function showWinner() {
       : `${winner} gano el match. Volve al selector para reintentar el torneo.`;
     startButton.textContent = hasNext ? "SIGUIENTE RIVAL" : "VOLVER";
   } else {
-    overlay.querySelector("h1").textContent = matchOver ? `Victoria de ${winner}` : `${winner} gana round ${roundNumber}`;
+    overlay.querySelector("h1").textContent = matchOver
+      ? `Victoria de ${winner}`
+      : roundFinishKind === "time"
+        ? `${winner} gana por decision`
+        : `${winner} gana round ${roundNumber}`;
     overlayCopy.textContent = matchOver
       ? `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Revancha disponible.`
-      : `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Prepara el siguiente round.`;
+      : roundFinishKind === "time"
+        ? `Time over. ${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Prepara el siguiente round.`
+        : `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Prepara el siguiente round.`;
   startButton.textContent = matchOver ? "REVANCHA" : "SIGUIENTE ROUND";
   }
   renderWinnerPanel();
@@ -17054,7 +17164,9 @@ function sendOnlineSnapshot(force = false) {
     matchOver,
     roundWinnerId,
     matchWinnerId,
+    roundFinishKind,
     countdownFrames,
+    roundTimerFrames,
     koFreeze,
     roundFrame,
     resultFrame,
@@ -17102,8 +17214,10 @@ function applyOnlineSnapshot(snapshot) {
   matchOver = Boolean(snapshot.matchOver);
   roundWinnerId = snapshot.roundWinnerId || "";
   matchWinnerId = snapshot.matchWinnerId || "";
+  roundFinishKind = snapshot.roundFinishKind || "ko";
   roundNumber = snapshot.roundNumber || roundNumber;
   countdownFrames = Math.max(0, snapshot.countdownFrames || 0);
+  roundTimerFrames = Math.max(0, snapshot.roundTimerFrames ?? roundTimerFrames);
   koFreeze = Math.max(0, snapshot.koFreeze || 0);
   roundFrame = snapshot.roundFrame || 0;
   resultFrame = snapshot.resultFrame || 0;
