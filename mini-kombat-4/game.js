@@ -1475,6 +1475,18 @@ const SOUND_PRESETS = {
     ],
     cooldown: 0.24,
   },
+  introCard: {
+    duration: 0.38,
+    volume: 0.082,
+    type: "triangle",
+    freq: [220, 440, 330],
+    noise: { volume: 0.026, type: "bandpass", frequency: 1250, q: 0.82, duration: 0.12 },
+    layers: [
+      { type: "sine", freq: [110, 82], volume: 0.34, duration: 0.34 },
+      { type: "triangle", freq: [660, 880], volume: 0.13, delay: 0.07, duration: 0.14 },
+    ],
+    cooldown: 0.18,
+  },
   announcer: {
     duration: 0.42,
     volume: 0.118,
@@ -2031,6 +2043,11 @@ function resetRound() {
   running = true;
   overlay.classList.add("hidden");
   cueAnnouncer(`ROUND ${toRoman(roundNumber)}`, `${fighters[0].name}  VS  ${fighters[1].name}`, "#fff1bd", 92);
+  fighters.forEach((fighter, index) => {
+    triggerDynamicLight(fighter, fighter.trim || "#fff1bd", "torso", fighter.dir || 1, 0.72, 52);
+    fighter.bracePulse = Math.max(fighter.bracePulse ?? 0, 18);
+    playSound("introCard", { x: fighter.x, intensity: index === 0 ? 0.92 : 1.02, key: `${fighter.id}:${roundNumber}` });
+  });
   syncShellState();
   sendOnlineSnapshot(true);
 }
@@ -4797,6 +4814,7 @@ function draw() {
 
   drawHud();
   drawComboCounters();
+  drawRoundIntroCards();
   drawCountdown();
   drawKOBanner();
   drawAnnouncerCue();
@@ -4961,6 +4979,129 @@ function drawFloatingTexts() {
     ctx.restore();
   }
   ctx.globalAlpha = 1;
+}
+
+function compactIntroText(text, maxLength = 30) {
+  const clean = String(text ?? "").trim();
+  if (clean.length <= maxLength) return clean;
+  return `${clean.slice(0, Math.max(0, maxLength - 1)).trim()}...`;
+}
+
+function drawRoundIntroCards() {
+  if (countdownFrames <= 48 || countdownFrames > 180 || !running || paused || winner) return;
+
+  const intro = smoothStep01(clamp((180 - countdownFrames) / 18, 0, 1));
+  const outro = smoothStep01(clamp((countdownFrames - 48) / 44, 0, 1));
+  const alpha = intro * outro;
+  if (alpha <= 0.01) return;
+
+  const mobile = isMobileFightView();
+  const cardW = mobile ? 292 : 336;
+  const cardH = mobile ? 86 : 102;
+  const y = mobile ? 104 : 116;
+  const slide = (1 - intro) * (mobile ? 58 : 86);
+  const pulse = 0.5 + Math.sin((180 - countdownFrames) * 0.12) * 0.5;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  drawRoundIntroCard(fighters[0], "left", 42 - slide, y, cardW, cardH, pulse);
+  drawRoundIntroCard(fighters[1], "right", W - 42 - cardW + slide, y, cardW, cardH, pulse);
+
+  ctx.globalCompositeOperation = "screen";
+  const beam = ctx.createLinearGradient(W * 0.18, y + cardH + 12, W * 0.82, y + cardH + 12);
+  beam.addColorStop(0, "rgba(255, 241, 189, 0)");
+  beam.addColorStop(0.5, `rgba(255, 241, 189, ${0.15 * alpha})`);
+  beam.addColorStop(1, "rgba(255, 241, 189, 0)");
+  ctx.strokeStyle = beam;
+  ctx.lineWidth = mobile ? 2 : 3;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.2, y + cardH + 13);
+  ctx.lineTo(W * 0.8, y + cardH + 13);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
+  const reverse = side === "right";
+  const trim = fighter.trim || "#fff1bd";
+  const presentation = fighterPresentation(fighter);
+  const portraitSize = height - 24;
+  const portraitX = reverse ? x + width - portraitSize - 14 : x + 14;
+  const portraitY = y + 12;
+  const textX = reverse ? x + 16 : portraitX + portraitSize + 13;
+  const textW = width - portraitSize - 45;
+  const textAnchor = reverse ? textX + textW : textX;
+
+  ctx.save();
+  ctx.translate(x + width / 2, y + height / 2);
+  ctx.rotate(reverse ? 0.018 : -0.018);
+  ctx.translate(-(x + width / 2), -(y + height / 2));
+
+  const panel = ctx.createLinearGradient(x, y, x + width, y + height);
+  panel.addColorStop(0, colorWithAlpha(reverse ? fighter.color : "#090a0d", 0.78));
+  panel.addColorStop(0.52, "rgba(15, 11, 12, 0.84)");
+  panel.addColorStop(1, colorWithAlpha(reverse ? "#090a0d" : fighter.color, 0.72));
+  ctx.fillStyle = panel;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 8);
+  ctx.fill();
+
+  ctx.strokeStyle = colorWithAlpha(trim, 0.42 + pulse * 0.14);
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "screen";
+  const glow = ctx.createRadialGradient(portraitX + portraitSize / 2, portraitY + portraitSize / 2, 8, portraitX + portraitSize / 2, portraitY + portraitSize / 2, portraitSize * 1.12);
+  glow.addColorStop(0, colorWithAlpha(trim, 0.22 + pulse * 0.08));
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(portraitX + portraitSize / 2, portraitY + portraitSize / 2, portraitSize * 0.88, portraitSize * 0.72, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(portraitX, portraitY, portraitSize, portraitSize, 7);
+  ctx.clip();
+  ctx.fillStyle = colorWithAlpha(fighter.color, 0.88);
+  ctx.fillRect(portraitX, portraitY, portraitSize, portraitSize);
+  if (fighter.face?.complete) {
+    ctx.drawImage(fighter.face, portraitX, portraitY, portraitSize, portraitSize);
+  } else {
+    ctx.fillStyle = "#fff1bd";
+    ctx.font = "900 28px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText((fighter.name || "?").slice(0, 1).toUpperCase(), portraitX + portraitSize / 2, portraitY + portraitSize / 2);
+  }
+  ctx.restore();
+  ctx.strokeStyle = colorWithAlpha(trim, 0.7);
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(portraitX + 1, portraitY + 1, portraitSize - 2, portraitSize - 2);
+
+  ctx.textAlign = reverse ? "right" : "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(126, 240, 207, 0.94)";
+  ctx.font = "900 9px system-ui, sans-serif";
+  ctx.fillText(reverse ? "JUGADOR 2" : cpuEnabled ? "CPU" : "JUGADOR 1", textAnchor, y + 23);
+
+  ctx.fillStyle = "#fff3c4";
+  ctx.font = "900 28px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif";
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "rgba(28, 10, 8, 0.88)";
+  const name = compactIntroText(fighter.name, 16).toUpperCase();
+  ctx.strokeText(name, textAnchor, y + 52);
+  ctx.fillText(name, textAnchor, y + 52);
+
+  ctx.fillStyle = colorWithAlpha(trim, 0.94);
+  ctx.font = "900 10px system-ui, sans-serif";
+  ctx.fillText(compactIntroText(presentation.discipline, 28).toUpperCase(), textAnchor, y + 70);
+  ctx.fillStyle = "rgba(255, 247, 214, 0.84)";
+  ctx.font = "900 10px system-ui, sans-serif";
+  ctx.fillText(compactIntroText(presentation.signature, 30).toUpperCase(), textAnchor, y + 86);
+
+  ctx.restore();
 }
 
 function drawCountdown() {
