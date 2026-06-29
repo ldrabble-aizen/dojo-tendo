@@ -9210,6 +9210,7 @@ function drawFighter(f) {
 
   if (drawRasterBodySprite(f, crouch, walking ? stride : 0, walking, transition)) {
     drawHeroRimComposite(f, crouch, impactEase);
+    drawFighterWearOverlay(f, crouch);
     if (f.attack && !unifiedSprite) drawAttackKineticFX(f, crouch, "front");
     if (!unifiedSprite) {
       if (f.blocking) drawGuard(f.trim, crouch, f);
@@ -9251,6 +9252,7 @@ function drawFighter(f) {
   drawSimiolinReachPolish(f, pose, crouch, walking, stride);
   drawLiliGuardPolish(f, pose, crouch, walking, stride);
   drawHead(f, crouch, walking ? stride : 0);
+  drawFighterWearOverlay(f, crouch);
   if (f.attack) drawAttackKineticFX(f, crouch, "front");
   drawFighterStageLighting(f, crouch);
   drawHeroRimComposite(f, crouch, impactEase);
@@ -9313,6 +9315,96 @@ function drawHeroRimComposite(f, crouch, impactEase = 0) {
     ctx.ellipse(0, -94 + crouch, radius * 0.72, radius, 0, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+function fighterWearState(f) {
+  const damageTaken = clamp((f.roundDamageTaken ?? 0) / 92, 0, 1);
+  const healthWear = clamp((100 - (f.health ?? 100)) / 78, 0, 1);
+  const danger = clamp((34 - (f.health ?? 100)) / 34, 0, 1);
+  const recent = clamp((f.damagePulse ?? 0) / 38, 0, 1);
+  const guard = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
+  const ko = winner && f.id !== roundWinnerId ? clamp(resultFrame / 62, 0, 1) : 0;
+  const amount = clamp(Math.max(damageTaken * 0.8, healthWear * 0.72, ko * 0.86) + recent * 0.22 + guard * 0.1, 0, 1.35);
+  return { amount, damageTaken, healthWear, danger, recent, guard, ko };
+}
+
+function drawFighterWearOverlay(f, crouch) {
+  const wear = fighterWearState(f);
+  if (wear.amount <= 0.035) return;
+
+  const mobile = isMobileFightView();
+  const intensity = wear.amount * (usesUnifiedSprite(f) ? 0.76 : 1);
+  const trim = f.trim || "#fff1bd";
+  const bruise = f.profileId === "p2" || f.profileId === "p6" ? "#8a2f45" : "#6d2c22";
+  const clothAlpha = mobile ? 0.52 : 1;
+  const breath = 0.5 + Math.sin(roundFrame * 0.09 + f.x * 0.02) * 0.5;
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(34, 17, 12, ${0.035 + intensity * 0.07})`;
+  ctx.beginPath();
+  ctx.ellipse(0, -92 + crouch, 43 + intensity * 9, 76 + intensity * 12, -0.04 * f.dir, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = colorWithAlpha(bruise, (0.11 + intensity * 0.2) * clothAlpha);
+  ctx.lineWidth = 2.2 + intensity * 1.6;
+  const slashSide = f.id === "right" ? -1 : 1;
+  for (let i = 0; i < (mobile ? 2 : 3); i += 1) {
+    const y = -130 + crouch + i * 32 + Math.sin(i + f.x) * 2;
+    const x = slashSide * (-26 + i * 16);
+    ctx.beginPath();
+    ctx.moveTo(x - slashSide * (16 + intensity * 6), y - 7);
+    ctx.lineTo(x + slashSide * (18 + intensity * 8), y + 5);
+    ctx.stroke();
+  }
+
+  if (wear.danger > 0.02) {
+    ctx.fillStyle = `rgba(26, 10, 8, ${0.08 + wear.danger * 0.16})`;
+    ctx.beginPath();
+    ctx.ellipse(-8 * f.dir, -116 + crouch + breath * 2, 31 + wear.danger * 8, 34 + wear.danger * 10, -0.08 * f.dir, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(trim, (0.055 + wear.recent * 0.12 + wear.danger * 0.05) * clothAlpha);
+  ctx.lineWidth = 1.2 + wear.recent * 1.1;
+  for (const mark of [
+    [-27, -105 + crouch, 20, -8],
+    [22, -76 + crouch, -18, 8],
+    [-19, -39 + crouch, 16, 5],
+  ]) {
+    ctx.beginPath();
+    ctx.moveTo(mark[0], mark[1]);
+    ctx.lineTo(mark[0] + mark[2], mark[1] + mark[3]);
+    ctx.stroke();
+  }
+
+  if (wear.healthWear > 0.28 && !mobile) {
+    ctx.fillStyle = `rgba(255, 247, 214, ${0.035 + wear.healthWear * 0.075})`;
+    for (const drop of [
+      [-16, -127 + crouch, 3.2],
+      [18, -112 + crouch, 2.6],
+      [4, -83 + crouch, 2.8],
+    ]) {
+      ctx.beginPath();
+      ctx.ellipse(drop[0] + Math.sin(roundFrame * 0.07 + drop[0]) * 0.8, drop[1] + breath * 3, drop[2] * 0.58, drop[2] * 1.55, 0.12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  if (wear.guard > 0.04) {
+    ctx.strokeStyle = colorWithAlpha("#dff8ff", 0.08 + wear.guard * 0.18);
+    ctx.lineWidth = 1.3 + wear.guard;
+    ctx.beginPath();
+    ctx.moveTo(-34, -146 + crouch);
+    ctx.lineTo(32, -57 + crouch);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -15904,6 +15996,7 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     ctx.fillRect(clipX, clipY, clipW, clipH);
     drawFacePaintPass(f, clipX, clipY, clipW, clipH, options.faceMask);
     drawFaceActingPass(f, clipX, clipY, clipW, clipH, acting, options.faceMask);
+    drawFaceWearPass(f, clipX, clipY, clipW, clipH, options.faceMask);
     ctx.restore();
 
     const rim = ctx.createLinearGradient(x, y, x + headW, y + headH);
@@ -16124,6 +16217,72 @@ function drawFaceActingPass(f, clipX, clipY, clipW, clipH, acting, maskMode) {
     ctx.beginPath();
     ctx.moveTo(clipX + clipW * 0.34 + snapDir * shock * 1.2, mouthY + clipH * (0.012 + grimace * 0.02 + shock * 0.012));
     ctx.lineTo(clipX + clipW * 0.66 + snapDir * shock * 1.2, mouthY + clipH * (0.012 + grimace * 0.018 + shock * 0.01));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawFaceWearPass(f, clipX, clipY, clipW, clipH, maskMode) {
+  const wear = fighterWearState(f);
+  if (wear.amount <= 0.04) return;
+
+  const cheekAlpha = maskMode === "sprite" ? 1 : 0.72;
+  const side = f.id === "right" ? -1 : 1;
+  const bruise = f.profileId === "p2" || f.profileId === "p6" ? "rgba(104, 35, 58," : "rgba(95, 39, 28,";
+  const eyeY = clipY + clipH * 0.38;
+  const cheekY = clipY + clipH * 0.62;
+  const mouthY = clipY + clipH * 0.76;
+  const fatigue = clamp(wear.healthWear * 0.72 + wear.danger * 0.4 + wear.ko * 0.5, 0, 1.2);
+  const fresh = clamp(wear.recent + wear.guard * 0.38, 0, 1.2);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `${bruise} ${0.035 * cheekAlpha + wear.amount * 0.085 * cheekAlpha})`;
+  ctx.beginPath();
+  ctx.ellipse(clipX + clipW * (side > 0 ? 0.35 : 0.65), cheekY, clipW * (0.16 + wear.amount * 0.025), clipH * (0.08 + wear.amount * 0.02), side * -0.24, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (fatigue > 0.04) {
+    ctx.fillStyle = `rgba(32, 16, 14, ${0.035 + fatigue * 0.105})`;
+    ctx.beginPath();
+    ctx.ellipse(clipX + clipW * 0.34, eyeY + clipH * 0.07, clipW * 0.17, clipH * 0.045, -0.08, 0, Math.PI * 2);
+    ctx.ellipse(clipX + clipW * 0.66, eyeY + clipH * 0.07, clipW * 0.17, clipH * 0.045, 0.08, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (fresh > 0.05) {
+    ctx.strokeStyle = `rgba(54, 20, 16, ${0.08 + fresh * 0.16})`;
+    ctx.lineWidth = 1 + fresh * 0.8;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(clipX + clipW * (side > 0 ? 0.58 : 0.28), clipY + clipH * 0.5);
+    ctx.lineTo(clipX + clipW * (side > 0 ? 0.75 : 0.45), clipY + clipH * 0.57);
+    ctx.moveTo(clipX + clipW * (side > 0 ? 0.4 : 0.72), mouthY - clipH * 0.04);
+    ctx.lineTo(clipX + clipW * (side > 0 ? 0.52 : 0.6), mouthY + clipH * 0.025);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  if (fatigue > 0.12) {
+    ctx.fillStyle = `rgba(255, 246, 220, ${0.035 + fatigue * 0.065})`;
+    for (const drop of [
+      [0.24, 0.42, 1.8],
+      [0.78, 0.48, 1.5],
+    ]) {
+      ctx.beginPath();
+      ctx.ellipse(clipX + clipW * drop[0], clipY + clipH * drop[1] + Math.sin(roundFrame * 0.08 + drop[0] * 10) * 1.2, drop[2], drop[2] * 2.4, 0.18, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  if (wear.danger > 0.08) {
+    ctx.strokeStyle = colorWithAlpha(f.trim || "#fff1bd", 0.035 + wear.danger * 0.09);
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(clipX + clipW * 0.22, clipY + clipH * 0.18);
+    ctx.quadraticCurveTo(clipX + clipW * 0.5, clipY + clipH * (0.08 - wear.danger * 0.02), clipX + clipW * 0.8, clipY + clipH * 0.2);
     ctx.stroke();
   }
   ctx.restore();
