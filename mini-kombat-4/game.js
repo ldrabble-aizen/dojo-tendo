@@ -17326,6 +17326,7 @@ function setSelectedFighter(side, nextId) {
 function renderFighterSelect() {
   fighterSelect.innerHTML = "";
   fighterSelect.classList.remove("versus-panel", "online-panel", "winner-panel");
+  fighterSelect.append(makeHomePremierePanel(selectedLeftId, selectedRightId));
   fighterSelect.append(makeSelectColumn("left", "Izquierda", selectedLeftId));
 
   const versus = document.createElement("div");
@@ -17340,6 +17341,82 @@ function renderFighterSelect() {
   fighterSelect.append(versus);
 
   fighterSelect.append(makeSelectColumn("right", "Derecha", selectedRightId));
+}
+
+function makeHomePremierePanel(leftId, rightId) {
+  const leftProfile = fighterProfiles[leftId];
+  const rightProfile = fighterProfiles[rightId];
+  const leftPresentation = fighterPresentation(leftProfile);
+  const rightPresentation = fighterPresentation(rightProfile);
+  const scout = matchupScout(leftProfile, rightProfile);
+  const panel = document.createElement("section");
+  panel.className = "home-premiere-panel";
+  panel.style.setProperty("--left-color", leftProfile.color);
+  panel.style.setProperty("--left-trim", leftProfile.trim);
+  panel.style.setProperty("--right-color", rightProfile.color);
+  panel.style.setProperty("--right-trim", rightProfile.trim);
+
+  const headline = document.createElement("div");
+  headline.className = "home-premiere-headline";
+  const event = document.createElement("span");
+  event.textContent = tournamentMode ? "TORNEO DOJO TENDO" : cpuEnabled ? "CPU EXHIBITION" : "LOCAL DUEL";
+  const title = document.createElement("b");
+  title.textContent = `${leftProfile.name} VS ${rightProfile.name}`;
+  const tempo = document.createElement("em");
+  tempo.textContent = scout.tempo;
+  headline.append(event, title, tempo);
+  panel.append(headline);
+
+  const leftRead = makePremiereFighterRead(leftProfile, leftPresentation, scout.leftPlan, "left");
+  const centerRead = document.createElement("div");
+  centerRead.className = "home-premiere-center";
+  const round = document.createElement("span");
+  round.textContent = "MEJOR DE III";
+  const clash = document.createElement("strong");
+  clash.textContent = "OPENING BOUT";
+  const warning = document.createElement("em");
+  warning.textContent = scout.warning;
+  centerRead.append(round, clash, warning);
+
+  const rightRead = makePremiereFighterRead(rightProfile, rightPresentation, scout.rightPlan, "right");
+  panel.append(leftRead, centerRead, rightRead);
+
+  const stats = document.createElement("div");
+  stats.className = "home-premiere-statline";
+  const labels = ["FUE", "VEL", "ENE"];
+  const leftStats = menuStatValues(leftProfile);
+  const rightStats = menuStatValues(rightProfile);
+  for (let i = 0; i < labels.length; i += 1) {
+    const row = document.createElement("span");
+    row.style.setProperty("--left-stat", `${leftStats[i]}%`);
+    row.style.setProperty("--right-stat", `${rightStats[i]}%`);
+    const label = document.createElement("b");
+    label.textContent = labels[i];
+    const leftTrack = document.createElement("i");
+    leftTrack.className = "left";
+    const rightTrack = document.createElement("i");
+    rightTrack.className = "right";
+    row.append(label, leftTrack, rightTrack);
+    stats.append(row);
+  }
+  panel.append(stats);
+  return panel;
+}
+
+function makePremiereFighterRead(profile, presentation, plan, side) {
+  const read = document.createElement("article");
+  read.className = "home-premiere-fighter";
+  read.dataset.side = side;
+  const name = document.createElement("strong");
+  name.textContent = profile.name;
+  const discipline = document.createElement("span");
+  discipline.textContent = presentation.discipline;
+  const signature = document.createElement("b");
+  signature.textContent = presentation.signature;
+  const edge = document.createElement("em");
+  edge.textContent = plan;
+  read.append(name, discipline, signature, edge);
+  return read;
 }
 
 function renderVersusPanel(roundLabel) {
