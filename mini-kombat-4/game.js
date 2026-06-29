@@ -978,6 +978,8 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     health: 100,
     healthLag: 100,
     energy: 52,
+    specialReadyCue: true,
+    specialReadyPulse: 0,
     grounded: true,
     blocking: false,
     crouch: 0,
@@ -1335,6 +1337,27 @@ const SOUND_PRESETS = {
     noise: { volume: 0.026, type: "highpass", frequency: 1600, duration: 0.08 },
     layers: [{ type: "sine", freq: [780, 1320], volume: 0.2, delay: 0.05, duration: 0.14 }],
     cooldown: 0.12,
+  },
+  comboBreak: {
+    duration: 0.28,
+    volume: 0.112,
+    type: "square",
+    freq: [740, 420],
+    noise: { volume: 0.04, type: "highpass", frequency: 1800, duration: 0.11 },
+    layers: [{ type: "sine", freq: [110, 55], volume: 0.38, duration: 0.24 }],
+    cooldown: 0.16,
+  },
+  specialReady: {
+    duration: 0.36,
+    volume: 0.1,
+    type: "triangle",
+    freq: [330, 660, 990],
+    noise: { volume: 0.018, type: "highpass", frequency: 2100, duration: 0.1 },
+    layers: [
+      { type: "sine", freq: [165, 330], volume: 0.28, duration: 0.32 },
+      { type: "triangle", freq: [990, 1320], volume: 0.12, delay: 0.08, duration: 0.18 },
+    ],
+    cooldown: 0.22,
   },
   musicPulse: {
     duration: 0.18,
@@ -1753,6 +1776,8 @@ function resetRound() {
     health: 100,
     healthLag: 100,
     energy: 52,
+    specialReadyCue: true,
+    specialReadyPulse: 0,
     attack: null,
     cooldown: 0,
     hurt: 0,
@@ -1861,6 +1886,8 @@ function resetRound() {
     health: 100,
     healthLag: 100,
     energy: 52,
+    specialReadyCue: true,
+    specialReadyPulse: 0,
     attack: null,
     cooldown: 0,
     hurt: 0,
@@ -2373,6 +2400,8 @@ function startSpecial(f) {
   const flowReady = (f.attackRecoverPulse ?? 0) > 2 || (f.comboTimer ?? 0) > 0;
   const timing = attackTiming("special");
   f.energy -= 45;
+  f.specialReadyCue = f.energy >= 45;
+  f.specialReadyPulse = 0;
   f.blocking = false;
   f.attackEntryPulse = Math.max(f.attackEntryPulse ?? 0, Math.round(timing.entry * (flowReady ? 0.56 : 1)));
   f.attackChainFrom = flowReady ? (f.lastAttackType || f.attackChainTo || "") : "";
@@ -2533,6 +2562,72 @@ function specialReleaseFX(f) {
       kind: "impactNeedle",
     });
   }
+}
+
+function specialReadyFX(f) {
+  const style = fighterSignatureStyle(f);
+  const x = f.x;
+  const y = f.y - fighterScale(114);
+  const dir = f.dir || 1;
+
+  particles.push({
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    angle: dir > 0 ? -0.08 : Math.PI + 0.08,
+    life: 24,
+    maxLife: 24,
+    size: fighterScale(76),
+    growth: 2.4,
+    color: style.rim,
+    kind: "ring",
+  });
+  particles.push({
+    x: x + dir * fighterScale(6),
+    y: y - fighterScale(4),
+    vx: 0,
+    vy: 0,
+    angle: dir > 0 ? 0 : Math.PI,
+    life: 14,
+    maxLife: 14,
+    size: fighterScale(42),
+    color: style.core,
+    core: style.rim,
+    kind: "signatureStar",
+  });
+
+  const sparkCount = fxCount(12, 5);
+  for (let i = 0; i < sparkCount; i += 1) {
+    const t = sparkCount === 1 ? 0.5 : i / (sparkCount - 1);
+    const angle = -Math.PI * 0.9 + t * Math.PI * 1.8;
+    const radius = fighterScale(34 + Math.random() * 22);
+    particles.push({
+      x: x + Math.cos(angle) * radius,
+      y: y + Math.sin(angle) * radius * 0.7,
+      vx: Math.cos(angle) * 0.34,
+      vy: Math.sin(angle) * 0.26 - 0.12,
+      angle,
+      length: fighterScale(18 + Math.random() * 22),
+      life: 16 + Math.random() * 8,
+      maxLife: 22,
+      size: 2 + Math.random() * 1.8,
+      color: i % 2 ? style.core : style.trail,
+      kind: i % 3 === 0 ? "glint" : "impactNeedle",
+    });
+  }
+}
+
+function triggerSpecialReady(f) {
+  if (!f || f.health <= 0) return;
+  f.specialReadyCue = true;
+  f.specialReadyPulse = Math.max(f.specialReadyPulse ?? 0, 54);
+  const color = f.trim || f.specialStyle?.rim || "#fff1bd";
+  triggerDynamicLight(f, color, "torso", f.dir || 1, 0.86, 34);
+  specialReadyFX(f);
+  addText(f.x, f.y - fighterScale(178), "SPECIAL READY", color, { size: 22, life: 66, rise: 0.42, drift: (f.dir || 1) * 0.04 });
+  if (!announcerCue || announcerCue.life < 34) cueAnnouncer("SPECIAL READY", `${f.name} carga su tecnica`, color, 72);
+  playSound("specialReady", { x: f.x, intensity: 1.04, key: f.id });
 }
 
 function updateCameraImpactPulse() {
@@ -2708,6 +2803,7 @@ function updateFighter(f, opponent) {
   if (f.counterWindow > 0) f.counterWindow -= 1;
   if (f.comboWindow > 0) f.comboWindow -= 1;
   if (f.comboPulse > 0) f.comboPulse -= 1;
+  if (f.specialReadyPulse > 0) f.specialReadyPulse -= 1;
   if (f.comboTimer > 0) {
     f.comboTimer -= 1;
     if (f.comboTimer <= 0) {
@@ -2940,6 +3036,8 @@ function updateFighter(f, opponent) {
 
   updatePoseTransition(f);
   f.energy = clamp(f.energy + 0.045 + (Math.abs(f.vx) > 1 ? 0.012 : 0), 0, 100);
+  if (f.energy < 45) f.specialReadyCue = false;
+  else if (!f.specialReadyCue && !winner && running && countdownFrames <= 0) triggerSpecialReady(f);
 }
 
 function updateProjectiles() {
@@ -3294,6 +3392,79 @@ function comboTierColor(count) {
   return "#ffd44d";
 }
 
+function comboFlourishFX(attacker, target, color, count, hitZone) {
+  if (!attacker || !target) return;
+  const mobile = isMobileFightView();
+  if (particles.length > particleBudget() * 0.84) return;
+
+  const dir = attacker.dir || 1;
+  const tier = count >= 7 ? 3 : count >= 5 ? 2 : 1;
+  const x = target.x - dir * fighterScale(18);
+  const y = target.y - fighterScale(hitZone === "legs" ? 74 : hitZone === "head" ? 164 : 126);
+  const baseAngle = dir > 0 ? -0.08 : Math.PI + 0.08;
+  const core = count >= 7 ? "#fff8df" : count >= 5 ? "#ffe08b" : "#c8fff1";
+
+  particles.push({
+    x,
+    y,
+    vx: dir * 0.08,
+    vy: 0,
+    angle: baseAngle,
+    life: mobile ? 12 : 15,
+    maxLife: mobile ? 12 : 15,
+    size: fighterScale((58 + tier * 12) * (mobile ? 0.86 : 1)),
+    growth: 1.8 + tier * 0.28,
+    color,
+    kind: "ring",
+  });
+  particles.push({
+    x: x - dir * fighterScale(5),
+    y,
+    vx: 0,
+    vy: 0,
+    angle: baseAngle,
+    life: mobile ? 9 : 12,
+    maxLife: mobile ? 9 : 12,
+    size: fighterScale((30 + tier * 8) * (mobile ? 0.84 : 1)),
+    color,
+    core,
+    kind: "signatureStar",
+  });
+
+  const shardCount = fxCount(6 + tier * 3, 3 + tier);
+  for (let i = 0; i < shardCount; i += 1) {
+    const lane = shardCount === 1 ? 0 : i / (shardCount - 1) - 0.5;
+    particles.push({
+      x: x - dir * fighterScale(6),
+      y: y + lane * fighterScale(44),
+      vx: dir * (0.56 + Math.random() * 0.72),
+      vy: lane * 0.42 - 0.08 + Math.random() * 0.12,
+      angle: baseAngle + lane * 0.72,
+      length: fighterScale(24 + tier * 10 + Math.random() * 22),
+      life: 12 + tier * 2 + Math.random() * 6,
+      maxLife: 18 + tier * 2,
+      size: 2.2 + tier * 0.45 + Math.random() * 1.6,
+      color: i % 2 ? core : color,
+      kind: i % 4 === 0 ? "hitShard" : "impactNeedle",
+    });
+  }
+
+  if (count >= 7 && particles.length < particleBudget() * 0.78) {
+    particles.push({
+      x: target.x - dir * fighterScale(16),
+      y: FLOOR + 4,
+      vx: dir * 0.14,
+      vy: 0,
+      angle: 0,
+      life: 16,
+      maxLife: 16,
+      size: fighterScale(58),
+      color,
+      kind: "floorShock",
+    });
+  }
+}
+
 function registerComboHit(attacker, target, damage, { blocked, projectile, heavyImpact, counter, hitZone }) {
   if (!attacker || blocked || !target) return;
 
@@ -3319,9 +3490,12 @@ function registerComboHit(attacker, target, damage, { blocked, projectile, heavy
       target.y - (hitZone === "legs" ? 104 : hitZone === "head" ? 184 : 164),
       label,
       color,
+      { size: attacker.comboCount >= 7 ? 24 : attacker.comboCount >= 5 ? 22 : 20, life: 58, rise: 0.44, drift: (attacker.dir || 1) * 0.06 },
     );
     if (attacker.comboCount === 3 || attacker.comboCount === 5 || attacker.comboCount === 7) {
       playSound("combo", { x: target.x, intensity: clamp(0.85 + attacker.comboCount * 0.08, 0.9, 1.55), key: attacker.id });
+      if (attacker.comboCount >= 5) playSound("comboBreak", { x: target.x, intensity: clamp(0.72 + attacker.comboCount * 0.07, 0.9, 1.42), key: attacker.id });
+      comboFlourishFX(attacker, target, color, attacker.comboCount, hitZone);
       triggerCinematicHit(attacker.dir || 1, color, 0.42 + Math.min(attacker.comboCount, 8) * 0.045, 7, {
         zoom: 0.01 + Math.min(attacker.comboCount, 8) * 0.0015,
         pan: 3.4 + Math.min(attacker.comboCount, 8) * 0.25,
@@ -3329,6 +3503,7 @@ function registerComboHit(attacker, target, damage, { blocked, projectile, heavy
         roll: 0.001,
         band: 0.42 + Math.min(attacker.comboCount, 8) * 0.035,
       });
+      if (attacker.comboCount >= 5) triggerScreenTear(attacker.dir || 1, color, attacker.comboCount >= 7 ? 0.86 : 0.58, attacker.comboCount >= 7 ? 11 : 8);
     }
   }
 }
@@ -5856,14 +6031,26 @@ function drawHealth(x, y, width, f, reverse, height = 28) {
 
 function drawEnergy(x, y, width, f, reverse, height = 12) {
   const ready = f.energy >= 45;
-  const pulse = 0.16 + Math.sin(roundFrame * 0.12) * 0.06;
+  const readyPulse = clamp((f.specialReadyPulse ?? 0) / 54, 0, 1);
+  const pulse = 0.16 + Math.sin(roundFrame * 0.12) * 0.06 + readyPulse * 0.2;
   if (ready) {
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.fillStyle = colorWithAlpha(f.trim, pulse);
     ctx.beginPath();
-    ctx.roundRect(x - 4, y - 4, width + 8, height + 8, 7);
+    ctx.roundRect(x - 4 - readyPulse * 4, y - 4 - readyPulse * 2, width + 8 + readyPulse * 8, height + 8 + readyPulse * 4, 7);
     ctx.fill();
+    if (readyPulse > 0.01) {
+      const sweep = reverse
+        ? x + width - width * readyPulse
+        : x + width * readyPulse;
+      ctx.strokeStyle = colorWithAlpha("#fff8df", 0.52 * readyPulse);
+      ctx.lineWidth = Math.max(1, height * 0.16);
+      ctx.beginPath();
+      ctx.moveTo(sweep, y - 2);
+      ctx.lineTo(sweep + (reverse ? -10 : 10), y + height + 2);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -5908,8 +6095,8 @@ function drawEnergy(x, y, width, f, reverse, height = 12) {
 
   if (ready) {
     ctx.save();
-    ctx.shadowColor = colorWithAlpha(f.trim, 0.55);
-    ctx.shadowBlur = 5;
+    ctx.shadowColor = colorWithAlpha(f.trim, 0.55 + readyPulse * 0.28);
+    ctx.shadowBlur = 5 + readyPulse * 7;
     ctx.fillStyle = "#fff1bd";
     ctx.font = `900 ${height <= 9 ? 7 : 8}px system-ui, sans-serif`;
     ctx.textAlign = reverse ? "left" : "right";
@@ -7279,17 +7466,18 @@ function drawEnergyAura(f, crouch) {
   const auraAlpha = cleanSprite ? 0.34 : 1;
   const auraScale = cleanSprite ? 0.82 : 1;
   const pulse = 0.45 + Math.sin(roundFrame * 0.08) * 0.16;
+  const readyPulse = clamp((f.specialReadyPulse ?? 0) / 54, 0, 1);
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.strokeStyle = color;
-  ctx.globalAlpha = (0.012 + pulse * 0.014) * auraAlpha;
-  ctx.lineWidth = cleanSprite ? 0.5 : 0.8;
+  ctx.globalAlpha = (0.012 + pulse * 0.014 + readyPulse * 0.055) * auraAlpha;
+  ctx.lineWidth = (cleanSprite ? 0.5 : 0.8) + readyPulse * 1.2;
   ctx.beginPath();
-  ctx.ellipse(0, -88 + crouch, 48 * auraScale, 72 * auraScale, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -88 + crouch, (48 + readyPulse * 14) * auraScale, (72 + readyPulse * 22) * auraScale, 0, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.globalAlpha = (0.008 + pulse * 0.01) * auraAlpha;
+  ctx.globalAlpha = (0.008 + pulse * 0.01 + readyPulse * 0.034) * auraAlpha;
   ctx.beginPath();
-  ctx.ellipse(0, -93 + crouch, 58 * auraScale, 84 * auraScale, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -93 + crouch, (58 + readyPulse * 18) * auraScale, (84 + readyPulse * 24) * auraScale, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }
