@@ -1451,6 +1451,53 @@ const SOUND_PRESETS = {
     layers: [{ type: "sine", freq: [110, 55], volume: 0.38, duration: 0.24 }],
     cooldown: 0.16,
   },
+  dojoGasp: {
+    duration: 0.34,
+    volume: 0.056,
+    type: "triangle",
+    freq: [460, 318],
+    noise: { volume: 0.044, type: "bandpass", frequency: 880, q: 0.4, duration: 0.3 },
+    layers: [
+      { type: "sine", freq: [180, 150], volume: 0.34, duration: 0.3 },
+      { type: "triangle", freq: [640, 520], volume: 0.12, delay: 0.035, duration: 0.18 },
+    ],
+    cooldown: 0.24,
+  },
+  dojoCrowd: {
+    duration: 0.76,
+    volume: 0.064,
+    type: "sine",
+    freq: [116, 110],
+    noise: { volume: 0.072, type: "bandpass", frequency: 430, q: 0.46, duration: 0.7 },
+    layers: [
+      { type: "triangle", freq: [232, 220], volume: 0.16, duration: 0.64 },
+      { type: "sine", freq: [58, 54], volume: 0.36, duration: 0.72 },
+      { type: "triangle", freq: [330, 392], volume: 0.08, delay: 0.12, duration: 0.34 },
+    ],
+    cooldown: 0.52,
+  },
+  dojoStomp: {
+    duration: 0.32,
+    volume: 0.076,
+    type: "sine",
+    freq: [72, 34],
+    noise: { volume: 0.05, type: "lowpass", frequency: 155, duration: 0.24 },
+    layers: [{ type: "triangle", freq: [144, 68], volume: 0.2, duration: 0.24 }],
+    cooldown: 0.2,
+  },
+  dojoRoar: {
+    duration: 1.12,
+    volume: 0.084,
+    type: "sawtooth",
+    freq: [128, 78],
+    noise: { volume: 0.088, type: "lowpass", frequency: 520, duration: 1 },
+    layers: [
+      { type: "sine", freq: [64, 38], volume: 0.48, duration: 1.04 },
+      { type: "triangle", freq: [256, 194], volume: 0.14, delay: 0.08, duration: 0.6 },
+      { type: "triangle", freq: [512, 388], volume: 0.08, delay: 0.22, duration: 0.44 },
+    ],
+    cooldown: 0.82,
+  },
   momentumShift: {
     duration: 0.34,
     volume: 0.074,
@@ -1974,6 +2021,28 @@ function playSound(type, options = {}) {
   const toneLayers = [baseLayer, ...(options.layers ?? preset.layers ?? [])];
   for (const layer of toneLayers) startSoundTone(layer, output, now, duration);
   startSoundNoise(preset.noise, output, now, duration, intensity);
+}
+
+function playDojoReaction(kind, options = {}) {
+  const reactions = {
+    comboSpark: { sound: "dojoGasp", accent: null, duck: 0.28, hold: 0.08, release: 0.24, intensity: 0.78 },
+    comboSurge: { sound: "dojoCrowd", accent: "dojoStomp", duck: 0.48, hold: 0.12, release: 0.34, intensity: 0.92 },
+    comboPeak: { sound: "dojoRoar", accent: "dojoStomp", duck: 0.72, hold: 0.16, release: 0.46, intensity: 1.06 },
+    specialReady: { sound: "dojoGasp", accent: "stageChime", duck: 0.34, hold: 0.1, release: 0.3, intensity: 0.82 },
+    finishImpact: { sound: "dojoGasp", accent: "dojoStomp", duck: 0.62, hold: 0.16, release: 0.42, intensity: 0.9 },
+    finish: { sound: "dojoRoar", accent: "dojoStomp", duck: 1.08, hold: 0.26, release: 0.62, intensity: 1.18 },
+    decision: { sound: "dojoCrowd", accent: "stageChime", duck: 0.58, hold: 0.16, release: 0.44, intensity: 0.94 },
+  };
+  const reaction = reactions[kind];
+  if (!reaction) return;
+  const x = Number.isFinite(options.x) ? options.x : W / 2;
+  const comboLift = clamp((options.combo ?? 0) * 0.035, 0, 0.3);
+  const intensity = clamp((options.intensity ?? reaction.intensity) + comboLift, 0.48, 1.5);
+  const keyBase = options.key ?? `${kind}:${roundNumber}`;
+
+  playSound(reaction.sound, { x, intensity, key: keyBase });
+  if (reaction.accent) playSound(reaction.accent, { x, intensity: clamp(intensity * 0.86, 0.42, 1.35), key: `${keyBase}:accent` });
+  if (reaction.duck) duckMusicForImpact(reaction.duck * intensity, reaction.hold, reaction.release);
 }
 
 function attackStartSound(type) {
@@ -3308,6 +3377,7 @@ function triggerSpecialReady(f) {
   addText(f.x, f.y - fighterScale(178), "SPECIAL READY", color, { size: 22, life: 66, rise: 0.42, drift: (f.dir || 1) * 0.04 });
   if (!announcerCue || announcerCue.life < 34) cueAnnouncer("SPECIAL READY", `${f.name} carga su tecnica`, color, 72);
   playSound("specialReady", { x: f.x, intensity: 1.04, key: f.id });
+  playDojoReaction("specialReady", { x: f.x, intensity: 0.84, key: f.id });
 }
 
 function updateCameraImpactPulse() {
@@ -3538,6 +3608,11 @@ function finishRound(winnerFighter, loserFighter, options = {}) {
     });
     triggerScreenTear(impactDir, winnerFighter.trim || "#fff1bd", matchOver ? 1.02 : 0.78, matchOver ? 16 : 12);
     playSound("timeOver", { intensity: matchOver ? 1.08 : 0.96, key: `time:${roundNumber}` });
+    playDojoReaction(matchOver ? "finish" : "decision", {
+      x: winnerFighter.x,
+      intensity: matchOver ? 1.04 : 0.88,
+      key: `time:${roundNumber}:${winnerFighter.id}`,
+    });
   } else {
     loserFighter.koFall = Math.max(loserFighter.koFall ?? 0, matchOver ? 118 : 104);
     loserFighter.koFallDir = loserFighter.impactDir || winnerFighter.dir || 1;
@@ -3568,6 +3643,11 @@ function finishRound(winnerFighter, loserFighter, options = {}) {
     triggerScreenTear(loserFighter.koFallDir, winnerFighter.trim || "#fff1bd", matchOver ? 1.68 : 1.34, matchOver ? 24 : 18);
     koCollapseFX(loserFighter, winnerFighter);
     playSound(matchOver ? tournamentActive && winnerFighter.id !== "right" ? "lose" : "victory" : "ko");
+    playDojoReaction("finish", {
+      x: loserFighter.x,
+      intensity: matchOver ? 1.18 : 1.02,
+      key: `ko:${roundNumber}:${winnerFighter.id}`,
+    });
   }
 
   triggerFinishFreezeCue(winnerFighter, loserFighter, timeOver, impactDir);
@@ -4436,6 +4516,12 @@ function registerComboHit(attacker, target, damage, { blocked, projectile, heavy
     if (attacker.comboCount === 3 || attacker.comboCount === 5 || attacker.comboCount === 7) {
       playSound("combo", { x: target.x, intensity: clamp(0.85 + attacker.comboCount * 0.08, 0.9, 1.55), key: attacker.id });
       if (attacker.comboCount >= 5) playSound("comboBreak", { x: target.x, intensity: clamp(0.72 + attacker.comboCount * 0.07, 0.9, 1.42), key: attacker.id });
+      playDojoReaction(attacker.comboCount >= 7 ? "comboPeak" : attacker.comboCount >= 5 ? "comboSurge" : "comboSpark", {
+        x: target.x,
+        combo: attacker.comboCount,
+        intensity: clamp(0.72 + attacker.comboCount * 0.05, 0.78, 1.18),
+        key: `${attacker.id}:${target.id}:${attacker.comboCount}`,
+      });
       comboFlourishFX(attacker, target, color, attacker.comboCount, hitZone);
       triggerCinematicHit(attacker.dir || 1, color, 0.42 + Math.min(attacker.comboCount, 8) * 0.045, 7, {
         zoom: 0.01 + Math.min(attacker.comboCount, 8) * 0.0015,
@@ -4475,6 +4561,7 @@ function sweetenImpactAudio({ target, blocked, heavyImpact, projectile, counter,
   if (finishingHit) {
     playSound("finishRumble", { x, intensity: clamp(0.9 + strength * 0.3, 0.95, 1.55), key: `${target.id}:${roundNumber}` });
     playSound("impactTail", { x, intensity: clamp(0.98 + strength * 0.24, 1, 1.65), key: `${target.id}:finish:${roundNumber}` });
+    playDojoReaction("finishImpact", { x, intensity: clamp(0.78 + strength * 0.1, 0.84, 1.02), key: `${target.id}:finish-impact:${roundNumber}` });
     duckMusicForImpact(1.32 + strength * 0.25, 0.24, 0.62);
     return;
   }
