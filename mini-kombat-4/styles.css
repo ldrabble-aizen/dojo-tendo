@@ -1401,7 +1401,7 @@ canvas {
   display: block;
   overflow: hidden;
   color: #fff7d6;
-  font: 900 clamp(22px, 3vw, 34px)/0.96 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+  font: 900 clamp(22px, 3vw, 34px)/1.36 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
   text-overflow: ellipsis;
   text-transform: uppercase;
   text-shadow:
@@ -1433,6 +1433,43 @@ canvas {
   font: 900 10px/1 system-ui, sans-serif;
   text-transform: uppercase;
   text-shadow: 0 1px 0 rgba(0,0,0,0.78);
+}
+
+.fighter-dossier {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.fighter-showcase-bio {
+  margin: 0;
+  color: rgba(255, 245, 214, 0.76);
+  font: 800 11px/1.28 system-ui, sans-serif;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.76);
+}
+
+.fighter-technique-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.fighter-technique-chip {
+  display: inline-grid;
+  max-width: 100%;
+  min-height: 22px;
+  align-items: center;
+  padding: 4px 7px;
+  overflow: hidden;
+  color: rgba(255, 247, 214, 0.9);
+  border: 1px solid color-mix(in srgb, var(--fighter-trim) 46%, rgba(255,255,255,0.14));
+  border-radius: 5px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--fighter-trim) 18%, transparent), rgba(0, 0, 0, 0.18));
+  font: 900 9px/1 system-ui, sans-serif;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .fighter-showcase-stats {
@@ -1673,7 +1710,7 @@ canvas {
 
 .overlay[data-screen="home"] .fighter-showcase-info strong {
   font-size: 31px;
-  line-height: 0.92;
+  line-height: 1.36;
 }
 
 .overlay[data-screen="home"] .fighter-showcase-info > span {
@@ -2033,7 +2070,7 @@ canvas {
   display: block;
   overflow: hidden;
   color: #fff7d6;
-  font: 900 clamp(26px, 4vw, 46px)/0.9 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+  font: 900 clamp(26px, 4vw, 46px)/1.36 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
   text-overflow: ellipsis;
   text-transform: uppercase;
   text-shadow: 0 3px 0 #250806, 0 0 18px color-mix(in srgb, var(--fighter-trim) 48%, transparent);
@@ -2050,6 +2087,23 @@ canvas {
   font: 900 10px/1 system-ui, sans-serif;
   text-transform: uppercase;
   text-shadow: 0 1px 0 rgba(0,0,0,0.78);
+}
+
+.versus-card .fighter-dossier {
+  margin-top: 12px;
+}
+
+.versus-card .fighter-showcase-bio {
+  width: min(310px, 100%);
+  font-size: 12px;
+}
+
+.versus-card[data-side="right"] .fighter-showcase-bio {
+  margin-left: auto;
+}
+
+.versus-card[data-side="right"] .fighter-technique-list {
+  justify-content: flex-end;
 }
 
 .versus-card[data-side="right"] .versus-card-info em {
@@ -2458,6 +2512,10 @@ canvas {
     font-size: 8px;
   }
 
+  .fighter-dossier {
+    display: none;
+  }
+
   .fighter-showcase-stats {
     gap: 3px;
     margin-top: 7px;
@@ -2863,7 +2921,7 @@ canvas {
 
   .fighter-showcase-info strong {
     font-size: 19px;
-    line-height: 0.9;
+    line-height: 1.28;
   }
 
   .fighter-showcase-info > span {
@@ -2906,7 +2964,7 @@ canvas {
 
   .overlay[data-screen="home"] .fighter-showcase-info strong {
     font-size: 22px;
-    line-height: 0.9;
+    line-height: 1.28;
   }
 
   .overlay[data-screen="home"] .fighter-showcase-info > span {
@@ -3069,7 +3127,7 @@ canvas {
     margin-top: 0;
     overflow: hidden;
     font-size: clamp(22px, 4.8vw, 34px);
-    line-height: 0.9;
+    line-height: 1.22;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

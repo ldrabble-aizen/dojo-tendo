@@ -881,6 +881,45 @@ const fighterProfiles = {
   },
 };
 
+const FIGHTER_PRESENTATION = {
+  p1: {
+    discipline: "Presion de corto rango",
+    signature: "Embestida del panuelito",
+    temperament: "Aguanta castigo y devuelve pesado.",
+    callout: "entra bajo, rompe guardia y no retrocede",
+  },
+  p2: {
+    discipline: "Karate rapido",
+    signature: "Contra limpia",
+    temperament: "Precisa, veloz y dificil de encerrar.",
+    callout: "marca distancia con velocidad y castiga errores",
+  },
+  p3: {
+    discipline: "Potencia de tribuna",
+    signature: "Avalancha celeste",
+    temperament: "Cuerpo grande, impacto seco y avance frontal.",
+    callout: "ocupa el tatami y pega con peso de clasico",
+  },
+  p4: {
+    discipline: "Reflejo elastico",
+    signature: "Chispa cruzada",
+    temperament: "Lee huecos, entra y sale con ritmo raro.",
+    callout: "flota alrededor del golpe y responde al angulo",
+  },
+  p5: {
+    discipline: "Alcance dominante",
+    signature: "Paso largo",
+    temperament: "El mas alto: controla linea y aire.",
+    callout: "pelea desde lejos y convierte distancia en dano",
+  },
+  p6: {
+    discipline: "Defensa oscura",
+    signature: "Muro negro",
+    temperament: "Solida, paciente y peligrosa en respuesta.",
+    callout: "cierra la puerta y espera el contragolpe",
+  },
+};
+
 let fighters = buildFighters();
 
 function fighterScale(value) {
@@ -1963,8 +2002,8 @@ function scheduleWinnerOverlay() {
 
 function homeOverlayCopy() {
   return tournamentMode
-    ? "El Dojo Tendo abre el torneo. Elegi tu campeon y subi al tatami."
-    : `El Dojo Tendo abre sus puertas. Elegi combatientes y prepara el duelo${cpuEnabled ? " contra la CPU." : "."}`;
+    ? "El Dojo Tendo abre el torneo. Elegi campeon, estudia su firma y subi al tatami."
+    : `El Dojo Tendo abre sus puertas. Elegi combatientes, lee sus estilos y prepara el duelo${cpuEnabled ? " contra la CPU." : "."}`;
 }
 
 function cueHomeIntro() {
@@ -2001,9 +2040,11 @@ function showVersusOverlay(startKind = "match") {
   overlay.dataset.mode = tournamentActive ? "tournament" : "match";
   const roundLabel = startKind === "round" ? `ROUND ${toRoman(roundNumber)}` : tournamentActive ? `RIVAL ${tournamentIndex + 1}/${tournamentOpponents.length}` : `ROUND ${toRoman(roundNumber)}`;
   overlay.querySelector("h1").textContent = roundLabel;
+  const leftPresentation = fighterPresentation(fighters[0]);
+  const rightPresentation = fighterPresentation(fighters[1]);
   overlayCopy.textContent = tournamentActive
-    ? `Torneo Dojo Tendo. ${fighters[0].name} VS ${fighters[1].name}. ${fighters[1].name} busca avanzar en la escalera.`
-    : `${fighters[0].name} VS ${fighters[1].name}. Preparados para pelear.`;
+    ? `Torneo Dojo Tendo. ${fighters[0].name} ${leftPresentation.callout}; ${fighters[1].name} busca avanzar con ${rightPresentation.signature}.`
+    : `${fighters[0].name} ${leftPresentation.callout}. ${fighters[1].name} responde con ${rightPresentation.signature}.`;
   renderVersusPanel(roundLabel);
   startButton.textContent = "COMENZAR";
   fighterSelect.classList.remove("hidden");
@@ -15018,6 +15059,7 @@ function makeVersusCard(fighter, role, side) {
   const trait = document.createElement("em");
   trait.textContent = fighterTrait(fighter);
   info.append(trait);
+  info.append(makeFighterDossier(fighter, true));
   info.append(makeMenuStats(fighter));
   card.append(info);
   return card;
@@ -15072,6 +15114,7 @@ function makeSelectColumn(side, title, selectedId) {
   trait.className = "fighter-showcase-trait";
   trait.textContent = fighterTrait(selectedProfile);
   info.append(trait);
+  info.append(makeFighterDossier(selectedProfile));
   info.append(makeMenuStats(selectedProfile));
   showcase.append(info);
   column.append(showcase);
@@ -15117,12 +15160,46 @@ function fighterTrait(profile) {
   }[key] ?? "Equilibrio";
 }
 
+function fighterPresentation(profile) {
+  const key = profile.profileId ?? profile.id;
+  return FIGHTER_PRESENTATION[key] ?? {
+    discipline: "Dojo libre",
+    signature: "Golpe limpio",
+    temperament: "Equilibrio y lectura.",
+    callout: "busca el centro y responde con calma",
+  };
+}
+
+function makeFighterDossier(profile, compact = false) {
+  const presentation = fighterPresentation(profile);
+  const wrap = document.createElement("div");
+  wrap.className = compact ? "fighter-dossier compact" : "fighter-dossier";
+
+  const bio = document.createElement("p");
+  bio.className = "fighter-showcase-bio";
+  bio.textContent = presentation.temperament;
+  wrap.append(bio);
+
+  const chips = document.createElement("div");
+  chips.className = "fighter-technique-list";
+  for (const label of [presentation.discipline, presentation.signature]) {
+    const chip = document.createElement("span");
+    chip.className = "fighter-technique-chip";
+    chip.textContent = label;
+    chips.append(chip);
+  }
+  wrap.append(chips);
+  return wrap;
+}
+
 function makeMenuStats(profile) {
   const stats = {
     athletic: [78, 88, 74],
     balanced: [80, 76, 82],
     heavy: [92, 62, 88],
     lean: [68, 92, 72],
+    racingHeavy: [94, 58, 86],
+    slimFemale: [70, 94, 78],
     softFemale: [72, 78, 86],
     tallLean: [64, 90, 74],
   }[profile.build] ?? [75, 75, 75];
