@@ -103,6 +103,14 @@ let soundEnabled = true;
 let matchOver = false;
 let roundNumber = 1;
 let musicClock = 0;
+let musicDirector = {
+  round: 0,
+  matchPoint: false,
+  duel: false,
+  closeCall: false,
+  comboPeak: 0,
+  critical: Object.create(null),
+};
 let particles = [];
 let floatingTexts = [];
 let announcerCue = null;
@@ -1525,6 +1533,48 @@ const SOUND_PRESETS = {
     noise: { volume: 0.038, type: "highpass", frequency: 2500, duration: 0.08 },
     cooldown: 0.06,
   },
+  musicMatchPoint: {
+    duration: 0.72,
+    volume: 0.078,
+    type: "sawtooth",
+    freq: [146, 73],
+    noise: { volume: 0.04, type: "bandpass", frequency: 680, q: 0.62, duration: 0.36 },
+    layers: [
+      { type: "sine", freq: [49, 36], volume: 0.48, duration: 0.68 },
+      { type: "triangle", freq: [438, 292], volume: 0.12, delay: 0.08, duration: 0.34 },
+    ],
+    cooldown: 0.7,
+  },
+  musicCritical: {
+    duration: 0.5,
+    volume: 0.062,
+    type: "square",
+    freq: [220, 110, 165],
+    noise: { volume: 0.036, type: "highpass", frequency: 1700, duration: 0.12 },
+    layers: [{ type: "sine", freq: [55, 44], volume: 0.42, duration: 0.46 }],
+    cooldown: 0.48,
+  },
+  musicComboRise: {
+    duration: 0.42,
+    volume: 0.052,
+    type: "triangle",
+    freq: [330, 660, 990],
+    noise: { volume: 0.018, type: "highpass", frequency: 2100, duration: 0.08 },
+    layers: [{ type: "sine", freq: [165, 330], volume: 0.24, duration: 0.36 }],
+    cooldown: 0.24,
+  },
+  musicDuel: {
+    duration: 0.66,
+    volume: 0.054,
+    type: "triangle",
+    freq: [292, 438],
+    noise: { volume: 0.02, type: "bandpass", frequency: 920, q: 0.7, duration: 0.2 },
+    layers: [
+      { type: "sine", freq: [73, 73.4], volume: 0.36, duration: 0.62 },
+      { type: "triangle", freq: [584, 876], volume: 0.1, delay: 0.1, duration: 0.26 },
+    ],
+    cooldown: 0.55,
+  },
   musicBreath: {
     duration: 0.92,
     volume: 0.018,
@@ -1762,6 +1812,60 @@ function playMusicTick() {
     playSound("musicStrike", { intensity: 0.36 + tension * 0.24, pan: Math.sin(step + bar) * 0.18, key: `strike:${step}` });
   }
   musicClock += 1;
+}
+
+function resetMusicDirectorRound() {
+  musicDirector = {
+    round: roundNumber,
+    matchPoint: false,
+    duel: false,
+    closeCall: false,
+    comboPeak: 0,
+    critical: Object.create(null),
+  };
+}
+
+function playMusicDirectorTick() {
+  if (!audioCtx || !soundEnabled || !running || paused || winner || countdownFrames > 0 || roundFrame < 8) return;
+
+  const [a, b] = fighters;
+  if (!a || !b) return;
+
+  const leadingWins = Math.max(a.wins ?? 0, b.wins ?? 0);
+  if (!musicDirector.matchPoint && leadingWins >= 1 && roundNumber >= 2) {
+    musicDirector.matchPoint = true;
+    playSound("musicMatchPoint", { intensity: 0.86 + musicTensionLevel() * 0.22, pan: 0, key: `match:${roundNumber}` });
+  }
+
+  if (!musicDirector.duel && a.energy >= 45 && b.energy >= 45) {
+    musicDirector.duel = true;
+    playSound("musicDuel", { intensity: 0.74 + musicTensionLevel() * 0.18, pan: 0, key: `duel:${roundNumber}` });
+  }
+
+  const minHealth = Math.min(a.health, b.health);
+  const healthGap = Math.abs(a.health - b.health);
+  if (!musicDirector.closeCall && minHealth <= 34 && healthGap <= 10) {
+    musicDirector.closeCall = true;
+    playSound("musicDuel", { intensity: 0.92 + musicTensionLevel() * 0.22, pan: 0, key: `close:${roundNumber}` });
+  }
+
+  for (const fighter of fighters) {
+    if (fighter.health > 0 && fighter.health <= 24 && !musicDirector.critical[fighter.id]) {
+      musicDirector.critical[fighter.id] = true;
+      playSound("musicCritical", { x: fighter.x, intensity: 0.9 + (24 - fighter.health) / 48, key: `critical:${fighter.id}:${roundNumber}` });
+    }
+  }
+
+  const comboLeader = fighters.reduce((best, fighter) => ((fighter.comboCount ?? 0) > (best?.comboCount ?? 0) ? fighter : best), null);
+  const comboCount = comboLeader?.comboCount ?? 0;
+  if (comboCount >= 5 && comboCount > musicDirector.comboPeak && (comboLeader.comboTimer ?? 0) > 0) {
+    musicDirector.comboPeak = comboCount;
+    playSound("musicComboRise", {
+      x: comboLeader.x,
+      intensity: clamp(0.7 + comboCount * 0.07, 0.9, 1.45),
+      key: `combo:${roundNumber}:${comboCount}`,
+    });
+  }
 }
 
 function resetGame() {
@@ -2039,6 +2143,7 @@ function resetRound() {
   roundFrame = 0;
   resultFrame = 0;
   countdownFrames = 180;
+  resetMusicDirectorRound();
   paused = false;
   running = true;
   overlay.classList.add("hidden");
@@ -2737,6 +2842,7 @@ function update() {
 
   roundFrame += 1;
   playMusicTick();
+  playMusicDirectorTick();
   const [a, b] = fighters;
   a.dir = a.x <= b.x ? 1 : -1;
   b.dir = b.x < a.x ? 1 : -1;
