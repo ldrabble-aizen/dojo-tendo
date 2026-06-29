@@ -127,8 +127,12 @@ let floatingTexts = [];
 let announcerCue = null;
 let audioCtx = null;
 let audioMasterGain = null;
+let audioFxGain = null;
+let audioMusicGain = null;
 let audioNoiseCache = new Map();
 let audioLastPlayed = Object.create(null);
+const AUDIO_FX_BASE_VOLUME = 1;
+const AUDIO_MUSIC_BASE_VOLUME = 0.84;
 let overlayMode = "home";
 let tournamentMode = false;
 let tournamentActive = false;
@@ -1278,6 +1282,51 @@ const SOUND_PRESETS = {
     layers: [{ type: "sine", freq: [90, 38], volume: 0.44, duration: 0.25 }],
     cooldown: 0.05,
   },
+  impactTail: {
+    duration: 0.42,
+    volume: 0.076,
+    type: "sine",
+    freq: [68, 36],
+    noise: { volume: 0.026, type: "lowpass", frequency: 210, duration: 0.24 },
+    layers: [
+      { type: "triangle", freq: [136, 92], volume: 0.18, delay: 0.012, duration: 0.2 },
+      { type: "sine", freq: [34, 27], volume: 0.5, duration: 0.4 },
+    ],
+    cooldown: 0.09,
+  },
+  guardTail: {
+    duration: 0.28,
+    volume: 0.064,
+    type: "square",
+    freq: [640, 355],
+    noise: { volume: 0.036, type: "highpass", frequency: 1900, duration: 0.1 },
+    layers: [{ type: "triangle", freq: [1280, 740], volume: 0.12, delay: 0.02, duration: 0.16 }],
+    cooldown: 0.08,
+  },
+  specialTail: {
+    duration: 0.54,
+    volume: 0.07,
+    type: "triangle",
+    freq: [720, 360, 540],
+    noise: { volume: 0.022, type: "bandpass", frequency: 1700, q: 0.82, duration: 0.2 },
+    layers: [
+      { type: "sine", freq: [90, 48], volume: 0.42, duration: 0.48 },
+      { type: "triangle", freq: [1080, 1440], volume: 0.1, delay: 0.08, duration: 0.2 },
+    ],
+    cooldown: 0.14,
+  },
+  finishRumble: {
+    duration: 0.92,
+    volume: 0.118,
+    type: "sawtooth",
+    freq: [54, 21],
+    noise: { volume: 0.07, type: "lowpass", frequency: 160, duration: 0.62 },
+    layers: [
+      { type: "sine", freq: [27, 18], volume: 0.86, duration: 0.86 },
+      { type: "triangle", freq: [108, 54], volume: 0.16, delay: 0.04, duration: 0.36 },
+    ],
+    cooldown: 0.28,
+  },
   counter: {
     duration: 0.23,
     volume: 0.15,
@@ -1684,8 +1733,15 @@ function soundPan(options) {
   return soundPanFromX(options.x);
 }
 
-function connectSoundOutput(node, pan, now) {
-  const destination = audioMasterGain || audioCtx.destination;
+function soundBusFor(type, preset) {
+  if (preset.bus) return preset.bus;
+  return type.startsWith("music") || type.startsWith("stage") ? "music" : "fx";
+}
+
+function connectSoundOutput(node, pan, now, bus = "fx") {
+  const destination = bus === "music"
+    ? audioMusicGain || audioMasterGain || audioCtx.destination
+    : audioFxGain || audioMasterGain || audioCtx.destination;
   if (typeof audioCtx.createStereoPanner === "function" && Math.abs(pan) > 0.01) {
     const panner = audioCtx.createStereoPanner();
     panner.pan.setValueAtTime(pan, now);
@@ -1756,7 +1812,29 @@ function ensureAudio() {
     audioMasterGain.gain.setValueAtTime(0.86, audioCtx.currentTime);
     audioMasterGain.connect(audioCtx.destination);
   }
+  if (!audioFxGain) {
+    audioFxGain = audioCtx.createGain();
+    audioFxGain.gain.setValueAtTime(AUDIO_FX_BASE_VOLUME, audioCtx.currentTime);
+    audioFxGain.connect(audioMasterGain);
+  }
+  if (!audioMusicGain) {
+    audioMusicGain = audioCtx.createGain();
+    audioMusicGain.gain.setValueAtTime(AUDIO_MUSIC_BASE_VOLUME, audioCtx.currentTime);
+    audioMusicGain.connect(audioMasterGain);
+  }
   if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function duckMusicForImpact(strength = 1, hold = 0.12, release = 0.34) {
+  if (!audioCtx || !audioMusicGain) return;
+  const now = audioCtx.currentTime;
+  const amount = clamp(strength, 0, 1.65);
+  const target = AUDIO_MUSIC_BASE_VOLUME * (1 - clamp(0.18 + amount * 0.22, 0.18, 0.5));
+  audioMusicGain.gain.cancelScheduledValues(now);
+  audioMusicGain.gain.setValueAtTime(audioMusicGain.gain.value || AUDIO_MUSIC_BASE_VOLUME, now);
+  audioMusicGain.gain.linearRampToValueAtTime(Math.max(0.22, target), now + 0.018);
+  audioMusicGain.gain.setValueAtTime(Math.max(0.22, target), now + hold);
+  audioMusicGain.gain.exponentialRampToValueAtTime(AUDIO_MUSIC_BASE_VOLUME, now + hold + release);
 }
 
 function playSound(type, options = {}) {
@@ -1776,7 +1854,7 @@ function playSound(type, options = {}) {
   output.gain.setValueAtTime(0.0001, now);
   output.gain.linearRampToValueAtTime(Math.max(0.0002, preset.volume * intensity), now + attack);
   output.gain.exponentialRampToValueAtTime(0.001, now + duration);
-  connectSoundOutput(output, soundPan(options), now);
+  connectSoundOutput(output, soundPan(options), now, soundBusFor(type, preset));
 
   const baseLayer = {
     type: preset.type,
@@ -4113,6 +4191,38 @@ function impactSoundType({ blocked, heavyImpact, projectile, counter, finishingH
   return "hit";
 }
 
+function sweetenImpactAudio({ target, blocked, heavyImpact, projectile, counter, finishingHit, hitZone, impactStrength }) {
+  if (!target) return;
+  const x = target.x;
+  const zoneBoost = hitZone === "head" || hitZone === "legs" ? 0.1 : 0;
+  const strength = clamp((impactStrength ?? 1) + zoneBoost, 0.42, 1.75);
+
+  if (blocked) {
+    playSound("guardTail", { x, intensity: clamp(0.68 + strength * 0.22, 0.68, 1.2), key: `${target.id}:${hitZone}` });
+    duckMusicForImpact(0.42 + strength * 0.28, 0.055, 0.18);
+    return;
+  }
+
+  if (finishingHit) {
+    playSound("finishRumble", { x, intensity: clamp(0.9 + strength * 0.3, 0.95, 1.55), key: `${target.id}:${roundNumber}` });
+    playSound("impactTail", { x, intensity: clamp(0.98 + strength * 0.24, 1, 1.65), key: `${target.id}:finish:${roundNumber}` });
+    duckMusicForImpact(1.32 + strength * 0.25, 0.24, 0.62);
+    return;
+  }
+
+  if (projectile || counter) {
+    playSound("specialTail", { x, intensity: clamp(0.82 + strength * 0.28, 0.86, 1.52), key: `${target.id}:${projectile ? "projectile" : "counter"}` });
+    playSound("impactTail", { x, intensity: clamp(0.74 + strength * 0.22, 0.78, 1.35), key: `${target.id}:${hitZone}:tail` });
+    duckMusicForImpact(0.92 + strength * 0.22, 0.13, 0.38);
+    return;
+  }
+
+  if (heavyImpact || hitZone === "head" || hitZone === "legs") {
+    playSound("impactTail", { x, intensity: clamp(0.62 + strength * 0.24, 0.66, 1.25), key: `${target.id}:${hitZone}:tail` });
+    duckMusicForImpact(0.58 + strength * 0.2, 0.075, 0.24);
+  }
+}
+
 function landHit(attacker, target, damage, projectile = false, projectileInfo = null) {
   const unblockable = attacker?.attack?.type === "grab";
   const counter = attacker?.counterWindow > 0;
@@ -4239,6 +4349,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
     intensity: impactStrength,
     key: `${target.id}:${hitZone}`,
   });
+  sweetenImpactAudio({ target, blocked, heavyImpact, projectile, counter, finishingHit, hitZone, impactStrength });
   registerComboHit(attacker, target, finalDamage, { blocked, projectile, heavyImpact, counter, hitZone });
   addText(
     target.x,
