@@ -116,6 +116,12 @@ let musicDirector = {
   comboPeak: 0,
   critical: Object.create(null),
 };
+let momentumHud = {
+  leader: null,
+  pulse: 0,
+  lastScore: 0,
+  lastCueFrame: -999,
+};
 let particles = [];
 let floatingTexts = [];
 let announcerCue = null;
@@ -1373,6 +1379,18 @@ const SOUND_PRESETS = {
     layers: [{ type: "sine", freq: [110, 55], volume: 0.38, duration: 0.24 }],
     cooldown: 0.16,
   },
+  momentumShift: {
+    duration: 0.34,
+    volume: 0.074,
+    type: "triangle",
+    freq: [196, 392, 294],
+    noise: { volume: 0.024, type: "bandpass", frequency: 1180, q: 0.72, duration: 0.12 },
+    layers: [
+      { type: "sine", freq: [73, 49], volume: 0.36, duration: 0.3 },
+      { type: "triangle", freq: [588, 784], volume: 0.12, delay: 0.06, duration: 0.16 },
+    ],
+    cooldown: 0.36,
+  },
   specialReady: {
     duration: 0.36,
     volume: 0.1,
@@ -1773,6 +1791,125 @@ function musicTensionLevel() {
   const closeFight = clamp(1 - distance / 320, 0, 1);
   const roundLift = clamp((roundNumber - 1) * 0.08, 0, 0.16);
   return clamp(lowHealth * 0.58 + specialReady * 0.18 + closeFight * 0.16 + roundLift, 0, 1.18);
+}
+
+function activeComboValue(fighter) {
+  if (!fighter || (fighter.comboTimer ?? 0) <= 0 || (fighter.comboCount ?? 0) < 2) return 0;
+  return (fighter.comboCount ?? 0) * 4.4 + (fighter.comboDamage ?? 0) * 0.12;
+}
+
+function fighterMomentumScore(fighter, opponent) {
+  if (!fighter || !opponent) return 0;
+  const healthLead = (fighter.health ?? 0) - (opponent.health ?? 0);
+  const energyLead = (fighter.energy ?? 0) - (opponent.energy ?? 0);
+  const winLead = (fighter.wins ?? 0) - (opponent.wins ?? 0);
+  const pressure = (fighter.rangePressure ?? 0) - (opponent.rangePressure ?? 0);
+  const comboLead = activeComboValue(fighter) - activeComboValue(opponent);
+  return healthLead * 0.58 + energyLead * 0.13 + winLead * 18 + pressure * 10 + comboLead;
+}
+
+function momentumReadState() {
+  const [left, right] = fighters;
+  if (!left || !right) {
+    return { leader: null, score: 0, amount: 0, label: "EVEN", detail: "ROUND ABIERTO", color: "#fff1bd" };
+  }
+  const rawScore = fighterMomentumScore(left, right);
+  const amount = clamp(Math.abs(rawScore) / 58, 0, 1);
+  const leader = rawScore > 5.5 ? left : rawScore < -5.5 ? right : null;
+  const opponent = leader === left ? right : left;
+  const matchPoint = Math.max(left.wins ?? 0, right.wins ?? 0) >= 1 && roundNumber >= 2;
+  const seconds = roundTimerSeconds();
+  const bothLoaded = left.energy >= 45 && right.energy >= 45;
+  const closeLate = seconds <= 18 && Math.abs((left.health ?? 0) - (right.health ?? 0)) <= 12;
+  const comboLeader = fighters.reduce((best, fighter) => ((fighter.comboCount ?? 0) > (best?.comboCount ?? 0) ? fighter : best), null);
+  const liveCombo = comboLeader && (comboLeader.comboTimer ?? 0) > 0 && (comboLeader.comboCount ?? 0) >= 3;
+
+  if (liveCombo) {
+    return {
+      leader: comboLeader,
+      score: comboLeader === left ? amount : -amount,
+      amount: clamp((comboLeader.comboCount ?? 0) / 9, 0.34, 1),
+      label: `${comboLeader.comboCount} HIT RUN`,
+      detail: `${comboLeader.name} encadena presion`,
+      color: comboTierColor(comboLeader.comboCount ?? 0),
+    };
+  }
+  if (matchPoint && leader) {
+    return {
+      leader,
+      score: rawScore,
+      amount,
+      label: "MATCH POINT",
+      detail: `${leader.name} puede cerrar el combate`,
+      color: leader.trim || "#ffd44d",
+    };
+  }
+  if (closeLate) {
+    return {
+      leader,
+      score: rawScore,
+      amount: Math.max(amount, 0.24),
+      label: "DECISION EN JUEGO",
+      detail: leader ? `${leader.name} lleva la iniciativa` : "Cualquier golpe cambia el round",
+      color: leader?.trim || "#ffd44d",
+    };
+  }
+  if (bothLoaded && !leader) {
+    return {
+      leader: null,
+      score: rawScore,
+      amount: 0.5,
+      label: "DOBLE AMENAZA",
+      detail: "Ambos tienen especial listo",
+      color: "#75f0cb",
+    };
+  }
+  if (leader) {
+    return {
+      leader,
+      score: rawScore,
+      amount,
+      label: amount > 0.62 ? "DOMINIO" : "VENTAJA",
+      detail: `${leader.name} controla a ${opponent.name}`,
+      color: leader.trim || "#fff1bd",
+    };
+  }
+  return { leader: null, score: rawScore, amount, label: "ROUND ABIERTO", detail: "La pelea esta pareja", color: "#fff1bd" };
+}
+
+function resetMomentumHud() {
+  momentumHud = {
+    leader: null,
+    pulse: 0,
+    lastScore: 0,
+    lastCueFrame: -999,
+  };
+}
+
+function updateMomentumHud() {
+  if (momentumHud.pulse > 0) momentumHud.pulse -= 1;
+  if (!running || paused || winner || countdownFrames > 0) return;
+
+  const read = momentumReadState();
+  const leaderId = read.leader?.id ?? null;
+  const prevLeader = momentumHud.leader;
+  const leaderChanged = leaderId && leaderId !== prevLeader;
+  const scoreJump = Math.abs(read.score - (momentumHud.lastScore ?? 0));
+  if (leaderChanged && read.amount >= 0.26 && roundFrame > 78 && roundFrame - momentumHud.lastCueFrame > 130) {
+    momentumHud.pulse = 42;
+    momentumHud.lastCueFrame = roundFrame;
+    playSound("momentumShift", { x: read.leader.x, intensity: 0.76 + read.amount * 0.38, key: `${leaderId}:${roundNumber}` });
+    addText(read.leader.x, read.leader.y - fighterScale(170), read.label, read.color, {
+      size: read.amount > 0.62 ? 23 : 20,
+      life: 48,
+      rise: 0.36,
+      drift: (read.leader.dir || 1) * 0.05,
+    });
+  } else if (scoreJump > 26 && read.amount >= 0.48) {
+    momentumHud.pulse = Math.max(momentumHud.pulse, 18);
+  }
+  momentumHud.leader = leaderId;
+  momentumHud.lastScore = read.score;
 }
 
 function playMusicTick() {
@@ -2177,6 +2314,7 @@ function resetRound() {
   resultFrame = 0;
   roundTimerFrames = ROUND_TIMER_FRAMES;
   countdownFrames = 180;
+  resetMomentumHud();
   resetMusicDirectorRound();
   paused = false;
   running = true;
@@ -3119,6 +3257,7 @@ function update() {
   updateParticles();
   updateFloatingTexts();
   updateAnnouncerCue();
+  updateMomentumHud();
   triggerCriticalHealthCues();
 
   if (!winner && roundTimerFrames > 0) {
@@ -6215,6 +6354,7 @@ function drawHud() {
   drawHudPanel(sideInset, panelY, panelW, fighters[0], false, compact);
   drawHudPanel(W - sideInset - panelW, panelY, panelW, fighters[1], true, compact);
   drawHudCenter(compact);
+  drawMomentumStrip(compact);
 }
 
 function drawHudBackdrop(compact = false) {
@@ -6306,6 +6446,104 @@ function drawHudCenter(compact = false) {
   ctx.font = `900 ${compact ? 8 : 10}px system-ui, sans-serif`;
   ctx.fillStyle = danger ? "rgba(255, 214, 117, 0.95)" : "rgba(255, 244, 205, 0.9)";
   ctx.fillText(winner ? (roundFinishKind === "time" ? "DECISION" : "FINAL") : danger ? "TIME" : "MEJOR DE III", cx, y + (compact ? 49 : 66));
+  ctx.restore();
+}
+
+function drawMomentumStrip(compact = false) {
+  if (!running || countdownFrames > 0) return;
+  const read = momentumReadState();
+  const pulse = clamp((momentumHud.pulse ?? 0) / 42, 0, 1);
+  const width = compact ? 252 : 438;
+  const height = compact ? 17 : 22;
+  const x = W / 2 - width / 2;
+  const y = compact ? 72 : 99;
+  const leaderSide = read.leader === fighters[0] ? -1 : read.leader === fighters[1] ? 1 : 0;
+  const color = read.color || "#fff1bd";
+  const amount = clamp(read.amount ?? 0, 0, 1);
+  const fillW = (width - 128) * (leaderSide ? amount : 0.5);
+  const centerX = x + width / 2;
+  const barY = y + height - (compact ? 5 : 6);
+  const barW = width - 92;
+  const barX = x + 46;
+
+  ctx.save();
+  ctx.globalAlpha = winner ? 0.58 : 0.94;
+  ctx.shadowColor = colorWithAlpha(color, 0.2 + pulse * 0.34);
+  ctx.shadowBlur = 8 + pulse * 14;
+
+  const panel = ctx.createLinearGradient(x, y, x + width, y + height);
+  panel.addColorStop(0, colorWithAlpha(fighters[0]?.trim || "#fff1bd", 0.16 + (leaderSide < 0 ? amount * 0.12 : 0)));
+  panel.addColorStop(0.46, "rgba(12, 10, 10, 0.72)");
+  panel.addColorStop(0.54, "rgba(12, 10, 10, 0.72)");
+  panel.addColorStop(1, colorWithAlpha(fighters[1]?.trim || "#75f0cb", 0.16 + (leaderSide > 0 ? amount * 0.12 : 0)));
+  ctx.fillStyle = panel;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, compact ? 6 : 7);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = colorWithAlpha(color, 0.38 + pulse * 0.3);
+  ctx.lineWidth = 1.2 + pulse * 0.8;
+  ctx.beginPath();
+  ctx.roundRect(x + 1, y + 1, width - 2, height - 2, compact ? 5 : 6);
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = colorWithAlpha(color, 0.08 + pulse * 0.1);
+  const sweep = leaderSide < 0 ? x + 18 : leaderSide > 0 ? x + width - 18 : centerX;
+  ctx.beginPath();
+  ctx.moveTo(sweep - leaderSide * (compact ? 20 : 28), y + 2);
+  ctx.lineTo(sweep + leaderSide * (compact ? 70 : 96), y + 2);
+  ctx.lineTo(sweep + leaderSide * (compact ? 42 : 58), y + height - 2);
+  ctx.lineTo(sweep - leaderSide * (compact ? 48 : 64), y + height - 2);
+  ctx.closePath();
+  if (leaderSide) ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+  ctx.beginPath();
+  ctx.roundRect(barX, barY, barW, compact ? 2 : 3, 2);
+  ctx.fill();
+
+  if (leaderSide) {
+    const leadW = Math.max(8, fillW);
+    const leadX = leaderSide < 0 ? centerX - leadW : centerX;
+    const lead = ctx.createLinearGradient(leaderSide < 0 ? centerX : leadX, barY, leaderSide < 0 ? leadX : leadX + leadW, barY);
+    lead.addColorStop(0, colorWithAlpha(color, 0.94));
+    lead.addColorStop(1, colorWithAlpha("#fff7d6", 0.68));
+    ctx.fillStyle = lead;
+    ctx.beginPath();
+    ctx.roundRect(leadX, barY, leadW, compact ? 2 : 3, 2);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = "rgba(255, 241, 189, 0.56)";
+    ctx.beginPath();
+    ctx.roundRect(centerX - 18, barY, 36, compact ? 2 : 3, 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = colorWithAlpha(fighters[0]?.trim || "#fff1bd", leaderSide < 0 ? 0.95 : 0.5);
+  ctx.beginPath();
+  ctx.arc(barX - 12, barY + 1.5, compact ? 3 : 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = colorWithAlpha(fighters[1]?.trim || "#75f0cb", leaderSide > 0 ? 0.95 : 0.5);
+  ctx.beginPath();
+  ctx.arc(barX + barW + 12, barY + 1.5, compact ? 3 : 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(0,0,0,0.78)";
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = "#fff1bd";
+  ctx.font = `900 ${compact ? 8 : 10}px system-ui, sans-serif`;
+  ctx.fillText(read.label, centerX, y + (compact ? 6 : 7));
+  if (!compact) {
+    ctx.fillStyle = colorWithAlpha(color, 0.86);
+    ctx.font = "850 9px system-ui, sans-serif";
+    ctx.fillText(read.detail.toUpperCase(), centerX, y + 16);
+  }
+  ctx.textBaseline = "alphabetic";
   ctx.restore();
 }
 
