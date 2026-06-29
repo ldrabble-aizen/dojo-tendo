@@ -7449,6 +7449,9 @@ function drawHudPanel(x, y, width, f, reverse, compact = false) {
   const energyX = compact
     ? reverse ? barX + healthW - energyW : barX
     : reverse ? x + width - 264 : x + 78;
+  const statusW = compact ? 92 : 132;
+  const statusX = reverse ? x + 14 : x + width - statusW - 14;
+  const statusY = y + (compact ? 6 : 9);
 
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.72)";
@@ -7463,12 +7466,81 @@ function drawHudPanel(x, y, width, f, reverse, compact = false) {
   ctx.fillText(f.name.toUpperCase(), nameX, y + (compact ? 16 : 20));
   ctx.restore();
 
+  drawHudStatusRibbon(statusX, statusY, statusW, f, reverse, compact);
   drawHealth(barX, healthY, healthW, f, reverse, compact ? 21 : 29);
   drawEnergy(energyX, y + (compact ? 45 : 63), energyW, f, reverse, compact ? 9 : 12);
   drawWins(reverse ? x + 38 : x + width - 58, y + (compact ? 39 : 59), f, reverse, compact);
 }
 
+function hudStatusRead(f) {
+  const hurt = clamp((f.damagePulse ?? 0) / 38, 0, 1);
+  const guard = clamp(Math.max((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, (f.guardPulse ?? 0) / 18), 0, 1);
+  const counter = clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
+  const readyPulse = clamp((f.specialReadyPulse ?? 0) / 54, 0, 1);
+  const criticalPulse = f.health > 0 && f.health <= 24 ? 0.42 + Math.sin(roundFrame * 0.18) * 0.18 : 0;
+
+  if (hurt > 0.12) return { key: "impact", label: "IMPACT", color: "#ff6048", accent: "#fff0c8", intensity: hurt };
+  if (guard > 0.1) return { key: "guard", label: "GUARD", color: "#6fd4ff", accent: "#f8fbff", intensity: guard };
+  if (counter > 0.16) return { key: "counter", label: "COUNTER", color: f.trim, accent: "#fff6ce", intensity: counter };
+  if (criticalPulse > 0) return { key: "critical", label: "CRITICAL", color: "#ff4a38", accent: "#fff0d7", intensity: criticalPulse };
+  if (f.energy >= 45 || readyPulse > 0.04) return { key: "special", label: "SPECIAL", color: f.trim, accent: "#fff4bc", intensity: 0.38 + readyPulse * 0.52 };
+  return { key: "steady", label: "READY", color: f.trim, accent: "#fff4c8", intensity: 0.16 };
+}
+
+function drawHudStatusRibbon(x, y, width, f, reverse, compact = false) {
+  const status = hudStatusRead(f);
+  const h = compact ? 11 : 14;
+  const pulse = clamp(status.intensity, 0, 1);
+  const alpha = status.key === "steady" ? 0.28 : 0.54 + pulse * 0.28;
+  const slant = compact ? 7 : 9;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.shadowColor = colorWithAlpha(status.color, 0.2 + pulse * 0.34);
+  ctx.shadowBlur = status.key === "steady" ? 0 : 4 + pulse * 8;
+  ctx.fillStyle = colorWithAlpha(status.color, alpha * 0.34);
+  ctx.beginPath();
+  if (reverse) {
+    ctx.moveTo(x + slant, y);
+    ctx.lineTo(x + width, y);
+    ctx.lineTo(x + width - slant, y + h);
+    ctx.lineTo(x, y + h);
+  } else {
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + width - slant, y);
+    ctx.lineTo(x + width, y + h);
+    ctx.lineTo(x + slant, y + h);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = colorWithAlpha(status.accent, status.key === "steady" ? 0.2 : 0.34 + pulse * 0.42);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  const scan = (roundFrame * (reverse ? -0.9 : 0.9) + width * 2) % (width + 28);
+  const scanX = reverse ? x + width - scan : x + scan - 28;
+  if (status.key !== "steady") {
+    ctx.strokeStyle = colorWithAlpha(status.accent, 0.14 + pulse * 0.26);
+    ctx.beginPath();
+    ctx.moveTo(scanX, y + 1);
+    ctx.lineTo(scanX + (reverse ? -10 : 10), y + h - 1);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = colorWithAlpha(status.accent, status.key === "steady" ? 0.66 : 0.86);
+  ctx.font = `900 ${compact ? 7 : 8}px system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(status.label, x + width / 2, y + h / 2 + 0.5);
+  ctx.textBaseline = "alphabetic";
+  ctx.restore();
+}
+
 function drawHudPortrait(x, y, f, reverse, size = 52) {
+  const status = hudStatusRead(f);
+  const statusPulse = clamp(status.intensity, 0, 1);
   const glowRadius = size * 0.8;
   const glow = ctx.createRadialGradient(x + size / 2, y + size / 2, size * 0.16, x + size / 2, y + size / 2, glowRadius);
   glow.addColorStop(0, colorWithAlpha(f.trim, 0.34));
@@ -7503,6 +7575,38 @@ function drawHudPortrait(x, y, f, reverse, size = 52) {
     shade.addColorStop(1, "rgba(0,0,0,0.24)");
     ctx.fillStyle = shade;
     ctx.fillRect(x + 5, y + 5, size - 10, size - 10);
+    if (status.key === "impact" || status.key === "critical") {
+      ctx.fillStyle = colorWithAlpha(status.color, 0.1 + statusPulse * 0.18);
+      ctx.fillRect(x + 5, y + 5, size - 10, size - 10);
+    } else if (status.key === "guard") {
+      ctx.strokeStyle = colorWithAlpha("#dff8ff", 0.18 + statusPulse * 0.22);
+      ctx.lineWidth = Math.max(1, size * 0.04);
+      ctx.beginPath();
+      ctx.moveTo(x + size * 0.24, y + size * 0.18);
+      ctx.lineTo(x + size * 0.76, y + size * 0.82);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  if (status.key !== "steady") {
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.shadowColor = colorWithAlpha(status.color, 0.44 + statusPulse * 0.3);
+    ctx.shadowBlur = 6 + statusPulse * 10;
+    ctx.strokeStyle = colorWithAlpha(status.color, 0.36 + statusPulse * 0.42);
+    ctx.lineWidth = Math.max(1.2, size * 0.045);
+    ctx.beginPath();
+    ctx.roundRect(x - 2, y - 2, size + 4, size + 4, 8);
+    ctx.stroke();
+    if (status.key === "impact" || status.key === "special") {
+      const sweep = (roundFrame * 0.16 + statusPulse) % 1;
+      const sx = reverse ? x + size - size * sweep : x + size * sweep;
+      ctx.strokeStyle = colorWithAlpha(status.accent, 0.22 + statusPulse * 0.28);
+      ctx.beginPath();
+      ctx.moveTo(sx, y - 1);
+      ctx.lineTo(sx + (reverse ? -size * 0.34 : size * 0.34), y + size + 1);
+      ctx.stroke();
+    }
     ctx.restore();
   }
   ctx.strokeStyle = "rgba(255, 247, 205, 0.5)";
@@ -7534,6 +7638,8 @@ function drawHealth(x, y, width, f, reverse, height = 28) {
   const innerH = height - 10;
   const pct = clamp(f.health / 100, 0, 1);
   const lagPct = clamp((f.healthLag ?? f.health) / 100, 0, 1);
+  const hurtPulse = clamp((f.damagePulse ?? 0) / 38, 0, 1);
+  const guardPulse = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
 
   ctx.fillStyle = "rgba(13, 10, 9, 0.78)";
   ctx.beginPath();
@@ -7586,6 +7692,25 @@ function drawHealth(x, y, width, f, reverse, height = 28) {
     ctx.beginPath();
     ctx.roundRect(bx, innerY + 1, barWidth, 5, 3);
     ctx.fill();
+
+    if (hurtPulse > 0.025) {
+      const edgeX = reverse ? bx : bx + barWidth;
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.shadowColor = colorWithAlpha("#fff0bc", 0.38 + hurtPulse * 0.34);
+      ctx.shadowBlur = 5 + hurtPulse * 10;
+      ctx.fillStyle = colorWithAlpha("#fff0bc", 0.16 + hurtPulse * 0.22);
+      ctx.beginPath();
+      ctx.roundRect(edgeX + (reverse ? -4 - hurtPulse * 9 : -hurtPulse * 9), innerY - 1, 4 + hurtPulse * 12, innerH + 2, 3);
+      ctx.fill();
+      ctx.strokeStyle = colorWithAlpha("#ff543f", 0.34 + hurtPulse * 0.42);
+      ctx.lineWidth = 1.2 + hurtPulse * 1.4;
+      ctx.beginPath();
+      ctx.moveTo(edgeX, innerY - 2);
+      ctx.lineTo(edgeX + (reverse ? -8 : 8), innerY + innerH + 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   ctx.strokeStyle = "rgba(255,255,255,0.16)";
@@ -7603,6 +7728,24 @@ function drawHealth(x, y, width, f, reverse, height = 28) {
   ctx.beginPath();
   ctx.roundRect(innerX, innerY, innerW, innerH, 4);
   ctx.stroke();
+
+  if (guardPulse > 0.025 && barWidth > 0.2) {
+    const guardW = Math.min(innerW * 0.34, 28 + guardPulse * 36);
+    const guardX = reverse ? innerX + innerW - guardW : innerX;
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = colorWithAlpha("#dff8ff", 0.22 + guardPulse * 0.44);
+    ctx.lineWidth = 1 + guardPulse * 1.2;
+    ctx.beginPath();
+    ctx.moveTo(guardX + (reverse ? guardW : 0), innerY + 1);
+    ctx.lineTo(guardX + (reverse ? guardW - 16 - guardPulse * 14 : 16 + guardPulse * 14), innerY + innerH - 1);
+    ctx.stroke();
+    ctx.fillStyle = colorWithAlpha("#8fe8ff", 0.08 + guardPulse * 0.16);
+    ctx.beginPath();
+    ctx.roundRect(guardX, innerY, guardW, innerH, 4);
+    ctx.fill();
+    ctx.restore();
+  }
 
   const counterReady = clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
   if (counterReady > 0.025 && !winner) {
