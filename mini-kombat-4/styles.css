@@ -2241,6 +2241,148 @@ canvas {
     0 0 10px rgba(255, 212, 77, 0.14);
 }
 
+.game-shell[data-screen="winner"] .topbar {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+
+.overlay[data-screen="winner"] .winner-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: min(540px, calc(100% - 32px));
+  gap: 0;
+  pointer-events: auto;
+}
+
+.winner-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: clamp(72px, 12vw, 112px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-height: 126px;
+  padding: 12px 14px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--fighter-trim), transparent 42%);
+  border-radius: 8px;
+  background:
+    linear-gradient(120deg, rgba(8, 9, 12, 0.82), rgba(36, 16, 16, 0.56)),
+    radial-gradient(circle at 12% 20%, color-mix(in srgb, var(--fighter-trim), transparent 76%), transparent 44%),
+    radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--fighter-color), transparent 78%), transparent 42%);
+  box-shadow:
+    0 14px 34px rgba(0,0,0,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.winner-card::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(255, 235, 166, 0.12);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.winner-card-portrait {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--fighter-trim), white 18%);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 22%, rgba(255,255,255,0.18), transparent 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--fighter-color), black 24%), rgba(8, 8, 10, 0.86));
+  box-shadow:
+    0 0 0 4px rgba(0,0,0,0.24),
+    0 0 22px color-mix(in srgb, var(--fighter-trim), transparent 62%);
+}
+
+.winner-card-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(1.1) contrast(1.06);
+}
+
+.winner-card-info {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.winner-card-kicker {
+  width: max-content;
+  max-width: 100%;
+  padding: 4px 7px;
+  color: #101015;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #fff2a8, var(--fighter-trim));
+  font: 900 9px/1 system-ui, sans-serif;
+  text-transform: uppercase;
+}
+
+.winner-card-info strong {
+  min-width: 0;
+  color: #fff4c8;
+  font: 900 clamp(24px, 4.2vw, 42px)/0.9 Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+  text-transform: uppercase;
+  text-shadow:
+    0 2px 0 rgba(0,0,0,0.9),
+    0 0 18px color-mix(in srgb, var(--fighter-trim), transparent 56%);
+}
+
+.winner-card-info em {
+  width: fit-content;
+  max-width: 100%;
+  color: rgba(255, 247, 214, 0.86);
+  font: 900 11px/1.15 system-ui, sans-serif;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.winner-card .fighter-dossier {
+  margin: 0;
+}
+
+.winner-card .fighter-showcase-bio {
+  width: min(360px, 100%);
+  margin: 0;
+  color: rgba(255, 247, 214, 0.68);
+  font-size: 11px;
+}
+
+.winner-card .fighter-technique-list {
+  margin-top: 4px;
+}
+
+.winner-card-result {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.winner-card-result span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px 6px;
+  color: #fff1bd;
+  border: 1px solid rgba(255, 226, 132, 0.16);
+  border-radius: 5px;
+  background: rgba(0,0,0,0.28);
+  font: 900 11px/1 system-ui, sans-serif;
+  text-transform: uppercase;
+}
+
+.winner-card-result b {
+  color: rgba(126, 240, 207, 0.78);
+  font: 900 8px/1 system-ui, sans-serif;
+}
+
 @media (max-width: 720px) {
   body {
     padding: 10px;
@@ -3184,6 +3326,44 @@ canvas {
     min-height: 36px;
     font-size: 12px;
     box-shadow: 0 5px 0 #9b651b;
+  }
+
+  .overlay[data-screen="winner"] .winner-panel {
+    width: min(430px, calc(100% - 20px));
+  }
+
+  .winner-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 9px;
+    min-height: 108px;
+    padding: 9px;
+  }
+
+  .winner-card-info {
+    gap: 4px;
+  }
+
+  .winner-card-info strong {
+    font-size: clamp(21px, 8vw, 30px);
+  }
+
+  .winner-card-info em,
+  .winner-card .fighter-showcase-bio {
+    font-size: 9px;
+  }
+
+  .winner-card .fighter-technique-list {
+    display: none;
+  }
+
+  .winner-card-result {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .winner-card-result span {
+    padding: 4px 5px;
+    font-size: 10px;
   }
 
   .mobile-controls {

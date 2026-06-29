@@ -15300,7 +15300,7 @@ function showWinner() {
       : `${fighters[0].name} ${fighters[0].wins} - ${fighters[1].wins} ${fighters[1].name}. Prepara el siguiente round.`;
   startButton.textContent = matchOver ? "REVANCHA" : "SIGUIENTE ROUND";
   }
-  fighterSelect.classList.add("hidden");
+  renderWinnerPanel();
   overlay.classList.remove("hidden");
   syncShellState();
 }
@@ -15447,7 +15447,7 @@ function setSelectedFighter(side, nextId) {
 
 function renderFighterSelect() {
   fighterSelect.innerHTML = "";
-  fighterSelect.classList.remove("versus-panel", "online-panel");
+  fighterSelect.classList.remove("versus-panel", "online-panel", "winner-panel");
   fighterSelect.append(makeSelectColumn("left", "Izquierda", selectedLeftId));
 
   const versus = document.createElement("div");
@@ -15466,7 +15466,7 @@ function renderFighterSelect() {
 
 function renderVersusPanel(roundLabel) {
   fighterSelect.innerHTML = "";
-  fighterSelect.classList.remove("online-panel");
+  fighterSelect.classList.remove("online-panel", "winner-panel");
   fighterSelect.classList.add("versus-panel");
   const leftRole = tournamentActive ? "Rival" : cpuEnabled ? "CPU" : "Jugador 1";
   const rightRole = tournamentActive ? "Jugador" : "Jugador 2";
@@ -15486,6 +15486,69 @@ function renderVersusPanel(roundLabel) {
   fighterSelect.append(center);
 
   fighterSelect.append(makeVersusCard(fighters[1], rightRole, "right"));
+}
+
+function renderWinnerPanel() {
+  const winnerFighter = fighters.find((fighter) => fighter.id === roundWinnerId) ?? fighters.find((fighter) => fighter.name === winner) ?? fighters[0];
+  const runnerUp = fighters.find((fighter) => fighter !== winnerFighter) ?? fighters[1];
+  const presentation = fighterPresentation(winnerFighter);
+  const winnerHealth = Math.max(0, Math.round(winnerFighter.health));
+  const winnerEnergy = Math.round(winnerFighter.energy ?? 0);
+
+  fighterSelect.innerHTML = "";
+  fighterSelect.classList.remove("versus-panel", "online-panel");
+  fighterSelect.classList.add("winner-panel");
+  fighterSelect.style.setProperty("--fighter-color", winnerFighter.color);
+  fighterSelect.style.setProperty("--fighter-trim", winnerFighter.trim);
+
+  const card = document.createElement("section");
+  card.className = "winner-card";
+  card.style.setProperty("--fighter-color", winnerFighter.color);
+  card.style.setProperty("--fighter-trim", winnerFighter.trim);
+
+  const portrait = document.createElement("div");
+  portrait.className = "winner-card-portrait";
+  const image = document.createElement("img");
+  image.src = winnerFighter.face.src;
+  image.alt = winnerFighter.name;
+  portrait.append(image);
+  card.append(portrait);
+
+  const info = document.createElement("div");
+  info.className = "winner-card-info";
+  const kicker = document.createElement("span");
+  kicker.className = "winner-card-kicker";
+  kicker.textContent = matchOver ? "MATCH CERRADO" : `ROUND ${toRoman(roundNumber)}`;
+  info.append(kicker);
+
+  const name = document.createElement("strong");
+  name.textContent = winnerFighter.name;
+  info.append(name);
+
+  const trait = document.createElement("em");
+  trait.textContent = `${fighterTrait(winnerFighter)} / ${presentation.signature}`;
+  info.append(trait);
+  info.append(makeFighterDossier(winnerFighter, true));
+
+  const result = document.createElement("div");
+  result.className = "winner-card-result";
+  for (const [label, value] of [
+    ["Score", `${fighters[0].wins}-${fighters[1].wins}`],
+    ["Salud", `${winnerHealth}%`],
+    ["Energia", `${winnerEnergy}%`],
+    ["Rival", runnerUp.name],
+  ]) {
+    const chip = document.createElement("span");
+    const chipLabel = document.createElement("b");
+    chipLabel.textContent = label;
+    chip.append(chipLabel, document.createTextNode(value));
+    result.append(chip);
+  }
+  info.append(result);
+  card.append(info);
+
+  fighterSelect.append(card);
+  fighterSelect.classList.remove("hidden");
 }
 
 function makeVersusCard(fighter, role, side) {
@@ -16850,7 +16913,7 @@ async function shareOnlineInviteLink() {
 
 function renderOnlinePanel() {
   fighterSelect.innerHTML = "";
-  fighterSelect.classList.remove("versus-panel");
+  fighterSelect.classList.remove("versus-panel", "winner-panel");
   fighterSelect.classList.add("online-panel");
 
   const panel = document.createElement("section");
