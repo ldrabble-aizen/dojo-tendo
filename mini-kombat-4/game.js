@@ -8767,6 +8767,7 @@ function drawFighter(f) {
   if (f.attack && !unifiedSprite) drawAttackBodyGlow(f, crouch);
   if (f.attack && !unifiedSprite) drawAttackKineticFX(f, crouch, "back");
   if (!winner && f.energy >= 45 && f.hurt <= 0 && !(unifiedSprite && f.attack)) drawEnergyAura(f, crouch);
+  drawFighterIdentityAura(f, crouch, walking, stride);
   if (!unifiedSprite) drawSpriteUnderlay(f, pose, crouch);
 
   if (drawRasterBodySprite(f, crouch, walking ? stride : 0, walking, transition)) {
@@ -8874,6 +8875,159 @@ function drawHeroRimComposite(f, crouch, impactEase = 0) {
     ctx.ellipse(0, -94 + crouch, radius * 0.72, radius, 0, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+function drawFighterIdentityAura(f, crouch, walking = false, stride = 0) {
+  if (!f || f.hurt > 26) return;
+
+  const localCrouch = crouch * 0.18;
+  const profileId = f.profileId ?? "";
+  const trim = f.trim ?? "#fff1bd";
+  const clock = roundFrame + (f.x ?? 0) * 0.07;
+  const idle = f.grounded && !walking && !f.attack && f.hurt <= 0 && !winner ? 1 : 0;
+  const energy = clamp((f.energy ?? 0) / 100, 0, 1);
+  const guard = f.blocking ? clamp(Math.max((f.guardPulse ?? 0) / 18, (f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES), 0, 1) : 0;
+  const hurt = clamp((f.hurt ?? 0) / 24, 0, 1);
+  const move = walking ? clamp(Math.abs(stride) * 0.72 + Math.abs(f.vx ?? 0) / 8, 0, 1) : 0;
+  const attack = f.attack ? attackPhase(f.attack) : null;
+  const strike = attack ? Math.max(attack.anticipation * 0.58, attack.strike, attack.snap * 0.75) : 0;
+  const special = f.attack?.type === "special" ? Math.max(strike, attack?.power ?? 0) : 0;
+  const intro = fighterEntranceCue(f)?.ease ?? 0;
+  const ready = clamp((f.specialReadyPulse ?? 0) / 54, 0, 1);
+  const cleanSprite = usesUnifiedSprite(f);
+  const scale = cleanSprite ? 0.86 : 1;
+  const base = clamp(
+    0.12 + idle * 0.18 + energy * 0.16 + move * 0.08 + strike * 0.24 + guard * 0.2 + intro * 0.2 + ready * 0.28 - hurt * 0.08,
+    0.06,
+    0.68
+  ) * (cleanSprite ? 0.72 : 1);
+  if (base <= 0.035) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  const floorPulse = 0.5 + Math.sin(clock * 0.08) * 0.5;
+  ctx.strokeStyle = colorWithAlpha(trim, 0.05 + base * 0.16);
+  ctx.lineWidth = 1.1 + base * 2.3;
+  ctx.beginPath();
+  ctx.ellipse(
+    0,
+    4 + localCrouch,
+    (38 + floorPulse * 8 + energy * 12) * scale,
+    (5 + floorPulse * 2 + energy * 3) * scale,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.stroke();
+
+  if (profileId === "p1") {
+    ctx.strokeStyle = colorWithAlpha("#7fc8ff", 0.08 + base * 0.24 + special * 0.12);
+    ctx.lineWidth = 2.1 + strike * 1.8;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * 42, -28 + localCrouch);
+      ctx.bezierCurveTo(
+        side * (26 + move * 9),
+        -77 + localCrouch,
+        side * (48 + special * 10),
+        -132 + localCrouch,
+        side * (24 + Math.sin(clock * 0.06) * 4),
+        -180 + localCrouch
+      );
+      ctx.stroke();
+    }
+  } else if (profileId === "p2") {
+    ctx.strokeStyle = colorWithAlpha("#5ee0b4", 0.08 + base * 0.24 + guard * 0.16);
+    ctx.lineWidth = 1.6 + strike * 1.3 + guard;
+    for (let i = 0; i < 2; i += 1) {
+      const phase = clock * 0.045 + i * Math.PI;
+      ctx.beginPath();
+      ctx.ellipse(
+        Math.sin(phase) * 11,
+        -121 + localCrouch + i * 18,
+        35 + strike * 12,
+        9 + guard * 5,
+        phase * 0.08,
+        Math.PI * 0.05,
+        Math.PI * 1.42
+      );
+      ctx.stroke();
+    }
+  } else if (profileId === "p3") {
+    ctx.strokeStyle = colorWithAlpha("#ffffff", 0.08 + base * 0.2 + strike * 0.12);
+    ctx.lineWidth = 2.2 + strike * 2.2;
+    for (let i = 0; i < 3; i += 1) {
+      const width = 48 + i * 15 + strike * 18 + move * 10;
+      ctx.beginPath();
+      ctx.ellipse(0, 5 + localCrouch, width, 5 + i * 1.4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = colorWithAlpha("#65c7f2", 0.06 + base * 0.18);
+    ctx.lineWidth = 1.6;
+    for (const x of [-42, -23, 23, 42]) {
+      ctx.beginPath();
+      ctx.moveTo(x, -38 + localCrouch);
+      ctx.lineTo(x + Math.sin(clock * 0.04 + x) * 4, -132 + localCrouch);
+      ctx.stroke();
+    }
+  } else if (profileId === "p4") {
+    ctx.strokeStyle = colorWithAlpha("#96e06c", 0.09 + base * 0.25 + ready * 0.08);
+    ctx.lineWidth = 1.5 + strike * 1.4;
+    for (let i = 0; i < 4; i += 1) {
+      const side = i % 2 ? 1 : -1;
+      const y = -55 - i * 26 + localCrouch + Math.sin(clock * 0.07 + i) * 4;
+      ctx.beginPath();
+      ctx.moveTo(side * (24 + i * 3), y);
+      ctx.lineTo(side * (39 + move * 12), y - 10 - strike * 5);
+      ctx.lineTo(side * (25 + special * 10), y - 21);
+      ctx.stroke();
+    }
+  } else if (profileId === "p5") {
+    ctx.strokeStyle = colorWithAlpha("#47d5ff", 0.08 + base * 0.22 + special * 0.12);
+    ctx.lineWidth = 1.7 + strike * 1.5;
+    for (const y of [-74, -111, -148]) {
+      const reach = 54 + energy * 11 + strike * 18;
+      ctx.beginPath();
+      ctx.moveTo(-reach, y + localCrouch + Math.sin(clock * 0.045 + y) * 2);
+      ctx.quadraticCurveTo(0, y - 7 + localCrouch, reach, y + localCrouch - Math.cos(clock * 0.04 + y) * 2);
+      ctx.stroke();
+    }
+    ctx.fillStyle = colorWithAlpha(trim, 0.1 + base * 0.2);
+    for (const x of [-58, 58]) {
+      ctx.beginPath();
+      ctx.ellipse(x, -108 + localCrouch, 3.4 + strike * 2, 11 + energy * 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (profileId === "p6") {
+    ctx.strokeStyle = colorWithAlpha("#ff8ac8", 0.08 + base * 0.22 + guard * 0.22);
+    ctx.lineWidth = 1.8 + guard * 2 + strike * 0.8;
+    const shield = 24 + guard * 12 + energy * 6;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * shield, -41 + localCrouch);
+      ctx.quadraticCurveTo(side * (54 + guard * 10), -96 + localCrouch, side * (31 + Math.sin(clock * 0.05) * 3), -160 + localCrouch);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = colorWithAlpha("#343840", 0.1 + base * 0.18);
+    ctx.lineWidth = 4 + guard * 2;
+    ctx.beginPath();
+    ctx.ellipse(0, -101 + localCrouch, 50 + guard * 16, 94 + guard * 16, 0, Math.PI * 0.08, Math.PI * 0.92);
+    ctx.stroke();
+  } else {
+    const glow = ctx.createRadialGradient(0, -98 + localCrouch, 8, 0, -98 + localCrouch, 95);
+    glow.addColorStop(0, colorWithAlpha(trim, 0.08 + base * 0.1));
+    glow.addColorStop(0.45, colorWithAlpha(f.color ?? trim, 0.035 + base * 0.04));
+    glow.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(0, -98 + localCrouch, 50, 98, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.restore();
 }
 
