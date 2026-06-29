@@ -129,6 +129,7 @@ let momentumHud = {
 let particles = [];
 let floatingTexts = [];
 let announcerCue = null;
+let specialCutinCue = null;
 let audioCtx = null;
 let audioMasterGain = null;
 let audioFxGain = null;
@@ -2703,6 +2704,7 @@ function resetRound() {
   particles = [];
   floatingTexts = [];
   announcerCue = null;
+  specialCutinCue = null;
   projectiles.length = 0;
   winner = "";
   roundWinnerId = "";
@@ -3159,6 +3161,7 @@ function startSpecial(f) {
     addText(f.x, f.y - fighterScale(166), "P-CHAN", "#ffe66a");
   }
   specialChargeFX(f);
+  triggerSpecialCutin(f);
   triggerCinematicHit(f.dir, f.specialStyle?.rim ?? "#fff1bd", 0.62, 10);
   playSound("special", { x: f.x, intensity: f.profileId === "p1" ? 1.12 : 1, key: f.id });
 }
@@ -3670,6 +3673,7 @@ function update() {
     updateParticles();
     updateFloatingTexts();
     updateAnnouncerCue();
+    updateSpecialCutinCue();
     sendOnlineSnapshot(false);
     return;
   }
@@ -3681,6 +3685,7 @@ function update() {
     updateParticles();
     updateFloatingTexts();
     updateAnnouncerCue();
+    updateSpecialCutinCue();
     sendOnlineSnapshot(false);
     return;
   }
@@ -3692,6 +3697,7 @@ function update() {
     updateParticles();
     updateFloatingTexts();
     updateAnnouncerCue();
+    updateSpecialCutinCue();
     sendOnlineSnapshot(false);
     return;
   }
@@ -3727,6 +3733,7 @@ function update() {
     updateParticles();
     updateFloatingTexts();
     updateAnnouncerCue();
+    updateSpecialCutinCue();
     sendOnlineSnapshot(false);
     return;
   }
@@ -3751,6 +3758,7 @@ function update() {
   updateParticles();
   updateFloatingTexts();
   updateAnnouncerCue();
+  updateSpecialCutinCue();
   updateMomentumHud();
   triggerCriticalHealthCues();
 
@@ -3781,6 +3789,7 @@ function update() {
   if (shake > 0) shake -= 1;
   updateCameraImpactPulse();
   updateAnnouncerCue();
+  updateSpecialCutinCue();
   sendOnlineSnapshot(false);
 }
 
@@ -5765,6 +5774,32 @@ function updateAnnouncerCue() {
   if (announcerCue.life <= 0) announcerCue = null;
 }
 
+function triggerSpecialCutin(f) {
+  if (!f) return;
+  const presentation = fighterPresentation(f);
+  const color = f.specialStyle?.rim || f.trim || "#fff1bd";
+  specialCutinCue = {
+    fighterId: f.id,
+    profileId: f.profileId,
+    name: f.name,
+    title: presentation.signature,
+    subtitle: presentation.discipline,
+    color,
+    trim: f.trim || color,
+    dir: f.dir || 1,
+    side: f.x < W / 2 ? "left" : "right",
+    life: 58,
+    maxLife: 58,
+  };
+  cueAnnouncer("SPECIAL", `${f.name} libera ${presentation.signature}`, color, 46);
+}
+
+function updateSpecialCutinCue() {
+  if (!specialCutinCue) return;
+  specialCutinCue.life -= 1;
+  if (specialCutinCue.life <= 0) specialCutinCue = null;
+}
+
 function triggerCriticalHealthCues() {
   if (!running || winner || countdownFrames > 0) return;
   for (const fighter of fighters) {
@@ -5881,6 +5916,7 @@ function draw() {
     drawAnnouncerCue();
     drawCinematicHitOverlay();
     drawScreenTearOverlay();
+    drawSpecialCutinCue();
     drawCriticalStateOverlay();
     drawFinalPressureOverlay();
   }
@@ -6595,6 +6631,115 @@ function drawAnnouncerCue() {
     ctx.fillStyle = "rgba(255, 239, 184, 0.88)";
     ctx.fillText(subtitle.toUpperCase(), W / 2, y + 31);
   }
+  ctx.restore();
+}
+
+function drawSpecialCutinCue() {
+  if (!specialCutinCue) return;
+  const cue = specialCutinCue;
+  const age = cue.maxLife - cue.life;
+  const intro = smoothStep01(clamp(age / 7, 0, 1));
+  const outro = smoothStep01(clamp(cue.life / 12, 0, 1));
+  const alpha = intro * outro;
+  if (alpha <= 0.01) return;
+
+  const mobile = isMobileFightView();
+  const side = cue.side === "left" ? -1 : 1;
+  const color = cue.color || "#fff1bd";
+  const trim = cue.trim || color;
+  const panelW = mobile ? 310 : 410;
+  const panelH = mobile ? 78 : 104;
+  const x = cue.side === "left" ? 24 - (1 - intro) * 56 : W - panelW - 24 + (1 - intro) * 56;
+  const y = mobile ? 120 : 154;
+  const portraitSize = mobile ? 60 : 82;
+  const portraitX = cue.side === "left" ? x + 14 : x + panelW - portraitSize - 14;
+  const textX = cue.side === "left" ? portraitX + portraitSize + 16 : portraitX - 16;
+  const align = cue.side === "left" ? "left" : "right";
+  const image = faces[cue.profileId];
+  const pulse = 0.5 + Math.sin((roundFrame + age) * 0.36) * 0.5;
+  const slashOffset = side * (18 + age * 1.4);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(12, 3, 3, ${mobile ? 0.12 : 0.16})`;
+  ctx.fillRect(0, y - 28, W, panelH + 56);
+
+  ctx.globalCompositeOperation = "source-over";
+  const panel = ctx.createLinearGradient(x, y, x + panelW, y + panelH);
+  panel.addColorStop(0, cue.side === "left" ? colorWithAlpha(color, 0.5) : "rgba(8, 8, 11, 0.86)");
+  panel.addColorStop(0.42, "rgba(13, 8, 8, 0.88)");
+  panel.addColorStop(1, cue.side === "left" ? "rgba(8, 8, 11, 0.86)" : colorWithAlpha(color, 0.5));
+  ctx.fillStyle = panel;
+  ctx.beginPath();
+  ctx.roundRect(x, y, panelW, panelH, 8);
+  ctx.fill();
+  ctx.strokeStyle = colorWithAlpha(trim, 0.58 + pulse * 0.2);
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x, y, panelW, panelH, 8);
+  ctx.clip();
+  ctx.globalCompositeOperation = "screen";
+  for (let i = 0; i < 5; i += 1) {
+    const lane = (i - 2) * (mobile ? 14 : 19);
+    ctx.strokeStyle = colorWithAlpha(i % 2 ? trim : color, 0.08 + pulse * 0.045);
+    ctx.lineWidth = mobile ? 5 : 7;
+    ctx.beginPath();
+    ctx.moveTo(x - 40 + slashOffset + lane, y + panelH + 20);
+    ctx.lineTo(x + panelW + 40 + slashOffset + lane, y - 20);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.shadowColor = colorWithAlpha(trim, 0.36);
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = "rgba(7, 8, 10, 0.86)";
+  ctx.beginPath();
+  ctx.roundRect(portraitX, y + (panelH - portraitSize) / 2, portraitSize, portraitSize, 8);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = colorWithAlpha(trim, 0.8);
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  if (image?.complete && image.naturalWidth > 0) {
+    ctx.beginPath();
+    ctx.roundRect(portraitX + 4, y + (panelH - portraitSize) / 2 + 4, portraitSize - 8, portraitSize - 8, 6);
+    ctx.clip();
+    drawCoverImage(image, portraitX + 4, y + (panelH - portraitSize) / 2 + 4, portraitSize - 8, portraitSize - 8);
+  } else {
+    ctx.fillStyle = colorWithAlpha(trim, 0.82);
+    ctx.font = `900 ${mobile ? 24 : 32}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText((cue.name || "?").slice(0, 1).toUpperCase(), portraitX + portraitSize / 2, y + panelH / 2);
+  }
+  ctx.restore();
+
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+  ctx.lineWidth = mobile ? 4 : 6;
+  ctx.strokeStyle = "rgba(20, 5, 4, 0.92)";
+  ctx.fillStyle = "#fff1bd";
+  ctx.shadowColor = colorWithAlpha(trim, 0.42);
+  ctx.shadowBlur = 10;
+  ctx.font = `900 ${mobile ? 26 : 38}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
+  ctx.strokeText(cue.name.toUpperCase(), textX, y + (mobile ? 38 : 50));
+  ctx.fillText(cue.name.toUpperCase(), textX, y + (mobile ? 38 : 50));
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = colorWithAlpha(trim, 0.92);
+  ctx.font = `950 ${mobile ? 9 : 11}px system-ui, sans-serif`;
+  ctx.fillText("SPECIAL RELEASE", textX, y + (mobile ? 17 : 23));
+  ctx.fillStyle = "rgba(255, 247, 214, 0.86)";
+  ctx.font = `900 ${mobile ? 9 : 12}px system-ui, sans-serif`;
+  ctx.fillText(cue.title.toUpperCase(), textX, y + (mobile ? 56 : 73));
+  ctx.fillStyle = "rgba(126, 240, 207, 0.78)";
+  ctx.font = `850 ${mobile ? 8 : 10}px system-ui, sans-serif`;
+  ctx.fillText(cue.subtitle.toUpperCase(), textX, y + (mobile ? 68 : 88));
   ctx.restore();
 }
 
