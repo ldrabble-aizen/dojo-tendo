@@ -649,6 +649,17 @@ function movementPivotProfile(f) {
   }[f?.profileId] ?? { brake: 1, snap: 1, shoulder: 1, hip: 1, foot: 1, sway: 1 };
 }
 
+function grabTechniqueProfile(f) {
+  return {
+    p1: { clasp: 0.82, shoulder: 0.9, hip: 1.18, pull: 1.12, foot: 1.16, aura: 0.86 },
+    p2: { clasp: 1.22, shoulder: 1.18, hip: 0.82, pull: 0.84, foot: 0.86, aura: 1.18 },
+    p3: { clasp: 0.72, shoulder: 0.78, hip: 1.3, pull: 1.26, foot: 1.28, aura: 0.74 },
+    p4: { clasp: 1.18, shoulder: 1.2, hip: 0.86, pull: 0.88, foot: 0.88, aura: 1.12 },
+    p5: { clasp: 1.28, shoulder: 1.26, hip: 0.78, pull: 0.82, foot: 0.78, aura: 1.24 },
+    p6: { clasp: 0.92, shoulder: 0.96, hip: 1.08, pull: 1.02, foot: 1.06, aura: 0.94 },
+  }[f?.profileId] ?? { clasp: 1, shoulder: 1, hip: 1, pull: 1, foot: 1, aura: 1 };
+}
+
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
@@ -5066,10 +5077,11 @@ function attackWhoosh(f) {
   if (!f.attack) return;
   const spec = attackVisualSpec(f.attack.type);
   const dir = f.dir || 1;
+  const grabTechnique = spec.grab ? grabTechniqueProfile(f) : null;
   const x = f.x + dir * fighterScale(spec.trailReach * 0.42);
   const y = f.y + fighterScale(spec.trailY);
   const angle = dir > 0 ? 0 : Math.PI;
-  const size = spec.sweep ? 34 : spec.kick ? 38 : spec.special ? 43 : spec.grab ? 31 : 28;
+  const size = spec.sweep ? 34 : spec.kick ? 38 : spec.special ? 43 : spec.grab ? 31 * grabTechnique.aura : 28;
   const life = spec.heavy || spec.grab ? 13 : 10;
 
   particles.push({
@@ -5085,6 +5097,22 @@ function attackWhoosh(f) {
     color: spec.color,
     kind: "airRipple",
   });
+
+  if (spec.grab) {
+    particles.push({
+      x: x + dir * fighterScale(18),
+      y: y - fighterScale(8),
+      vx: dir * 0.18,
+      vy: -0.04,
+      angle,
+      life: 12,
+      maxLife: 12,
+      size: fighterScale(34 * grabTechnique.aura),
+      growth: 1.15,
+      color: spec.core,
+      kind: "ring",
+    });
+  }
 
   const count = fxCount(spec.sweep ? 5 : spec.kick ? 6 : spec.special ? 7 : spec.grab ? 4 : 4, spec.special ? 4 : 2);
   for (let i = 0; i < count; i += 1) {
@@ -5102,6 +5130,22 @@ function attackWhoosh(f) {
       color: spec.core,
       kind: "impactNeedle",
     });
+  }
+
+  if (spec.grab) {
+    for (const lane of [-1, 1]) {
+      particles.push({
+        x: x + dir * fighterScale(36 + Math.random() * 8),
+        y: y + fighterScale(lane * (14 + Math.random() * 4)),
+        vx: dir * (0.12 + Math.random() * 0.18),
+        vy: -0.14 + lane * 0.08,
+        life: 9 + Math.random() * 4,
+        maxLife: 12,
+        size: 4.8 + grabTechnique.clasp * 1.8,
+        color: spec.core,
+        kind: "glint",
+      });
+    }
   }
 
   if (f.grounded) {
@@ -14787,6 +14831,7 @@ function drawAttackArc(f, box) {
   const y = box.y + box.h * 0.45;
 
   if (spec.grab) {
+    const grabTechnique = grabTechniqueProfile(f);
     const reach = 74 * motion.reach * (0.92 + read.clarity * 0.08);
     const catchT = Math.max(phase.strike, phase.snap * 0.85);
     const open = Math.max(phase.anticipation * 0.65, catchT, phase.followThrough * 0.45);
@@ -14795,15 +14840,15 @@ function drawAttackArc(f, box) {
     ctx.globalCompositeOperation = "screen";
     ctx.translate(x, y);
     ctx.scale(f.dir * FIGHTER_SCALE, FIGHTER_SCALE);
-    ctx.rotate((-0.035 + catchT * 0.055 - recoil * 0.03) * motion.rotation);
+    ctx.rotate((-0.035 + catchT * 0.055 - recoil * 0.03) * motion.rotation * grabTechnique.shoulder);
 
     const grabGlow = ctx.createRadialGradient(30, -18, 5, 42, -18, reach + 36);
-    grabGlow.addColorStop(0, colorWithAlpha(spec.core, 0.11 + catchT * 0.12));
-    grabGlow.addColorStop(0.46, colorWithAlpha(spec.color, 0.07 + open * 0.08));
+    grabGlow.addColorStop(0, colorWithAlpha(spec.core, (0.11 + catchT * 0.12) * grabTechnique.aura));
+    grabGlow.addColorStop(0.46, colorWithAlpha(spec.color, (0.07 + open * 0.08) * grabTechnique.aura));
     grabGlow.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = grabGlow;
     ctx.beginPath();
-    ctx.ellipse(42 + catchT * 12, -20, 54 + open * 32, 38 + catchT * 18, 0.04, 0, Math.PI * 2);
+    ctx.ellipse(42 + catchT * 12, -20, (54 + open * 32) * grabTechnique.aura, 38 + catchT * 18, 0.04, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.lineCap = "round";
@@ -14817,6 +14862,20 @@ function drawAttackArc(f, box) {
         side * (34 + open * 16) - catchT * 8,
         reach + catchT * 28 - recoil * 14,
         side * (13 + recoil * 4)
+      );
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = colorWithAlpha(spec.core, 0.12 + catchT * 0.28 * grabTechnique.clasp);
+    ctx.lineWidth = 1.8 + catchT * 1.4;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(30 + open * 12, side * (24 + open * 10));
+      ctx.quadraticCurveTo(
+        reach + catchT * 14,
+        side * (22 - catchT * 8),
+        reach + catchT * 34 - recoil * 12,
+        side * (5 + catchT * 2)
       );
       ctx.stroke();
     }
@@ -16065,6 +16124,7 @@ function getPose(f, stride) {
     const catchSnap = clamp(activePulse * 0.8 + mass.snap * 0.5, 0, 1.35);
     const reach = clamp(drive + catchSnap * 0.36, 0, 1.65);
     const drag = clamp(recovery * 0.9 + phase.followThrough * 0.35, 0, 1.3);
+    const technique = grabTechniqueProfile(f);
     const grabStyle = {
       p1: { brace: 1.22, reach: 0.92, spread: 1.08, snap: 0.78 },
       p2: { brace: 0.82, reach: 1.18, spread: 0.86, snap: 1.18 },
@@ -16090,16 +16150,38 @@ function getPose(f, stride) {
       x: (43 - windup * 23 + reach * 79 - drag * 17) * spec.stance * grabStyle.reach,
       y: -120 + crouch - windup * 10 - catchSnap * 8 + drag * 11,
     };
-    base.torsoTilt += -load * 0.036 * grabStyle.brace + reach * 0.052 - drag * 0.02;
+    const clasp = catchSnap * technique.clasp;
+    const pull = drag * technique.pull;
+    const hipLoad = (load * 0.72 + reach * 0.24) * technique.hip;
+
+    base.torsoTilt += -load * 0.036 * grabStyle.brace + reach * 0.052 - drag * 0.02 - hipLoad * 0.012 + clasp * 0.018;
+    base.frontArm.shoulder.x += (reach * 2.4 - pull * 1.2) * spec.stance * technique.shoulder;
+    base.frontArm.shoulder.y += load * 1.6 - clasp * 1.8;
+    base.backArm.shoulder.x += (reach * 1.8 - pull * 1.4) * spec.stance * technique.shoulder;
+    base.backArm.shoulder.y += load * 1.2 - clasp * 1.2;
+    base.frontArm.elbow.x += (clasp * 8.8 - pull * 4.2) * spec.stance * technique.clasp;
+    base.frontArm.elbow.y += clasp * 3.2 - pull * 2.2;
+    base.frontArm.hand.x += (clasp * 15.5 - pull * 7.4) * spec.stance * technique.clasp;
+    base.frontArm.hand.y += clasp * 6.4 - pull * 2.8;
+    base.backArm.elbow.x += (clasp * 11.2 - pull * 5.2) * spec.stance * technique.clasp;
+    base.backArm.elbow.y -= clasp * 4.8 - pull * 2.4;
+    base.backArm.hand.x += (clasp * 17.5 - pull * 8.6) * spec.stance * technique.clasp;
+    base.backArm.hand.y -= clasp * 8.2 - pull * 3.2;
+    base.frontLeg.hip.x += hipLoad * 2.4 * spec.stance;
+    base.frontLeg.hip.y += hipLoad * 1.5;
+    base.backLeg.hip.x -= hipLoad * 3.2 * spec.stance;
+    base.backLeg.hip.y += hipLoad * 2.1;
     base.frontLeg.knee.x += (windup * 4 + reach * 8 - drag * 3) * spec.stance * grabStyle.spread;
     base.frontLeg.knee.y += load * 3.8 + reach * 4.6;
-    base.frontLeg.foot.x += (8 * activePulse - 5 * windup + drive * 13 - drag * 4) * spec.stance * grabStyle.spread;
+    base.frontLeg.foot.x += (8 * activePulse - 5 * windup + drive * 13 - drag * 4) * spec.stance * grabStyle.spread * technique.foot;
     base.frontLeg.foot.y += reach * 0.8;
     base.backLeg.knee.y += (mass.plant * 4.8 + load * 4.2 + reach * 2.6) * grabStyle.brace;
-    base.backLeg.foot.x -= (9 * activePulse + 7 * windup - recovery * 5 + load * 7 + drive * 7) * spec.stance * grabStyle.brace;
+    base.backLeg.foot.x -= (9 * activePulse + 7 * windup - recovery * 5 + load * 7 + drive * 7) * spec.stance * grabStyle.brace * technique.foot;
     base.backLeg.foot.y += load * 0.6 + reach * 0.8;
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.48 + reach * 0.24, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(mass.plant * 0.9 + load * 0.22, 0, 1));
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + (reach * 0.018 - pull * 0.01) * technique.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - (load * 0.032 + reach * 0.016 - pull * 0.014) * technique.foot;
     if (f.profileId === "p2" || f.profileId === "p4" || f.profileId === "p5") {
       base.frontArm.hand.y -= catchSnap * 5 * grabStyle.snap;
       base.backArm.hand.y -= catchSnap * 4 * grabStyle.snap;
