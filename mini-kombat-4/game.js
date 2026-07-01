@@ -14986,6 +14986,45 @@ function getPose(f, stride) {
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, braceT * 0.82);
   }
 
+  const landingPose = f.grounded && f.hurt <= 0 && !f.attack && !winner
+    ? smoothStep01(clamp((f.landingPulse ?? 0) / 16, 0, 1))
+    : 0;
+  if (landingPose > 0.03) {
+    const landingStyle = {
+      p1: { absorb: 1.22, rebound: 0.72, arm: 0.78, spread: 1.18 },
+      p2: { absorb: 0.82, rebound: 1.22, arm: 1.12, spread: 0.84 },
+      p3: { absorb: 1.34, rebound: 0.62, arm: 0.66, spread: 1.28 },
+      p4: { absorb: 0.86, rebound: 1.18, arm: 1.18, spread: 0.88 },
+      p5: { absorb: 0.78, rebound: 1.3, arm: 1.24, spread: 0.82 },
+      p6: { absorb: 1.04, rebound: 0.86, arm: 0.92, spread: 1.04 },
+    }[f.profileId] ?? { absorb: 1, rebound: 1, arm: 1, spread: 1 };
+    const strength = clamp(f.landingStrength ?? 1, 0.38, 1.65);
+    const press = landingPose * strength * landingStyle.absorb;
+    const rebound = Math.sin((1 - landingPose) * Math.PI) * landingStyle.rebound * strength;
+    const landingDir = (f.landingDir || f.jumpDir || f.dir || 1) === (f.dir || 1) ? 1 : -1;
+    const footSpread = press * landingStyle.spread;
+
+    base.torsoTilt += landingDir * (press * 0.032 - rebound * 0.012);
+    base.frontLeg.knee.x += landingDir * (footSpread * 4.5 + rebound * 1.8) * spec.stance;
+    base.frontLeg.knee.y += press * 10.5 - rebound * 2.4;
+    base.frontLeg.foot.x += landingDir * (footSpread * 10 + rebound * 2.2) * spec.stance;
+    base.frontLeg.foot.y += press * 1.8;
+    base.backLeg.knee.x -= landingDir * (footSpread * 5.2 + rebound * 1.4) * spec.stance;
+    base.backLeg.knee.y += press * 12.5 - rebound * 1.8;
+    base.backLeg.foot.x -= landingDir * (footSpread * 12 + rebound * 2.8) * spec.stance;
+    base.backLeg.foot.y += press * 2.2;
+    base.frontArm.elbow.x -= landingDir * press * 3.2 * spec.stance * landingStyle.arm;
+    base.frontArm.elbow.y += press * 5.5 * landingStyle.arm - rebound * 3.2;
+    base.frontArm.hand.x -= landingDir * press * 4.6 * spec.stance * landingStyle.arm;
+    base.frontArm.hand.y += press * 8.6 * landingStyle.arm - rebound * 4.8;
+    base.backArm.elbow.x += landingDir * press * 2.8 * spec.stance * landingStyle.arm;
+    base.backArm.elbow.y += press * 4.2 * landingStyle.arm - rebound * 2.8;
+    base.backArm.hand.x += landingDir * press * 3.8 * spec.stance * landingStyle.arm;
+    base.backArm.hand.y += press * 6.8 * landingStyle.arm - rebound * 3.8;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(press * 0.86, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(press * 0.96, 0, 1));
+  }
+
   const airKickLandingPose = f.grounded ? smoothStep01(clamp((f.airKickLandingPulse ?? 0) / 16, 0, 1)) : 0;
   if (airKickLandingPose > 0.03 && f.hurt <= 0 && !f.attack && !winner) {
     const press = airKickLandingPose * (f.profileId === "p1" ? 1.12 : f.profileId === "p2" ? 0.84 : 1);
