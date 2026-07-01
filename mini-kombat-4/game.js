@@ -594,6 +594,17 @@ function counterReadinessProfile(f) {
   }[f?.profileId] ?? { drive: 1, coil: 1, hand: 1, lift: 1, foot: 1, sink: 1, ring: 1, angle: 1 };
 }
 
+function rangePressureProfile(f) {
+  return {
+    p1: { weight: 1.18, guard: 0.86, reach: 0.9, foot: 1.2, sway: 0.72, lift: 0.82, floor: 1.16 },
+    p2: { weight: 0.82, guard: 1.18, reach: 1.14, foot: 0.84, sway: 1.18, lift: 1.16, floor: 0.86 },
+    p3: { weight: 1.3, guard: 0.78, reach: 0.84, foot: 1.28, sway: 0.58, lift: 0.72, floor: 1.22 },
+    p4: { weight: 0.84, guard: 1.2, reach: 1.16, foot: 0.86, sway: 1.24, lift: 1.18, floor: 0.88 },
+    p5: { weight: 0.78, guard: 1.16, reach: 1.22, foot: 0.8, sway: 1.18, lift: 1.12, floor: 0.82 },
+    p6: { weight: 1.06, guard: 1.04, reach: 0.98, foot: 1.08, sway: 0.78, lift: 0.9, floor: 1.04 },
+  }[f?.profileId] ?? { weight: 1, guard: 1, reach: 1, foot: 1, sway: 1, lift: 1, floor: 1 };
+}
+
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
@@ -9145,13 +9156,18 @@ function fighterTransitionMotion(f, walking) {
 
   const braceT = clamp(Math.max(f.rangePressure ?? 0, (f.bracePulse ?? 0) / 14), 0, 1);
   if (braceT > 0.02 && f.grounded && f.hurt <= 0 && !f.attack) {
+    const rangeProfile = rangePressureProfile(f);
     const side = f.rangeSide || dir;
     const plantT = clamp((f.footPlantPulse ?? 0) / 8, 0, 1);
-    motion.x -= side * braceT * (0.8 + plantT * 0.6);
-    motion.y += braceT * 1.25;
-    motion.rotation -= side * braceT * 0.012;
-    motion.scaleX *= 1 + braceT * 0.014;
-    motion.scaleY *= 1 - braceT * 0.018;
+    const pulse = (0.5 + Math.sin(roundFrame * 0.22 + (f.profileId?.charCodeAt(1) ?? 0)) * 0.5) * braceT;
+    const pressure = smoothStep01(braceT) * rangeProfile.weight;
+    const microSlip = Math.sin(roundFrame * 0.11 + f.x * 0.017) * braceT * rangeProfile.sway;
+    motion.x -= side * pressure * (0.72 + plantT * 0.62) - side * microSlip * 0.18;
+    motion.y += pressure * (1.1 + plantT * 0.32) - pulse * 0.18 * rangeProfile.lift;
+    motion.rotation -= side * (pressure * 0.011 + microSlip * 0.004);
+    motion.scaleX *= 1 + pressure * 0.013 + plantT * braceT * 0.004;
+    motion.scaleY *= 1 - pressure * 0.016 + pulse * 0.003;
+    motion.afterimage = Math.max(motion.afterimage, braceT * 0.01 * rangeProfile.guard);
   }
 
   const poseShift = poseTransitionProfile(f);
@@ -9975,6 +9991,7 @@ function drawFighter(f) {
   if (f.attack && !unifiedSprite) drawAttackKineticFX(f, crouch, "back");
   if (!winner && f.energy >= 45 && f.hurt <= 0 && !(unifiedSprite && f.attack)) drawEnergyAura(f, crouch);
   drawFighterIdentityAura(f, crouch, walking, stride);
+  drawRangePressureFX(f, crouch);
   if (!unifiedSprite) drawSpriteUnderlay(f, pose, crouch);
 
   if (drawRasterBodySprite(f, crouch, walking ? stride : 0, walking, transition)) {
@@ -13978,6 +13995,74 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
   ctx.restore();
 }
 
+function drawRangePressureFX(f, crouch) {
+  if (!f || winner || f.attack || f.hurt > 0 || !f.grounded) return;
+  const pressure = clamp(Math.max(f.rangePressure ?? 0, (f.bracePulse ?? 0) / 18), 0, 1);
+  if (pressure <= 0.045) return;
+
+  const profile = rangePressureProfile(f);
+  const guard = characterGuard(f);
+  const trim = f.trim ?? "#fff1bd";
+  const pulse = 0.5 + Math.sin(roundFrame * 0.18 + f.x * 0.01) * 0.5;
+  const quick = 0.5 + Math.sin(roundFrame * 0.43 + (f.profileId?.charCodeAt(1) ?? 0)) * 0.5;
+  const side = (f.rangeSide || f.dir || 1) === (f.dir || 1) ? 1 : -1;
+  const localCrouch = crouch * 0.12;
+  const alpha = smoothStep01(pressure) * (0.11 + quick * 0.035);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.strokeStyle = colorWithAlpha(trim, alpha * profile.floor);
+  ctx.lineWidth = 1.2 + pressure * 1.4 * profile.floor;
+  ctx.beginPath();
+  ctx.ellipse(
+    side * (7 + pressure * 5),
+    2 + localCrouch,
+    36 + pressure * 18 * profile.floor,
+    4.5 + pressure * 2.5,
+    side * 0.04,
+    Math.PI * 0.08,
+    Math.PI * 1.92
+  );
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha("#fff1bd", alpha * 0.72);
+  ctx.lineWidth = 0.9 + pressure * 0.8;
+  for (let i = 0; i < 2; i += 1) {
+    const y = -102 + localCrouch + i * 18;
+    const reach = 18 + pressure * (12 + i * 4) * profile.reach;
+    ctx.beginPath();
+    ctx.moveTo(side * (20 + i * 5), y - pulse * 3);
+    ctx.quadraticCurveTo(
+      side * (34 + reach * 0.42),
+      y - 10 - quick * 5,
+      side * (44 + reach),
+      y - 2 + pulse * 4
+    );
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = colorWithAlpha(guard.color || trim, alpha * 0.7 * guard.shieldAlpha);
+  for (let i = 0; i < 3; i += 1) {
+    const offset = i - 1;
+    ctx.beginPath();
+    ctx.ellipse(
+      side * (42 + pressure * 12 + offset * 5),
+      -119 + localCrouch + offset * 12 + pulse * 2,
+      1.6 + pressure * 1.2,
+      0.9 + pressure * 0.7,
+      side * 0.18,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 function drawPchanPigForm(f, crouch) {
   const pulse = Math.sin(roundFrame * 0.24) * 1.5;
   ctx.save();
@@ -15438,13 +15523,37 @@ function getPose(f, stride) {
 
   const braceT = clamp(Math.max(f.rangePressure ?? 0, (f.bracePulse ?? 0) / 14), 0, 1);
   if (braceT > 0.02 && f.grounded && f.hurt <= 0 && !f.attack) {
-    base.torsoTilt -= (f.rangeSide || f.dir || 1) * braceT * 0.026;
-    base.frontLeg.knee.y += braceT * 5;
-    base.backLeg.knee.y += braceT * 5;
-    base.frontLeg.foot.x += 8 * braceT * spec.stance;
-    base.backLeg.foot.x -= 10 * braceT * spec.stance;
-    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, braceT);
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, braceT * 0.82);
+    const rangeProfile = rangePressureProfile(f);
+    const side = (f.rangeSide || f.dir || 1) === (f.dir || 1) ? 1 : -1;
+    const close = smoothStep01(braceT);
+    const pulse = Math.sin(roundFrame * 0.16 + (f.profileId?.charCodeAt(1) ?? 0)) * close * rangeProfile.sway;
+    const handReady = close * rangeProfile.guard;
+    const footReady = close * rangeProfile.foot;
+    const reach = close * rangeProfile.reach;
+
+    base.torsoTilt -= side * (close * 0.022 * rangeProfile.weight + pulse * 0.006);
+    base.frontArm.shoulder.x += side * handReady * 1.8 * spec.stance;
+    base.frontArm.shoulder.y += close * 1.2 * rangeProfile.weight;
+    base.frontArm.elbow.x += side * (handReady * 5.4 + reach * 2.6) * spec.stance;
+    base.frontArm.elbow.y -= handReady * 4.2 * rangeProfile.lift - close * 1.8;
+    base.frontArm.hand.x += side * (handReady * 8.6 + reach * 4.8 + pulse * 1.6) * spec.stance;
+    base.frontArm.hand.y -= handReady * 7.2 * rangeProfile.lift - close * 2.4;
+    base.backArm.elbow.x -= side * (handReady * 2.8 + pulse * 1.4) * spec.stance;
+    base.backArm.elbow.y -= handReady * 2.8 * rangeProfile.lift;
+    base.backArm.hand.x -= side * (handReady * 4.4 + pulse * 1.8) * spec.stance;
+    base.backArm.hand.y -= handReady * 4.8 * rangeProfile.lift;
+    base.frontLeg.knee.x += side * (footReady * 4.8 + pulse * 1.2) * spec.stance;
+    base.frontLeg.knee.y += close * (4.4 + rangeProfile.weight * 1.8);
+    base.frontLeg.foot.x += side * (footReady * 8.2 + reach * 1.8) * spec.stance;
+    base.frontLeg.foot.y += close * 0.6;
+    base.backLeg.knee.x -= side * (footReady * 5.8 + pulse * 1.6) * spec.stance;
+    base.backLeg.knee.y += close * (5.6 + rangeProfile.weight * 2.2);
+    base.backLeg.foot.x -= side * (footReady * 10.4 + reach * 2.2) * spec.stance;
+    base.backLeg.foot.y += close * 0.8;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.58 + close * 0.36, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.66 + close * 0.32, 0, 1));
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + side * close * 0.022;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - side * close * 0.028;
   }
 
   const landingPose = f.grounded && f.hurt <= 0 && !f.attack && !winner
