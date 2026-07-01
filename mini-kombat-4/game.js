@@ -6170,9 +6170,9 @@ function drawRoundIntroCards() {
   if (alpha <= 0.01) return;
 
   const mobile = isMobileFightView();
-  const cardW = mobile ? 292 : 336;
-  const cardH = mobile ? 86 : 102;
-  const y = mobile ? 104 : 116;
+  const cardW = mobile ? 300 : 348;
+  const cardH = mobile ? 112 : 116;
+  const y = mobile ? 92 : 108;
   const slide = (1 - intro) * (mobile ? 58 : 86);
   const pulse = 0.5 + Math.sin((180 - countdownFrames) * 0.12) * 0.5;
 
@@ -6180,6 +6180,12 @@ function drawRoundIntroCards() {
   ctx.globalAlpha = alpha;
   drawRoundIntroCard(fighters[0], "left", 42 - slide, y, cardW, cardH, pulse);
   drawRoundIntroCard(fighters[1], "right", W - 42 - cardW + slide, y, cardW, cardH, pulse);
+  if (countdownFrames > 132) {
+    ctx.save();
+    ctx.globalAlpha *= smoothStep01(clamp((countdownFrames - 132) / 18, 0, 1));
+    drawRoundIntroTape(fighters[0], fighters[1], W / 2, y + cardH / 2, mobile, pulse);
+    ctx.restore();
+  }
 
   ctx.globalCompositeOperation = "screen";
   const beam = ctx.createLinearGradient(W * 0.18, y + cardH + 12, W * 0.82, y + cardH + 12);
@@ -6205,6 +6211,7 @@ function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
   const textX = reverse ? x + 16 : portraitX + portraitSize + 13;
   const textW = width - portraitSize - 45;
   const textAnchor = reverse ? textX + textW : textX;
+  const fontScale = height <= 100 ? 0.88 : 1;
 
   ctx.save();
   ctx.translate(x + width / 2, y + height / 2);
@@ -6257,11 +6264,11 @@ function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
   ctx.textAlign = reverse ? "right" : "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "rgba(126, 240, 207, 0.94)";
-  ctx.font = "900 9px system-ui, sans-serif";
+  ctx.font = `900 ${Math.round(9 * fontScale)}px system-ui, sans-serif`;
   ctx.fillText(reverse ? "JUGADOR 2" : cpuEnabled ? "CPU" : "JUGADOR 1", textAnchor, y + 23);
 
   ctx.fillStyle = "#fff3c4";
-  ctx.font = "900 28px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif";
+  ctx.font = `900 ${Math.round(28 * fontScale)}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
   ctx.lineWidth = 4;
   ctx.strokeStyle = "rgba(28, 10, 8, 0.88)";
   const name = compactIntroText(fighter.name, 16).toUpperCase();
@@ -6269,12 +6276,91 @@ function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
   ctx.fillText(name, textAnchor, y + 52);
 
   ctx.fillStyle = colorWithAlpha(trim, 0.94);
-  ctx.font = "900 10px system-ui, sans-serif";
+  ctx.font = `900 ${Math.round(10 * fontScale)}px system-ui, sans-serif`;
   ctx.fillText(compactIntroText(presentation.discipline, 28).toUpperCase(), textAnchor, y + 70);
   ctx.fillStyle = "rgba(255, 247, 214, 0.84)";
-  ctx.font = "900 10px system-ui, sans-serif";
+  ctx.font = `900 ${Math.round(10 * fontScale)}px system-ui, sans-serif`;
   ctx.fillText(compactIntroText(presentation.signature, 30).toUpperCase(), textAnchor, y + 86);
+  drawRoundIntroStats(fighter, textX, y + height - 13, textW, reverse, pulse);
 
+  ctx.restore();
+}
+
+function drawRoundIntroStats(fighter, x, y, width, reverse, pulse) {
+  const stats = menuStatValues(fighter);
+  const labels = ["FUE", "VEL", "ENE"];
+  const trim = fighter.trim || "#fff1bd";
+  const rowGap = Math.max(6, Math.floor(width / 3));
+  const meterW = Math.min(44, rowGap - 22);
+  const originX = reverse ? x + width - rowGap * 3 + 2 : x;
+
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.font = "850 7px system-ui, sans-serif";
+  for (let i = 0; i < labels.length; i += 1) {
+    const lx = originX + i * rowGap;
+    const fill = clamp(stats[i] / 100, 0.08, 1);
+    ctx.fillStyle = "rgba(255, 247, 214, 0.7)";
+    ctx.fillText(labels[i], lx, y + 4);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+    ctx.beginPath();
+    ctx.roundRect(lx + 17, y, meterW, 7, 3);
+    ctx.fill();
+    const statGrad = ctx.createLinearGradient(lx + 17, y, lx + 17 + meterW, y);
+    statGrad.addColorStop(0, colorWithAlpha(trim, 0.44 + pulse * 0.08));
+    statGrad.addColorStop(1, colorWithAlpha(fighter.color || trim, 0.72));
+    ctx.fillStyle = statGrad;
+    ctx.beginPath();
+    ctx.roundRect(lx + 17, y, meterW * fill, 7, 3);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawRoundIntroTape(left, right, centerX, centerY, mobile, pulse) {
+  const scout = matchupScout(left, right);
+  const width = mobile ? 224 : 204;
+  const height = mobile ? 70 : 78;
+  const x = centerX - width / 2;
+  const y = centerY - height / 2;
+  const leftStats = menuStatValues(left);
+  const rightStats = menuStatValues(right);
+  const leftRating = Math.round(leftStats[0] * 0.42 + leftStats[1] * 0.35 + leftStats[2] * 0.23);
+  const rightRating = Math.round(rightStats[0] * 0.42 + rightStats[1] * 0.35 + rightStats[2] * 0.23);
+  const split = clamp(leftRating / Math.max(1, leftRating + rightRating), 0.18, 0.82);
+
+  ctx.save();
+  const panel = ctx.createLinearGradient(x, y, x + width, y + height);
+  panel.addColorStop(0, "rgba(18, 10, 10, 0.82)");
+  panel.addColorStop(0.5, "rgba(8, 8, 10, 0.9)");
+  panel.addColorStop(1, "rgba(18, 10, 10, 0.82)");
+  ctx.fillStyle = panel;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 8);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(255, 241, 189, ${0.28 + pulse * 0.14})`;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = colorWithAlpha(left.trim || "#fff1bd", 0.18);
+  ctx.fillRect(x + 10, y + height - 14, (width - 20) * split, 6);
+  ctx.fillStyle = colorWithAlpha(right.trim || "#75f0cb", 0.18);
+  ctx.fillRect(x + 10 + (width - 20) * split, y + height - 14, (width - 20) * (1 - split), 6);
+  ctx.globalCompositeOperation = "source-over";
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(126, 240, 207, 0.9)";
+  ctx.font = `950 ${mobile ? 8 : 9}px system-ui, sans-serif`;
+  ctx.fillText("LECTURA DEL ROUND", centerX, y + 15);
+  ctx.fillStyle = "#fff1bd";
+  ctx.font = `900 ${mobile ? 16 : 18}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
+  ctx.fillText(compactIntroText(scout.tempo, mobile ? 21 : 18).toUpperCase(), centerX, y + 38);
+  ctx.fillStyle = "rgba(255, 247, 214, 0.74)";
+  ctx.font = `850 ${mobile ? 8 : 9}px system-ui, sans-serif`;
+  ctx.fillText(compactIntroText(scout.warning, mobile ? 28 : 24).toUpperCase(), centerX, y + 54);
   ctx.restore();
 }
 
