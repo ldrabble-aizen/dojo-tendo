@@ -616,6 +616,17 @@ function specialTechniqueProfile(f) {
   }[f?.profileId] ?? { coil: 1, release: 1, hands: 1, lift: 1, foot: 1, arc: 1, focus: 1 };
 }
 
+function hitReactionAnatomyProfile(f) {
+  return {
+    p1: { shoulder: 0.86, hip: 1.14, armLag: 0.78, footLag: 0.9, settle: 1.18, twist: 0.82 },
+    p2: { shoulder: 1.16, hip: 0.82, armLag: 1.24, footLag: 1.18, settle: 0.82, twist: 1.18 },
+    p3: { shoulder: 0.74, hip: 1.28, armLag: 0.66, footLag: 0.78, settle: 1.32, twist: 0.72 },
+    p4: { shoulder: 1.2, hip: 0.86, armLag: 1.18, footLag: 1.24, settle: 0.88, twist: 1.22 },
+    p5: { shoulder: 1.26, hip: 0.76, armLag: 1.3, footLag: 1.22, settle: 0.78, twist: 1.28 },
+    p6: { shoulder: 0.96, hip: 1.08, armLag: 0.9, footLag: 0.92, settle: 1.08, twist: 0.9 },
+  }[f?.profileId] ?? { shoulder: 1, hip: 1, armLag: 1, footLag: 1, settle: 1, twist: 1 };
+}
+
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
@@ -16632,16 +16643,37 @@ function getPose(f, stride) {
     const skid = clamp(hitMass.skid, 0, 1.85);
     const absorbStyle = f.profileId === "p1" ? 0.82 : f.profileId === "p2" ? 1.12 : f.profileId === "p3" ? 0.68 : 1;
     const liftStyle = f.profileId === "p1" ? 0.74 : f.profileId === "p2" ? 1.18 : f.profileId === "p3" ? 0.58 : 1;
+    const anatomy = hitReactionAnatomyProfile(f);
     const braceFoot = worldLocal > 0 ? "backLeg" : "frontLeg";
     const freeFoot = braceFoot === "backLeg" ? "frontLeg" : "backLeg";
+    const headHit = hitMass.zone === "head";
+    const lowHit = hitMass.zone === "legs";
+    const heavyHit = hitMass.kind === "finish" || hitMass.kind === "counter" || hitMass.kind === "blast" || hitMass.kind === "heavy";
+    const chain = clamp(snap * 0.56 + recoil * 0.44 + floor * 0.18, 0, 2.05);
+    const delayedChain = Math.sin((1 - clamp(hitMass.active, 0, 1)) * Math.PI) * clamp(hitMass.strength, 0.35, 1.9) * (heavyHit ? 1.12 : 0.88);
+    const shoulderShock = chain * anatomy.shoulder;
+    const hipShock = chain * anatomy.hip;
+    const armLag = delayedChain * anatomy.armLag;
+    const footLag = delayedChain * anatomy.footLag;
 
     base.torsoTilt += (localDir * hitMass.fold * snap * 0.05 + localDir * recoil * 0.018) * absorbStyle;
+    base.torsoTilt += localDir * shoulderShock * (headHit ? -0.035 : lowHit ? 0.022 : 0.026) * anatomy.twist;
+    base.frontArm.shoulder.x += localDir * shoulderShock * (headHit ? 4.2 : lowHit ? -1.8 : -3.2) * spec.stance;
+    base.frontArm.shoulder.y += shoulderShock * (headHit ? -3.6 : lowHit ? 2.8 : 1.4);
+    base.backArm.shoulder.x += localDir * shoulderShock * (headHit ? 2.4 : lowHit ? -1.2 : -4.6) * spec.stance;
+    base.backArm.shoulder.y += shoulderShock * (headHit ? -2.4 : lowHit ? 2.2 : 2.8);
+    base.frontLeg.hip.x -= localDir * hipShock * (lowHit ? 5.8 : 3.1) * spec.stance;
+    base.frontLeg.hip.y += hipShock * (lowHit ? 4.6 : 1.8) * anatomy.settle;
+    base.backLeg.hip.x += localDir * hipShock * (lowHit ? 4.4 : 2.6) * spec.stance;
+    base.backLeg.hip.y += hipShock * (lowHit ? 5.2 : 2.2) * anatomy.settle;
     base[braceFoot].knee.y += floor * 5.5;
     base[braceFoot].foot.y += floor * 1.4;
     base[braceFoot].foot.x -= worldLocal * (floor * 7 + skid * 6) * spec.stance;
     base[braceFoot].plant = Math.max(base[braceFoot].plant ?? 0, floor * 0.92);
+    base[braceFoot].footAngle = (base[braceFoot].footAngle ?? 0) - worldLocal * (floor * 0.035 + skid * 0.018) * anatomy.settle;
     base[freeFoot].knee.y += floor * 2.3;
     base[freeFoot].foot.x += worldLocal * skid * 4.5 * spec.stance;
+    base[freeFoot].footAngle = (base[freeFoot].footAngle ?? 0) + worldLocal * (skid * 0.028 + footLag * 0.022);
 
     if (hitMass.zone === "head") {
       base.frontArm.elbow.x += localDir * snap * 10 * spec.stance * absorbStyle;
@@ -16677,12 +16709,29 @@ function getPose(f, stride) {
       base.backLeg.knee.y += floor * 4.5 * liftStyle;
     }
 
+    if (armLag > 0.035) {
+      base.frontArm.elbow.x -= localDir * armLag * (headHit ? 5.8 : lowHit ? 3.2 : 4.2) * spec.stance;
+      base.frontArm.elbow.y += armLag * (headHit ? 8.4 : lowHit ? 10.4 : 6.2);
+      base.frontArm.hand.x -= localDir * armLag * (headHit ? 9.8 : lowHit ? 5.8 : 7.5) * spec.stance;
+      base.frontArm.hand.y += armLag * (headHit ? 14.5 : lowHit ? 15.6 : 9.8);
+      base.backArm.elbow.x -= localDir * armLag * (headHit ? 4.8 : lowHit ? 3.6 : 4.6) * spec.stance;
+      base.backArm.elbow.y += armLag * (headHit ? 7.2 : lowHit ? 8.6 : 5.4);
+      base.backArm.hand.x -= localDir * armLag * (headHit ? 8.5 : lowHit ? 6.2 : 7.8) * spec.stance;
+      base.backArm.hand.y += armLag * (headHit ? 12.8 : lowHit ? 12.2 : 8.4);
+    }
+
+    if (footLag > 0.035) {
+      base[freeFoot].knee.x += worldLocal * footLag * (lowHit ? 5.8 : 3.4) * spec.stance;
+      base[freeFoot].knee.y += footLag * (lowHit ? 8.6 : 4.2);
+      base[freeFoot].foot.x += worldLocal * footLag * (lowHit ? 10.8 : 6.2) * spec.stance;
+      base[freeFoot].foot.y += footLag * (lowHit ? 6.2 : 2.8);
+      base[braceFoot].plant = Math.max(base[braceFoot].plant ?? 0, clamp(0.5 + floor * 0.28 + footLag * 0.16, 0, 1));
+    }
+
     const follow = Math.sin(clamp(hitMass.active, 0, 1) * Math.PI) * clamp(hitMass.strength, 0.35, 1.85);
     if (follow > 0.035) {
       const delayed = follow * (hitMass.kind === "finish" ? 1.2 : hitMass.kind === "counter" || hitMass.kind === "blast" ? 1.1 : 0.92);
       const looseStyle = f.profileId === "p1" ? 0.72 : f.profileId === "p2" ? 1.22 : f.profileId === "p3" ? 0.62 : f.profileId === "p5" ? 1.16 : 1;
-      const lowHit = hitMass.zone === "legs";
-      const headHit = hitMass.zone === "head";
       const looseArm = delayed * looseStyle;
       const freeKick = delayed * (lowHit ? 1.18 : 0.72);
 
