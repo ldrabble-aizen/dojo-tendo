@@ -3818,6 +3818,7 @@ function updateFighter(f, opponent) {
   const wantBlock = input.block && f.grounded && !f.attack && !wantSpecial;
   const move = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   const baseSpeed = wantBlock ? 1.2 : 3.35;
+  const guardProfile = characterGuard(f);
   const wasGrounded = f.grounded;
   const wasBlocking = f.blocking;
   const wasHurt = f.hurt > 0;
@@ -3841,7 +3842,8 @@ function updateFighter(f, opponent) {
   }
   if (wantBlock && !wasBlocking) f.guardEntryPulse = Math.max(f.guardEntryPulse ?? 0, 12);
   if (!wantBlock && wasBlocking) f.guardExitPulse = Math.max(f.guardExitPulse ?? 0, 10);
-  f.crouch += ((wantBlock ? 1 : 0) - f.crouch) * 0.18;
+  const guardCrouchTarget = wantBlock ? clamp(0.92 + (guardProfile.crouch - 1) * 0.28, 0.76, 1.12) : 0;
+  f.crouch += (guardCrouchTarget - f.crouch) * (wantBlock ? 0.2 : 0.16);
   if (f.counterWindow > 0) f.counterWindow -= 1;
   if (f.comboWindow > 0) f.comboWindow -= 1;
   if (f.comboPulse > 0) f.comboPulse -= 1;
@@ -15432,6 +15434,40 @@ function getPose(f, stride) {
     base.backLeg.foot.x -= (guardHold * 4.2 + guardSnap * 8.2) * spec.stance * brace;
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.52 + guardHold * 0.26 + guardSnap * 0.22, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.62 + guardHold * 0.28 + guardSnap * 0.28, 0, 1));
+
+    const guardLowStyle = {
+      p1: { sink: 1.12, shoulder: 0.86, foot: 1.2, arm: 0.86, angle: 0.72 },
+      p2: { sink: 0.82, shoulder: 1.16, foot: 0.78, arm: 1.18, angle: 1.08 },
+      p3: { sink: 1.24, shoulder: 0.72, foot: 1.28, arm: 0.78, angle: 0.62 },
+      p4: { sink: 0.84, shoulder: 1.18, foot: 0.82, arm: 1.14, angle: 1.16 },
+      p5: { sink: 0.76, shoulder: 1.24, foot: 0.76, arm: 1.2, angle: 1.22 },
+      p6: { sink: 1.04, shoulder: 0.92, foot: 1.08, arm: 0.96, angle: 0.86 },
+    }[f.profileId] ?? { sink: 1, shoulder: 1, foot: 1, arm: 1, angle: 1 };
+    const guardLow = smoothStep01(clamp(f.crouch ?? 0, 0, 1));
+    const entrySnap = smoothStep01(guardEntry);
+    const lowPulse = Math.sin(roundFrame * 0.09 + (f.profileId?.charCodeAt(1) ?? 0)) * guardLow;
+    const sink = guardLow * guardLowStyle.sink;
+    const coil = Math.max(guardSnap, entrySnap * 0.72);
+
+    base.torsoTilt -= (sink * 0.018 + coil * 0.02) * brace;
+    base.frontArm.shoulder.x += (lowPulse * 0.8 - coil * 1.6) * spec.stance * guardLowStyle.shoulder;
+    base.frontArm.shoulder.y += sink * 1.6;
+    base.backArm.shoulder.x += (lowPulse * 0.6 + coil * 1.2) * spec.stance * guardLowStyle.shoulder;
+    base.backArm.shoulder.y += sink * 2.2;
+    base.frontArm.elbow.x += (sink * 2.4 - coil * 2.8) * spec.stance * guardLowStyle.arm;
+    base.frontArm.hand.x += (sink * 3.2 - coil * 3.6) * spec.stance * guardLowStyle.arm;
+    base.backArm.elbow.x += (sink * 1.4 + coil * 3.4) * spec.stance * guardLowStyle.arm;
+    base.backArm.hand.x += (sink * 2 + coil * 4.8) * spec.stance * guardLowStyle.arm;
+    base.frontLeg.knee.x += (sink * 5.2 + coil * 3.6) * spec.stance * guardLowStyle.foot;
+    base.frontLeg.knee.y += sink * 6.4;
+    base.frontLeg.foot.x += (sink * 7.2 + coil * 3.2) * spec.stance * guardLowStyle.foot;
+    base.backLeg.knee.x -= (sink * 6.6 + coil * 4.2) * spec.stance * guardLowStyle.foot;
+    base.backLeg.knee.y += sink * 8.2;
+    base.backLeg.foot.x -= (sink * 9.4 + coil * 5.6) * spec.stance * guardLowStyle.foot;
+    base.frontLeg.footAngle = Math.max(base.frontLeg.footAngle ?? -Infinity, guardLow * 0.06 * guardLowStyle.angle);
+    base.backLeg.footAngle = Math.min(base.backLeg.footAngle ?? Infinity, -guardLow * 0.075 * guardLowStyle.angle);
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.68 + sink * 0.2 + coil * 0.12, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.78 + sink * 0.22 + coil * 0.14, 0, 1));
   }
 
   if (attackType === "punch" || attackType === "airPunch") {
