@@ -15856,6 +15856,30 @@ function getPose(f, stride) {
       base.frontLeg.knee.y += floor * 4 * liftStyle;
       base.backLeg.knee.y += floor * 4.5 * liftStyle;
     }
+
+    const follow = Math.sin(clamp(hitMass.active, 0, 1) * Math.PI) * clamp(hitMass.strength, 0.35, 1.85);
+    if (follow > 0.035) {
+      const delayed = follow * (hitMass.kind === "finish" ? 1.2 : hitMass.kind === "counter" || hitMass.kind === "blast" ? 1.1 : 0.92);
+      const looseStyle = f.profileId === "p1" ? 0.72 : f.profileId === "p2" ? 1.22 : f.profileId === "p3" ? 0.62 : f.profileId === "p5" ? 1.16 : 1;
+      const lowHit = hitMass.zone === "legs";
+      const headHit = hitMass.zone === "head";
+      const looseArm = delayed * looseStyle;
+      const freeKick = delayed * (lowHit ? 1.18 : 0.72);
+
+      base.torsoTilt += localDir * delayed * (headHit ? -0.024 : lowHit ? 0.02 : 0.016);
+      base.frontArm.elbow.x -= localDir * looseArm * (headHit ? 6.2 : 3.6) * spec.stance;
+      base.frontArm.elbow.y += looseArm * (headHit ? 7.8 : lowHit ? 9.2 : 5.6);
+      base.frontArm.hand.x -= localDir * looseArm * (headHit ? 10.5 : 6.6) * spec.stance;
+      base.frontArm.hand.y += looseArm * (headHit ? 14 : lowHit ? 15 : 9.4);
+      base.backArm.elbow.x -= localDir * looseArm * (headHit ? 5.2 : 3.8) * spec.stance;
+      base.backArm.elbow.y += looseArm * (headHit ? 6.4 : lowHit ? 7.5 : 4.8);
+      base.backArm.hand.x -= localDir * looseArm * (headHit ? 8.8 : 6.2) * spec.stance;
+      base.backArm.hand.y += looseArm * (headHit ? 12 : lowHit ? 11.4 : 7.6);
+      base[freeFoot].knee.x += worldLocal * freeKick * 3.8 * spec.stance;
+      base[freeFoot].knee.y += freeKick * (lowHit ? 7.8 : 3.6);
+      base[freeFoot].foot.x += worldLocal * freeKick * (lowHit ? 8.8 : 5.2) * spec.stance;
+      base[freeFoot].foot.y += freeKick * (lowHit ? 5.2 : 2.4);
+    }
   }
 
   const airKickRecoverPose = airborne && !f.attack ? smoothStep01(clamp((f.airKickRecoverPulse ?? 0) / 24, 0, 1)) : 0;
