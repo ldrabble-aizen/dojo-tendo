@@ -1094,6 +1094,11 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     staggerPulse: 0,
     attackEntryPulse: 0,
     attackRecoverPulse: 0,
+    whiffPulse: 0,
+    whiffPulseMax: 1,
+    whiffSide: dir,
+    whiffType: "",
+    whiffStrength: 0,
     attackChainPulse: 0,
     attackChainMax: 1,
     attackChainFrom: "",
@@ -2532,6 +2537,11 @@ function resetRound() {
     staggerPulse: 0,
     attackEntryPulse: 0,
     attackRecoverPulse: 0,
+    whiffPulse: 0,
+    whiffPulseMax: 1,
+    whiffSide: 1,
+    whiffType: "",
+    whiffStrength: 0,
     attackChainPulse: 0,
     attackChainMax: 1,
     attackChainFrom: "",
@@ -2643,6 +2653,11 @@ function resetRound() {
     staggerPulse: 0,
     attackEntryPulse: 0,
     attackRecoverPulse: 0,
+    whiffPulse: 0,
+    whiffPulseMax: 1,
+    whiffSide: -1,
+    whiffType: "",
+    whiffStrength: 0,
     attackChainPulse: 0,
     attackChainMax: 1,
     attackChainFrom: "",
@@ -3871,6 +3886,7 @@ function updateFighter(f, opponent) {
   if (f.staggerPulse > 0) f.staggerPulse -= 1;
   if (f.attackEntryPulse > 0) f.attackEntryPulse -= 1;
   if (f.attackRecoverPulse > 0) f.attackRecoverPulse -= 1;
+  if (f.whiffPulse > 0) f.whiffPulse -= 1;
   if (f.attackChainPulse > 0) f.attackChainPulse -= 1;
   if (f.hurtRecoverPulse > 0) f.hurtRecoverPulse -= 1;
   if (f.moveTurnPulse > 0) f.moveTurnPulse -= 1;
@@ -4062,8 +4078,10 @@ function updateFighter(f, opponent) {
     }
     if (f.attack.frame >= f.attack.duration) {
       const endedType = f.attack.type;
+      const missedAttack = !f.attack.hit && endedType !== "special";
       const timing = attackTiming(endedType);
       f.attackRecoverPulse = Math.max(f.attackRecoverPulse ?? 0, timing.recover);
+      if (missedAttack) triggerWhiffRecovery(f, endedType);
       if (endedType === "airKick") {
         f.airKickRecoverPulse = Math.max(f.airKickRecoverPulse ?? 0, Math.round(timing.recover * 1.35));
         f.airKickDir = f.dir || f.jumpDir || 1;
@@ -5022,6 +5040,64 @@ function attackWhoosh(f) {
 
   if (f.grounded) {
     movementDust(f.x - dir * fighterScale(spec.sweep ? 18 : 28), FLOOR + 5, -dir, spec.heavy ? 0.9 : 0.62, spec.sweep ? 4 : spec.heavy ? 3 : 2);
+  }
+}
+
+function triggerWhiffRecovery(f, type) {
+  if (!f || type === "special") return;
+  const spec = attackVisualSpec(type);
+  const dir = f.dir || 1;
+  const strength = spec.kick || spec.sweep ? 1.12 : spec.grab ? 1.02 : 0.86;
+  const duration = spec.kick || spec.sweep ? 20 : spec.grab ? 18 : 15;
+  const y = f.y - fighterScale(spec.sweep ? 34 : spec.kick ? 84 : spec.grab ? 112 : 124);
+  const x = f.x + dir * fighterScale(spec.sweep ? 76 : spec.kick ? 68 : spec.grab ? 58 : 54);
+  const angle = dir > 0 ? 0 : Math.PI;
+
+  f.whiffPulse = Math.max(f.whiffPulse ?? 0, duration);
+  f.whiffPulseMax = duration;
+  f.whiffSide = dir;
+  f.whiffType = type;
+  f.whiffStrength = strength;
+  f.attackRecoverPulse = Math.max(f.attackRecoverPulse ?? 0, Math.round(duration * 0.72));
+  if (f.grounded) {
+    f.footPlantPulse = Math.max(f.footPlantPulse ?? 0, Math.round(7 + strength * 4));
+    f.walkAnchorPulse = Math.max(f.walkAnchorPulse ?? 0, Math.round(8 + strength * 5));
+    f.walkStopPulse = Math.max(f.walkStopPulse ?? 0, Math.round(5 + strength * 4));
+    f.walkStopDir = dir;
+    f.walkStopSpeed = Math.max(f.walkStopSpeed ?? 0, 0.42 + strength * 0.2);
+    movementDust(f.x - dir * fighterScale(spec.sweep ? 18 : 24), FLOOR + 5, -dir, 0.48 + strength * 0.26, spec.sweep ? 4 : 3);
+  }
+
+  particles.push({
+    x,
+    y,
+    vx: -dir * 0.1,
+    vy: 0,
+    angle,
+    life: Math.round(10 + strength * 5),
+    maxLife: Math.round(10 + strength * 5),
+    size: fighterScale(spec.sweep ? 38 : spec.kick ? 44 : spec.grab ? 34 : 30),
+    growth: 1.55,
+    color: colorWithAlpha(spec.color, 0.58),
+    kind: "airRipple",
+  });
+
+  const count = fxCount(spec.sweep ? 5 : spec.kick ? 5 : 3, 2);
+  for (let i = 0; i < count; i += 1) {
+    const lane = count === 1 ? 0 : i / (count - 1) - 0.5;
+    particles.push({
+      x: x - dir * fighterScale(8 + Math.random() * 14),
+      y: y + lane * fighterScale(spec.trailHeight * 1.15),
+      vx: dir * (0.08 + Math.random() * 0.18) - dir * strength * 0.18,
+      vy: lane * 0.12 - 0.04,
+      angle: angle + lane * (spec.sweep ? 0.22 : spec.kick ? 0.28 : 0.18),
+      length: fighterScale((spec.sweep ? 44 : spec.kick ? 52 : spec.grab ? 42 : 36) * (0.82 + Math.random() * 0.22)),
+      life: 11 + Math.random() * 5,
+      maxLife: 15,
+      size: spec.kick || spec.sweep ? 2.4 : 2,
+      color: colorWithAlpha(spec.core, 0.5),
+      kind: "impactNeedle",
+    });
   }
 }
 
@@ -9164,6 +9240,19 @@ function fighterTransitionMotion(f, walking) {
       motion.scaleY *= 1 - settle * 0.008;
     }
 
+    const whiffRecover = clamp((f.whiffPulse ?? 0) / Math.max(1, f.whiffPulseMax ?? 1), 0, 1);
+    if (whiffRecover > 0.02 && f.hurt <= 0) {
+      const side = f.whiffSide || dir;
+      const pull = smoothStep01(whiffRecover) * clamp(f.whiffStrength ?? 1, 0.65, 1.4);
+      const rebound = Math.sin((1 - whiffRecover) * Math.PI) * 0.42;
+      motion.x += side * (pull * 1.05 - rebound * 0.45);
+      motion.y += pull * 0.45 - rebound * 0.3;
+      motion.rotation += side * (pull * 0.014 - rebound * 0.009);
+      motion.scaleX *= 1 + pull * 0.006;
+      motion.scaleY *= 1 - pull * 0.007;
+      motion.afterimage = Math.max(motion.afterimage, pull * 0.018);
+    }
+
     if (guardEntry > 0.02) {
       motion.x -= dir * guardEntry * 1.45;
       motion.y += guardEntry * 1.35;
@@ -9852,6 +9941,7 @@ function drawFighter(f) {
     drawDamageReactionFX(f, crouch);
     if (winner) drawResultPoseEffect(f, crouch);
     ctx.restore();
+    drawWhiffRecoveryFX(f, crouch, baseX, baseY);
     const box = attackBox(f);
     if (box && f.attack.frame >= f.attack.activeStart - 2 && f.attack.frame <= f.attack.activeEnd + 2) {
       drawSpeedLines(f, box);
@@ -9887,6 +9977,7 @@ function drawFighter(f) {
       if (winner) drawResultPoseEffect(f, crouch);
     }
     ctx.restore();
+    drawWhiffRecoveryFX(f, crouch, baseX, baseY);
 
     const box = attackBox(f);
     if (!unifiedSprite && box && f.attack.frame >= f.attack.activeStart - 2 && f.attack.frame <= f.attack.activeEnd + 2) {
@@ -9930,6 +10021,7 @@ function drawFighter(f) {
   if (f.health < 30 && f.hurt <= 0 && !winner) drawLowHealthStagger(f, crouch);
   if (winner) drawResultPoseEffect(f, crouch);
   ctx.restore();
+  drawWhiffRecoveryFX(f, crouch, baseX, baseY);
 
   const box = attackBox(f);
   if (box && f.attack.frame >= f.attack.activeStart - 2 && f.attack.frame <= f.attack.activeEnd + 2) {
@@ -14669,6 +14761,70 @@ function drawAttackArc(f, box) {
   ctx.restore();
 }
 
+function drawWhiffRecoveryFX(f, crouch, baseX = f.x, baseY = f.y) {
+  if (!f || winner || f.attack || f.hurt > 0) return;
+  const raw = clamp((f.whiffPulse ?? 0) / Math.max(1, f.whiffPulseMax ?? 1), 0, 1);
+  if (raw <= 0.025) return;
+
+  const type = f.whiffType || f.lastAttackType || "punch";
+  const spec = attackVisualSpec(type);
+  const motion = characterMotion(f);
+  const dir = f.whiffSide || f.dir || 1;
+  const localDir = dir === (f.dir || 1) ? 1 : -1;
+  const strength = clamp(f.whiffStrength ?? 1, 0.65, 1.45);
+  const fade = smoothStep01(raw);
+  const rebound = Math.sin((1 - raw) * Math.PI);
+  const reach = spec.sweep ? 104 : spec.kick ? 94 : spec.grab ? 76 : 66;
+  const y = spec.sweep ? -34 : spec.kick ? -82 : spec.grab ? -112 : -124;
+  const height = spec.sweep ? 16 : spec.kick ? 22 : spec.grab ? 30 : 20;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.translate(baseX, baseY);
+  ctx.scale(f.dir * FIGHTER_SCALE, FIGHTER_SCALE);
+  ctx.rotate(localDir * (spec.sweep ? 0.04 : spec.kick ? -0.09 : -0.035) * motion.rotation);
+
+  const x = localDir * (34 + fade * 10 - rebound * 4);
+  ctx.globalAlpha = clamp(0.08 + fade * 0.12, 0, 0.22) * strength;
+  const glow = ctx.createRadialGradient(x + localDir * 28, y + crouch * 0.42, 4, x + localDir * 28, y + crouch * 0.42, reach);
+  glow.addColorStop(0, colorWithAlpha(spec.core, 0.2));
+  glow.addColorStop(0.52, colorWithAlpha(spec.color, 0.08));
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(x + localDir * 28, y + crouch * 0.42, reach * 0.58, height + fade * 9, localDir * -0.07, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.lineCap = "round";
+  ctx.globalAlpha = clamp(0.1 + fade * 0.22, 0, 0.32) * strength;
+  ctx.strokeStyle = colorWithAlpha(spec.core, 0.72);
+  ctx.lineWidth = (spec.kick || spec.sweep ? 2.2 : 1.6) + fade * 1.3;
+  ctx.beginPath();
+  ctx.moveTo(x - localDir * 16, y + crouch * 0.42 + height * 0.55);
+  ctx.quadraticCurveTo(
+    x + localDir * reach * 0.28,
+    y + crouch * 0.42 - height * (1.25 + fade * 0.55),
+    x + localDir * reach * (0.82 + fade * 0.12),
+    y + crouch * 0.42 - height * 0.22 + rebound * 5
+  );
+  ctx.stroke();
+
+  ctx.globalAlpha = clamp(0.06 + fade * 0.16, 0, 0.22) * strength;
+  ctx.strokeStyle = colorWithAlpha("#ffffff", 0.58);
+  ctx.lineWidth = 0.9 + fade * 0.9;
+  ctx.beginPath();
+  ctx.moveTo(x - localDir * 8, y + crouch * 0.42 + height * 0.12);
+  ctx.quadraticCurveTo(
+    x + localDir * reach * 0.18,
+    y + crouch * 0.42 - height * 0.64,
+    x + localDir * reach * (0.58 + fade * 0.1),
+    y + crouch * 0.42 + height * 0.28
+  );
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 function attackProgress(attack) {
   if (!attack) return 0;
   return Math.sin(clamp(attack.frame / attack.duration, 0, 1) * Math.PI);
@@ -15847,6 +16003,48 @@ function getPose(f, stride) {
     base.backLeg.foot.x -= load * 8 * spec.stance + drive * 8 * spec.stance;
     base.backLeg.knee.y += mass.plant * 4.5;
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 0.86);
+  }
+
+  const whiffPose = !f.attack && !winner && f.hurt <= 0
+    ? smoothStep01(clamp((f.whiffPulse ?? 0) / Math.max(1, f.whiffPulseMax ?? 1), 0, 1))
+    : 0;
+  if (whiffPose > 0.025) {
+    const whiffType = f.whiffType || f.lastAttackType || "punch";
+    const whiffSpec = attackVisualSpec(whiffType);
+    const side = (f.whiffSide || f.dir || 1) === (f.dir || 1) ? 1 : -1;
+    const strength = clamp(f.whiffStrength ?? 1, 0.65, 1.45);
+    const overreach = whiffPose * strength;
+    const rebound = Math.sin((1 - whiffPose) * Math.PI) * strength;
+    const low = whiffSpec.sweep ? 1 : 0;
+    const leg = whiffSpec.kick || whiffSpec.sweep;
+    const grab = whiffSpec.grab ? 1 : 0;
+
+    base.torsoTilt += side * (overreach * (leg ? 0.026 : 0.018) - rebound * 0.012);
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.42 + overreach * 0.38, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.62 + overreach * 0.32, 0, 1));
+    base.backLeg.knee.y += overreach * (5.5 + low * 4);
+    base.backLeg.foot.x -= side * overreach * (8 + low * 7) * spec.stance;
+    base.frontLeg.knee.y += overreach * (leg ? 3.2 : 1.8);
+
+    if (leg) {
+      base.frontLeg.knee.x += side * overreach * (13 + low * 9) * spec.stance;
+      base.frontLeg.knee.y += low ? overreach * 7 : -overreach * 5 + rebound * 4;
+      base.frontLeg.foot.x += side * overreach * (26 + low * 28) * spec.stance - side * rebound * 8 * spec.stance;
+      base.frontLeg.foot.y += low ? overreach * 3 : -overreach * 10 + rebound * 9;
+      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - side * (overreach * 0.035 - rebound * 0.02);
+      base.frontArm.hand.x -= side * overreach * 7 * spec.stance;
+      base.backArm.hand.x -= side * overreach * 9 * spec.stance;
+      base.frontArm.hand.y += overreach * 4;
+      base.backArm.hand.y += overreach * 5;
+    } else {
+      base.frontArm.elbow.x += side * overreach * (17 + grab * 13) * spec.stance - side * rebound * 5 * spec.stance;
+      base.frontArm.hand.x += side * overreach * (30 + grab * 24) * spec.stance - side * rebound * 9 * spec.stance;
+      base.frontArm.hand.y += overreach * (5 + grab * 2) + rebound * 2;
+      base.backArm.elbow.x += side * overreach * (5 + grab * 18) * spec.stance;
+      base.backArm.hand.x += side * overreach * (8 + grab * 28) * spec.stance;
+      base.backArm.hand.y += overreach * (3 + grab * 3);
+      base.frontLeg.foot.x += side * overreach * 4 * spec.stance;
+    }
   }
 
   if (bodyWeight && bodyWeight.active > 0.03 && f.grounded) {
