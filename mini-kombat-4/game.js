@@ -14885,6 +14885,62 @@ function getPose(f, stride) {
     },
   };
 
+  const idlePose = !winner && f.grounded && f.hurt <= 0 && !f.attack && !f.blocking && Math.abs(f.vx ?? 0) <= 0.45;
+  if (idlePose) {
+    const clock = roundFrame + (f.profileId?.charCodeAt(1) ?? 0) * 17 + f.x * 0.04;
+    const breath = Math.sin(clock * 0.055);
+    const settle = Math.sin(clock * 0.032 + 1.4);
+    const alert = Math.sin(clock * 0.118 + 0.7);
+    const stanceProfile = {
+      p1: { weight: 1.14, sway: 0.52, arm: 0.66, guard: 0.34, bounce: 0.35, wide: 1.12 },
+      p2: { weight: 0.78, sway: 0.86, arm: 1.08, guard: 0.62, bounce: 0.72, wide: 0.86 },
+      p3: { weight: 1.28, sway: 0.38, arm: 0.58, guard: 0.3, bounce: 0.24, wide: 1.24 },
+      p4: { weight: 0.82, sway: 1.08, arm: 1.12, guard: 0.68, bounce: 0.9, wide: 0.82 },
+      p5: { weight: 0.7, sway: 0.98, arm: 1.18, guard: 0.56, bounce: 0.78, wide: 0.76 },
+      p6: { weight: 1.02, sway: 0.5, arm: 0.72, guard: 0.78, bounce: 0.28, wide: 1.02 },
+    }[f.profileId] ?? { weight: 1, sway: 0.68, arm: 0.82, guard: 0.48, bounce: 0.5, wide: 1 };
+    const weight = stanceProfile.weight;
+    const sway = settle * stanceProfile.sway;
+    const breathLift = breath * (1.6 + stanceProfile.bounce * 1.2);
+    const guardFloat = (0.5 + breath * 0.5) * stanceProfile.guard;
+    const alertSnap = Math.max(0, alert) * stanceProfile.arm;
+
+    base.torsoTilt += sway * 0.018 - breath * 0.006 * weight;
+    base.frontArm.elbow.x += (sway * 2.4 + alertSnap * 2.2) * spec.stance;
+    base.frontArm.elbow.y += breathLift * 0.8 - guardFloat * 5.5;
+    base.frontArm.hand.x += (sway * 3.2 + alertSnap * 3.8) * spec.stance;
+    base.frontArm.hand.y += breathLift * 1.1 - guardFloat * 8.2;
+    base.backArm.elbow.x -= (sway * 1.8 + alertSnap * 1.4) * spec.stance;
+    base.backArm.elbow.y -= guardFloat * 3.8 - breathLift * 0.6;
+    base.backArm.hand.x -= (sway * 2.5 + alertSnap * 2.2) * spec.stance;
+    base.backArm.hand.y -= guardFloat * 5.4 - breathLift * 0.8;
+
+    const footSpread = (stanceProfile.wide - 1) * 9;
+    const frontPress = clamp(0.45 + settle * 0.22 * weight, 0, 1);
+    const backPress = clamp(0.48 - settle * 0.18 * weight, 0, 1);
+    base.frontLeg.knee.x += (sway * 2.8 + footSpread * 0.28) * spec.stance;
+    base.frontLeg.knee.y += (1 - frontPress) * 2.2 + breathLift * 0.5;
+    base.frontLeg.foot.x += (sway * 2.2 + footSpread) * spec.stance;
+    base.frontLeg.foot.y -= stanceProfile.bounce * Math.max(0, breath) * 1.4;
+    base.backLeg.knee.x -= (sway * 2.4 + footSpread * 0.22) * spec.stance;
+    base.backLeg.knee.y += (1 - backPress) * 2.6 - breathLift * 0.25;
+    base.backLeg.foot.x -= (sway * 1.8 + footSpread) * spec.stance;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, frontPress);
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, backPress);
+
+    if (f.profileId === "p2" || f.profileId === "p4" || f.profileId === "p5") {
+      const ready = Math.max(0, Math.sin(clock * 0.074 + 0.8));
+      base.frontLeg.foot.y -= ready * stanceProfile.bounce * 1.8;
+      base.frontArm.hand.y -= ready * stanceProfile.guard * 3.2;
+      base.backArm.hand.y -= ready * stanceProfile.guard * 2.4;
+    } else if (f.profileId === "p1" || f.profileId === "p3") {
+      const settleWeight = Math.max(0, -breath) * stanceProfile.weight;
+      base.frontLeg.knee.y += settleWeight * 2.4;
+      base.backLeg.knee.y += settleWeight * 3.2;
+      base.backLeg.foot.x -= settleWeight * 2.6 * spec.stance;
+    }
+  }
+
   const walkingPose = f.grounded && f.hurt <= 0 && !f.attack && Math.abs(f.vx) > 0.45;
   if (walkingPose) {
     const weight = clamp((f.walkWeight ?? 0) * motion.walkWeight, 0, 1.35);
