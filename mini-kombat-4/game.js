@@ -9471,6 +9471,17 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const crouchSpread = f.blocking ? 8 : 0;
   const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1);
   const landingWeight = landing * clamp(f.landingStrength ?? 1, 0.42, 1.65);
+  const facingTurn = f.grounded ? clamp((f.facingTurnPulse ?? 0) / 14, 0, 1) : 0;
+  const facingStyle = {
+    p1: { weight: 1.18, snap: 0.78 },
+    p2: { weight: 0.82, snap: 1.14 },
+    p3: { weight: 1.28, snap: 0.7 },
+    p4: { weight: 0.86, snap: 1.12 },
+    p5: { weight: 0.78, snap: 1.2 },
+    p6: { weight: 1.04, snap: 0.92 },
+  }[f.profileId] ?? { weight: 1, snap: 1 };
+  const facingPress = smoothStep01(facingTurn) * facingStyle.weight;
+  const facingSnap = Math.sin((1 - facingTurn) * Math.PI) * facingStyle.snap;
   const step = clamp((f.stepPulse ?? 0) / 7, 0, 1);
   const anchor = walking ? clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1) : 0;
   const push = walking ? clamp((f.walkPushPulse ?? 0) / 9, 0, 1) : 0;
@@ -9488,13 +9499,14 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const attackOffset = (attackDrive * 8 - attackLoad * 5 - (attackWeight?.recoil ?? 0) * 2.4) * (f.dir || 1) * FIGHTER_SCALE;
   const reactionOffset = hitMass ? hitMass.worldDir * reactionSkid * 7 * FIGHTER_SCALE : 0;
   const stopOffset = -(f.walkStopDir || 0) * stopStrength * 7 * FIGHTER_SCALE;
-  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
-  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
-  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.56);
+  const facingOffset = -(f.facingTurnTo || f.dir || 1) * (facingPress * 5 - facingSnap * 2.5) * FIGHTER_SCALE;
+  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + facingPress * 34 + facingSnap * 16 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
+  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + facingPress * 4.8 + facingSnap * 1.7 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
+  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + facingPress * 0.085 + facingSnap * 0.035 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.58);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
-  ctx.translate(baseX + attackOffset + reactionOffset + stopOffset, FLOOR + 5);
+  ctx.translate(baseX + attackOffset + reactionOffset + stopOffset + facingOffset, FLOOR + 5);
   ctx.scale(width, height);
   const shadow = ctx.createRadialGradient(0, 0, 0.12, 0, 0, 1);
   shadow.addColorStop(0, `rgba(22, 12, 8, ${alpha})`);
@@ -9514,6 +9526,43 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     ctx.beginPath();
     ctx.ellipse(baseX, FLOOR + 7, 42 + landing * 30 + landingWeight * 42, 6 + landing * 5 + landingWeight * 7, 0, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
+  }
+
+  if (facingTurn > 0.04) {
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    const turnDir = f.facingTurnTo || f.dir || 1;
+    const twist = facingPress + facingSnap * 0.42;
+    ctx.strokeStyle = `rgba(255, 229, 151, ${0.08 + twist * 0.1})`;
+    ctx.lineWidth = 1.5 + twist * 2.2;
+    ctx.beginPath();
+    ctx.ellipse(baseX - turnDir * (14 + facingPress * 8) * FIGHTER_SCALE, FLOOR + 7, 36 + twist * 26, 5.2 + twist * 3.2, -turnDir * 0.08, Math.PI * 0.05, Math.PI * 1.72);
+    ctx.stroke();
+    ctx.strokeStyle = colorWithAlpha(f.trim ?? "#fff1bd", 0.08 + facingSnap * 0.11);
+    ctx.lineWidth = 1.1 + facingSnap * 1.5;
+    ctx.beginPath();
+    ctx.moveTo(baseX + turnDir * 18 * FIGHTER_SCALE, FLOOR + 6);
+    ctx.quadraticCurveTo(baseX - turnDir * (8 + facingSnap * 18) * FIGHTER_SCALE, FLOOR + 12, baseX - turnDir * (46 + facingPress * 18) * FIGHTER_SCALE, FLOOR + 7);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = `rgba(45, 28, 15, ${0.075 + facingPress * 0.06})`;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(
+        baseX + side * (24 + facingSnap * 8) * FIGHTER_SCALE * (f.dir || 1),
+        FLOOR + 8,
+        18 + facingPress * 11,
+        4.2 + facingPress * 1.8,
+        side * 0.06 - turnDir * 0.04,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -9551,7 +9600,7 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     ctx.restore();
   }
 
-  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.75, stop * 0.68, landingWeight * 0.72, attackPlant * 0.46, attackCompression * 0.36, reactionFloor * 0.34);
+  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.75, stop * 0.68, landingWeight * 0.72, facingPress * 0.78, attackPlant * 0.46, attackCompression * 0.36, reactionFloor * 0.34);
   if (f.grounded && footPlant > 0.04) {
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
@@ -9580,6 +9629,17 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   const jump = clamp((f.jumpPulse ?? 0) / 12, 0, 1);
   const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1);
   const landingWeight = landing * clamp(f.landingStrength ?? 1, 0.42, 1.65);
+  const facingTurn = f.grounded ? clamp((f.facingTurnPulse ?? 0) / 14, 0, 1) : 0;
+  const facingStyle = {
+    p1: { weight: 1.18, snap: 0.78 },
+    p2: { weight: 0.82, snap: 1.14 },
+    p3: { weight: 1.28, snap: 0.7 },
+    p4: { weight: 0.86, snap: 1.12 },
+    p5: { weight: 0.78, snap: 1.2 },
+    p6: { weight: 1.04, snap: 0.92 },
+  }[f.profileId] ?? { weight: 1, snap: 1 };
+  const facingPress = smoothStep01(facingTurn) * facingStyle.weight;
+  const facingSnap = Math.sin((1 - facingTurn) * Math.PI) * facingStyle.snap;
   const air = !f.grounded ? clamp((FLOOR - f.y) / 155, 0, 1) : 0;
   const plant = walking ? clamp(f.walkPlant ?? 0, 0, 1) : 0;
   const anchor = walking ? clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1) : 0;
@@ -9594,8 +9654,8 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   const hitMass = f.hurt > 0 || (f.reactionPulse ?? 0) > 0 ? hitReactionMassProfile(f) : null;
   const reactionFloor = hitMass ? clamp(hitMass.floor, 0, 1.7) : 0;
   const reactionSkid = hitMass ? clamp(hitMass.skid, 0, 1.85) : 0;
-  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.78, stop * 0.65, landingWeight * 0.7, attackPlant * 0.45, attackCompression * 0.34, reactionFloor * 0.34);
-  if (jump <= 0.03 && landing <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && stopStrength <= 0.03 && attackPlant <= 0.03 && attackCompression <= 0.03 && reactionSkid <= 0.03) return;
+  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.78, stop * 0.65, landingWeight * 0.7, facingPress * 0.78, attackPlant * 0.45, attackCompression * 0.34, reactionFloor * 0.34);
+  if (jump <= 0.03 && landing <= 0.03 && facingTurn <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && stopStrength <= 0.03 && attackPlant <= 0.03 && attackCompression <= 0.03 && reactionSkid <= 0.03) return;
 
   const localCrouch = crouch * 0.18;
   const trim = f.trim ?? "#fff1bd";
@@ -9635,6 +9695,29 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
     ctx.beginPath();
     ctx.ellipse(0, 2 + localCrouch, 44 + landing * 15 + landingWeight * 26, 6 + landing * 3 + landingWeight * 4, 0, 0, Math.PI * 2);
     ctx.stroke();
+  }
+
+  if (facingTurn > 0.03) {
+    const turnDir = f.facingTurnTo || f.dir || 1;
+    const twist = facingPress + facingSnap * 0.45;
+    const pivotSide = -(f.facingTurnTo || f.dir || 1) === (f.dir || 1) ? -1 : 1;
+    ctx.strokeStyle = `rgba(255, 230, 156, ${0.12 * twist})`;
+    ctx.lineWidth = 1.5 + twist * 1.8;
+    ctx.beginPath();
+    ctx.ellipse(pivotSide * 30, 4 + localCrouch, 22 + twist * 12, 5 + twist * 2.6, -turnDir * 0.08, Math.PI * 0.1, Math.PI * 1.85);
+    ctx.stroke();
+
+    ctx.strokeStyle = colorWithAlpha(trim, 0.075 + facingSnap * 0.1);
+    ctx.lineWidth = 1.15 + facingSnap * 1.3;
+    ctx.beginPath();
+    ctx.moveTo(-pivotSide * 20, 1 + localCrouch);
+    ctx.quadraticCurveTo(-turnDir * (4 + facingSnap * 12), 10 + localCrouch, pivotSide * (36 + facingPress * 16), 5 + localCrouch);
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(255, 236, 184, ${0.045 + facingPress * 0.04})`;
+    ctx.beginPath();
+    ctx.ellipse(pivotSide * 30, 3 + localCrouch, 18 + facingPress * 8, 4.2 + facingPress * 1.4, -turnDir * 0.06, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   if (footPlant > 0.03) {
@@ -11997,6 +12080,7 @@ function drawSpriteExtremityDetails(f, crouch, frameName, stride, options = {}) 
   const hands = spriteHandDetailPose(frameName, action, guard, hurt, localCrouch);
   const feet = spriteFootDetailPose(frameName, action, walk, localCrouch, f);
   applyAttackFootPressure(feet, f);
+  applyFacingTurnFootPressure(feet, f);
   applyReactionFootPressure(feet, f);
 
   for (const foot of feet) drawSpriteFootDetail(foot, shoe, trim);
@@ -12144,6 +12228,42 @@ function applyReactionFootPressure(feet, f) {
     free.y -= mass.zone === "head" ? skid * 0.9 : 0;
     free.x += localImpactDir * skid * 2.6;
   }
+}
+
+function applyFacingTurnFootPressure(feet, f) {
+  if (!f?.grounded || f.hurt > 0 || f.attack || !Array.isArray(feet) || feet.length < 2) return;
+  const turn = clamp((f.facingTurnPulse ?? 0) / 14, 0, 1);
+  if (turn <= 0.03) return;
+
+  const turnStyle = {
+    p1: { weight: 1.18, snap: 0.78 },
+    p2: { weight: 0.82, snap: 1.14 },
+    p3: { weight: 1.28, snap: 0.7 },
+    p4: { weight: 0.86, snap: 1.12 },
+    p5: { weight: 0.78, snap: 1.2 },
+    p6: { weight: 1.04, snap: 0.92 },
+  }[f.profileId] ?? { weight: 1, snap: 1 };
+  const press = clamp(smoothStep01(turn) * turnStyle.weight, 0, 1.18);
+  const snap = clamp(Math.sin((1 - turn) * Math.PI) * turnStyle.snap, 0, 1.28);
+  const pivotIndex = (f.facingTurnTo || f.dir || 1) === (f.dir || 1) ? 0 : 1;
+  const releaseIndex = pivotIndex === 0 ? 1 : 0;
+  const pivot = feet[pivotIndex];
+  const release = feet[releaseIndex];
+  const turnDir = f.facingTurnTo || f.dir || 1;
+
+  pivot.press = Math.max(pivot.press ?? 0, press);
+  pivot.plant = Math.max(pivot.plant ?? 0, 0.72 + press * 0.24);
+  pivot.w += press * 5.8 + snap * 2.2;
+  pivot.h = Math.max(7.1, pivot.h - press * 1.2);
+  pivot.y += press * 1.3;
+  pivot.x -= turnDir * (press * 2.2 - snap * 1.4);
+  pivot.angle += pivotIndex === 0 ? -press * 0.05 + snap * 0.018 : press * 0.05 - snap * 0.018;
+
+  release.plant = Math.max(0.18, (release.plant ?? 0.72) - snap * 0.18);
+  release.press = Math.max(release.press ?? 0, snap * 0.12);
+  release.y -= snap * 1.1;
+  release.x += turnDir * (snap * 2.7 + press * 0.8);
+  release.angle += releaseIndex === 0 ? snap * 0.04 : -snap * 0.04;
 }
 
 function drawSpriteHandDetail(hand, skin, trim) {
