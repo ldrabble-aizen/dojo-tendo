@@ -14296,14 +14296,51 @@ function drawResultPoseEffect(f, crouch) {
   } else {
     ctx.globalCompositeOperation = "source-over";
     const fall = smoothStep01(clamp(resultFrame / 56, 0, 1));
+    const collapse = smoothStep01(clamp((resultFrame - 18) / 76, 0, 1));
     const slam = 1 - smoothStep01(clamp((resultFrame - 4) / 36, 0, 1));
     const breath = 0.5 + Math.sin(clock * 0.06) * 0.5;
+    const fallDir = (f.koFallDir || f.impactDir || -f.dir || -1) === (f.dir || 1) ? 1 : -1;
     ctx.fillStyle = `rgba(12, 8, 7, ${0.3 + fall * 0.16 + slam * 0.12})`;
     ctx.beginPath();
-    ctx.ellipse(0, -2 + crouch, 58 + fall * 24 + slam * 18, 10 + fall * 4 + slam * 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(fallDir * collapse * 24, -2 + crouch + collapse * 3, 58 + fall * 24 + slam * 18 + collapse * 22, 10 + fall * 4 + slam * 4, fallDir * 0.06, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.globalCompositeOperation = "screen";
+    const shockAlpha = (0.18 + slam * 0.2) * (1 - collapse * 0.38);
+    if (shockAlpha > 0.03) {
+      ctx.globalAlpha = shockAlpha;
+      ctx.strokeStyle = colorWithAlpha(f.trim, 0.44);
+      ctx.lineWidth = 2.4 + slam * 2.2;
+      for (let i = 0; i < 3; i += 1) {
+        const ring = i / 2;
+        ctx.beginPath();
+        ctx.ellipse(
+          fallDir * (14 + collapse * 32 + ring * 8),
+          -4 + crouch + collapse * 3,
+          42 + fall * 34 + ring * 28,
+          8 + fall * 5 + ring * 4,
+          fallDir * 0.05,
+          0,
+          Math.PI * 2
+        );
+        ctx.stroke();
+      }
+    }
+
+    ctx.globalAlpha = 0.14 + slam * 0.18;
+    ctx.strokeStyle = "rgba(255, 241, 189, 0.55)";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    for (let i = 0; i < 4; i += 1) {
+      const lane = i - 1.5;
+      const startX = fallDir * (-16 - i * 6);
+      const y = -11 + crouch + lane * 3 + collapse * 4;
+      ctx.beginPath();
+      ctx.moveTo(startX, y);
+      ctx.quadraticCurveTo(fallDir * (18 + collapse * 18), y - 6 - slam * 4, fallDir * (54 + collapse * 36), y + 2);
+      ctx.stroke();
+    }
+
     ctx.globalAlpha = 0.22 + breath * 0.08;
     ctx.strokeStyle = colorWithAlpha(f.trim, 0.28);
     ctx.lineWidth = 2;
@@ -16337,15 +16374,55 @@ function getPose(f, stride) {
     } else {
       const fall = smoothStep01(clamp(resultFrame / 46, 0, 1));
       const limp = smoothStep01(clamp((resultFrame - 10) / 54, 0, 1));
-      base.torsoTilt = 0.12 + fall * (f.profileId === "p2" ? 0.25 : 0.18);
-      base.frontArm.elbow.y += fall * 10;
-      base.backArm.elbow.y += fall * 12;
-      base.frontArm.hand = { x: (42 + fall * 10) * spec.stance, y: -48 + crouch + fall * 18 + limp * 4 };
-      base.backArm.hand = { x: (-38 - fall * 8) * spec.stance, y: -46 + crouch + fall * 20 + limp * 5 };
-      base.frontLeg.knee.y += 8 + fall * 12;
-      base.backLeg.knee.y += 10 + fall * 14;
-      base.frontLeg.foot.x += (10 + fall * 9) * spec.stance;
-      base.backLeg.foot.x -= (12 + fall * 9) * spec.stance;
+      const collapse = smoothStep01(clamp((resultFrame - 18) / 76, 0, 1));
+      const twitch = Math.sin(resultFrame * 0.22) * (1 - collapse) * 0.55;
+      const fallDir = (f.koFallDir || f.impactDir || -f.dir || -1) === (f.dir || 1) ? 1 : -1;
+      const defeatStyle = {
+        p1: { fold: 0.86, sprawl: 0.82, arm: 0.78, knee: 1.16, twist: 0.82 },
+        p2: { fold: 1.2, sprawl: 1.18, arm: 1.28, knee: 0.86, twist: 1.24 },
+        p3: { fold: 0.74, sprawl: 0.76, arm: 0.72, knee: 1.28, twist: 0.72 },
+        p4: { fold: 1.16, sprawl: 1.16, arm: 1.2, knee: 0.9, twist: 1.18 },
+        p5: { fold: 1.24, sprawl: 1.32, arm: 1.14, knee: 0.84, twist: 1.28 },
+        p6: { fold: 0.94, sprawl: 0.92, arm: 0.86, knee: 1.08, twist: 0.94 },
+      }[f.profileId] ?? { fold: 1, sprawl: 1, arm: 1, knee: 1, twist: 1 };
+      const fold = fall * defeatStyle.fold;
+      const sprawl = collapse * defeatStyle.sprawl;
+      const armDrop = (fall * 0.75 + limp * 0.55) * defeatStyle.arm;
+      const kneeDrop = (fall * 0.7 + collapse * 0.65) * defeatStyle.knee;
+
+      base.torsoTilt = fallDir * (0.08 + fold * 0.16 * defeatStyle.twist) + collapse * 0.06;
+      base.frontArm = {
+        shoulder: { x: shoulderX + fallDir * fall * 4 * spec.stance, y: shoulderY + fall * 3 },
+        elbow: { x: (32 + fall * 14 + sprawl * 18) * spec.stance, y: -92 + crouch + armDrop * 31 + twitch * 5 },
+        hand: { x: (46 + fall * 18 + sprawl * 34) * spec.stance, y: -56 + crouch + armDrop * 31 + collapse * 10 + twitch * 6 },
+      };
+      base.backArm = {
+        shoulder: { x: -shoulderX + fallDir * fall * 3 * spec.stance, y: shoulderY + 5 + fall * 4 },
+        elbow: { x: (-33 - fall * 12 + fallDir * sprawl * 8) * spec.stance, y: -96 + crouch + armDrop * 26 - twitch * 3 },
+        hand: { x: (-44 - fall * 12 - sprawl * 18) * spec.stance, y: -58 + crouch + armDrop * 34 + collapse * 9 - twitch * 5 },
+      };
+      base.frontLeg.knee = {
+        x: (22 + stride * 7 + fallDir * fall * 8 + sprawl * 20) * spec.stance,
+        y: -31 + crouch + 13 + kneeDrop * 22,
+      };
+      base.frontLeg.foot = {
+        x: (37 + stride * 10 + fallDir * fall * 10 + sprawl * 36) * spec.stance,
+        y: -1 + collapse * 2,
+      };
+      base.backLeg.knee = {
+        x: (-24 - stride * 6 + fallDir * fall * 6 - sprawl * 18) * spec.stance,
+        y: -32 + crouch + 15 + kneeDrop * 26,
+      };
+      base.backLeg.foot = {
+        x: (-39 - stride * 8 + fallDir * fall * 8 - sprawl * 34) * spec.stance,
+        y: -1 + collapse * 2,
+      };
+      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, 0.8 + collapse * 0.2);
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, 0.86 + collapse * 0.14);
+      base.frontLeg.extension = Math.max(base.frontLeg.extension ?? 0, sprawl * 0.48);
+      base.backLeg.extension = Math.max(base.backLeg.extension ?? 0, sprawl * 0.42);
+      base.frontLeg.footAngle = fallDir * (0.04 + sprawl * 0.1);
+      base.backLeg.footAngle = -fallDir * (0.05 + sprawl * 0.08);
     }
   }
 
