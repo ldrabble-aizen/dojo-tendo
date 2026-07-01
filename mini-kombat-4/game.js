@@ -15812,6 +15812,45 @@ function getPose(f, stride) {
     base.backArm.hand.y -= fold * 5;
   }
 
+  const airPose = airborne && f.hurt <= 0 && !f.attack && !winner;
+  if (airPose) {
+    const rise = clamp(-f.vy / 13, 0, 1);
+    const fall = clamp(f.vy / 13, 0, 1);
+    const apex = clamp(1 - Math.abs(f.vy) / 8.5, 0, 1);
+    const travel = clamp(Math.abs(f.vx ?? 0) / 3.35, 0, 1.25);
+    const localDir = (f.jumpDir || Math.sign(f.vx) || f.dir || 1) === (f.dir || 1) ? 1 : -1;
+    const airStyle = {
+      p1: { tuck: 0.84, reach: 0.82, swing: 0.72, weight: 1.16 },
+      p2: { tuck: 1.16, reach: 1.22, swing: 1.14, weight: 0.82 },
+      p3: { tuck: 0.76, reach: 0.74, swing: 0.62, weight: 1.28 },
+      p4: { tuck: 1.24, reach: 1.18, swing: 1.22, weight: 0.86 },
+      p5: { tuck: 1.08, reach: 1.32, swing: 1.08, weight: 0.78 },
+      p6: { tuck: 0.94, reach: 0.92, swing: 0.78, weight: 1.04 },
+    }[f.profileId] ?? { tuck: 1, reach: 1, swing: 1, weight: 1 };
+    const tuck = clamp((apex * 0.72 + rise * 0.32 + fall * 0.22) * airStyle.tuck, 0, 1.35);
+    const landingReach = fall * (0.52 + travel * 0.32) * airStyle.weight;
+    const armFloat = (rise * 0.86 + apex * 0.55 - fall * 0.2) * airStyle.swing;
+
+    base.torsoTilt += localDir * (-rise * 0.036 + fall * 0.048 + travel * 0.014) * airStyle.weight;
+    base.frontArm.elbow.x += localDir * (rise * 6 + travel * 4 - fall * 3) * spec.stance * airStyle.swing;
+    base.frontArm.elbow.y -= (10 + rise * 11 + apex * 8 - fall * 3) * airStyle.swing;
+    base.frontArm.hand.x += localDir * (rise * 12 + travel * 8 - fall * 5) * spec.stance * airStyle.swing;
+    base.frontArm.hand.y -= (18 + rise * 17 + apex * 11 - fall * 4) * airStyle.swing;
+    base.backArm.elbow.x -= localDir * (8 + rise * 5 + travel * 7) * spec.stance * airStyle.swing;
+    base.backArm.elbow.y += fall * 8 - armFloat * 8;
+    base.backArm.hand.x -= localDir * (13 + rise * 7 + travel * 9) * spec.stance * airStyle.swing;
+    base.backArm.hand.y += fall * 11 - armFloat * 10;
+
+    base.frontLeg.knee.x += localDir * (tuck * 11 + travel * 7 - landingReach * 5) * spec.stance;
+    base.frontLeg.knee.y += tuck * 13 - rise * 7 + landingReach * 7;
+    base.frontLeg.foot.x += localDir * (tuck * 9 + travel * 14 + landingReach * 13) * spec.stance * airStyle.reach;
+    base.frontLeg.foot.y += tuck * 20 - rise * 8 + landingReach * 18;
+    base.backLeg.knee.x -= localDir * (tuck * 8 + travel * 5) * spec.stance;
+    base.backLeg.knee.y += tuck * 8 - apex * 5 + fall * 5;
+    base.backLeg.foot.x -= localDir * (tuck * 14 + travel * 10 - fall * 3) * spec.stance;
+    base.backLeg.foot.y += tuck * 13 - apex * 6 + fall * 9;
+  }
+
   if (airborne) {
     base.frontLeg.knee.y -= 18;
     base.frontLeg.foot.y -= 18;
