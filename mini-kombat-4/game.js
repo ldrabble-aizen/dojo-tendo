@@ -15693,6 +15693,21 @@ function getPose(f, stride) {
 
     if (attackRecoverT > 0.02 && !f.attack && f.hurt <= 0) {
       const settle = smoothStep01(attackRecoverT);
+      const lastType = f.lastAttackType || "";
+      const fromKick = lastType === "kick" || lastType === "airKick" || lastType === "sweep";
+      const fromHeavy = fromKick || lastType === "special" || lastType === "grab";
+      const recoverStyle = {
+        p1: { weight: 1.22, snap: 0.76, arm: 0.82, foot: 1.1 },
+        p2: { weight: 0.78, snap: 1.18, arm: 1.2, foot: 0.86 },
+        p3: { weight: 1.3, snap: 0.66, arm: 0.72, foot: 1.22 },
+        p4: { weight: 0.82, snap: 1.16, arm: 1.18, foot: 0.88 },
+        p5: { weight: 0.76, snap: 1.24, arm: 1.26, foot: 0.82 },
+        p6: { weight: 1.05, snap: 0.9, arm: 0.94, foot: 1.04 },
+      }[f.profileId] ?? { weight: 1, snap: 1, arm: 1, foot: 1 };
+      const recoverArc = Math.sin((1 - attackRecoverT) * Math.PI);
+      const drag = settle * recoverStyle.weight * (fromHeavy ? 1.16 : 0.92);
+      const snapBack = recoverArc * recoverStyle.snap;
+      const side = f.lastAttackType === "airKick" ? (f.airKickDir || f.jumpDir || f.dir || 1) : f.dir || 1;
       base.torsoTilt += settle * 0.02;
       base.frontArm.elbow.x -= settle * 3 * spec.stance;
       base.frontArm.elbow.y += settle * 4;
@@ -15704,6 +15719,30 @@ function getPose(f, stride) {
       base.backArm.hand.y += settle * 4;
       base.frontLeg.knee.y += settle * 3;
       base.backLeg.knee.y += settle * 2;
+
+      base.torsoTilt -= side * drag * (fromKick ? 0.026 : 0.016);
+      base.frontArm.elbow.x -= side * (drag * 4.2 + snapBack * 2.2) * spec.stance * recoverStyle.arm;
+      base.frontArm.elbow.y += (drag * 5.2 - snapBack * 2.4) * recoverStyle.arm;
+      base.frontArm.hand.x -= side * (drag * 6.6 + snapBack * 3.8) * spec.stance * recoverStyle.arm;
+      base.frontArm.hand.y += (drag * 8.4 - snapBack * 3.6) * recoverStyle.arm;
+      base.backArm.elbow.x += side * (drag * 2.8 - snapBack * 1.2) * spec.stance * recoverStyle.arm;
+      base.backArm.elbow.y += (drag * 3.8 - snapBack * 1.8) * recoverStyle.arm;
+      base.backArm.hand.x += side * (drag * 4.6 - snapBack * 1.8) * spec.stance * recoverStyle.arm;
+      base.backArm.hand.y += (drag * 5.4 - snapBack * 2.6) * recoverStyle.arm;
+      if (fromKick) {
+        base.frontLeg.knee.x -= side * (drag * 6.4 + snapBack * 2.6) * spec.stance * recoverStyle.foot;
+        base.frontLeg.knee.y += drag * 6.8 - snapBack * 2.2;
+        base.frontLeg.foot.x -= side * (drag * 10.5 + snapBack * 4.2) * spec.stance * recoverStyle.foot;
+        base.frontLeg.foot.y += drag * 5.8 - snapBack * 2.8;
+        base.backLeg.knee.y += drag * 5.2 * recoverStyle.weight;
+        base.backLeg.foot.x -= side * drag * 7.4 * spec.stance * recoverStyle.weight;
+        base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.62 + drag * 0.34, 0, 1));
+      } else {
+        base.backLeg.knee.y += drag * 4.8 * recoverStyle.weight;
+        base.backLeg.foot.x -= side * drag * 7.2 * spec.stance * recoverStyle.weight;
+        base.frontLeg.foot.x += side * snapBack * 2.8 * spec.stance;
+        base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.58 + drag * 0.32, 0, 1));
+      }
     }
 
     if (hurtRecoverT > 0.02 && f.hurt <= 0 && !f.attack) {
