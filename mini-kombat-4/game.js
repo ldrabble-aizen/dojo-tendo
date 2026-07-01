@@ -605,6 +605,17 @@ function rangePressureProfile(f) {
   }[f?.profileId] ?? { weight: 1, guard: 1, reach: 1, foot: 1, sway: 1, lift: 1, floor: 1 };
 }
 
+function specialTechniqueProfile(f) {
+  return {
+    p1: { coil: 1.18, release: 0.88, hands: 0.92, lift: 0.78, foot: 1.2, arc: 0.86, focus: 1.08 },
+    p2: { coil: 0.82, release: 1.22, hands: 1.22, lift: 1.18, foot: 0.82, arc: 1.18, focus: 1.16 },
+    p3: { coil: 1.3, release: 0.8, hands: 0.84, lift: 0.7, foot: 1.3, arc: 0.76, focus: 1.02 },
+    p4: { coil: 0.86, release: 1.18, hands: 1.16, lift: 1.1, foot: 0.86, arc: 1.2, focus: 1.14 },
+    p5: { coil: 0.78, release: 1.24, hands: 1.24, lift: 1.18, foot: 0.78, arc: 1.24, focus: 1.18 },
+    p6: { coil: 1.04, release: 0.96, hands: 0.98, lift: 0.9, foot: 1.08, arc: 0.94, focus: 1.06 },
+  }[f?.profileId] ?? { coil: 1, release: 1, hands: 1, lift: 1, foot: 1, arc: 1, focus: 1 };
+}
+
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
@@ -13685,6 +13696,7 @@ function drawAttackBodyGlow(f, crouch) {
   const mass = attackMassProfile(f);
   const progress = phase.power;
   const style = f.attack.type === "special" ? fighterSignatureStyle(f) : null;
+  const technique = f.attack.type === "special" ? specialTechniqueProfile(f) : null;
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.strokeStyle = style ? style.rim : colorWithAlpha(f.trim, 0.55);
@@ -13705,22 +13717,25 @@ function drawAttackBodyGlow(f, crouch) {
   if (f.attack.type === "special") {
     ctx.strokeStyle = style.core;
     ctx.lineWidth = 2;
+    const charge = clamp(phase.anticipation * 0.86 + mass.load * 0.18, 0, 1.3) * technique.coil;
+    const release = clamp(phase.strike + phase.snap * 0.5 + phase.followThrough * 0.3, 0, 1.4) * technique.release;
+    const focusScale = technique.focus * (0.86 + progress * 0.18);
     for (let i = 0; i < 3; i += 1) {
-      const a = roundFrame * 0.08 + i * 2.1;
+      const a = roundFrame * (0.07 + technique.arc * 0.015) + i * 2.1;
       ctx.beginPath();
-      ctx.arc(Math.cos(a) * 20, -108 + crouch + Math.sin(a) * 16, 18 + progress * 10, 0.2, Math.PI * 1.55);
+      ctx.arc(Math.cos(a) * (18 + release * 6), -108 + crouch + Math.sin(a) * (14 + charge * 5), (18 + progress * 10) * focusScale, 0.2, Math.PI * (1.44 + technique.arc * 0.12));
       ctx.stroke();
     }
 
-    const handY = f.profileId === "p2" ? -126 + crouch : -112 + crouch;
-    const handX = f.profileId === "p2" ? 58 + phase.strike * 18 : 46 + phase.strike * 14;
-    const aura = ctx.createRadialGradient(handX, handY, 2, handX, handY, 54 + progress * 36);
+    const handY = (f.profileId === "p2" ? -126 : -112) + crouch - release * 7 * technique.lift + charge * 2;
+    const handX = (f.profileId === "p2" ? 58 : 46) + phase.strike * (14 + technique.hands * 6) + release * 7 * technique.hands - charge * 4;
+    const aura = ctx.createRadialGradient(handX, handY, 2, handX, handY, (54 + progress * 36) * focusScale);
     aura.addColorStop(0, `rgba(255,255,255,${0.2 + progress * 0.26})`);
     aura.addColorStop(0.35, colorWithAlpha(style.rim, 0.13 + progress * 0.18));
     aura.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = aura;
     ctx.beginPath();
-    ctx.ellipse(handX, handY, 46 + progress * 28, 34 + progress * 24, -0.12, 0, Math.PI * 2);
+    ctx.ellipse(handX, handY, (46 + progress * 28) * technique.focus, (34 + progress * 24) * (0.88 + technique.lift * 0.12), -0.12 * technique.arc, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.strokeStyle = colorWithAlpha(style.trail, 0.08 + progress * 0.16);
@@ -16121,6 +16136,35 @@ function getPose(f, stride) {
       base.frontLeg.foot.x += 7 * activePulse - 3 * windup;
       base.backLeg.foot.x -= 7 * activePulse + 3 * windup;
     }
+    const technique = specialTechniqueProfile(f);
+    const charge = clamp(windup * 0.9 + load * 0.22, 0, 1.35) * technique.coil;
+    const release = clamp(activePulse * 0.92 + mass.snap * 0.34 + phase.followThrough * 0.28, 0, 1.45) * technique.release;
+    const focusPulse = Math.sin(roundFrame * 0.22 + (f.profileId?.charCodeAt(1) ?? 0)) * clamp(Math.max(charge, release), 0, 1.2);
+    const handPull = charge * technique.hands;
+    const handPush = release * technique.hands;
+    const footBrace = clamp(charge * 0.86 + release * 0.42, 0, 1.6) * technique.foot;
+
+    base.torsoTilt += -charge * 0.018 * technique.coil + release * 0.034 * technique.arc;
+    base.frontArm.shoulder.x -= handPull * 2.2 * spec.stance;
+    base.frontArm.shoulder.y -= release * 2.2 * technique.lift - charge * 1.2;
+    base.backArm.shoulder.x += handPull * 1.6 * spec.stance;
+    base.backArm.shoulder.y += charge * 1.4;
+    base.frontArm.elbow.x += (-handPull * 5.6 + handPush * 8.8 + focusPulse * 1.4) * spec.stance;
+    base.frontArm.elbow.y += charge * 3.4 - release * 6.2 * technique.lift;
+    base.frontArm.hand.x += (-handPull * 8.8 + handPush * 15.5 + focusPulse * 2.4) * spec.stance;
+    base.frontArm.hand.y += charge * 4.8 - release * 9.4 * technique.lift;
+    base.backArm.elbow.x += (-handPull * 3.8 + handPush * 6.4 - focusPulse * 1.2) * spec.stance;
+    base.backArm.elbow.y += charge * 2.8 - release * 5.2 * technique.lift;
+    base.backArm.hand.x += (-handPull * 5.8 + handPush * 11.2 - focusPulse * 1.8) * spec.stance;
+    base.backArm.hand.y += charge * 3.8 - release * 8.2 * technique.lift;
+    base.frontLeg.knee.y += footBrace * 4.8;
+    base.frontLeg.foot.x += (release * 4.2 - charge * 2.8) * spec.stance * technique.foot;
+    base.frontLeg.foot.y += footBrace * 0.55 - release * 1.6 * technique.lift;
+    base.backLeg.knee.y += footBrace * 6.2;
+    base.backLeg.foot.x -= (charge * 8.2 + release * 5.8) * spec.stance * technique.foot;
+    base.backLeg.foot.y += footBrace * 0.75;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.42 + release * 0.26 + footBrace * 0.22, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.72 + charge * 0.22 + footBrace * 0.2, 0, 1));
     base.torsoTilt += -load * 0.03 + drive * 0.04;
     base.frontLeg.foot.x += drive * 8 * spec.stance;
     base.backLeg.foot.x -= load * 8 * spec.stance + drive * 8 * spec.stance;
