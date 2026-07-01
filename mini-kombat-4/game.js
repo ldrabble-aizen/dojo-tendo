@@ -14292,6 +14292,43 @@ function drawResultPoseEffect(f, crouch) {
       ctx.moveTo(43, -34 + crouch);
       ctx.quadraticCurveTo(17, -96 + crouch + Math.cos(clock * 0.05) * 6, 32, -166 + crouch);
       ctx.stroke();
+    } else if (f.profileId === "p3") {
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+      ctx.lineWidth = 3.4;
+      for (let i = 0; i < 3; i += 1) {
+        const y = -54 + crouch - i * 23;
+        ctx.beginPath();
+        ctx.moveTo(-54 - i * 5, y);
+        ctx.quadraticCurveTo(0, y - 12 + Math.sin(clock * 0.04 + i) * 4, 58 + i * 5, y - 2);
+        ctx.stroke();
+      }
+    } else if (f.profileId === "p4") {
+      ctx.strokeStyle = "rgba(215, 201, 255, 0.24)";
+      ctx.lineWidth = 2.4;
+      for (let i = 0; i < 4; i += 1) {
+        const phase = clock * 0.06 + i * 1.1;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(phase) * 22, -70 + crouch + i * -20);
+        ctx.lineTo(Math.cos(phase + 0.7) * 48, -82 + crouch + i * -22);
+        ctx.stroke();
+      }
+    } else if (f.profileId === "p5") {
+      ctx.strokeStyle = "rgba(138, 218, 255, 0.22)";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.ellipse(0, -121 + crouch, 58 + Math.sin(clock * 0.05) * 5, 18, -0.14, 0, Math.PI * 1.62);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0, -86 + crouch, 42, 12, 0.18, Math.PI * 0.15, Math.PI * 1.75);
+      ctx.stroke();
+    } else if (f.profileId === "p6") {
+      ctx.strokeStyle = "rgba(210, 228, 255, 0.22)";
+      ctx.lineWidth = 2.8;
+      ctx.beginPath();
+      ctx.moveTo(-46, -62 + crouch);
+      ctx.lineTo(0, -164 + crouch + Math.sin(clock * 0.04) * 5);
+      ctx.lineTo(46, -62 + crouch);
+      ctx.stroke();
     }
   } else {
     ctx.globalCompositeOperation = "source-over";
@@ -16340,37 +16377,91 @@ function getPose(f, stride) {
     if (f.id === roundWinnerId) {
       const victory = clamp(Math.max(0, (f.victoryPulse ?? 60) - resultFrame * 0.9) / 60, 0, 1);
       const cheer = Math.sin(Math.min(resultFrame, 72) * 0.17) * clamp(resultFrame / 48, 0, 1);
-      if (f.profileId === "p2") {
-        base.torsoTilt = -0.07 - victory * 0.03 + cheer * 0.012;
-        base.frontArm = {
-          shoulder: { x: shoulderX, y: shoulderY },
-          elbow: { x: 47 * spec.stance, y: -147 + crouch - victory * 5 },
-          hand: { x: 58 * spec.stance, y: -166 + crouch - victory * 8 - Math.max(0, cheer) * 4 },
-        };
-        base.backArm = {
-          shoulder: { x: -shoulderX, y: shoulderY + 4 },
-          elbow: { x: -39 * spec.stance, y: -110 + crouch + cheer * 2 },
-          hand: { x: -28 * spec.stance, y: -94 + crouch + cheer * 3 },
-        };
-        base.frontLeg.foot.x += 5 * spec.stance;
-        base.backLeg.foot.x -= 6 * spec.stance;
-      } else {
-        base.torsoTilt = -0.055 - victory * 0.025;
-        base.frontArm = {
-          shoulder: { x: shoulderX, y: shoulderY },
-          elbow: { x: 45 * spec.stance, y: -151 + crouch - victory * 5 },
-          hand: { x: 52 * spec.stance, y: -178 + crouch - victory * 7 },
-        };
-        base.backArm = {
-          shoulder: { x: -shoulderX, y: shoulderY + 4 },
-          elbow: { x: -38 * spec.stance, y: -111 + crouch + cheer * 1.5 },
-          hand: { x: -24 * spec.stance, y: -93 + crouch + cheer * 2 },
-        };
-        base.frontLeg.foot.x += 10 * spec.stance;
-        base.backLeg.foot.x -= 10 * spec.stance;
-        base.frontLeg.knee.y += 3;
-        base.backLeg.knee.y += 4;
-      }
+      const victoryStyle = {
+        p1: {
+          torso: -0.045,
+          chest: 0.9,
+          front: { elbow: [48, -151], hand: [61, -171] },
+          back: { elbow: [-47, -148], hand: [-58, -166] },
+          foot: 14,
+          knee: 5.2,
+          swagger: 0.72,
+        },
+        p2: {
+          torso: -0.072,
+          chest: 1.08,
+          front: { elbow: [47, -149], hand: [58, -170] },
+          back: { elbow: [-39, -110], hand: [-28, -94] },
+          foot: 7,
+          knee: 2.6,
+          swagger: 1.12,
+        },
+        p3: {
+          torso: -0.032,
+          chest: 0.68,
+          front: { elbow: [42, -142], hand: [48, -160] },
+          back: { elbow: [-48, -123], hand: [-61, -108] },
+          foot: 18,
+          knee: 8.6,
+          swagger: 0.58,
+        },
+        p4: {
+          torso: -0.08,
+          chest: 1.16,
+          front: { elbow: [49, -152], hand: [69, -169] },
+          back: { elbow: [-45, -143], hand: [-58, -160] },
+          foot: 8,
+          knee: 3,
+          swagger: 1.22,
+        },
+        p5: {
+          torso: -0.092,
+          chest: 1.24,
+          front: { elbow: [50, -151], hand: [77, -165] },
+          back: { elbow: [-36, -122], hand: [-49, -103] },
+          foot: 6,
+          knee: 2.2,
+          swagger: 1.3,
+        },
+        p6: {
+          torso: -0.05,
+          chest: 0.82,
+          front: { elbow: [42, -139], hand: [50, -157] },
+          back: { elbow: [-41, -136], hand: [-51, -153] },
+          foot: 12,
+          knee: 5.8,
+          swagger: 0.82,
+        },
+      }[f.profileId] ?? {
+        torso: -0.055,
+        chest: 0.86,
+        front: { elbow: [45, -151], hand: [52, -178] },
+        back: { elbow: [-38, -111], hand: [-24, -93] },
+        foot: 10,
+        knee: 4,
+        swagger: 1,
+      };
+      const cheerLift = Math.max(0, cheer) * victoryStyle.swagger;
+      const victoryLift = victory * victoryStyle.chest;
+      const sway = Math.sin(resultFrame * 0.075 + (f.profileId?.charCodeAt(1) ?? 0)) * clamp(resultFrame / 72, 0, 1);
+
+      base.torsoTilt = victoryStyle.torso - victoryLift * 0.026 + cheer * 0.012 * victoryStyle.swagger + sway * 0.006;
+      base.frontArm = {
+        shoulder: { x: shoulderX, y: shoulderY - victoryLift * 1.2 },
+        elbow: { x: victoryStyle.front.elbow[0] * spec.stance + sway * 2.4 * spec.stance, y: victoryStyle.front.elbow[1] + crouch - victoryLift * 6 - cheerLift * 2.6 },
+        hand: { x: victoryStyle.front.hand[0] * spec.stance + sway * 4.2 * spec.stance, y: victoryStyle.front.hand[1] + crouch - victoryLift * 9 - cheerLift * 5.6 },
+      };
+      base.backArm = {
+        shoulder: { x: -shoulderX, y: shoulderY + 4 - victoryLift * 0.8 },
+        elbow: { x: victoryStyle.back.elbow[0] * spec.stance - sway * 1.8 * spec.stance, y: victoryStyle.back.elbow[1] + crouch - victoryLift * 4 + cheer * 2.2 },
+        hand: { x: victoryStyle.back.hand[0] * spec.stance - sway * 3.4 * spec.stance, y: victoryStyle.back.hand[1] + crouch - victoryLift * 5 + cheer * 3.2 },
+      };
+      base.frontLeg.foot.x += (victoryStyle.foot + cheerLift * 1.8) * spec.stance;
+      base.backLeg.foot.x -= (victoryStyle.foot + victoryLift * 2.4) * spec.stance;
+      base.frontLeg.knee.y += victoryStyle.knee + cheerLift * 1.8;
+      base.backLeg.knee.y += victoryStyle.knee + victoryLift * 2.2;
+      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, 0.72 + victoryLift * 0.2);
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, 0.82 + victoryLift * 0.18);
     } else {
       const fall = smoothStep01(clamp(resultFrame / 46, 0, 1));
       const limp = smoothStep01(clamp((resultFrame - 10) / 54, 0, 1));
