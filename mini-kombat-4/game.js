@@ -618,13 +618,13 @@ function specialTechniqueProfile(f) {
 
 function hitReactionAnatomyProfile(f) {
   return {
-    p1: { shoulder: 0.86, hip: 1.14, armLag: 0.78, footLag: 0.9, settle: 1.18, twist: 0.82 },
-    p2: { shoulder: 1.16, hip: 0.82, armLag: 1.24, footLag: 1.18, settle: 0.82, twist: 1.18 },
-    p3: { shoulder: 0.74, hip: 1.28, armLag: 0.66, footLag: 0.78, settle: 1.32, twist: 0.72 },
-    p4: { shoulder: 1.2, hip: 0.86, armLag: 1.18, footLag: 1.24, settle: 0.88, twist: 1.22 },
-    p5: { shoulder: 1.26, hip: 0.76, armLag: 1.3, footLag: 1.22, settle: 0.78, twist: 1.28 },
-    p6: { shoulder: 0.96, hip: 1.08, armLag: 0.9, footLag: 0.92, settle: 1.08, twist: 0.9 },
-  }[f?.profileId] ?? { shoulder: 1, hip: 1, armLag: 1, footLag: 1, settle: 1, twist: 1 };
+    p1: { shoulder: 0.86, hip: 1.14, armLag: 0.78, footLag: 0.9, settle: 1.18, twist: 0.82, handWhip: 0.78, kneeWhip: 0.92, spine: 0.82 },
+    p2: { shoulder: 1.16, hip: 0.82, armLag: 1.24, footLag: 1.18, settle: 0.82, twist: 1.18, handWhip: 1.28, kneeWhip: 1.16, spine: 1.18 },
+    p3: { shoulder: 0.74, hip: 1.28, armLag: 0.66, footLag: 0.78, settle: 1.32, twist: 0.72, handWhip: 0.66, kneeWhip: 0.82, spine: 0.74 },
+    p4: { shoulder: 1.2, hip: 0.86, armLag: 1.18, footLag: 1.24, settle: 0.88, twist: 1.22, handWhip: 1.18, kneeWhip: 1.24, spine: 1.16 },
+    p5: { shoulder: 1.26, hip: 0.76, armLag: 1.3, footLag: 1.22, settle: 0.78, twist: 1.28, handWhip: 1.34, kneeWhip: 1.28, spine: 1.22 },
+    p6: { shoulder: 0.96, hip: 1.08, armLag: 0.9, footLag: 0.92, settle: 1.08, twist: 0.9, handWhip: 0.92, kneeWhip: 0.94, spine: 0.94 },
+  }[f?.profileId] ?? { shoulder: 1, hip: 1, armLag: 1, footLag: 1, settle: 1, twist: 1, handWhip: 1, kneeWhip: 1, spine: 1 };
 }
 
 function entrancePoseProfile(f) {
@@ -16830,9 +16830,13 @@ function getPose(f, stride) {
     const hipShock = chain * anatomy.hip;
     const armLag = delayedChain * anatomy.armLag;
     const footLag = delayedChain * anatomy.footLag;
+    const spineLag = delayedChain * anatomy.spine * (heavyHit ? 1.08 : 0.86);
+    const handWhip = delayedChain * anatomy.handWhip * (heavyHit ? 1.18 : 0.92);
+    const kneeWhip = delayedChain * anatomy.kneeWhip * (lowHit ? 1.22 : heavyHit ? 0.92 : 0.72);
 
     base.torsoTilt += (localDir * hitMass.fold * snap * 0.05 + localDir * recoil * 0.018) * absorbStyle;
     base.torsoTilt += localDir * shoulderShock * (headHit ? -0.035 : lowHit ? 0.022 : 0.026) * anatomy.twist;
+    base.torsoTilt -= localDir * spineLag * (headHit ? 0.02 : lowHit ? -0.012 : 0.014);
     base.frontArm.shoulder.x += localDir * shoulderShock * (headHit ? 4.2 : lowHit ? -1.8 : -3.2) * spec.stance;
     base.frontArm.shoulder.y += shoulderShock * (headHit ? -3.6 : lowHit ? 2.8 : 1.4);
     base.backArm.shoulder.x += localDir * shoulderShock * (headHit ? 2.4 : lowHit ? -1.2 : -4.6) * spec.stance;
@@ -16901,6 +16905,30 @@ function getPose(f, stride) {
       base[freeFoot].foot.x += worldLocal * footLag * (lowHit ? 10.8 : 6.2) * spec.stance;
       base[freeFoot].foot.y += footLag * (lowHit ? 6.2 : 2.8);
       base[braceFoot].plant = Math.max(base[braceFoot].plant ?? 0, clamp(0.5 + floor * 0.28 + footLag * 0.16, 0, 1));
+    }
+
+    if (handWhip > 0.035) {
+      const wristDir = headHit ? localDir : -localDir;
+      const frontWhip = handWhip * (headHit ? 1.08 : lowHit ? 0.82 : 0.96);
+      const backWhip = handWhip * (headHit ? 0.94 : lowHit ? 0.72 : 0.88);
+      base.frontArm.elbow.x += wristDir * frontWhip * (headHit ? 4.6 : 3.2) * spec.stance;
+      base.frontArm.elbow.y += frontWhip * (headHit ? -3.4 : lowHit ? 5.6 : 3.8);
+      base.frontArm.hand.x += wristDir * frontWhip * (headHit ? 14.6 : 11.2) * spec.stance;
+      base.frontArm.hand.y += frontWhip * (headHit ? -9.8 : lowHit ? 13.8 : 9.6);
+      base.backArm.elbow.x += wristDir * backWhip * (headHit ? 3.2 : 2.6) * spec.stance;
+      base.backArm.elbow.y += backWhip * (headHit ? -2.8 : lowHit ? 4.4 : 3.2);
+      base.backArm.hand.x += wristDir * backWhip * (headHit ? 11.4 : 9.2) * spec.stance;
+      base.backArm.hand.y += backWhip * (headHit ? -8.2 : lowHit ? 11.4 : 7.4);
+    }
+
+    if (kneeWhip > 0.035) {
+      const kneeSide = lowHit ? -localDir : worldLocal;
+      base[freeFoot].knee.x += kneeSide * kneeWhip * (lowHit ? 7.8 : 4.6) * spec.stance;
+      base[freeFoot].knee.y += kneeWhip * (lowHit ? 9.8 : 4.8);
+      base[freeFoot].foot.x += kneeSide * kneeWhip * (lowHit ? 12.8 : 6.8) * spec.stance;
+      base[freeFoot].foot.y += kneeWhip * (lowHit ? 6.8 : 2.4);
+      base[freeFoot].footAngle = (base[freeFoot].footAngle ?? 0) + kneeSide * kneeWhip * (lowHit ? 0.05 : 0.028);
+      base[braceFoot].plant = Math.max(base[braceFoot].plant ?? 0, clamp(0.56 + floor * 0.26 + kneeWhip * 0.12, 0, 1));
     }
 
     const follow = Math.sin(clamp(hitMass.active, 0, 1) * Math.PI) * clamp(hitMass.strength, 0.35, 1.85);
