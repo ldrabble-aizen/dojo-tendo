@@ -1101,6 +1101,9 @@ function makeFighter({ id, profileId, name, x, dir, color, trim, face, controls,
     lastAttackType: "",
     hurtRecoverPulse: 0,
     moveTurnPulse: 0,
+    facingTurnPulse: 0,
+    facingTurnFrom: dir,
+    facingTurnTo: dir,
     jumpPulse: 0,
     jumpStrength: 0,
     landingPulse: 0,
@@ -3743,8 +3746,12 @@ function update() {
   playMusicDirectorTick();
   playStageAmbienceTick();
   const [a, b] = fighters;
+  const previousADir = a.dir || 1;
+  const previousBDir = b.dir || -1;
   a.dir = a.x <= b.x ? 1 : -1;
   b.dir = b.x < a.x ? 1 : -1;
+  triggerFacingTurn(a, previousADir, a.dir);
+  triggerFacingTurn(b, previousBDir, b.dir);
 
   if (cpuEnabled) {
     const cpu = fighters.find((f) => f.id === cpuFighterId);
@@ -3791,6 +3798,18 @@ function update() {
   updateAnnouncerCue();
   updateSpecialCutinCue();
   sendOnlineSnapshot(false);
+}
+
+function triggerFacingTurn(f, previousDir, nextDir) {
+  if (!f || previousDir === nextDir || winner) return;
+  f.facingTurnFrom = previousDir || nextDir || 1;
+  f.facingTurnTo = nextDir || previousDir || 1;
+  if (f.grounded && f.hurt <= 0 && !f.attack) {
+    f.facingTurnPulse = Math.max(f.facingTurnPulse ?? 0, 14);
+    f.footPlantPulse = Math.max(f.footPlantPulse ?? 0, 8);
+    f.walkAnchorPulse = Math.max(f.walkAnchorPulse ?? 0, 10);
+    f.walkAnchorSide = -(nextDir || 1);
+  }
 }
 
 function updateFighter(f, opponent) {
@@ -3853,6 +3872,7 @@ function updateFighter(f, opponent) {
   if (f.attackChainPulse > 0) f.attackChainPulse -= 1;
   if (f.hurtRecoverPulse > 0) f.hurtRecoverPulse -= 1;
   if (f.moveTurnPulse > 0) f.moveTurnPulse -= 1;
+  if (f.facingTurnPulse > 0) f.facingTurnPulse -= 1;
   if (f.jumpPulse > 0) f.jumpPulse -= 1;
   if (f.jumpStrength > 0) f.jumpStrength *= 0.9;
   if (f.landingPulse > 0) f.landingPulse -= 1;
@@ -9092,6 +9112,7 @@ function fighterTransitionMotion(f, walking) {
     const guardExit = clamp((f.guardExitPulse ?? 0) / 10, 0, 1);
     const hurtRecover = clamp((f.hurtRecoverPulse ?? 0) / 14, 0, 1);
     const moveTurn = clamp((f.moveTurnPulse ?? 0) / 10, 0, 1);
+    const facingTurn = clamp((f.facingTurnPulse ?? 0) / 14, 0, 1);
     const moveDir = f.moveIntent || Math.sign(f.vx) || dir;
     const impactDir = f.impactDir ?? dir;
 
@@ -9101,6 +9122,26 @@ function fighterTransitionMotion(f, walking) {
       motion.rotation -= moveDir * moveTurn * 0.014;
       motion.scaleX *= 1 + moveTurn * 0.01;
       motion.scaleY *= 1 - moveTurn * 0.009;
+    }
+
+    if (facingTurn > 0.02 && f.grounded && f.hurt <= 0 && !f.attack) {
+      const turnStyle = {
+        p1: { weight: 1.22, snap: 0.74 },
+        p2: { weight: 0.82, snap: 1.16 },
+        p3: { weight: 1.34, snap: 0.66 },
+        p4: { weight: 0.84, snap: 1.18 },
+        p5: { weight: 0.76, snap: 1.24 },
+        p6: { weight: 1.08, snap: 0.9 },
+      }[f.profileId] ?? { weight: 1, snap: 1 };
+      const coil = smoothStep01(facingTurn) * turnStyle.weight;
+      const unwind = Math.sin((1 - facingTurn) * Math.PI) * turnStyle.snap;
+      const turnDir = f.facingTurnTo || dir;
+      motion.x -= turnDir * (coil * 1.2 - unwind * 0.35);
+      motion.y += coil * 1.05 - unwind * 0.38;
+      motion.rotation += turnDir * (coil * 0.03 - unwind * 0.014);
+      motion.scaleX *= 1 + coil * 0.018 - unwind * 0.004;
+      motion.scaleY *= 1 - coil * 0.02 + unwind * 0.008;
+      motion.afterimage = Math.max(motion.afterimage, unwind * 0.02);
     }
 
     if (attackEntry > 0.02) {
@@ -15046,6 +15087,7 @@ function getPose(f, stride) {
   const guardExitT = clamp((f.guardExitPulse ?? 0) / 10, 0, 1);
   const hurtRecoverT = clamp((f.hurtRecoverPulse ?? 0) / 14, 0, 1);
   const moveTurnT = clamp((f.moveTurnPulse ?? 0) / 10, 0, 1);
+  const facingTurnT = clamp((f.facingTurnPulse ?? 0) / 14, 0, 1);
   const counterReadyT = clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
 
   if (f.blocking) {
@@ -15625,6 +15667,40 @@ function getPose(f, stride) {
       base.backLeg.knee.y += moveTurnT * 4;
       base.frontLeg.foot.x += moveLocal * moveTurnT * 4 * spec.stance;
       base.backLeg.foot.x -= moveLocal * moveTurnT * 4 * spec.stance;
+    }
+
+    if (facingTurnT > 0.02 && f.grounded && f.hurt <= 0 && !f.attack) {
+      const turnStyle = {
+        p1: { weight: 1.22, arm: 0.82, foot: 1.12, snap: 0.72 },
+        p2: { weight: 0.78, arm: 1.2, foot: 0.84, snap: 1.18 },
+        p3: { weight: 1.34, arm: 0.72, foot: 1.28, snap: 0.64 },
+        p4: { weight: 0.84, arm: 1.18, foot: 0.86, snap: 1.16 },
+        p5: { weight: 0.74, arm: 1.26, foot: 0.8, snap: 1.24 },
+        p6: { weight: 1.06, arm: 0.94, foot: 1.04, snap: 0.9 },
+      }[f.profileId] ?? { weight: 1, arm: 1, foot: 1, snap: 1 };
+      const coil = smoothStep01(facingTurnT) * turnStyle.weight;
+      const unwind = Math.sin((1 - facingTurnT) * Math.PI) * turnStyle.snap;
+      const turnDir = f.facingTurnTo || f.dir || 1;
+      const oldLocal = (f.facingTurnFrom || -turnDir) === (f.dir || 1) ? 1 : -1;
+      base.torsoTilt += turnDir * (coil * 0.055 - unwind * 0.018);
+      base.frontArm.elbow.x -= oldLocal * (coil * 7.2 + unwind * 2.2) * spec.stance * turnStyle.arm;
+      base.frontArm.elbow.y -= (coil * 4.5 - unwind * 2.8) * turnStyle.arm;
+      base.frontArm.hand.x -= oldLocal * (coil * 10.5 + unwind * 3.4) * spec.stance * turnStyle.arm;
+      base.frontArm.hand.y -= (coil * 7.2 - unwind * 4.2) * turnStyle.arm;
+      base.backArm.elbow.x += oldLocal * (coil * 5.5 - unwind * 1.6) * spec.stance * turnStyle.arm;
+      base.backArm.elbow.y += (coil * 5.2 - unwind * 2.2) * turnStyle.arm;
+      base.backArm.hand.x += oldLocal * (coil * 7.8 - unwind * 2.4) * spec.stance * turnStyle.arm;
+      base.backArm.hand.y += (coil * 7.4 - unwind * 3.4) * turnStyle.arm;
+      base.frontLeg.knee.x += turnDir * (coil * 6.5 + unwind * 1.8) * spec.stance * turnStyle.foot;
+      base.frontLeg.knee.y += coil * 5.8 - unwind * 1.4;
+      base.frontLeg.foot.x += turnDir * (coil * 10.8 + unwind * 2.6) * spec.stance * turnStyle.foot;
+      base.frontLeg.foot.y += coil * 1.5;
+      base.backLeg.knee.x -= turnDir * (coil * 5.8 - unwind * 1.2) * spec.stance * turnStyle.foot;
+      base.backLeg.knee.y += coil * 8.2 - unwind * 1.6;
+      base.backLeg.foot.x -= turnDir * (coil * 13.2 - unwind * 2.2) * spec.stance * turnStyle.foot;
+      base.backLeg.foot.y += coil * 2.1;
+      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.64 + coil * 0.24, 0, 1));
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.78 + coil * 0.2, 0, 1));
     }
 
     if (guardEntryT > 0.02 && f.blocking && !f.attack) {
