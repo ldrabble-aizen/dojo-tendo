@@ -638,6 +638,17 @@ function entrancePoseProfile(f) {
   }[f?.profileId] ?? { slide: 1, lift: 1, weight: 1, flourish: 1, lean: 0, guard: 1, settle: 1, foot: 1, front: [[42, -116], [50, -100]], back: [[-38, -112], [-32, -94]], aura: 1 };
 }
 
+function movementPivotProfile(f) {
+  return {
+    p1: { brake: 1.2, snap: 0.74, shoulder: 0.82, hip: 1.16, foot: 1.18, sway: 0.72 },
+    p2: { brake: 0.78, snap: 1.22, shoulder: 1.22, hip: 0.84, foot: 0.84, sway: 1.18 },
+    p3: { brake: 1.32, snap: 0.64, shoulder: 0.68, hip: 1.3, foot: 1.28, sway: 0.62 },
+    p4: { brake: 0.84, snap: 1.18, shoulder: 1.18, hip: 0.88, foot: 0.88, sway: 1.22 },
+    p5: { brake: 0.74, snap: 1.28, shoulder: 1.26, hip: 0.8, foot: 0.78, sway: 1.26 },
+    p6: { brake: 1.06, snap: 0.92, shoulder: 0.94, hip: 1.08, foot: 1.06, sway: 0.86 },
+  }[f?.profileId] ?? { brake: 1, snap: 1, shoulder: 1, hip: 1, foot: 1, sway: 1 };
+}
+
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
@@ -16375,17 +16386,67 @@ function getPose(f, stride) {
   }
 
   if (!winner) {
+    const pivot = movementPivotProfile(f);
+    const stopT = f.grounded && f.hurt <= 0 && !f.attack ? clamp((f.walkStopPulse ?? 0) / 16, 0, 1) : 0;
+    if (stopT > 0.025) {
+      const stopDir = f.walkStopDir || Math.sign(f.vx) || f.dir || 1;
+      const stopLocal = stopDir === (f.dir || 1) ? 1 : -1;
+      const stopPower = clamp(f.walkStopSpeed ?? 0.45, 0, 1.55);
+      const brake = smoothStep01(stopT) * stopPower * pivot.brake;
+      const rebound = Math.sin((1 - stopT) * Math.PI) * stopPower * pivot.snap;
+      const shoulderLag = (brake * 0.76 + rebound * 0.42) * pivot.shoulder;
+      const hipSet = brake * pivot.hip;
+
+      base.torsoTilt -= stopLocal * (brake * 0.035 - rebound * 0.012) * pivot.sway;
+      base.frontArm.shoulder.x -= stopLocal * shoulderLag * 1.9 * spec.stance;
+      base.frontArm.shoulder.y += brake * 1.4 - rebound * 0.7;
+      base.backArm.shoulder.x -= stopLocal * shoulderLag * 1.2 * spec.stance;
+      base.backArm.shoulder.y += brake * 1.8;
+      base.frontArm.elbow.x -= stopLocal * (shoulderLag * 5.2 + rebound * 2.4) * spec.stance;
+      base.frontArm.elbow.y += brake * 5.4 - rebound * 3.8;
+      base.frontArm.hand.x -= stopLocal * (shoulderLag * 8.6 + rebound * 4.2) * spec.stance;
+      base.frontArm.hand.y += brake * 8.2 - rebound * 5.4;
+      base.backArm.elbow.x -= stopLocal * (shoulderLag * 3.8 - rebound * 1.4) * spec.stance;
+      base.backArm.elbow.y += brake * 4.6 - rebound * 2.2;
+      base.backArm.hand.x -= stopLocal * (shoulderLag * 6.2 - rebound * 2.2) * spec.stance;
+      base.backArm.hand.y += brake * 6.8 - rebound * 3.4;
+      base.frontLeg.hip.x += stopLocal * hipSet * 2.8 * spec.stance;
+      base.frontLeg.hip.y += brake * 1.7;
+      base.backLeg.hip.x -= stopLocal * hipSet * 3.4 * spec.stance;
+      base.backLeg.hip.y += brake * 2.4;
+      base.frontLeg.knee.x += stopLocal * (hipSet * 4.2 + rebound * 1.2) * spec.stance;
+      base.frontLeg.knee.y += brake * 5.8 - rebound * 1.4;
+      base.frontLeg.foot.x += stopLocal * (hipSet * 7.4 + rebound * 2.2) * spec.stance * pivot.foot;
+      base.frontLeg.foot.y += brake * 1.2;
+      base.backLeg.knee.x -= stopLocal * (hipSet * 5.8 + brake * 1.8) * spec.stance;
+      base.backLeg.knee.y += brake * 8.2 - rebound * 1.1;
+      base.backLeg.foot.x -= stopLocal * (hipSet * 11.4 + brake * 4.6) * spec.stance * pivot.foot;
+      base.backLeg.foot.y += brake * 1.8;
+      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.5 + brake * 0.24 + rebound * 0.08, 0, 1));
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.68 + brake * 0.3, 0, 1));
+      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + stopLocal * (brake * 0.02 - rebound * 0.01) * pivot.foot;
+      base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - stopLocal * (brake * 0.034 + rebound * 0.012) * pivot.foot;
+    }
+
     if (moveTurnT > 0.02 && walkingPose) {
       const moveLocal = Math.sign(f.vx) === f.dir ? 1 : -1;
-      base.torsoTilt += moveLocal * moveTurnT * 0.025;
-      base.frontArm.elbow.x -= moveLocal * moveTurnT * 4.5 * spec.stance;
-      base.frontArm.hand.x -= moveLocal * moveTurnT * 6 * spec.stance;
-      base.backArm.elbow.x -= moveLocal * moveTurnT * 3.5 * spec.stance;
-      base.backArm.hand.x -= moveLocal * moveTurnT * 5 * spec.stance;
-      base.frontLeg.knee.y += moveTurnT * 3;
-      base.backLeg.knee.y += moveTurnT * 4;
-      base.frontLeg.foot.x += moveLocal * moveTurnT * 4 * spec.stance;
-      base.backLeg.foot.x -= moveLocal * moveTurnT * 4 * spec.stance;
+      const turnLoad = smoothStep01(moveTurnT) * pivot.brake;
+      const turnSnap = Math.sin((1 - moveTurnT) * Math.PI) * pivot.snap;
+      base.torsoTilt += moveLocal * (turnLoad * 0.027 - turnSnap * 0.01) * pivot.sway;
+      base.frontArm.shoulder.x -= moveLocal * turnLoad * 1.2 * spec.stance * pivot.shoulder;
+      base.backArm.shoulder.x -= moveLocal * turnLoad * 0.9 * spec.stance * pivot.shoulder;
+      base.frontArm.elbow.x -= moveLocal * (turnLoad * 5.2 + turnSnap * 1.6) * spec.stance * pivot.shoulder;
+      base.frontArm.hand.x -= moveLocal * (turnLoad * 7.4 + turnSnap * 2.8) * spec.stance * pivot.shoulder;
+      base.backArm.elbow.x -= moveLocal * (turnLoad * 4.2 - turnSnap * 1.1) * spec.stance * pivot.shoulder;
+      base.backArm.hand.x -= moveLocal * (turnLoad * 6.2 - turnSnap * 1.7) * spec.stance * pivot.shoulder;
+      base.frontLeg.hip.x += moveLocal * turnLoad * 1.8 * spec.stance * pivot.hip;
+      base.backLeg.hip.x -= moveLocal * turnLoad * 2.4 * spec.stance * pivot.hip;
+      base.frontLeg.knee.y += turnLoad * 3.6 * pivot.hip;
+      base.backLeg.knee.y += turnLoad * 4.8 * pivot.hip;
+      base.frontLeg.foot.x += moveLocal * (turnLoad * 5.2 + turnSnap * 1.8) * spec.stance * pivot.foot;
+      base.backLeg.foot.x -= moveLocal * (turnLoad * 6.8 + turnSnap * 1.4) * spec.stance * pivot.foot;
+      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + moveLocal * turnLoad * 0.018 * pivot.foot;
+      base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - moveLocal * turnLoad * 0.026 * pivot.foot;
     }
 
     if (facingTurnT > 0.02 && f.grounded && f.hurt <= 0 && !f.attack) {
@@ -16401,7 +16462,13 @@ function getPose(f, stride) {
       const unwind = Math.sin((1 - facingTurnT) * Math.PI) * turnStyle.snap;
       const turnDir = f.facingTurnTo || f.dir || 1;
       const oldLocal = (f.facingTurnFrom || -turnDir) === (f.dir || 1) ? 1 : -1;
-      base.torsoTilt += turnDir * (coil * 0.055 - unwind * 0.018);
+      const shoulderCoil = coil * pivot.shoulder;
+      const hipCoil = coil * pivot.hip;
+      base.torsoTilt += turnDir * (coil * 0.055 - unwind * 0.018) * pivot.sway;
+      base.frontArm.shoulder.x -= oldLocal * shoulderCoil * 2.2 * spec.stance;
+      base.frontArm.shoulder.y += coil * 1.2 - unwind * 0.8;
+      base.backArm.shoulder.x += oldLocal * shoulderCoil * 1.8 * spec.stance;
+      base.backArm.shoulder.y += coil * 1.8;
       base.frontArm.elbow.x -= oldLocal * (coil * 7.2 + unwind * 2.2) * spec.stance * turnStyle.arm;
       base.frontArm.elbow.y -= (coil * 4.5 - unwind * 2.8) * turnStyle.arm;
       base.frontArm.hand.x -= oldLocal * (coil * 10.5 + unwind * 3.4) * spec.stance * turnStyle.arm;
@@ -16410,16 +16477,22 @@ function getPose(f, stride) {
       base.backArm.elbow.y += (coil * 5.2 - unwind * 2.2) * turnStyle.arm;
       base.backArm.hand.x += oldLocal * (coil * 7.8 - unwind * 2.4) * spec.stance * turnStyle.arm;
       base.backArm.hand.y += (coil * 7.4 - unwind * 3.4) * turnStyle.arm;
-      base.frontLeg.knee.x += turnDir * (coil * 6.5 + unwind * 1.8) * spec.stance * turnStyle.foot;
+      base.frontLeg.hip.x += turnDir * hipCoil * 2.8 * spec.stance;
+      base.frontLeg.hip.y += coil * 1.3 * pivot.hip;
+      base.backLeg.hip.x -= turnDir * hipCoil * 3.4 * spec.stance;
+      base.backLeg.hip.y += coil * 2.2 * pivot.hip;
+      base.frontLeg.knee.x += turnDir * (coil * 6.5 + unwind * 1.8) * spec.stance * turnStyle.foot * pivot.foot;
       base.frontLeg.knee.y += coil * 5.8 - unwind * 1.4;
-      base.frontLeg.foot.x += turnDir * (coil * 10.8 + unwind * 2.6) * spec.stance * turnStyle.foot;
+      base.frontLeg.foot.x += turnDir * (coil * 10.8 + unwind * 2.6) * spec.stance * turnStyle.foot * pivot.foot;
       base.frontLeg.foot.y += coil * 1.5;
-      base.backLeg.knee.x -= turnDir * (coil * 5.8 - unwind * 1.2) * spec.stance * turnStyle.foot;
+      base.backLeg.knee.x -= turnDir * (coil * 5.8 - unwind * 1.2) * spec.stance * turnStyle.foot * pivot.foot;
       base.backLeg.knee.y += coil * 8.2 - unwind * 1.6;
-      base.backLeg.foot.x -= turnDir * (coil * 13.2 - unwind * 2.2) * spec.stance * turnStyle.foot;
+      base.backLeg.foot.x -= turnDir * (coil * 13.2 - unwind * 2.2) * spec.stance * turnStyle.foot * pivot.foot;
       base.backLeg.foot.y += coil * 2.1;
       base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.64 + coil * 0.24, 0, 1));
       base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.78 + coil * 0.2, 0, 1));
+      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + turnDir * (coil * 0.026 + unwind * 0.008) * pivot.foot;
+      base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - turnDir * (coil * 0.038 - unwind * 0.01) * pivot.foot;
     }
 
     if (guardEntryT > 0.02 && f.blocking && !f.attack) {
