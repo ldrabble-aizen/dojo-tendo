@@ -583,6 +583,17 @@ function characterGuard(f) {
   return CHARACTER_GUARD[f?.profileId] ?? CHARACTER_GUARD.default;
 }
 
+function counterReadinessProfile(f) {
+  return {
+    p1: { drive: 0.86, coil: 1.14, hand: 0.92, lift: 0.78, foot: 1.22, sink: 1.18, ring: 1.14, angle: 0.82 },
+    p2: { drive: 1.2, coil: 0.82, hand: 1.22, lift: 1.2, foot: 0.82, sink: 0.76, ring: 0.86, angle: 1.16 },
+    p3: { drive: 0.78, coil: 1.28, hand: 0.84, lift: 0.72, foot: 1.3, sink: 1.28, ring: 1.22, angle: 0.72 },
+    p4: { drive: 1.16, coil: 0.86, hand: 1.16, lift: 1.08, foot: 0.88, sink: 0.82, ring: 0.88, angle: 1.18 },
+    p5: { drive: 1.24, coil: 0.78, hand: 1.26, lift: 1.18, foot: 0.78, sink: 0.74, ring: 0.82, angle: 1.24 },
+    p6: { drive: 0.94, coil: 1.08, hand: 0.98, lift: 0.88, foot: 1.08, sink: 1.08, ring: 1.06, angle: 0.92 },
+  }[f?.profileId] ?? { drive: 1, coil: 1, hand: 1, lift: 1, foot: 1, sink: 1, ring: 1, angle: 1 };
+}
+
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
@@ -9420,13 +9431,16 @@ function fighterTransitionMotion(f, walking) {
   const counterReady = clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
   if (counterReady > 0.03 && f.hurt <= 0 && !f.attack && !winner) {
     const guardProfile = characterGuard(f);
+    const counterProfile = counterReadinessProfile(f);
     const coil = Math.sin((1 - counterReady) * Math.PI);
-    motion.x += dir * (counterReady * 1.1 + coil * 0.8) * guardProfile.counter;
-    motion.y += counterReady * 0.5 * guardProfile.crouch - coil * 0.26 * guardProfile.handLift;
-    motion.rotation += dir * (counterReady * 0.014 + coil * 0.014) * guardProfile.counter;
-    motion.scaleX *= 1 + counterReady * 0.008 * guardProfile.counter + coil * 0.006;
-    motion.scaleY *= 1 - counterReady * 0.006 * guardProfile.counter;
-    motion.afterimage = Math.max(motion.afterimage, counterReady * 0.018 * guardProfile.spark);
+    const load = smoothStep01(counterReady) * counterProfile.coil;
+    const release = coil * counterProfile.drive;
+    motion.x += dir * (load * 0.9 + release * 1.05) * guardProfile.counter;
+    motion.y += load * 0.48 * guardProfile.crouch * counterProfile.sink - release * 0.34 * guardProfile.handLift;
+    motion.rotation += dir * (load * 0.012 * counterProfile.coil + release * 0.018 * counterProfile.angle) * guardProfile.counter;
+    motion.scaleX *= 1 + load * 0.007 * guardProfile.counter + release * 0.008;
+    motion.scaleY *= 1 - load * 0.006 * guardProfile.counter + release * 0.003;
+    motion.afterimage = Math.max(motion.afterimage, (counterReady * 0.014 + release * 0.016) * guardProfile.spark * counterProfile.drive);
   }
 
   const effectiveHurt = winner ? Math.max(0, (f.hurt ?? 0) - resultFrame * 0.9) : (f.hurt ?? 0);
@@ -16254,23 +16268,40 @@ function getPose(f, stride) {
 
     if (counterReadyT > 0.03 && f.hurt <= 0 && !f.attack) {
       const coil = Math.sin((1 - counterReadyT) * Math.PI);
+      const counterProfile = counterReadinessProfile(f);
       const counter = counterReadyT * guardProfile.counter;
-      base.torsoTilt += f.dir * (0.014 + coil * 0.02) * counter;
+      const load = smoothStep01(counterReadyT) * counterProfile.coil;
+      const release = coil * counterProfile.drive;
+      const handSnap = (load * 0.72 + release * 1.05) * counterProfile.hand;
+      const footSet = (load * 0.85 + release * 0.42) * counterProfile.foot;
+
+      base.torsoTilt += f.dir * (0.012 * load + 0.022 * release * counterProfile.angle) * counter;
+      base.frontArm.shoulder.x += (load * 1.5 + release * 1.2) * spec.stance * counterProfile.hand;
+      base.frontArm.shoulder.y -= release * 1.8 * counterProfile.lift;
+      base.backArm.shoulder.x -= load * 1.1 * spec.stance * counterProfile.hand;
+      base.backArm.shoulder.y += load * 1.2 * counterProfile.sink;
       if (f.profileId === "p2") {
-        base.frontArm.elbow.x += (5 + coil * 9) * spec.stance * counter;
-        base.frontArm.elbow.y -= (4 + coil * 6) * guardProfile.handLift;
-        base.frontArm.hand.x += (8 + coil * 14) * spec.stance * counter;
-        base.frontArm.hand.y -= (7 + coil * 8) * guardProfile.handLift;
-        base.backArm.hand.x -= 5 * spec.stance * counter;
-        base.frontLeg.foot.y -= 2 * counter;
+        base.frontArm.elbow.x += (5 + handSnap * 10) * spec.stance * counter;
+        base.frontArm.elbow.y -= (4 + release * 7) * guardProfile.handLift * counterProfile.lift;
+        base.frontArm.hand.x += (8 + handSnap * 16) * spec.stance * counter;
+        base.frontArm.hand.y -= (7 + release * 10) * guardProfile.handLift * counterProfile.lift;
+        base.backArm.hand.x -= (5 + load * 3) * spec.stance * counter;
+        base.frontLeg.foot.y -= (2 + release * 2) * counter;
       } else {
-        base.frontArm.elbow.x += (3 + coil * 5) * spec.stance * counter;
-        base.frontArm.hand.x += (5 + coil * 8) * spec.stance * counter;
-        base.backArm.elbow.y -= (2 + coil * 4) * guardProfile.handLift;
-        base.backArm.hand.y -= (3 + coil * 5) * guardProfile.handLift;
-        base.backLeg.foot.x -= 4 * spec.stance * counter;
-        base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, 0.68 * counter);
+        base.frontArm.elbow.x += (3 + handSnap * 6) * spec.stance * counter;
+        base.frontArm.elbow.y -= release * 2.2 * guardProfile.handLift * counterProfile.lift;
+        base.frontArm.hand.x += (5 + handSnap * 9.5) * spec.stance * counter;
+        base.frontArm.hand.y -= release * 3.2 * guardProfile.handLift * counterProfile.lift;
+        base.backArm.elbow.y -= (2 + release * 4.6) * guardProfile.handLift;
+        base.backArm.hand.x -= load * 2.4 * spec.stance * counterProfile.hand;
+        base.backArm.hand.y -= (3 + release * 6.2) * guardProfile.handLift;
+        base.backLeg.foot.x -= (4 + footSet * 4.2) * spec.stance * counter;
+        base.backLeg.knee.y += footSet * 3.2 * counterProfile.sink;
+        base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.58 + footSet * 0.32, 0, 1));
       }
+      base.frontLeg.knee.y += load * 2.4 * counterProfile.sink;
+      base.frontLeg.foot.x += release * 3.8 * spec.stance * counterProfile.foot;
+      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.38 + release * 0.28, 0, 0.86));
     }
 
     if (attackEntryT > 0.02 && f.attack) {
@@ -18425,11 +18456,17 @@ function drawCounterReadyFX(color, crouch, f) {
   const counter = clamp((f?.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
   if (counter <= 0.04) return;
 
+  const guardProfile = characterGuard(f);
+  const counterProfile = counterReadinessProfile(f);
   const pulse = 0.5 + Math.sin(roundFrame * 0.38) * 0.5;
-  const spark = counter * (0.76 + pulse * 0.34);
-  const centerX = 31 + counter * 5;
-  const centerY = -112 + crouch;
-  const radius = 32 + spark * 14;
+  const quickPulse = 0.5 + Math.sin(roundFrame * 0.74 + counterProfile.angle) * 0.5;
+  const spark = counter * (0.76 + pulse * 0.34) * guardProfile.spark;
+  const load = smoothStep01(counter) * counterProfile.coil;
+  const release = Math.sin((1 - counter) * Math.PI) * counterProfile.drive;
+  const centerX = 30 + counter * 5 + release * 5 * counterProfile.hand;
+  const centerY = -112 + crouch - release * 5 * counterProfile.lift + load * 3 * counterProfile.sink;
+  const radius = (31 + spark * 14) * counterProfile.ring;
+  const lean = -0.12 * counterProfile.angle;
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
@@ -18437,49 +18474,57 @@ function drawCounterReadyFX(color, crouch, f) {
   ctx.lineJoin = "round";
 
   const glow = ctx.createRadialGradient(centerX, centerY, 4, centerX, centerY, radius + 34);
-  glow.addColorStop(0, colorWithAlpha(color, 0.12 + spark * 0.18));
-  glow.addColorStop(0.38, `rgba(255, 241, 189, ${0.08 + spark * 0.1})`);
+  glow.addColorStop(0, colorWithAlpha(color, 0.1 + spark * 0.16));
+  glow.addColorStop(0.38, `rgba(255, 241, 189, ${0.07 + spark * 0.1 + quickPulse * 0.025})`);
   glow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(centerX, centerY, radius + 23, radius + 32, -0.12, 0, Math.PI * 2);
+  ctx.ellipse(centerX, centerY, radius + 21, radius + 30 + load * 8, lean, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = `rgba(255, 241, 189, ${0.22 + spark * 0.42})`;
-  ctx.lineWidth = 2.2 + spark * 2.2;
+  ctx.lineWidth = (2 + spark * 2.2) * guardProfile.shieldWidth;
   ctx.beginPath();
-  ctx.arc(centerX, centerY, radius, -0.92, 0.82);
+  ctx.ellipse(centerX, centerY, radius, radius * (0.88 + load * 0.12), lean, -0.92 * guardProfile.arc, 0.82 * guardProfile.arc);
   ctx.stroke();
 
   ctx.strokeStyle = colorWithAlpha(color, 0.22 + spark * 0.32);
-  ctx.lineWidth = 1.7 + spark * 1.4;
+  ctx.lineWidth = 1.6 + spark * 1.45;
   ctx.beginPath();
-  ctx.moveTo(centerX - 26, centerY - 18);
-  ctx.quadraticCurveTo(centerX + 6 + spark * 10, centerY - 36 - spark * 8, centerX + 38 + spark * 10, centerY - 12);
-  ctx.moveTo(centerX - 18, centerY + 12);
-  ctx.quadraticCurveTo(centerX + 11 + spark * 8, centerY + 25 + spark * 3, centerX + 44 + spark * 9, centerY + 8);
+  ctx.moveTo(centerX - 26 * counterProfile.ring, centerY - 18);
+  ctx.quadraticCurveTo(centerX + 6 + spark * 10 + release * 6, centerY - 36 - spark * 8 - release * 5, centerX + 38 + spark * 10 + release * 8, centerY - 12);
+  ctx.moveTo(centerX - 18 * counterProfile.ring, centerY + 12 + load * 2);
+  ctx.quadraticCurveTo(centerX + 11 + spark * 8 + release * 4, centerY + 25 + spark * 3 + load * 5, centerX + 44 + spark * 9 + release * 7, centerY + 8);
   ctx.stroke();
 
-  ctx.strokeStyle = `rgba(255, 241, 189, ${0.16 + spark * 0.28})`;
+  ctx.strokeStyle = `rgba(255, 241, 189, ${0.14 + spark * 0.28 + quickPulse * 0.06})`;
   ctx.lineWidth = 1.6 + spark;
-  for (let i = 0; i < 2; i += 1) {
-    const y = centerY - 10 + i * 20;
+  for (let i = 0; i < 3; i += 1) {
+    const y = centerY - 16 + i * 16 + load * 2;
+    const lead = radius * (0.38 + i * 0.09);
     ctx.beginPath();
-    ctx.moveTo(centerX + radius * 0.42, y - 6);
-    ctx.lineTo(centerX + radius * 0.66 + pulse * 3, y);
-    ctx.lineTo(centerX + radius * 0.42, y + 6);
+    ctx.moveTo(centerX + lead, y - 5);
+    ctx.lineTo(centerX + lead + 16 + pulse * 4 + release * 5, y);
+    ctx.lineTo(centerX + lead, y + 5);
     ctx.stroke();
   }
 
-  ctx.fillStyle = `rgba(255, 241, 189, ${0.16 + spark * 0.32})`;
-  for (let i = 0; i < 3; i += 1) {
-    const angle = -0.55 + i * 0.42 + pulse * 0.08;
+  ctx.fillStyle = `rgba(255, 241, 189, ${0.14 + spark * 0.3 + quickPulse * 0.05})`;
+  for (let i = 0; i < 4; i += 1) {
+    const angle = -0.64 + i * 0.36 + pulse * 0.08 * counterProfile.angle;
     const x = centerX + Math.cos(angle) * (radius + 4 + i * 3);
     const y = centerY + Math.sin(angle) * (radius * 0.72 + i * 2);
     ctx.beginPath();
     ctx.ellipse(x, y, 2.2 + spark * 1.8, 1.2 + spark, angle, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  ctx.strokeStyle = colorWithAlpha(color, 0.12 + spark * 0.18);
+  ctx.lineWidth = 1 + spark * 0.7;
+  ctx.beginPath();
+  ctx.moveTo(centerX - 32 * counterProfile.ring, centerY + 40 + load * 4);
+  ctx.quadraticCurveTo(centerX + 6 + release * 5, centerY + 50 + load * 6, centerX + 46 * counterProfile.ring, centerY + 34 + release * 3);
+  ctx.stroke();
 
   ctx.restore();
 }
