@@ -15117,6 +15117,31 @@ function getPose(f, stride) {
       base.frontLeg.knee.x += 8;
       base.backLeg.foot.x -= 8;
     }
+
+    const guardHold = clamp((f.guardPulse ?? 0) / 18, 0, 1);
+    const guardEntry = clamp((f.guardEntryPulse ?? 0) / 12, 0, 1);
+    const guardImpact = clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
+    const guardBreath = Math.sin(roundFrame * 0.11 + (f.profileId?.charCodeAt(1) ?? 0)) * guardHold;
+    const guardSnap = Math.max(guardEntry, guardImpact * guardProfile.recoil);
+    const brace = guardProfile.brace;
+    const handLift = guardProfile.handLift;
+    const crouchPress = guardProfile.crouch;
+
+    base.torsoTilt -= (0.012 * guardHold + 0.026 * guardSnap) * brace;
+    base.frontArm.elbow.x += (guardBreath * 1.6 - guardSnap * 2.4) * spec.stance * brace;
+    base.frontArm.elbow.y -= (guardHold * 2.8 + guardSnap * 4.8) * handLift;
+    base.frontArm.hand.x += (guardBreath * 2.2 - guardSnap * 3.4) * spec.stance * brace;
+    base.frontArm.hand.y -= (guardHold * 4.2 + guardSnap * 6.6) * handLift;
+    base.backArm.elbow.x += (guardBreath * 1.1 + guardSnap * 2.8) * spec.stance * brace;
+    base.backArm.elbow.y -= (guardHold * 2.1 + guardSnap * 3.8) * handLift;
+    base.backArm.hand.x += (guardBreath * 1.6 + guardSnap * 4.2) * spec.stance * brace;
+    base.backArm.hand.y -= (guardHold * 3.2 + guardSnap * 5.2) * handLift;
+    base.frontLeg.knee.y += (guardHold * 2.4 + guardSnap * 4.8) * crouchPress;
+    base.backLeg.knee.y += (guardHold * 3.2 + guardSnap * 6.2) * crouchPress;
+    base.frontLeg.foot.x += (guardHold * 2.6 + guardSnap * 5.6) * spec.stance * brace;
+    base.backLeg.foot.x -= (guardHold * 4.2 + guardSnap * 8.2) * spec.stance * brace;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.52 + guardHold * 0.26 + guardSnap * 0.22, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.62 + guardHold * 0.28 + guardSnap * 0.28, 0, 1));
   }
 
   if (attackType === "punch" || attackType === "airPunch") {
