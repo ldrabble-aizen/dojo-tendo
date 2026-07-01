@@ -627,6 +627,17 @@ function hitReactionAnatomyProfile(f) {
   }[f?.profileId] ?? { shoulder: 1, hip: 1, armLag: 1, footLag: 1, settle: 1, twist: 1 };
 }
 
+function entrancePoseProfile(f) {
+  return {
+    p1: { slide: 1.12, lift: 0.82, weight: 1.18, flourish: 0.86, lean: 0.025, guard: 0.74, settle: 1.16, foot: 1.16, front: [[45, -112], [48, -92]], back: [[-42, -118], [-35, -98]], aura: 0.82 },
+    p2: { slide: 0.84, lift: 1.18, weight: 0.9, flourish: 1.12, lean: -0.035, guard: 1.16, settle: 0.86, foot: 0.82, front: [[42, -121], [48, -142]], back: [[-36, -98], [-28, -82]], aura: 1.18 },
+    p3: { slide: 1.2, lift: 0.72, weight: 1.28, flourish: 0.72, lean: 0.038, guard: 0.66, settle: 1.3, foot: 1.28, front: [[43, -105], [55, -86]], back: [[-45, -116], [-40, -94]], aura: 0.72 },
+    p4: { slide: 0.88, lift: 1.14, weight: 0.88, flourish: 1.18, lean: -0.028, guard: 1.12, settle: 0.9, foot: 0.86, front: [[45, -122], [58, -132]], back: [[-33, -106], [-42, -84]], aura: 1.12 },
+    p5: { slide: 0.78, lift: 1.24, weight: 0.78, flourish: 1.24, lean: -0.02, guard: 1.18, settle: 0.82, foot: 0.78, front: [[39, -124], [55, -137]], back: [[-30, -104], [-39, -86]], aura: 1.2 },
+    p6: { slide: 1.02, lift: 0.9, weight: 1.08, flourish: 0.94, lean: 0.012, guard: 0.92, settle: 1.06, foot: 1.04, front: [[40, -118], [47, -106]], back: [[-38, -116], [-30, -96]], aura: 0.94 },
+  }[f?.profileId] ?? { slide: 1, lift: 1, weight: 1, flourish: 1, lean: 0, guard: 1, settle: 1, foot: 1, front: [[42, -116], [50, -100]], back: [[-38, -112], [-32, -94]], aura: 1 };
+}
+
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
@@ -9010,17 +9021,17 @@ function fighterEntranceCue(f) {
   const reveal = 1 - ease;
   const step = Math.sin(reveal * Math.PI);
   const side = f.id === "left" ? -1 : 1;
-  const heavy = f.profileId === "p1";
-  const agile = f.profileId === "p2";
+  const profile = entrancePoseProfile(f);
   return {
     side,
     ease,
     reveal,
     step,
-    slide: heavy ? 1.12 : agile ? 0.84 : 1,
-    lift: agile ? 1.18 : heavy ? 0.82 : 1,
-    weight: heavy ? 1.18 : agile ? 0.9 : 1,
-    flourish: agile ? 1.12 : heavy ? 0.86 : 1,
+    slide: profile.slide,
+    lift: profile.lift,
+    weight: profile.weight,
+    flourish: profile.flourish,
+    profile,
   };
 }
 
@@ -14662,7 +14673,8 @@ function drawEntrancePoseEffect(f, crouch) {
   const entrance = fighterEntranceCue(f);
   if (!entrance) return;
   const clock = 180 - countdownFrames;
-  const alpha = clamp(entrance.ease * 0.22 + entrance.step * 0.08, 0.04, 0.28);
+  const profile = entrance.profile ?? entrancePoseProfile(f);
+  const alpha = clamp((entrance.ease * 0.22 + entrance.step * 0.08) * profile.aura, 0.04, 0.3);
   const trim = f.trim ?? "#fff1bd";
 
   ctx.save();
@@ -14670,14 +14682,14 @@ function drawEntrancePoseEffect(f, crouch) {
   ctx.strokeStyle = colorWithAlpha(trim, alpha);
   ctx.lineWidth = 2.2;
   ctx.beginPath();
-  ctx.ellipse(0, -3 + crouch, 42 + entrance.reveal * 28, 8 + entrance.reveal * 4, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -3 + crouch, (42 + entrance.reveal * 28) * profile.foot, 8 + entrance.reveal * 4, 0, 0, Math.PI * 2);
   ctx.stroke();
 
   const trailSide = -entrance.side;
   const trailCount = isMobileFightView() ? 2 : 3;
   for (let i = 0; i < trailCount; i += 1) {
     const offset = trailSide * (34 + i * 18 + entrance.ease * 18);
-    const height = f.profileId === "p2" ? 128 : 150;
+    const height = (f.profileId === "p2" || f.profileId === "p4" || f.profileId === "p5") ? 128 : 150;
     const drift = Math.sin(clock * 0.1 + i) * 4;
     const grad = ctx.createLinearGradient(offset, -36 + crouch, offset + trailSide * 12, -height + crouch);
     grad.addColorStop(0, colorWithAlpha(trim, alpha * 0.7));
@@ -14703,6 +14715,14 @@ function drawEntrancePoseEffect(f, crouch) {
     ctx.beginPath();
     ctx.moveTo(-36, -28 + crouch);
     ctx.quadraticCurveTo(-4, -82 + crouch, -26, -142 + crouch);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = colorWithAlpha(trim, 0.1 + alpha * 0.28);
+    ctx.lineWidth = 1.4 + profile.flourish * 0.7;
+    ctx.beginPath();
+    const arc = profile.lift > 1 ? -1 : 1;
+    ctx.moveTo(-34 * profile.foot, -34 + crouch);
+    ctx.quadraticCurveTo(arc * 12 * profile.flourish, -102 + crouch - entrance.step * 8, 38 * profile.foot, -72 + crouch);
     ctx.stroke();
   }
   ctx.restore();
@@ -16817,27 +16837,39 @@ function getPose(f, stride) {
 
   const entrance = fighterEntranceCue(f);
   if (entrance && f.grounded && f.hurt <= 0 && !f.attack) {
+    const style = entrance.profile ?? entrancePoseProfile(f);
     const guard = entrance.ease;
     const settle = entrance.step;
-    if (f.profileId === "p2") {
-      base.torsoTilt -= 0.035 * guard;
-      base.frontArm.elbow = { x: 42 * spec.stance, y: -121 + crouch - settle * 4 };
-      base.frontArm.hand = { x: 48 * spec.stance, y: -142 + crouch - settle * 8 };
-      base.backArm.elbow = { x: -36 * spec.stance, y: -98 + crouch + guard * 5 };
-      base.backArm.hand = { x: -28 * spec.stance, y: -82 + crouch + guard * 7 };
-      base.frontLeg.foot.x += 5 * spec.stance * guard;
-      base.backLeg.foot.x -= 4 * spec.stance * guard;
-    } else if (f.profileId === "p1") {
-      base.torsoTilt += 0.025 * guard;
-      base.frontArm.elbow = { x: 45 * spec.stance, y: -112 + crouch + guard * 4 };
-      base.frontArm.hand = { x: 48 * spec.stance, y: -92 + crouch + guard * 4 };
-      base.backArm.elbow = { x: -42 * spec.stance, y: -118 + crouch - settle * 3 };
-      base.backArm.hand = { x: -35 * spec.stance, y: -98 + crouch - settle * 4 };
-      base.frontLeg.foot.x += 8 * spec.stance * guard;
-      base.backLeg.foot.x -= 8 * spec.stance * guard;
-      base.frontLeg.knee.y += guard * 4;
-      base.backLeg.knee.y += guard * 5;
-    }
+    const settleWeight = style.settle ?? 1;
+    const guardLift = style.guard ?? 1;
+    const footSet = style.foot ?? 1;
+    const pulse = Math.sin((180 - countdownFrames) * 0.12 + (f.profileId?.charCodeAt(1) ?? 0)) * guard * 0.6;
+    const frontElbow = style.front?.[0] ?? [42, -116];
+    const frontHand = style.front?.[1] ?? [50, -100];
+    const backElbow = style.back?.[0] ?? [-38, -112];
+    const backHand = style.back?.[1] ?? [-32, -94];
+
+    base.torsoTilt += style.lean * guard + entrance.side * settle * 0.006 * style.flourish;
+    base.frontArm.shoulder.x += entrance.side * guard * 1.8 * spec.stance * guardLift;
+    base.frontArm.shoulder.y -= settle * 1.4 * guardLift;
+    base.backArm.shoulder.x -= entrance.side * guard * 1.3 * spec.stance * guardLift;
+    base.backArm.shoulder.y += guard * 1.2 * settleWeight;
+    base.frontArm.elbow = { x: (frontElbow[0] + pulse * 2.2) * spec.stance, y: frontElbow[1] + crouch - settle * 4.2 * guardLift + guard * 3.2 * settleWeight };
+    base.frontArm.hand = { x: (frontHand[0] + pulse * 3.4) * spec.stance, y: frontHand[1] + crouch - settle * 7.2 * guardLift + guard * 4.2 * settleWeight };
+    base.backArm.elbow = { x: (backElbow[0] - pulse * 1.5) * spec.stance, y: backElbow[1] + crouch - settle * 2.4 * guardLift + guard * 4.8 * settleWeight };
+    base.backArm.hand = { x: (backHand[0] - pulse * 2.4) * spec.stance, y: backHand[1] + crouch - settle * 3.8 * guardLift + guard * 5.8 * settleWeight };
+    base.frontLeg.knee.x += entrance.side * guard * 1.8 * spec.stance * footSet;
+    base.frontLeg.knee.y += guard * (3.6 + settleWeight * 2.2);
+    base.frontLeg.foot.x += (5.2 + style.slide * 2.4) * spec.stance * guard * footSet;
+    base.frontLeg.foot.y += guard * 0.8 * settleWeight - settle * 0.8 * style.lift;
+    base.backLeg.knee.x -= entrance.side * guard * 2.6 * spec.stance * footSet;
+    base.backLeg.knee.y += guard * (4.8 + settleWeight * 2.6);
+    base.backLeg.foot.x -= (6.6 + style.slide * 3.2) * spec.stance * guard * footSet;
+    base.backLeg.foot.y += guard * 1.1 * settleWeight;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.48 + guard * 0.3 + settle * 0.18, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.64 + guard * 0.28 + settle * 0.2, 0, 1));
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + entrance.side * guard * 0.018 * footSet;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - entrance.side * guard * 0.026 * footSet;
   }
 
   if (winner) {
