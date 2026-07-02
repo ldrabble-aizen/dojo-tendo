@@ -710,13 +710,29 @@ function grabTechniqueProfile(f) {
 
 function aerialBodyProfile(f) {
   return {
-    p1: { launch: 0.82, tuck: 0.84, arm: 0.74, land: 1.22, foot: 1.18, rebound: 0.72 },
-    p2: { launch: 1.18, tuck: 1.16, arm: 1.2, land: 0.82, foot: 0.84, rebound: 1.22 },
-    p3: { launch: 0.72, tuck: 0.76, arm: 0.64, land: 1.34, foot: 1.3, rebound: 0.62 },
-    p4: { launch: 1.22, tuck: 1.24, arm: 1.24, land: 0.86, foot: 0.88, rebound: 1.18 },
-    p5: { launch: 1.12, tuck: 1.08, arm: 1.1, land: 0.78, foot: 0.82, rebound: 1.3 },
-    p6: { launch: 0.9, tuck: 0.94, arm: 0.88, land: 1.04, foot: 1.06, rebound: 0.86 },
-  }[f?.profileId] ?? { launch: 1, tuck: 1, arm: 1, land: 1, foot: 1, rebound: 1 };
+    p1: { launch: 0.82, tuck: 0.84, arm: 0.74, land: 1.22, foot: 1.18, rebound: 0.72, coil: 1.12, apex: 0.82, fallReach: 0.92, squash: 1.18, plant: 1.2, recover: 0.84, shadow: 1.16 },
+    p2: { launch: 1.18, tuck: 1.16, arm: 1.2, land: 0.82, foot: 0.84, rebound: 1.22, coil: 0.86, apex: 1.18, fallReach: 1.2, squash: 0.82, plant: 0.84, recover: 1.2, shadow: 0.88 },
+    p3: { launch: 0.72, tuck: 0.76, arm: 0.64, land: 1.34, foot: 1.3, rebound: 0.62, coil: 1.28, apex: 0.76, fallReach: 0.84, squash: 1.28, plant: 1.3, recover: 0.72, shadow: 1.24 },
+    p4: { launch: 1.22, tuck: 1.24, arm: 1.24, land: 0.86, foot: 0.88, rebound: 1.18, coil: 0.9, apex: 1.24, fallReach: 1.18, squash: 0.86, plant: 0.88, recover: 1.18, shadow: 0.9 },
+    p5: { launch: 1.12, tuck: 1.08, arm: 1.1, land: 0.78, foot: 0.82, rebound: 1.3, coil: 0.82, apex: 1.12, fallReach: 1.16, squash: 0.78, plant: 0.82, recover: 1.26, shadow: 0.86 },
+    p6: { launch: 0.9, tuck: 0.94, arm: 0.88, land: 1.04, foot: 1.06, rebound: 0.86, coil: 1.04, apex: 0.96, fallReach: 0.98, squash: 1.04, plant: 1.06, recover: 0.94, shadow: 1.04 },
+  }[f?.profileId] ?? { launch: 1, tuck: 1, arm: 1, land: 1, foot: 1, rebound: 1, coil: 1, apex: 1, fallReach: 1, squash: 1, plant: 1, recover: 1, shadow: 1 };
+}
+
+function aerialVisualMotion(f) {
+  const style = aerialBodyProfile(f);
+  const strength = clamp(f?.jumpStrength ?? 1, 0.65, 1.42);
+  const landingStrength = clamp(f?.landingStrength ?? 1, 0.38, 1.65);
+  const rise = clamp(-(f?.vy ?? 0) / 13, 0, 1);
+  const fall = clamp((f?.vy ?? 0) / 13, 0, 1);
+  const apex = clamp(1 - Math.abs(f?.vy ?? 0) / 8.5, 0, 1);
+  const launch = smoothStep01(clamp((f?.jumpPulse ?? 0) / 12, 0, 1)) * strength;
+  const landingRaw = clamp((f?.landingPulse ?? 0) / 16, 0, 1);
+  const landing = smoothStep01(landingRaw) * landingStrength;
+  const rebound = Math.sin((1 - landingRaw) * Math.PI) * landingStrength;
+  const recover = smoothStep01(clamp((f?.airKickRecoverPulse ?? 0) / 24, 0, 1));
+  const preLand = !f?.grounded ? smoothStep01(clamp(((f?.vy ?? 0) - 3.4) / 7.5, 0, 1)) : 0;
+  return { style, strength, landingStrength, rise, fall, apex, launch, landing, rebound, recover, preLand };
 }
 
 function whiffRecoveryProfile(f) {
@@ -9273,18 +9289,20 @@ function fighterTransitionMotion(f, walking) {
   }
 
   if (!f.grounded && f.hurt <= 0) {
-    const rise = clamp(-f.vy / 13, 0, 1);
-    const fall = clamp(f.vy / 13, 0, 1);
-    const jumpStrength = clamp(f.jumpStrength ?? 1, 0.65, 1.42);
+    const aerial = aerialVisualMotion(f);
+    const { rise, fall, apex, preLand } = aerial;
+    const jumpStrength = aerial.strength;
+    const aerialStyle = aerial.style;
     const liftStyle = style.walkLift ?? 1;
     const weightStyle = style.walkWeight ?? 1;
     const airLean = clamp((f.vx ?? 0) * 0.008, -0.035, 0.035);
     const jumpDir = f.jumpDir || dir;
     motion.y -= rise * (1.55 + liftStyle * 0.75) * jumpStrength;
-    motion.y += fall * weightStyle * 0.48;
-    motion.rotation += airLean + jumpDir * (rise * -0.018 * liftStyle + fall * (0.022 + weightStyle * 0.006));
-    motion.scaleX *= 1 - rise * (0.014 + liftStyle * 0.006) + fall * (0.012 + weightStyle * 0.004);
-    motion.scaleY *= 1 + rise * (0.033 + liftStyle * 0.009) - fall * (0.018 + weightStyle * 0.004);
+    motion.y -= apex * 0.32 * aerialStyle.apex;
+    motion.y += fall * weightStyle * 0.48 + preLand * (0.8 + aerialStyle.plant * 0.58);
+    motion.rotation += airLean + jumpDir * (rise * -0.018 * liftStyle + fall * (0.022 + weightStyle * 0.006) + preLand * 0.012 * aerialStyle.fallReach);
+    motion.scaleX *= 1 - rise * (0.014 + liftStyle * 0.006) + fall * (0.012 + weightStyle * 0.004) + preLand * 0.01 * aerialStyle.plant;
+    motion.scaleY *= 1 + rise * (0.033 + liftStyle * 0.009) + apex * 0.006 * aerialStyle.apex - fall * (0.018 + weightStyle * 0.004) - preLand * 0.011 * aerialStyle.fallReach;
   }
 
   const airKickRecoverT = smoothStep01(clamp((f.airKickRecoverPulse ?? 0) / 24, 0, 1));
@@ -9304,27 +9322,30 @@ function fighterTransitionMotion(f, walking) {
 
   const jumpT = clamp((f.jumpPulse ?? 0) / 12, 0, 1);
   if (jumpT > 0) {
-    const jumpStrength = clamp(f.jumpStrength ?? 1, 0.65, 1.42);
-    const launch = smoothStep01(jumpT) * jumpStrength;
+    const aerial = aerialVisualMotion(f);
+    const launch = aerial.launch;
+    const aerialStyle = aerial.style;
     const jumpDir = f.jumpDir || dir;
-    motion.x -= jumpDir * launch * 0.48;
-    motion.y -= launch * (1.25 + (style.walkLift ?? 1) * 0.65);
-    motion.rotation -= jumpDir * launch * 0.012;
-    motion.scaleX *= 1 - launch * 0.012;
-    motion.scaleY *= 1 + launch * 0.032;
+    motion.x -= jumpDir * launch * (0.42 + aerialStyle.coil * 0.08);
+    motion.y -= launch * (1.18 + (style.walkLift ?? 1) * 0.58 + aerialStyle.coil * 0.2);
+    motion.rotation -= jumpDir * launch * (0.01 + aerialStyle.coil * 0.004);
+    motion.scaleX *= 1 - launch * (0.01 + aerialStyle.coil * 0.004);
+    motion.scaleY *= 1 + launch * (0.028 + aerialStyle.coil * 0.009);
   }
 
   const landingT = clamp((f.landingPulse ?? 0) / 16, 0, 1);
   if (landingT > 0) {
-    const landingStrength = clamp(f.landingStrength ?? 1, 0.38, 1.65);
-    const settle = smoothStep01(landingT);
-    const rebound = Math.sin((1 - landingT) * Math.PI) * (0.58 + landingStrength * 0.36);
+    const aerial = aerialVisualMotion(f);
+    const aerialStyle = aerial.style;
+    const landingStrength = aerial.landingStrength;
+    const settle = aerial.landing;
+    const rebound = aerial.rebound * (0.58 + landingStrength * 0.36);
     const landingDir = f.landingDir || (f.vx >= 0 ? 1 : -1);
-    motion.x -= landingDir * settle * landingStrength * 0.8;
-    motion.y += settle * (4.4 + landingStrength * 3.4) - rebound * (0.7 + (style.walkLift ?? 1) * 0.24);
-    motion.rotation += landingDir * settle * (0.014 + landingStrength * 0.014);
-    motion.scaleX *= 1 + settle * (0.036 + landingStrength * 0.026) - rebound * 0.005;
-    motion.scaleY *= 1 - settle * (0.04 + landingStrength * 0.03) + rebound * 0.012;
+    motion.x -= landingDir * settle * (0.68 + aerialStyle.plant * 0.16);
+    motion.y += settle * (4.1 + landingStrength * 2.35 + aerialStyle.squash * 1.15) - rebound * (0.58 + (style.walkLift ?? 1) * 0.22 + aerialStyle.rebound * 0.14);
+    motion.rotation += landingDir * settle * (0.012 + landingStrength * 0.011 + aerialStyle.plant * 0.005);
+    motion.scaleX *= 1 + settle * (0.032 + landingStrength * 0.017 + aerialStyle.squash * 0.021) - rebound * 0.004;
+    motion.scaleY *= 1 - settle * (0.034 + landingStrength * 0.02 + aerialStyle.squash * 0.026) + rebound * (0.009 + aerialStyle.rebound * 0.004);
   }
 
   const airKickLandingT = clamp((f.airKickLandingPulse ?? 0) / 16, 0, 1);
@@ -9791,6 +9812,8 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const crouchSpread = f.blocking ? 8 : 0;
   const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1);
   const landingWeight = landing * clamp(f.landingStrength ?? 1, 0.42, 1.65);
+  const aerial = aerialVisualMotion(f);
+  const preLandShadow = aerial.preLand * aerial.style.shadow;
   const facingTurn = f.grounded ? clamp((f.facingTurnPulse ?? 0) / 14, 0, 1) : 0;
   const facingStyle = {
     p1: { weight: 1.18, snap: 0.78 },
@@ -9820,13 +9843,14 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const reactionOffset = hitMass ? hitMass.worldDir * reactionSkid * 7 * FIGHTER_SCALE : 0;
   const stopOffset = -(f.walkStopDir || 0) * stopStrength * 7 * FIGHTER_SCALE;
   const facingOffset = -(f.facingTurnTo || f.dir || 1) * (facingPress * 5 - facingSnap * 2.5) * FIGHTER_SCALE;
-  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + facingPress * 34 + facingSnap * 16 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
-  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + facingPress * 4.8 + facingSnap * 1.7 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
-  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + facingPress * 0.085 + facingSnap * 0.035 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.58);
+  const aerialOffset = (f.landingDir || f.jumpDir || Math.sign(f.vx) || f.dir || 1) * preLandShadow * 6 * FIGHTER_SCALE;
+  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + preLandShadow * 18 + facingPress * 34 + facingSnap * 16 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
+  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + preLandShadow * 2.2 + facingPress * 4.8 + facingSnap * 1.7 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
+  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + preLandShadow * 0.035 + facingPress * 0.085 + facingSnap * 0.035 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.58);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
-  ctx.translate(baseX + attackOffset + reactionOffset + stopOffset + facingOffset, FLOOR + 5);
+  ctx.translate(baseX + attackOffset + reactionOffset + stopOffset + facingOffset + aerialOffset, FLOOR + 5);
   ctx.scale(width, height);
   const shadow = ctx.createRadialGradient(0, 0, 0.12, 0, 0, 1);
   shadow.addColorStop(0, `rgba(22, 12, 8, ${alpha})`);
@@ -9949,6 +9973,10 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   const jump = clamp((f.jumpPulse ?? 0) / 12, 0, 1);
   const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1);
   const landingWeight = landing * clamp(f.landingStrength ?? 1, 0.42, 1.65);
+  const aerial = aerialVisualMotion(f);
+  const aerialLaunch = clamp(aerial.launch * aerial.style.coil, 0, 1.55);
+  const aerialTuck = !f.grounded ? clamp(aerial.apex * aerial.style.apex * 0.82 + aerial.rise * 0.16, 0, 1.35) : 0;
+  const preLand = clamp(aerial.preLand * aerial.style.fallReach, 0, 1.35);
   const facingTurn = f.grounded ? clamp((f.facingTurnPulse ?? 0) / 14, 0, 1) : 0;
   const facingStyle = {
     p1: { weight: 1.18, snap: 0.78 },
@@ -9975,7 +10003,7 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   const reactionFloor = hitMass ? clamp(hitMass.floor, 0, 1.7) : 0;
   const reactionSkid = hitMass ? clamp(hitMass.skid, 0, 1.85) : 0;
   const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.78, stop * 0.65, landingWeight * 0.7, facingPress * 0.78, attackPlant * 0.45, attackCompression * 0.34, reactionFloor * 0.34);
-  if (jump <= 0.03 && landing <= 0.03 && facingTurn <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && stopStrength <= 0.03 && attackPlant <= 0.03 && attackCompression <= 0.03 && reactionSkid <= 0.03) return;
+  if (jump <= 0.03 && aerialTuck <= 0.03 && preLand <= 0.03 && landing <= 0.03 && facingTurn <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && stopStrength <= 0.03 && attackPlant <= 0.03 && attackCompression <= 0.03 && reactionSkid <= 0.03) return;
 
   const localCrouch = crouch * 0.18;
   const trim = f.trim ?? "#fff1bd";
@@ -9994,6 +10022,17 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
       ctx.quadraticCurveTo(x - moveDir * 6, 10 + localCrouch, x - moveDir * 12, 28 + localCrouch);
       ctx.stroke();
     }
+
+    if (aerialLaunch > 0.04) {
+      ctx.strokeStyle = colorWithAlpha(trim, 0.07 + aerialLaunch * 0.07);
+      ctx.lineWidth = 1.1 + aerialLaunch * 1.1;
+      for (const x of [-29, 0, 29]) {
+        ctx.beginPath();
+        ctx.moveTo(x - moveDir * 3, 22 + localCrouch);
+        ctx.quadraticCurveTo(x - moveDir * (5 + aerialLaunch * 8), 8 + localCrouch, x - moveDir * (11 + aerialLaunch * 12), -9 + localCrouch);
+        ctx.stroke();
+      }
+    }
   }
 
   if (air > 0.03) {
@@ -10009,12 +10048,41 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
     }
   }
 
+  if (aerialTuck > 0.04) {
+    ctx.strokeStyle = colorWithAlpha(trim, 0.045 + aerialTuck * 0.06);
+    ctx.lineWidth = 1 + aerialTuck * 0.8;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(
+        side * (18 + aerialTuck * 5),
+        -76 + localCrouch + aerial.fall * 7,
+        11 + aerialTuck * 5,
+        5 + aerialTuck * 2,
+        side * 0.36,
+        Math.PI * 0.12,
+        Math.PI * 1.5
+      );
+      ctx.stroke();
+    }
+  }
+
   if (landing > 0.03) {
     ctx.strokeStyle = `rgba(255, 224, 142, ${0.12 * landing + 0.12 * landingWeight})`;
     ctx.lineWidth = 2.2 * landing + 1.7 * landingWeight;
     ctx.beginPath();
     ctx.ellipse(0, 2 + localCrouch, 44 + landing * 15 + landingWeight * 26, 6 + landing * 3 + landingWeight * 4, 0, 0, Math.PI * 2);
     ctx.stroke();
+
+    const scrape = Math.max(landingWeight * aerial.style.plant, aerial.rebound * 0.18 * aerial.style.rebound);
+    if (scrape > 0.04) {
+      const side = (f.landingDir || f.jumpDir || moveDir) * 28;
+      ctx.strokeStyle = `rgba(255, 238, 184, ${0.055 + scrape * 0.07})`;
+      ctx.lineWidth = 1.05 + scrape * 0.75;
+      ctx.beginPath();
+      ctx.moveTo(side, 6 + localCrouch);
+      ctx.quadraticCurveTo(side - moveDir * (18 + scrape * 10), 9 + localCrouch, side - moveDir * (36 + scrape * 15), 7 + localCrouch);
+      ctx.stroke();
+    }
   }
 
   if (facingTurn > 0.03) {
@@ -11134,6 +11202,7 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
 
   drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting);
   drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase);
+  drawUnifiedAerialBodyPolish(f, localCrouch, frameName);
   drawUnifiedFatiguePolish(f, localCrouch);
   drawUnifiedGuardCommitmentPolish(f, localCrouch);
   drawUnifiedWhiffRecoveryPolish(f, localCrouch);
@@ -11563,6 +11632,117 @@ function drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kic
     ctx.stroke();
     ctx.restore();
   }
+}
+
+function drawUnifiedAerialBodyPolish(f, localCrouch, frameName) {
+  const aerial = aerialVisualMotion(f);
+  const airborne = !f.grounded && f.hurt <= 0;
+  const landing = f.grounded ? aerial.landing * aerial.style.squash : 0;
+  const active = Math.max(
+    airborne ? aerial.launch * aerial.style.coil : 0,
+    airborne ? aerial.apex * aerial.style.apex * 0.82 : 0,
+    airborne ? aerial.preLand * aerial.style.fallReach : 0,
+    landing,
+    aerial.recover * aerial.style.recover * 0.72
+  );
+  if (active <= 0.035 || f.hurt > 0 || frameName === "ko") return;
+
+  const heavy = f.profileId === "p1";
+  const dir = (f.jumpDir || f.landingDir || f.airKickDir || f.dir || 1) === (f.dir || 1) ? 1 : -1;
+  const trim = f.trim ?? "#fff1bd";
+  const tuck = airborne ? clamp(aerial.apex * aerial.style.apex * 0.9 + aerial.recover * 0.35, 0, 1.28) : 0;
+  const preLand = airborne ? clamp(aerial.preLand * aerial.style.fallReach, 0, 1.2) : 0;
+  const launch = airborne ? clamp(aerial.launch * aerial.style.coil, 0, 1.35) : 0;
+  const footY = -3 + localCrouch;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(18, 9, 7, ${0.035 + active * 0.058})`;
+  ctx.beginPath();
+  ctx.ellipse(
+    dir * (heavy ? -2 : 1) + preLand * dir * 4,
+    (heavy ? -118 : -119) + localCrouch + landing * 2.4 + preLand * 3.4,
+    (heavy ? 42 : 34) + tuck * 6 + landing * 5,
+    (heavy ? 13 : 11) + tuck * 3 + landing * 2.2,
+    dir * (-0.06 + aerial.fall * 0.08),
+    0,
+    Math.PI * 2
+  );
+  ctx.ellipse(
+    -dir * (heavy ? 7 : 5),
+    (heavy ? -67 : -62) + localCrouch + landing * 3.2 + preLand * 5.5,
+    (heavy ? 45 : 36) + landing * 10 + preLand * 5,
+    (heavy ? 12 : 10) + landing * 4.4 + tuck * 1.5,
+    dir * 0.04,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  if (landing > 0.04) {
+    ctx.fillStyle = `rgba(32, 19, 11, ${0.045 + landing * 0.08})`;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(
+        side * (heavy ? 33 : 29) + dir * landing * 4,
+        footY + 4,
+        (heavy ? 24 : 20) + landing * 14,
+        5 + landing * 2.2,
+        side * 0.035,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = colorWithAlpha(trim, 0.045 + active * 0.07);
+  ctx.lineWidth = 1 + active * 0.65;
+
+  if (launch > 0.04) {
+    for (const x of [-22, 22]) {
+      ctx.beginPath();
+      ctx.moveTo(x, -24 + localCrouch);
+      ctx.quadraticCurveTo(x - dir * (7 + launch * 5), -48 + localCrouch, x - dir * (12 + launch * 9), -72 + localCrouch);
+      ctx.stroke();
+    }
+  }
+
+  if (tuck > 0.04) {
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(side * (heavy ? 25 : 20), -82 + localCrouch + aerial.fall * 6, 10 + tuck * 6, 4.5 + tuck * 2, side * 0.28, Math.PI * 0.08, Math.PI * 1.52);
+      ctx.stroke();
+    }
+  }
+
+  if (preLand > 0.04) {
+    ctx.strokeStyle = colorWithAlpha(trim, 0.04 + preLand * 0.06);
+    ctx.lineWidth = 0.9 + preLand * 0.65;
+    for (const side of [-1, 1]) {
+      const x = side * (heavy ? 31 : 27) + dir * preLand * 5;
+      ctx.beginPath();
+      ctx.moveTo(x, footY - 13 - preLand * 7);
+      ctx.quadraticCurveTo(x + dir * 3, footY - 6, x + dir * (9 + preLand * 6), footY + 1);
+      ctx.stroke();
+    }
+  }
+
+  if (landing > 0.04) {
+    ctx.strokeStyle = `rgba(255, 231, 157, ${0.06 + landing * 0.07})`;
+    ctx.lineWidth = 1.05 + landing * 0.75;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(side * (heavy ? 33 : 29), footY + 2, 17 + landing * 9, 3.4 + landing, side * 0.035, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 function drawUnifiedHeadAccessoryPolish(f, localCrouch, motion, acting) {
@@ -15941,6 +16121,7 @@ function getPose(f, stride) {
   const attackMass = f.attack ? attackMassProfile(f) : null;
   const bodyWeight = f.attack ? attackBodyWeightProfile(f) : null;
   const aerialBody = aerialBodyProfile(f);
+  const aerialMotion = aerialVisualMotion(f);
   const activePulse = phase.strike;
   const windup = phase.anticipation;
   const recovery = phase.recovery;
@@ -16150,27 +16331,28 @@ function getPose(f, stride) {
     const jumpDir = (f.jumpDir || Math.sign(f.vx) || f.dir || 1) === (f.dir || 1) ? 1 : -1;
     const strength = clamp(f.jumpStrength ?? 1, 0.65, 1.42);
     const launch = jumpLaunchPose * strength * aerialBody.launch;
+    const coil = launch * aerialBody.coil;
     const trail = Math.sin((1 - jumpLaunchPose) * Math.PI) * strength * aerialBody.tuck;
 
-    base.torsoTilt += jumpDir * (-launch * 0.03 + trail * 0.018);
-    base.frontArm.elbow.x -= jumpDir * (launch * 5.6 + trail * 2.2) * spec.stance * aerialBody.arm;
-    base.frontArm.elbow.y -= launch * 10.2 * aerialBody.arm - trail * 2.4;
-    base.frontArm.hand.x -= jumpDir * (launch * 9.8 + trail * 3.8) * spec.stance * aerialBody.arm;
-    base.frontArm.hand.y -= launch * 17.4 * aerialBody.arm - trail * 3.8;
-    base.backArm.elbow.x += jumpDir * (launch * 4.8 + trail * 1.8) * spec.stance * aerialBody.arm;
-    base.backArm.elbow.y -= launch * 7.6 * aerialBody.arm - trail * 1.6;
-    base.backArm.hand.x += jumpDir * (launch * 8.4 + trail * 3.2) * spec.stance * aerialBody.arm;
-    base.backArm.hand.y -= launch * 13.2 * aerialBody.arm - trail * 2.8;
-    base.frontLeg.knee.x -= jumpDir * trail * 7.8 * spec.stance * aerialBody.foot;
-    base.frontLeg.knee.y += trail * 7.4 - launch * 4.6;
-    base.frontLeg.foot.x -= jumpDir * trail * 13.6 * spec.stance * aerialBody.foot;
-    base.frontLeg.foot.y += trail * 12.8 - launch * 8.2;
-    base.backLeg.knee.x += jumpDir * trail * 5.6 * spec.stance * aerialBody.foot;
-    base.backLeg.knee.y += trail * 5.2 - launch * 3.4;
-    base.backLeg.foot.x += jumpDir * trail * 9.4 * spec.stance * aerialBody.foot;
-    base.backLeg.foot.y += trail * 9.8 - launch * 5.8;
-    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - jumpDir * trail * 0.036 * aerialBody.foot;
-    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) + jumpDir * trail * 0.03 * aerialBody.foot;
+    base.torsoTilt += jumpDir * (-launch * 0.03 - coil * 0.012 + trail * 0.018);
+    base.frontArm.elbow.x -= jumpDir * (launch * 5.6 + coil * 2.8 + trail * 2.2) * spec.stance * aerialBody.arm;
+    base.frontArm.elbow.y -= (launch * 10.2 + coil * 3.4) * aerialBody.arm - trail * 2.4;
+    base.frontArm.hand.x -= jumpDir * (launch * 9.8 + coil * 4.6 + trail * 3.8) * spec.stance * aerialBody.arm;
+    base.frontArm.hand.y -= (launch * 17.4 + coil * 6.2) * aerialBody.arm - trail * 3.8;
+    base.backArm.elbow.x += jumpDir * (launch * 4.8 + coil * 2.4 + trail * 1.8) * spec.stance * aerialBody.arm;
+    base.backArm.elbow.y -= (launch * 7.6 + coil * 2.8) * aerialBody.arm - trail * 1.6;
+    base.backArm.hand.x += jumpDir * (launch * 8.4 + coil * 4 + trail * 3.2) * spec.stance * aerialBody.arm;
+    base.backArm.hand.y -= (launch * 13.2 + coil * 5.2) * aerialBody.arm - trail * 2.8;
+    base.frontLeg.knee.x -= jumpDir * (trail * 7.8 + coil * 2.8) * spec.stance * aerialBody.foot;
+    base.frontLeg.knee.y += trail * 7.4 - launch * 4.6 + coil * 2.2;
+    base.frontLeg.foot.x -= jumpDir * (trail * 13.6 + coil * 4.8) * spec.stance * aerialBody.foot;
+    base.frontLeg.foot.y += trail * 12.8 - launch * 8.2 + coil * 4.6;
+    base.backLeg.knee.x += jumpDir * (trail * 5.6 + coil * 2.2) * spec.stance * aerialBody.foot;
+    base.backLeg.knee.y += trail * 5.2 - launch * 3.4 + coil * 1.8;
+    base.backLeg.foot.x += jumpDir * (trail * 9.4 + coil * 3.4) * spec.stance * aerialBody.foot;
+    base.backLeg.foot.y += trail * 9.8 - launch * 5.8 + coil * 3.2;
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - jumpDir * (trail * 0.036 + coil * 0.012) * aerialBody.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) + jumpDir * (trail * 0.03 + coil * 0.01) * aerialBody.foot;
   }
 
   const landingPose = f.grounded && f.hurt <= 0 && !f.attack && !winner
@@ -16187,23 +16369,24 @@ function getPose(f, stride) {
     }[f.profileId] ?? { absorb: 1, rebound: 1, arm: 1, spread: 1 };
     const strength = clamp(f.landingStrength ?? 1, 0.38, 1.65);
     const press = landingPose * strength * landingStyle.absorb * aerialBody.land;
+    const squash = press * aerialBody.squash;
     const rebound = Math.sin((1 - landingPose) * Math.PI) * landingStyle.rebound * strength * aerialBody.rebound;
     const landingDir = (f.landingDir || f.jumpDir || f.dir || 1) === (f.dir || 1) ? 1 : -1;
-    const footSpread = press * landingStyle.spread * aerialBody.foot;
+    const footSpread = press * landingStyle.spread * aerialBody.foot * aerialBody.plant;
 
-    base.torsoTilt += landingDir * (press * 0.032 - rebound * 0.012) - press * 0.008;
-    base.frontArm.shoulder.y += press * 1.8 - rebound * 0.8;
-    base.backArm.shoulder.y += press * 1.4 - rebound * 0.6;
-    base.frontLeg.hip.y += press * 1.6;
-    base.backLeg.hip.y += press * 1.9;
+    base.torsoTilt += landingDir * (squash * 0.032 - rebound * 0.012) - squash * 0.01;
+    base.frontArm.shoulder.y += squash * 1.8 - rebound * 0.8;
+    base.backArm.shoulder.y += squash * 1.4 - rebound * 0.6;
+    base.frontLeg.hip.y += squash * 1.9;
+    base.backLeg.hip.y += squash * 2.25;
     base.frontLeg.knee.x += landingDir * (footSpread * 4.5 + rebound * 1.8) * spec.stance;
-    base.frontLeg.knee.y += press * 10.5 - rebound * 2.4;
+    base.frontLeg.knee.y += squash * 11.8 - rebound * 2.4;
     base.frontLeg.foot.x += landingDir * (footSpread * 10 + rebound * 2.2) * spec.stance;
-    base.frontLeg.foot.y += press * 1.8;
+    base.frontLeg.foot.y += squash * 2.15;
     base.backLeg.knee.x -= landingDir * (footSpread * 5.2 + rebound * 1.4) * spec.stance;
-    base.backLeg.knee.y += press * 12.5 - rebound * 1.8;
+    base.backLeg.knee.y += squash * 13.8 - rebound * 1.8;
     base.backLeg.foot.x -= landingDir * (footSpread * 12 + rebound * 2.8) * spec.stance;
-    base.backLeg.foot.y += press * 2.2;
+    base.backLeg.foot.y += squash * 2.55;
     base.frontArm.elbow.x -= landingDir * press * 3.2 * spec.stance * landingStyle.arm;
     base.frontArm.elbow.y += press * 5.5 * landingStyle.arm - rebound * 3.2;
     base.frontArm.hand.x -= landingDir * press * 4.6 * spec.stance * landingStyle.arm;
@@ -16212,10 +16395,10 @@ function getPose(f, stride) {
     base.backArm.elbow.y += press * 4.2 * landingStyle.arm - rebound * 2.8;
     base.backArm.hand.x += landingDir * press * 3.8 * spec.stance * landingStyle.arm;
     base.backArm.hand.y += press * 6.8 * landingStyle.arm - rebound * 3.8;
-    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(press * 0.86, 0, 1));
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(press * 0.96, 0, 1));
-    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + landingDir * (press * 0.028 - rebound * 0.012) * aerialBody.foot;
-    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - landingDir * (press * 0.036 - rebound * 0.01) * aerialBody.foot;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(squash * 0.86, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(squash * 0.96, 0, 1));
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + landingDir * (squash * 0.028 - rebound * 0.012) * aerialBody.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - landingDir * (squash * 0.036 - rebound * 0.01) * aerialBody.foot;
   }
 
   const airKickLandingPose = f.grounded ? smoothStep01(clamp((f.airKickLandingPulse ?? 0) / 16, 0, 1)) : 0;
@@ -17548,19 +17731,20 @@ function getPose(f, stride) {
   const airKickRecoverPose = airborne && !f.attack ? smoothStep01(clamp((f.airKickRecoverPulse ?? 0) / 24, 0, 1)) : 0;
   if (airKickRecoverPose > 0.03 && f.hurt <= 0 && !winner) {
     const fall = clamp(f.vy / 13, 0, 1);
-    const fold = clamp(airKickRecoverPose + fall * 0.28, 0, 1.2);
+    const fold = clamp((airKickRecoverPose + fall * 0.28) * aerialBody.recover, 0, 1.2);
+    const center = fold * clamp(0.76 + aerialBody.plant * 0.18, 0.7, 1.05);
     const localDir = (f.airKickDir || f.jumpDir || f.dir || 1) === (f.dir || 1) ? 1 : -1;
-    base.torsoTilt += localDir * fold * 0.024;
-    base.frontLeg.knee.x -= fold * 14 * spec.stance;
-    base.frontLeg.knee.y += fold * 10;
-    base.frontLeg.foot.x -= fold * 28 * spec.stance;
-    base.frontLeg.foot.y += fold * 16;
+    base.torsoTilt += localDir * (fold * 0.024 - center * 0.006);
+    base.frontLeg.knee.x -= center * 15 * spec.stance;
+    base.frontLeg.knee.y += center * 11;
+    base.frontLeg.foot.x -= center * 29 * spec.stance;
+    base.frontLeg.foot.y += center * 18;
     base.backLeg.knee.x += fold * 8 * spec.stance;
-    base.backLeg.knee.y -= fold * 5;
-    base.backLeg.foot.x += fold * 13 * spec.stance;
-    base.backLeg.foot.y -= fold * 4;
-    base.frontArm.hand.y += fold * 7;
-    base.backArm.hand.y -= fold * 5;
+    base.backLeg.knee.y -= fold * 4.2 - fall * 2.4;
+    base.backLeg.foot.x += fold * 13 * spec.stance - localDir * center * 2.8;
+    base.backLeg.foot.y -= fold * 3.2 - fall * 3.4;
+    base.frontArm.hand.y += fold * 7.5;
+    base.backArm.hand.y -= fold * 4.2;
   }
 
   const airPose = airborne && f.hurt <= 0 && !f.attack && !winner;
@@ -17578,28 +17762,32 @@ function getPose(f, stride) {
       p5: { tuck: 1.08, reach: 1.32, swing: 1.08, weight: 0.78 },
       p6: { tuck: 0.94, reach: 0.92, swing: 0.78, weight: 1.04 },
     }[f.profileId] ?? { tuck: 1, reach: 1, swing: 1, weight: 1 };
-    const tuck = clamp((apex * 0.72 + rise * 0.32 + fall * 0.22) * airStyle.tuck, 0, 1.35);
-    const landingReach = fall * (0.52 + travel * 0.32) * airStyle.weight;
-    const armFloat = (rise * 0.86 + apex * 0.55 - fall * 0.2) * airStyle.swing;
+    const visualApex = apex * aerialBody.apex;
+    const preLand = aerialMotion.preLand * aerialBody.fallReach;
+    const tuck = clamp((visualApex * 0.82 + rise * 0.3 + fall * 0.18) * airStyle.tuck, 0, 1.42);
+    const landingReach = (fall * (0.52 + travel * 0.32) + preLand * 0.42) * airStyle.weight * aerialBody.fallReach;
+    const armFloat = (rise * 0.86 + visualApex * 0.6 - fall * 0.18 - preLand * 0.18) * airStyle.swing;
 
-    base.torsoTilt += localDir * (-rise * 0.036 + fall * 0.048 + travel * 0.014) * airStyle.weight;
+    base.torsoTilt += localDir * (-rise * 0.036 + fall * 0.048 + preLand * 0.022 + travel * 0.014) * airStyle.weight;
     base.frontArm.elbow.x += localDir * (rise * 6 + travel * 4 - fall * 3) * spec.stance * airStyle.swing;
     base.frontArm.elbow.y -= (10 + rise * 11 + apex * 8 - fall * 3) * airStyle.swing;
     base.frontArm.hand.x += localDir * (rise * 12 + travel * 8 - fall * 5) * spec.stance * airStyle.swing;
     base.frontArm.hand.y -= (18 + rise * 17 + apex * 11 - fall * 4) * airStyle.swing;
-    base.backArm.elbow.x -= localDir * (8 + rise * 5 + travel * 7) * spec.stance * airStyle.swing;
-    base.backArm.elbow.y += fall * 8 - armFloat * 8;
-    base.backArm.hand.x -= localDir * (13 + rise * 7 + travel * 9) * spec.stance * airStyle.swing;
-    base.backArm.hand.y += fall * 11 - armFloat * 10;
+    base.backArm.elbow.x -= localDir * (8 + rise * 5 + travel * 7 - preLand * 2) * spec.stance * airStyle.swing;
+    base.backArm.elbow.y += fall * 8 + preLand * 4 - armFloat * 8;
+    base.backArm.hand.x -= localDir * (13 + rise * 7 + travel * 9 - preLand * 3) * spec.stance * airStyle.swing;
+    base.backArm.hand.y += fall * 11 + preLand * 5 - armFloat * 10;
 
     base.frontLeg.knee.x += localDir * (tuck * 11 + travel * 7 - landingReach * 5) * spec.stance;
-    base.frontLeg.knee.y += tuck * 13 - rise * 7 + landingReach * 7;
-    base.frontLeg.foot.x += localDir * (tuck * 9 + travel * 14 + landingReach * 13) * spec.stance * airStyle.reach;
-    base.frontLeg.foot.y += tuck * 20 - rise * 8 + landingReach * 18;
+    base.frontLeg.knee.y += tuck * 13 - rise * 7 + landingReach * 8 + preLand * 3;
+    base.frontLeg.foot.x += localDir * (tuck * 9 + travel * 14 + landingReach * 14) * spec.stance * airStyle.reach;
+    base.frontLeg.foot.y += tuck * 20 - rise * 8 + landingReach * 20 + preLand * 6;
     base.backLeg.knee.x -= localDir * (tuck * 8 + travel * 5) * spec.stance;
-    base.backLeg.knee.y += tuck * 8 - apex * 5 + fall * 5;
-    base.backLeg.foot.x -= localDir * (tuck * 14 + travel * 10 - fall * 3) * spec.stance;
-    base.backLeg.foot.y += tuck * 13 - apex * 6 + fall * 9;
+    base.backLeg.knee.y += tuck * 8 - visualApex * 5 + fall * 5 + preLand * 4;
+    base.backLeg.foot.x -= localDir * (tuck * 14 + travel * 10 - fall * 3 - preLand * 4) * spec.stance;
+    base.backLeg.foot.y += tuck * 13 - visualApex * 6 + fall * 9 + preLand * 9;
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + localDir * preLand * 0.028 * aerialBody.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - localDir * preLand * 0.024 * aerialBody.foot;
   }
 
   if (airborne) {
