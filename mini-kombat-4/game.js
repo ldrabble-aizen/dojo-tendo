@@ -583,6 +583,17 @@ function characterGuard(f) {
   return CHARACTER_GUARD[f?.profileId] ?? CHARACTER_GUARD.default;
 }
 
+function guardAbsorptionProfile(f) {
+  return {
+    p1: { shoulder: 0.82, hip: 1.18, hand: 0.88, foot: 1.2, twist: 0.76, shield: 0.9 },
+    p2: { shoulder: 1.18, hip: 0.82, hand: 1.22, foot: 0.82, twist: 1.18, shield: 1.16 },
+    p3: { shoulder: 0.72, hip: 1.3, hand: 0.76, foot: 1.28, twist: 0.68, shield: 0.94 },
+    p4: { shoulder: 1.16, hip: 0.86, hand: 1.18, foot: 0.86, twist: 1.2, shield: 1.12 },
+    p5: { shoulder: 1.24, hip: 0.78, hand: 1.26, foot: 0.78, twist: 1.26, shield: 1.18 },
+    p6: { shoulder: 0.94, hip: 1.08, hand: 0.94, foot: 1.08, twist: 0.9, shield: 1.02 },
+  }[f?.profileId] ?? { shoulder: 1, hip: 1, hand: 1, foot: 1, twist: 1, shield: 1 };
+}
+
 function counterReadinessProfile(f) {
   return {
     p1: { drive: 0.86, coil: 1.14, hand: 0.92, lift: 0.78, foot: 1.22, sink: 1.18, ring: 1.14, angle: 0.82 },
@@ -15861,8 +15872,15 @@ function getPose(f, stride) {
     const brace = guardProfile.brace;
     const handLift = guardProfile.handLift;
     const crouchPress = guardProfile.crouch;
+    const absorption = guardAbsorptionProfile(f);
+    const impactAbsorb = smoothStep01(guardImpact) * absorption.shield;
 
     base.torsoTilt -= (0.012 * guardHold + 0.026 * guardSnap) * brace;
+    base.torsoTilt -= (impactAbsorb * 0.018 + guardSnap * 0.006) * absorption.twist;
+    base.frontArm.shoulder.x -= impactAbsorb * 2.2 * spec.stance * absorption.shoulder;
+    base.frontArm.shoulder.y += impactAbsorb * 1.9 * absorption.shoulder;
+    base.backArm.shoulder.x += impactAbsorb * 1.8 * spec.stance * absorption.shoulder;
+    base.backArm.shoulder.y += impactAbsorb * 1.6 * absorption.shoulder;
     base.frontArm.elbow.x += (guardBreath * 1.6 - guardSnap * 2.4) * spec.stance * brace;
     base.frontArm.elbow.y -= (guardHold * 2.8 + guardSnap * 4.8) * handLift;
     base.frontArm.hand.x += (guardBreath * 2.2 - guardSnap * 3.4) * spec.stance * brace;
@@ -15875,8 +15893,26 @@ function getPose(f, stride) {
     base.backLeg.knee.y += (guardHold * 3.2 + guardSnap * 6.2) * crouchPress;
     base.frontLeg.foot.x += (guardHold * 2.6 + guardSnap * 5.6) * spec.stance * brace;
     base.backLeg.foot.x -= (guardHold * 4.2 + guardSnap * 8.2) * spec.stance * brace;
+    base.frontLeg.hip.x -= impactAbsorb * 1.6 * spec.stance * absorption.hip;
+    base.frontLeg.hip.y += impactAbsorb * 1.8 * absorption.hip;
+    base.backLeg.hip.x += impactAbsorb * 2.4 * spec.stance * absorption.hip;
+    base.backLeg.hip.y += impactAbsorb * 2.4 * absorption.hip;
+    base.frontArm.elbow.x -= impactAbsorb * 2.8 * spec.stance * absorption.hand;
+    base.frontArm.hand.x -= impactAbsorb * 5.6 * spec.stance * absorption.hand;
+    base.frontArm.hand.y += impactAbsorb * 2.4 * absorption.hand;
+    base.backArm.elbow.x += impactAbsorb * 2.2 * spec.stance * absorption.hand;
+    base.backArm.hand.x += impactAbsorb * 4.4 * spec.stance * absorption.hand;
+    base.backArm.hand.y += impactAbsorb * 1.8 * absorption.hand;
+    base.frontLeg.knee.x += impactAbsorb * 4.2 * spec.stance * absorption.foot;
+    base.backLeg.knee.x -= impactAbsorb * 5.4 * spec.stance * absorption.foot;
+    base.frontLeg.foot.x += impactAbsorb * 6.8 * spec.stance * absorption.foot;
+    base.backLeg.foot.x -= impactAbsorb * 8.6 * spec.stance * absorption.foot;
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.52 + guardHold * 0.26 + guardSnap * 0.22, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.62 + guardHold * 0.28 + guardSnap * 0.28, 0, 1));
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + impactAbsorb * 0.026 * absorption.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - impactAbsorb * 0.038 * absorption.foot;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.66 + impactAbsorb * 0.24, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.78 + impactAbsorb * 0.22, 0, 1));
 
     const guardLowStyle = {
       p1: { sink: 1.12, shoulder: 0.86, foot: 1.2, arm: 0.86, angle: 0.72 },
@@ -18846,6 +18882,7 @@ function drawGiFolds(f, shoulder, waist, crouch) {
 
 function drawGuard(color, crouch, f) {
   const guardProfile = characterGuard(f);
+  const absorption = guardAbsorptionProfile(f);
   const guard = clamp((f?.guardPulse ?? 0) / 18, 0, 1);
   const impact = clamp((f?.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1);
   const counter = clamp((f?.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
@@ -18891,6 +18928,23 @@ function drawGuard(color, crouch, f) {
       ctx.beginPath();
       ctx.moveTo(centerX - 7 + lane * 5, centerY - radius * 0.78 + lane * 7);
       ctx.lineTo(centerX + 22 + impact * 16 * guardProfile.recoil + lane * 7, centerY + lane * 12);
+      ctx.stroke();
+    }
+  }
+
+  if (impact > 0.08) {
+    ctx.strokeStyle = colorWithAlpha("#ffffff", (0.1 + impact * 0.28) * absorption.shield);
+    ctx.lineWidth = (1.1 + impact * 1.4) * guardProfile.shieldWidth;
+    ctx.lineCap = "round";
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(centerX - radius * 0.42, centerY + side * radius * 0.34);
+      ctx.quadraticCurveTo(
+        centerX + impact * 18 * guardProfile.recoil,
+        centerY + side * radius * (0.18 - impact * 0.08),
+        centerX + radius * (0.58 + impact * 0.16),
+        centerY + side * radius * 0.12
+      );
       ctx.stroke();
     }
   }
