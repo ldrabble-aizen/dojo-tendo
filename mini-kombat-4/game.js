@@ -23125,6 +23125,7 @@ function drawTorso(f, crouch) {
   drawOutfitPattern(f, outfit, shoulder, waist, hip, top, bottom, crouch);
   drawOutfitMaterial(f, outfit, shoulder, waist, hip, top, bottom, crouch);
   drawSpriteTorsoVolume(f, outfit, shoulder, chest, waist, hip, top, bottom, crouch);
+  drawTorsoCoreReadability(f, outfit, shoulder, chest, waist, hip, top, bottom, crouch);
   if (f.profileId === "p3") drawMaguilaRacingTorsoDetails(f, outfit, shoulder, chest, waist, hip, top, bottom, crouch);
 
   ctx.fillStyle = outfit.belt;
@@ -23434,6 +23435,151 @@ function drawSpriteTorsoVolume(f, outfit, shoulder, chest, waist, hip, top, bott
   ctx.moveTo(-shoulder + 16, top + shoulderSlope + 7);
   ctx.quadraticCurveTo(0, top - 10, shoulder - 16, top + shoulderSlope + 7);
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawTorsoCoreReadability(f, outfit, shoulder, chest, waist, hip, top, bottom, crouch) {
+  const spec = bodySpec(f);
+  const lowerWaist = waist * (spec.belly ?? 1);
+  const lowerHip = hip * (spec.belly ? 1.08 : 1);
+  const shoulderSlope = spec.shoulderSlope ?? 8;
+  const attack = f.attack ? attackPresentationProfile(f) : null;
+  const guard = f.blocking ? guardPresentationMotion(f) : null;
+  const reaction = (f.hurt > 0 || (f.reactionPulse ?? 0) > 0) ? reactionPresentationProfile(f) : null;
+  const result = resultPresentationMotion(f);
+  const attackPressure = clamp((attack?.drive ?? 0) * 0.48 + (attack?.load ?? 0) * 0.24 + (attack?.follow ?? 0) * 0.18, 0, 1.45);
+  const guardPressure = clamp((guard?.brace ?? 0) * 0.34 + (guard?.shoulderSink ?? 0) * 0.2 + (guard?.hipSet ?? 0) * 0.16, 0, 1.35);
+  const hurtPressure = clamp((reaction?.force ?? 0) * 0.46 + (reaction?.torsoCompress ?? 0) * 0.34 + (reaction?.creaseAlpha ?? 0) * 0.22, 0, 1.45);
+  const resultLift = clamp((result?.heroChest ?? 0) * 0.44 + (result?.heroShoulderSet ?? 0) * 0.22, 0, 1.15);
+  const resultDrop = clamp((result?.loose ?? 0) * 0.28 + (result?.collapse ?? 0) * 0.22, 0, 1.1);
+  const crouchSettle = clamp(crouch / 20, 0, 1);
+  const pressure = clamp(Math.max(attackPressure, guardPressure, hurtPressure, resultLift, resultDrop) + crouchSettle * 0.2, 0, 1.7);
+  const profileSeed = f.profileId?.charCodeAt(1) ?? 0;
+  const breath = Math.sin(roundFrame * 0.086 + profileSeed * 0.37) * (0.34 + resultLift * 0.18 - resultDrop * 0.08);
+  const twist = clamp(
+    (attack?.freeSide ?? 0) * (attackPressure * 0.8) -
+      (guard?.shieldLean ?? 0) * 0.55 -
+      (reaction?.localDir ?? 0) * hurtPressure * 0.72 +
+      (result?.sway ?? 0) * 0.32,
+    -1.4,
+    1.4
+  );
+  const ribLift = clamp(resultLift + attackPressure * 0.38 - resultDrop * 0.36 - crouchSettle * 0.14, -0.55, 1.35);
+  const hipLoad = clamp(guardPressure * 0.58 + hurtPressure * 0.38 + crouchSettle * 0.5 + resultDrop * 0.42, 0, 1.55);
+  const chestY = -103 + crouch - ribLift * 2.4 + breath;
+  const waistY = -76 + crouch + hipLoad * 1.8;
+  const pelvisY = -47 + crouch + hipLoad * 2.6 + resultDrop * 1.6;
+  const trim = outfit.accent ?? f.trim ?? "#fff1bd";
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(-shoulder + 7, top + shoulderSlope + 4);
+  ctx.bezierCurveTo(-chest - 5, -110 + crouch, -lowerWaist - 5, -68 + crouch, -lowerHip + 1, bottom);
+  ctx.lineTo(lowerHip - 1, bottom);
+  ctx.bezierCurveTo(lowerWaist + 5, -68 + crouch, chest + 5, -110 + crouch, shoulder - 7, top + shoulderSlope + 4);
+  ctx.quadraticCurveTo(0, top - 6, -shoulder + 7, top + shoulderSlope + 4);
+  ctx.closePath();
+  ctx.clip();
+
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(27, 14, 10, ${0.08 + pressure * 0.04})`;
+  ctx.beginPath();
+  ctx.ellipse(-twist * 1.8, waistY + 1, lowerWaist * (0.82 + hipLoad * 0.08), 22 + pressure * 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(30, 16, 12, ${0.07 + hipLoad * 0.045 + resultDrop * 0.04})`;
+  ctx.beginPath();
+  ctx.ellipse(twist * 1.2, pelvisY, lowerHip * 0.82, 13 + hipLoad * 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.07 + resultLift * 0.06})`;
+  ctx.beginPath();
+  ctx.ellipse(-chest * 0.28 - twist * 1.5, chestY, chest * 0.38, 25 + ribLift * 2, -0.2 - twist * 0.02, 0, Math.PI * 2);
+  ctx.ellipse(chest * 0.22 - twist * 0.4, chestY + 1, chest * 0.34, 23 + ribLift * 1.4, 0.22 - twist * 0.02, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = colorWithAlpha(trim, 0.12 + pressure * 0.045 + resultLift * 0.05);
+  ctx.lineWidth = 1.4 + pressure * 0.42;
+  ctx.beginPath();
+  ctx.moveTo(-shoulder + 15, top + shoulderSlope + 12);
+  ctx.bezierCurveTo(-chest * 0.55 - twist * 1.2, -111 + crouch - ribLift, -chest * 0.34, -101 + crouch, -7 - twist, -98 + crouch);
+  ctx.moveTo(shoulder - 15, top + shoulderSlope + 12);
+  ctx.bezierCurveTo(chest * 0.55 - twist * 1.2, -111 + crouch - ribLift, chest * 0.34, -101 + crouch, 7 - twist, -98 + crouch);
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = `rgba(32, 18, 14, ${0.24 + pressure * 0.08})`;
+  ctx.lineWidth = 1.8 + pressure * 0.5;
+  ctx.beginPath();
+  ctx.moveTo(-8 - twist * 1.4, -119 + crouch);
+  ctx.bezierCurveTo(-3 - twist, -104 + crouch, 2 + twist * 0.2, -88 + crouch, -1 + twist * 0.8, -68 + crouch);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 + resultLift * 0.06})`;
+  ctx.lineWidth = 1.2 + resultLift * 0.55;
+  ctx.beginPath();
+  ctx.moveTo(-lowerWaist + 8, waistY - 5);
+  ctx.bezierCurveTo(-waist * 0.35 - twist, waistY + 4 + pressure, waist * 0.35 - twist, waistY + 4 + pressure, lowerWaist - 8, waistY - 5);
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "multiply";
+  ctx.strokeStyle = `rgba(28, 15, 11, ${0.16 + guardPressure * 0.08 + hurtPressure * 0.1 + resultDrop * 0.08})`;
+  ctx.lineWidth = 1.5 + pressure * 0.5;
+  for (let side = -1; side <= 1; side += 2) {
+    ctx.beginPath();
+    ctx.moveTo(side * (shoulder - 18), top + shoulderSlope + 20);
+    ctx.bezierCurveTo(side * (waist + 8) - twist, -93 + crouch, side * (waist + 4) - twist * 0.4, -65 + crouch, side * (lowerHip - 10), bottom - 5);
+    ctx.stroke();
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+  const foldAlpha = 0.12 + pressure * 0.08;
+  ctx.strokeStyle = `rgba(255, 255, 255, ${foldAlpha})`;
+  ctx.lineWidth = 1.1 + attackPressure * 0.55 + guardPressure * 0.32;
+  for (let i = 0; i < 3; i += 1) {
+    const lane = i - 1;
+    const y = -91 + crouch + i * 14 + hipLoad * 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-lowerWaist + 10 + lane * 2, y);
+    ctx.bezierCurveTo(-waist * 0.36 - twist * 0.8, y + 6 + pressure * 1.4, waist * 0.36 - twist * 0.2, y + 6 + pressure * 1.4, lowerWaist - 10 - lane * 2, y);
+    ctx.stroke();
+  }
+
+  if (f.build === "racingHeavy") {
+    ctx.globalCompositeOperation = "multiply";
+    ctx.strokeStyle = "rgba(9, 24, 48, 0.2)";
+    ctx.lineWidth = 2.1 + pressure * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(-lowerWaist + 6, -82 + crouch + hipLoad);
+    ctx.bezierCurveTo(-18, -73 + crouch + hipLoad * 2, 18, -73 + crouch + hipLoad * 2, lowerWaist - 6, -82 + crouch + hipLoad);
+    ctx.moveTo(-lowerWaist + 9, -63 + crouch + hipLoad);
+    ctx.bezierCurveTo(-14, -56 + crouch + hipLoad * 2, 14, -56 + crouch + hipLoad * 2, lowerWaist - 9, -63 + crouch + hipLoad);
+    ctx.stroke();
+  } else if (f.build === "tallLean") {
+    ctx.strokeStyle = colorWithAlpha(trim, 0.18 + resultLift * 0.05);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-12 - twist * 0.4, -116 + crouch);
+    ctx.bezierCurveTo(-8 - twist * 0.2, -93 + crouch, -7 + twist * 0.25, -67 + crouch, -10, -43 + crouch);
+    ctx.moveTo(12 - twist * 0.4, -116 + crouch);
+    ctx.bezierCurveTo(8 - twist * 0.2, -93 + crouch, 7 + twist * 0.25, -67 + crouch, 10, -43 + crouch);
+    ctx.stroke();
+  } else if (f.build === "slimFemale" || f.build === "softFemale") {
+    ctx.strokeStyle = colorWithAlpha(trim, f.build === "softFemale" ? 0.22 : 0.26);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-waist - 5, -72 + crouch + hipLoad);
+    ctx.bezierCurveTo(-waist * 0.34 - twist, -63 + crouch + hipLoad, waist * 0.34 - twist * 0.4, -63 + crouch + hipLoad, waist + 5, -72 + crouch + hipLoad);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.07)";
+    ctx.beginPath();
+    ctx.ellipse(0, -47 + crouch + hipLoad, hip * 0.66, 7.5 + resultDrop * 1.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.restore();
 }
 
