@@ -1554,6 +1554,126 @@ function movementPresentationMotion(f, walking = false, stride = 0) {
   };
 }
 
+function pivotTransitionActingProfile(f, movePresent = movementPresentationMotion(f, false, 0), context = {}) {
+  const grounded = !!f?.grounded;
+  const available = grounded && !winner && (f?.hurt ?? 0) <= 0 && !f?.attack;
+  const pivot = movePresent?.pivot ?? pivotVisualMotion(f);
+  if (!available || (pivot?.activeAmount ?? 0) <= 0.025) {
+    return { active: 0 };
+  }
+
+  const style = pivot.style ?? movementPivotProfile(f);
+  const dir = f?.dir || 1;
+  const stopDir = f?.walkStopDir || pivot.stopDir || Math.sign(f?.vx ?? 0) || dir;
+  const moveDir = f?.moveIntent || pivot.moveDir || Math.sign(f?.vx ?? 0) || dir;
+  const faceDir = f?.facingTurnTo || pivot.faceDir || dir;
+  const leadDir = pivot.faceRaw > 0.035 ? faceDir : pivot.stopRaw > 0.035 ? stopDir : moveDir;
+  const localDir = leadDir === dir ? 1 : -1;
+  const anchorSide = f?.walkAnchorSide || f?.footPlantSide || movePresent?.pivotSide || (localDir > 0 ? 1 : -1);
+  const plantSide = anchorSide >= 0 ? 1 : -1;
+  const releaseSide = -plantSide;
+  const clock = (roundFrame ?? 0) + (f?.profileId?.charCodeAt(1) ?? 0) * 13 + (context.stride ?? 0) * 5;
+  const pulse = Math.sin(clock * 0.18) * 0.5 + 0.5;
+  const stopSpeed = clamp(f?.walkStopSpeed ?? pivot.stopSpeed ?? 0.45, 0, 1.55);
+  const brakePress = clamp((pivot.stop * 0.72 + pivot.press * 0.38 + (movePresent?.stopHeelCatch ?? 0) * 0.34) * style.brake, 0, 1.95);
+  const heelCatch = clamp((pivot.stop * 0.56 + pivot.stopRebound * 0.22 + stopSpeed * pivot.stopRaw * 0.22) * style.foot, 0, 1.7);
+  const rebound = clamp((pivot.stopRebound * 0.58 + pivot.snap * 0.28) * style.snap, 0, 1.55);
+  const pivotPress = clamp((movePresent?.pivotFootPress ?? 0) * 0.54 + pivot.press * 0.48, 0, 1.8);
+  const toeGrip = clamp((pivotPress * 0.58 + heelCatch * 0.34 + Math.max(pivot.moveTurn, pivot.faceTurn) * 0.18) * style.foot, 0, 1.65);
+  const hipCounter = clamp(((movePresent?.pivotHipTwist ?? 0) * 0.52 + pivot.faceTurn * 0.58 + pivot.moveTurn * 0.34) * style.hip, 0, 1.7);
+  const shoulderLag = clamp(((movePresent?.pivotShoulderLag ?? 0) * 0.42 + pivot.faceSnap * 0.58 + pivot.moveSnap * 0.36 + brakePress * 0.24) * style.shoulder, 0, 1.65);
+  const unwind = clamp((rebound * 0.62 + pivot.faceSnap * 0.42 + pivot.moveSnap * 0.3 + pulse * 0.04 * pivotPress) * style.snap, 0, 1.55);
+  const handDrag = clamp((brakePress * 0.5 + shoulderLag * 0.72 + unwind * 0.22) * style.shoulder, 0, 1.8);
+  const weightDrop = clamp((brakePress * 0.44 + pivotPress * 0.42 + heelCatch * 0.3 - rebound * 0.1) * style.brake, 0, 1.75);
+  const active = clamp(Math.max(brakePress, heelCatch, rebound, pivotPress, toeGrip, hipCounter, shoulderLag, handDrag, weightDrop), 0, 1.95);
+
+  return {
+    active,
+    style,
+    localDir,
+    plantSide,
+    releaseSide,
+    brakePress,
+    heelCatch,
+    rebound,
+    pivotPress,
+    toeGrip,
+    hipCounter,
+    shoulderLag,
+    unwind,
+    handDrag,
+    weightDrop,
+    faceBias: clamp(pivot.faceTurn + pivot.faceSnap * 0.42, 0, 1.65),
+    moveBias: clamp(pivot.moveTurn + pivot.moveSnap * 0.34, 0, 1.55),
+  };
+}
+
+function applyPivotTransitionActingPose(base, f, spec, context = {}) {
+  if (!base || !f || !spec || f.attack || winner) return;
+
+  const acting = pivotTransitionActingProfile(f, context.movePresent, context);
+  if (acting.active <= 0.025) return;
+
+  const stance = spec.stance ?? 1;
+  const dirScale = (f.dir || 1) * stance;
+  const local = acting.localDir;
+  const plantFront = acting.plantSide >= 0;
+  const supportLeg = plantFront ? base.frontLeg : base.backLeg;
+  const releaseLeg = plantFront ? base.backLeg : base.frontLeg;
+  const supportSign = plantFront ? 1 : -1;
+  const releaseSign = -supportSign;
+  const brake = acting.brakePress;
+  const catchHeel = acting.heelCatch;
+  const rebound = acting.rebound;
+  const toeGrip = acting.toeGrip;
+  const hip = acting.hipCounter;
+  const shoulder = acting.shoulderLag;
+  const handDrag = acting.handDrag;
+  const drop = acting.weightDrop;
+  const unwind = acting.unwind;
+  const turnRead = acting.faceBias * 0.65 + acting.moveBias * 0.42;
+
+  base.torsoTilt += local * (rebound * 0.012 - brake * 0.018) * acting.style.sway + (f.dir || 1) * (turnRead * 0.012 - hip * 0.006);
+  base.frontArm.shoulder.x -= dirScale * local * shoulder * 0.9;
+  base.backArm.shoulder.x += dirScale * local * shoulder * 0.62;
+  base.frontArm.shoulder.y += drop * 0.62 - unwind * 0.22;
+  base.backArm.shoulder.y += drop * 0.78 - rebound * 0.18;
+  base.frontLeg.hip.x += dirScale * (local * hip * 0.9 - supportSign * toeGrip * 0.34);
+  base.backLeg.hip.x -= dirScale * (local * hip * 0.74 - releaseSign * rebound * 0.22);
+  base.frontLeg.hip.y += drop * 0.46 + (plantFront ? catchHeel * 0.44 : rebound * 0.18);
+  base.backLeg.hip.y += drop * 0.58 + (!plantFront ? catchHeel * 0.5 : rebound * 0.16);
+
+  base.frontArm.elbow.x -= dirScale * local * (handDrag * 2.8 + unwind * 1.4);
+  base.frontArm.elbow.y += drop * 1.4 - unwind * 1.2;
+  base.frontArm.hand.x -= dirScale * local * (handDrag * 5.4 + unwind * 2.2);
+  base.frontArm.hand.y += drop * 2.8 - unwind * 2.6;
+  base.backArm.elbow.x += dirScale * local * (handDrag * 2.15 - rebound * 0.9);
+  base.backArm.elbow.y += drop * 1.25 - rebound * 1.15;
+  base.backArm.hand.x += dirScale * local * (handDrag * 4.25 - rebound * 1.45);
+  base.backArm.hand.y += drop * 2.35 - rebound * 2.1;
+  base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + toeGrip * 0.055 + brake * 0.035 - unwind * 0.025, 0.05, 1);
+  base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.48) + toeGrip * 0.045 + brake * 0.026 - rebound * 0.018, 0.05, 1);
+  base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(handDrag * 0.22 + unwind * 0.18, 0, 0.72));
+  base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(handDrag * 0.18 + rebound * 0.16, 0, 0.62));
+
+  supportLeg.knee.x += dirScale * supportSign * (toeGrip * 2.8 + catchHeel * 1.9 + hip * 1.2);
+  supportLeg.knee.y += drop * 3.4 + catchHeel * 2.6 + brake * 1.3;
+  supportLeg.foot.x += dirScale * supportSign * (toeGrip * 3.9 + catchHeel * 2.7 + hip * 1.4);
+  supportLeg.foot.y += catchHeel * 0.82 + brake * 0.42;
+  supportLeg.plant = Math.max(supportLeg.plant ?? 0, clamp(0.64 + toeGrip * 0.26 + catchHeel * 0.18 + brake * 0.08, 0, 1));
+  supportLeg.toeFlex = Math.max(supportLeg.toeFlex ?? 0, clamp(toeGrip * 0.5 + catchHeel * 0.2 + turnRead * 0.12, 0, 0.92));
+  supportLeg.footAngle = (supportLeg.footAngle ?? 0) + supportSign * (toeGrip * 0.018 + catchHeel * 0.014 + turnRead * 0.008);
+  supportLeg.extension = Math.max(supportLeg.extension ?? 0, clamp(toeGrip * 0.16 + catchHeel * 0.1, 0, 0.38));
+
+  releaseLeg.knee.x += dirScale * releaseSign * (rebound * 2.4 + unwind * 1.8 - brake * 0.45);
+  releaseLeg.knee.y += drop * 1.45 - rebound * 1.1;
+  releaseLeg.foot.x += dirScale * releaseSign * (rebound * 4.8 + unwind * 2.8 - brake * 0.8);
+  releaseLeg.foot.y -= rebound * 1.3 + unwind * 0.8 - drop * 0.36;
+  releaseLeg.lift = Math.max(releaseLeg.lift ?? 0, clamp(rebound * 0.38 + unwind * 0.26, 0, 0.82));
+  releaseLeg.toeFlex = Math.max(releaseLeg.toeFlex ?? 0, clamp(rebound * 0.28 + unwind * 0.2, 0, 0.72));
+  releaseLeg.footAngle = (releaseLeg.footAngle ?? 0) - releaseSign * (rebound * 0.02 + unwind * 0.014);
+}
+
 function whiffRecoveryProfile(f) {
   return {
     p1: { torso: 1.14, arm: 0.86, foot: 1.2, rebound: 0.82, trail: 0.9, settle: 1.18, balance: 0.8, shoulderLag: 0.86, hipSlip: 1.18, freeLimb: 0.9, plant: 1.22 },
@@ -22000,6 +22120,11 @@ function getPose(f, stride) {
       base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, resultPresent.collapse * 0.16 + floorDrag * 0.1 + koFloorContact * 0.08 + ankleRoll * 0.11 + floorCompression * 0.07);
     }
   }
+
+  applyPivotTransitionActingPose(base, f, spec, {
+    movePresent,
+    stride,
+  });
 
   applyLimbMicroActingPose(base, f, spec, {
     movePresent,
