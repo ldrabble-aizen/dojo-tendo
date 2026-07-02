@@ -16546,6 +16546,175 @@ function drawSpriteAttackMotionTrace(f, crouch, type, power, read, phase) {
     ctx.stroke();
   }
 
+  drawAttackKineticReadability(f, crouch, type, power, read, phase, { variant: "sprite", intensity: 0.62 });
+
+  ctx.restore();
+}
+
+function drawAttackKineticReadability(f, crouch, type, power, read, phase, options = {}) {
+  if (!f?.attack || power <= 0.035 || (f?.hurt ?? 0) > 0 || winner) return;
+
+  const spec = attackVisualSpec(type);
+  const presentation = attackPresentationProfile(f);
+  const silhouette = attackSilhouetteAnatomyProfile(f, presentation);
+  const acting = attackActingPolishProfile(f, presentation, null, silhouette);
+  const motion = characterMotion(f);
+  const signature = spec.special ? fighterSignatureStyle(f) : null;
+  const intensity = options.intensity ?? 1;
+  const variant = options.variant ?? "arc";
+  const localCrouch = crouch * 0.18;
+  const snap = clamp(Math.max(phase.snap, acting.snap * 0.72, phase.strike * 0.76), 0, 1.35);
+  const follow = clamp(Math.max(phase.followThrough, acting.follow * 0.72, phase.recovery * 0.24), 0, 1.25);
+  const wind = clamp(Math.max(phase.anticipation * 0.68, acting.anticipation * 0.48), 0, 1.18);
+  const lineRead = clamp((read?.clarity ?? 0) * 0.72 + silhouette.attackLine * 0.36 + acting.actionLine * 0.32, 0, 1.55);
+  const leg = spec.kick || spec.sweep;
+  const sweep = spec.sweep;
+  const grab = spec.grab;
+  const special = spec.special;
+  const style = signature ?? { core: spec.core, rim: spec.color, trail: spec.color };
+  const accent = special ? style.rim : spec.color;
+  const core = special ? style.core : spec.core;
+  const trail = special ? style.trail : f.trim ?? spec.color;
+  const reach = (
+    sweep ? 136 :
+    leg ? 124 :
+    grab ? 108 :
+    special ? 118 :
+    96
+  ) * motion.reach * (0.92 + lineRead * 0.08);
+  const height = (
+    sweep ? 12 :
+    leg ? 39 :
+    grab ? 32 :
+    special ? 34 :
+    24
+  ) * motion.lift;
+  const baseY = (
+    sweep ? -20 :
+    leg ? -42 :
+    grab ? -22 :
+    special ? -16 :
+    -10
+  ) + localCrouch * (variant === "sprite" ? 1.1 : 0.24);
+  const liftY = sweep ? -8 : leg ? -40 : special ? -31 : grab ? -20 : -25;
+  const pressure = clamp(power * 0.48 + lineRead * 0.28 + snap * 0.32 + follow * 0.16, 0, 1.55) * intensity;
+  if (pressure <= 0.035) return;
+
+  const laneCount = special || grab ? 4 : leg ? 3 : 2;
+  const laneGap = sweep ? 5.5 : leg ? 8.5 : 6.5;
+  const laneReach = reach + snap * (sweep ? 25 : leg ? 30 : special ? 22 : 18);
+  const startX = -18 - wind * (sweep ? 16 : 11);
+  const endX = laneReach + snap * (sweep ? 20 : leg ? 24 : 15) - follow * 10;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.globalAlpha = clamp(0.025 + pressure * 0.05 + wind * 0.015, 0.018, special ? 0.12 : 0.095);
+  const glow = ctx.createRadialGradient(22, baseY, 4, reach * 0.42, baseY + liftY * 0.35, reach * (special ? 0.96 : 0.82));
+  glow.addColorStop(0, colorWithAlpha(core, 0.12 + snap * 0.04));
+  glow.addColorStop(0.48, colorWithAlpha(accent, 0.08 + lineRead * 0.035));
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(reach * 0.42 + snap * 4, baseY + liftY * 0.28, reach * 0.56, Math.max(8, height * 0.92), sweep ? -0.02 : -0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  for (let i = 0; i < laneCount; i += 1) {
+    const mid = (laneCount - 1) / 2;
+    const lane = i - mid;
+    const laneFade = 1 - Math.abs(lane) / (laneCount + 0.8);
+    const laneLead = i / Math.max(1, laneCount - 1);
+    const laneAlpha = clamp((0.038 + pressure * 0.07) * laneFade * (1 - laneLead * 0.2), 0.018, 0.16);
+    ctx.globalAlpha = laneAlpha;
+    ctx.strokeStyle = colorWithAlpha(i === 0 || special ? core : trail, special ? 0.82 : 0.72);
+    ctx.lineWidth = (special ? 2.4 : grab ? 2.15 : leg ? 2.05 : 1.55) + snap * 1.05 - laneLead * 0.34;
+    ctx.beginPath();
+    ctx.moveTo(startX - laneLead * 8, baseY + lane * laneGap + wind * (sweep ? 2 : 4));
+    ctx.bezierCurveTo(
+      reach * 0.2 + wind * 9,
+      baseY + lane * laneGap + liftY * (0.74 + laneLead * 0.12) - snap * 5,
+      reach * 0.58 + snap * 12,
+      baseY + liftY * (1.04 + laneLead * 0.1) - lane * laneGap * 0.36,
+      endX - laneLead * 10,
+      baseY + (sweep ? lane * 1.8 : lane * 3.2) - follow * (leg ? 9 : 5)
+    );
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = clamp(0.035 + snap * 0.09 + lineRead * 0.035, 0.02, 0.18) * intensity;
+  ctx.strokeStyle = colorWithAlpha("#ffffff", special ? 0.74 : 0.58);
+  ctx.lineWidth = 0.8 + snap * 0.75;
+  ctx.beginPath();
+  ctx.moveTo(reach * 0.34, baseY + liftY * 0.72);
+  ctx.quadraticCurveTo(reach * 0.62 + snap * 8, baseY + liftY * 1.1 - snap * 3, endX + snap * 8, baseY - follow * 4);
+  ctx.stroke();
+
+  if (snap > 0.045) {
+    const tipX = endX + snap * (leg ? 6 : 4);
+    const tipY = baseY - follow * (leg ? 7 : 4);
+    ctx.globalAlpha = clamp(0.035 + snap * 0.12 + pressure * 0.035, 0.025, special ? 0.22 : 0.18);
+    ctx.fillStyle = colorWithAlpha(core, special ? 0.72 : 0.58);
+    ctx.beginPath();
+    ctx.ellipse(tipX, tipY, sweep ? 24 + snap * 12 : leg ? 20 + snap * 10 : 15 + snap * 8, sweep ? 4.4 + snap * 2 : 5.5 + snap * 2.2, sweep ? 0.02 : -0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = clamp(0.04 + snap * 0.11, 0.025, 0.17) * intensity;
+    ctx.strokeStyle = colorWithAlpha("#ffffff", 0.7);
+    ctx.lineWidth = 0.75 + snap * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(tipX - (sweep ? 22 : 15), tipY - 4);
+    ctx.lineTo(tipX + (sweep ? 18 : 14) + lineRead * 7, tipY - 2);
+    ctx.stroke();
+  }
+
+  if (follow > 0.035) {
+    ctx.globalAlpha = clamp(0.026 + follow * 0.072, 0.018, 0.12) * intensity;
+    ctx.strokeStyle = colorWithAlpha(trail, 0.62);
+    ctx.lineWidth = 0.8 + follow * 0.85;
+    for (let i = 0; i < 2; i += 1) {
+      const lag = 18 + i * 13;
+      const lane = i === 0 ? -0.44 : 0.58;
+      ctx.beginPath();
+      ctx.moveTo(endX - lag - follow * 12, baseY + lane * laneGap - follow * 4);
+      ctx.quadraticCurveTo(
+        reach * 0.68 - lag * 0.32,
+        baseY + liftY * (0.72 - i * 0.1) + lane * laneGap,
+        reach * 0.42 - lag,
+        baseY + liftY * 0.24 + lane * laneGap
+      );
+      ctx.stroke();
+    }
+  }
+
+  if (sweep && f.grounded) {
+    ctx.globalCompositeOperation = "multiply";
+    ctx.globalAlpha = clamp(0.035 + pressure * 0.055 + snap * 0.035, 0.02, 0.12);
+    ctx.fillStyle = "rgba(24, 13, 8, 0.92)";
+    ctx.beginPath();
+    ctx.ellipse(reach * 0.42 + snap * 8, 1 + localCrouch * 0.2, reach * 0.54, 4.5 + snap * 1.8, -0.015, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = "screen";
+    ctx.globalAlpha = clamp(0.035 + snap * 0.08, 0.018, 0.13);
+    ctx.strokeStyle = colorWithAlpha("#fff0b8", 0.62);
+    ctx.lineWidth = 0.85 + snap * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(18, -6 + localCrouch * 0.18);
+    ctx.quadraticCurveTo(reach * 0.45, -12 - snap * 5, reach + snap * 20, -5);
+    ctx.stroke();
+  }
+
+  if (grab || special) {
+    ctx.globalCompositeOperation = "screen";
+    ctx.globalAlpha = clamp(0.026 + pressure * 0.052 + snap * 0.035, 0.018, special ? 0.14 : 0.11);
+    ctx.strokeStyle = colorWithAlpha(special ? style.rim : core, 0.72);
+    ctx.lineWidth = 1 + snap * 0.75;
+    ctx.beginPath();
+    ctx.ellipse(reach * 0.68 + snap * 9, baseY + liftY * 0.25, grab ? 26 + snap * 12 : 34 + snap * 18, grab ? 21 + snap * 9 : 25 + snap * 11, special ? -0.08 : 0.02, Math.PI * 0.12, Math.PI * 1.88);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -18881,6 +19050,7 @@ function drawAttackArc(f, box) {
         ctx.fill();
       }
     }
+    drawAttackKineticReadability(f, 0, f.attack.type, progress, read, phase, { variant: "arc", intensity: 0.72 });
     ctx.restore();
     return;
   }
@@ -18959,6 +19129,7 @@ function drawAttackArc(f, box) {
     ctx.lineTo(tipX + 12 + read.clarity * 6, tipY - 2);
     ctx.stroke();
   }
+  drawAttackKineticReadability(f, 0, f.attack.type, progress, read, phase, { variant: "arc", intensity: 0.82 });
   ctx.globalAlpha = 1;
   ctx.restore();
 }
