@@ -20106,6 +20106,7 @@ function getPose(f, stride) {
       base.backLeg.foot.x -= 7 * activePulse + 3 * windup;
     }
     const specialPresent = specialPresentationMotion(f);
+    const signature = specialSignatureAnatomyProfile(f, specialPresent);
     const technique = specialPresent.technique;
     const charge = specialPresent.charge;
     const release = specialPresent.release;
@@ -20114,33 +20115,43 @@ function getPose(f, stride) {
     const handPush = specialPresent.handPush;
     const footBrace = specialPresent.footBrace;
 
-    base.torsoTilt += -charge * 0.018 * technique.coil + release * 0.034 * technique.arc + specialPresent.torsoArc * 0.012;
-    base.frontArm.shoulder.x -= handPull * 2.2 * spec.stance;
-    base.frontArm.shoulder.y -= release * 2.2 * technique.lift - charge * 1.2 + specialPresent.shoulderLift * 1.4;
-    base.backArm.shoulder.x += handPull * 1.6 * spec.stance;
-    base.backArm.shoulder.y += charge * 1.4;
-    base.frontArm.elbow.x += (-handPull * 5.6 + handPush * 8.8 + focusPulse * 1.4 + specialPresent.palm * 1.2) * spec.stance;
-    base.frontArm.elbow.y += charge * 3.4 - release * 6.2 * technique.lift - specialPresent.focus * 1.6;
-    base.frontArm.hand.x += (-handPull * 8.8 + handPush * 15.5 + focusPulse * 2.4 + specialPresent.palm * 2.4) * spec.stance;
-    base.frontArm.hand.y += charge * 4.8 - release * 9.4 * technique.lift - specialPresent.focus * 2.4;
-    base.backArm.elbow.x += (-handPull * 3.8 + handPush * 6.4 - focusPulse * 1.2 - specialPresent.palm * 0.8) * spec.stance;
-    base.backArm.elbow.y += charge * 2.8 - release * 5.2 * technique.lift - specialPresent.focus * 1.1;
-    base.backArm.hand.x += (-handPull * 5.8 + handPush * 11.2 - focusPulse * 1.8 - specialPresent.palm * 1.5) * spec.stance;
-    base.backArm.hand.y += charge * 3.8 - release * 8.2 * technique.lift - specialPresent.focus * 1.8;
-    base.frontLeg.knee.y += footBrace * 4.8;
-    base.frontLeg.foot.x += (release * 4.2 - charge * 2.8) * spec.stance * technique.foot;
-    base.frontLeg.foot.y += footBrace * 0.55 - release * 1.6 * technique.lift;
-    base.backLeg.knee.y += footBrace * 6.2;
-    base.backLeg.foot.x -= (charge * 8.2 + release * 5.8) * spec.stance * technique.foot;
-    base.backLeg.foot.y += footBrace * 0.75;
-    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.42 + release * 0.26 + footBrace * 0.22, 0, 1));
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.72 + charge * 0.22 + footBrace * 0.2, 0, 1));
-    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + specialPresent.palm * 0.16, 0, 1);
-    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + specialPresent.charge * 0.12 + release * 0.08, 0, 1);
-    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(specialPresent.focus * 0.28, 0, 0.72));
-    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(specialPresent.charge * 0.22, 0, 0.58));
-    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, clamp(release * 0.22, 0, 0.54));
-    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, clamp(footBrace * 0.2, 0, 0.58));
+    base.torsoTilt +=
+      -charge * 0.018 * technique.coil +
+      release * 0.034 * technique.arc +
+      specialPresent.torsoArc * 0.012 -
+      signature.coil * 0.012 +
+      signature.releaseSnap * 0.018 +
+      signature.spineLift * 0.012;
+    base.frontArm.shoulder.x += (-handPull * 2.2 + signature.shoulderHalo * 2.4 - signature.coil * 1.3) * spec.stance;
+    base.frontArm.shoulder.y -= release * 2.2 * technique.lift - charge * 1.2 + specialPresent.shoulderLift * 1.4 + signature.spineLift * 1.8;
+    base.backArm.shoulder.x += (handPull * 1.6 - signature.shoulderHalo * 1.8 + signature.coil * 0.9) * spec.stance;
+    base.backArm.shoulder.y += charge * 1.4 - signature.shoulderHalo * 0.8 + signature.hipAnchor * 0.4;
+    base.frontArm.elbow.x += (-handPull * 5.6 + handPush * 8.8 + focusPulse * 1.4 + specialPresent.palm * 1.2 + signature.wristArc * 4.2 + signature.palmBloom * 2.4) * spec.stance;
+    base.frontArm.elbow.y += charge * 3.4 - release * 6.2 * technique.lift - specialPresent.focus * 1.6 - signature.palmBloom * 2.1 + signature.coil * 1.2;
+    base.frontArm.hand.x += (-handPull * 8.8 + handPush * 15.5 + focusPulse * 2.4 + specialPresent.palm * 2.4 + signature.wristArc * 7.8 + signature.palmBloom * 5.2) * spec.stance;
+    base.frontArm.hand.y += charge * 4.8 - release * 9.4 * technique.lift - specialPresent.focus * 2.4 - signature.palmBloom * 3.4 - signature.auraBreath * 1.2;
+    base.backArm.elbow.x += (-handPull * 3.8 + handPush * 6.4 - focusPulse * 1.2 - specialPresent.palm * 0.8 - signature.wristArc * 2.2 + signature.clothWake * 1.4) * spec.stance;
+    base.backArm.elbow.y += charge * 2.8 - release * 5.2 * technique.lift - specialPresent.focus * 1.1 - signature.shoulderHalo * 1.2 + signature.coil * 0.8;
+    base.backArm.hand.x += (-handPull * 5.8 + handPush * 11.2 - focusPulse * 1.8 - specialPresent.palm * 1.5 - signature.wristArc * 3.6 + signature.clothWake * 2.4) * spec.stance;
+    base.backArm.hand.y += charge * 3.8 - release * 8.2 * technique.lift - specialPresent.focus * 1.8 - signature.shoulderHalo * 2.1 + signature.clothWake * 0.8;
+    base.frontLeg.hip.y = base.frontLeg.hip.y + signature.hipAnchor * 0.7;
+    base.backLeg.hip.y = base.backLeg.hip.y + signature.hipAnchor * 1.1;
+    base.frontLeg.knee.y += footBrace * 4.8 + signature.hipAnchor * 2.8;
+    base.frontLeg.foot.x += (release * 4.2 - charge * 2.8 + signature.releaseSnap * 2.4 - signature.toeBrace * 1.7) * spec.stance * technique.foot;
+    base.frontLeg.foot.y += footBrace * 0.55 - release * 1.6 * technique.lift + signature.floorGlow * 0.35;
+    base.backLeg.knee.y += footBrace * 6.2 + signature.hipAnchor * 4.1;
+    base.backLeg.foot.x -= (charge * 8.2 + release * 5.8 + signature.hipAnchor * 6.2 + signature.toeBrace * 2.8) * spec.stance * technique.foot;
+    base.backLeg.foot.y += footBrace * 0.75 + signature.floorGlow * 0.55;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.42 + release * 0.26 + footBrace * 0.22 + signature.floorGlow * 0.12, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.72 + charge * 0.22 + footBrace * 0.2 + signature.hipAnchor * 0.14, 0, 1));
+    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + specialPresent.palm * 0.16 + signature.palmBloom * 0.09 - signature.fingerFan * 0.035, 0, 1);
+    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + specialPresent.charge * 0.12 + release * 0.08 + signature.coil * 0.045, 0, 1);
+    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(specialPresent.focus * 0.28 + signature.fingerFan * 0.34 + signature.auraBreath * 0.08, 0, 0.88));
+    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(specialPresent.charge * 0.22 + signature.fingerFan * 0.2 + signature.clothWake * 0.08, 0, 0.72));
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, clamp(release * 0.22 + signature.toeBrace * 0.24, 0, 0.76));
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, clamp(footBrace * 0.2 + signature.toeBrace * 0.38 + signature.floorGlow * 0.08, 0, 0.84));
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + signature.toeBrace * 0.012;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - signature.toeBrace * 0.024;
     base.torsoTilt += -load * 0.03 + drive * 0.04;
     base.frontLeg.foot.x += drive * 8 * spec.stance;
     base.backLeg.foot.x -= load * 8 * spec.stance + drive * 8 * spec.stance;
@@ -23599,10 +23610,102 @@ function drawCounterReadyFX(color, crouch, f) {
   ctx.restore();
 }
 
+function specialSignatureAnatomyProfile(f, special = specialPresentationMotion(f)) {
+  const attack = f?.attack;
+  const activeState = attack?.type === "special" && (f?.hurt ?? 0) <= 0 && !winner;
+  const technique = special?.technique ?? specialTechniqueProfile(f);
+  const style = special?.style ?? fighterSignatureStyle(f);
+  const handStyle = style.hand ?? technique.hands ?? 1;
+  const footStyle = style.foot ?? technique.foot ?? 1;
+  const phase = activeState ? attackPhase(attack) : { anticipation: 0, strike: 0, snap: 0, followThrough: 0, recovery: 0, power: 0 };
+  const mass = activeState ? attackMassProfile(f) : { load: 0, drive: 0, snap: 0, plant: 0 };
+  const profileSeed = (f?.profileId?.charCodeAt(1) ?? 1) * 0.37;
+  const dirWeight = (f?.dir || 1) < 0 ? -0.08 : 0.08;
+  const breathe = Math.sin(roundFrame * (0.13 + technique.arc * 0.012) + profileSeed) * 0.5 + 0.5;
+  const shimmer = Math.sin(roundFrame * (0.31 + technique.focus * 0.014) + profileSeed * 1.7) * 0.5 + 0.5;
+  const focus = activeState ? clamp(special?.focus ?? 0, 0, 1.95) : 0;
+  const charge = activeState ? clamp(special?.charge ?? 0, 0, 1.8) : 0;
+  const release = activeState ? clamp(special?.release ?? 0, 0, 1.8) : 0;
+  const palm = activeState ? clamp(special?.palm ?? 0, 0, 1.95) : 0;
+  const wake = activeState ? clamp(special?.wake ?? 0, 0, 1.6) : 0;
+  const orbit = activeState ? clamp(special?.orbit ?? 0, 0, 1.8) : 0;
+  const coil = clamp((charge * 0.7 + phase.anticipation * 0.34 + mass.load * 0.22) * technique.coil, 0, 1.85);
+  const releaseSnap = clamp((release * 0.82 + phase.snap * 0.42 + mass.snap * 0.24) * technique.release, 0, 1.9);
+  const shoulderHalo = clamp((focus * 0.34 + releaseSnap * 0.42 + palm * 0.18 + shimmer * 0.08) * technique.lift, 0, 1.65);
+  const palmBloom = clamp((palm * 0.62 + releaseSnap * 0.46 + focus * 0.18) * technique.hands, 0, 1.85);
+  const wristArc = clamp((orbit * 0.38 + palmBloom * 0.34 + phase.strike * 0.26) * technique.arc, 0, 1.72);
+  const fingerFan = clamp((palmBloom * 0.48 + releaseSnap * 0.3 + focus * 0.16 + shimmer * 0.08) * handStyle, 0, 1.28);
+  const spineLift = clamp((releaseSnap * 0.44 + focus * 0.28 - coil * 0.16 + breathe * 0.08) * technique.lift, 0, 1.45);
+  const hipAnchor = clamp((coil * 0.46 + mass.plant * 0.34 + releaseSnap * 0.18) * technique.foot, 0, 1.62);
+  const toeBrace = clamp((hipAnchor * 0.56 + charge * 0.28 + releaseSnap * 0.2) * footStyle, 0, 1.25);
+  const clothWake = clamp((wake * 0.5 + releaseSnap * 0.32 + focus * 0.18 + Math.abs(dirWeight) * 0.2) * technique.arc, 0, 1.48);
+  const auraBreath = clamp((focus * 0.46 + palmBloom * 0.24 + breathe * 0.16) * technique.focus, 0, 1.6);
+  const floorGlow = clamp((hipAnchor * 0.38 + toeBrace * 0.32 + releaseSnap * 0.18) * technique.foot, 0, 1.32);
+
+  return {
+    active: clamp(Math.max(coil, releaseSnap, shoulderHalo, palmBloom, wristArc, spineLift, hipAnchor, auraBreath), 0, 1.95),
+    coil,
+    releaseSnap,
+    shoulderHalo,
+    palmBloom,
+    wristArc,
+    fingerFan,
+    spineLift,
+    hipAnchor,
+    toeBrace,
+    clothWake,
+    auraBreath,
+    floorGlow,
+  };
+}
+
+function specialProjectileAuraProfile(p, present = specialProjectilePresentation(p)) {
+  const profile = present?.profile ?? {};
+  const age = present?.age ?? 0;
+  const currentLife = present?.life ?? 0;
+  const maxLife = Math.max(1, p?.maxLife ?? currentLife + age);
+  const lifeT = clamp(currentLife / maxLife, 0, 1);
+  const ageT = smoothStep01(clamp(age / 18, 0, 1));
+  const speed = clamp(Math.abs(p?.vx ?? 0) / 8.6, 0, 1.45);
+  const radius = Math.max(8, p?.r ?? profile.radius ?? 14);
+  const dir = present?.dir || ((p?.vx ?? 0) > 0 ? 1 : -1);
+  const spin = profile.spinRate || p?.spinRate || 0.08;
+  const pulse = clamp(present?.pulse ?? 0.5, 0, 1);
+  const wake = clamp(present?.wake ?? 0, 0, 1.45);
+  const wave = clamp(Math.abs(p?.waveAmp ?? profile.waveAmp ?? 0) / 18, 0, 1.25);
+  const orbitClock = age * (spin + 0.05) + (p?.profileId?.charCodeAt(1) ?? 1) * 0.45;
+  const lifeFade = smoothStep01(lifeT);
+  const launchBloom = 1 - ageT * 0.38;
+  const wakeRibbon = clamp((wake * 0.68 + speed * 0.28 + wave * 0.14) * lifeFade, 0, 1.75);
+  const coreBreath = clamp((0.78 + pulse * 0.34 + wake * 0.12 + wave * 0.06) * lifeFade, 0.62, 1.42);
+  const rimShear = clamp((speed * 0.36 + wake * 0.42 + pulse * 0.14) * lifeFade, 0, 1.5);
+  const afterglow = clamp((wake * 0.46 + ageT * 0.26 + speed * 0.14) * lifeFade, 0, 1.38);
+  const laneSpread = clamp((radius / 22) * 0.32 + wave * 0.38 + wake * 0.22, 0, 1.35);
+  const sparkOrbit = clamp((present?.orbit ?? 0) * 0.52 + pulse * 0.32 + wave * 0.18, 0, 1.55);
+  const tailTaper = clamp((wakeRibbon * 0.54 + speed * 0.28 + launchBloom * 0.1) * lifeFade, 0, 1.48);
+  const pressureRing = clamp((rimShear * 0.46 + coreBreath * 0.22 + pulse * 0.2) * lifeFade, 0, 1.45);
+  const inkShadow = clamp((afterglow * 0.34 + laneSpread * 0.26 + speed * 0.12) * lifeFade, 0, 0.95);
+
+  return {
+    wakeRibbon,
+    coreBreath,
+    rimShear,
+    afterglow,
+    laneSpread,
+    sparkOrbit,
+    tailTaper,
+    pressureRing,
+    inkShadow,
+    orbitClock,
+    dir,
+  };
+}
+
 function drawProjectiles() {
   for (const p of projectiles) {
     const style = p.style ?? SPECIAL_STYLES.p1;
     const present = specialProjectilePresentation(p);
+    const aura = specialProjectileAuraProfile(p, present);
     const profile = present.profile;
     for (let i = 0; i < p.trail.length; i += 1) {
       const point = p.trail[i];
@@ -23622,33 +23725,48 @@ function drawProjectiles() {
     glow.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.ellipse(p.x + present.dir * present.wake * 2.5, p.y, glowSize * present.stretch, glowSize * present.compression, present.dir * 0.02, 0, Math.PI * 2);
+    ctx.ellipse(p.x + present.dir * (present.wake * 2.5 + aura.rimShear * 2.4), p.y, glowSize * present.stretch * (1 + aura.coreBreath * 0.04), glowSize * present.compression * (1 + aura.laneSpread * 0.05), present.dir * (0.02 + aura.rimShear * 0.018), 0, Math.PI * 2);
     ctx.fill();
+    if (aura.inkShadow > 0.025) {
+      ctx.save();
+      ctx.globalCompositeOperation = "multiply";
+      ctx.fillStyle = `rgba(12, 11, 18, ${0.025 + aura.inkShadow * 0.055})`;
+      ctx.beginPath();
+      ctx.ellipse(p.x - aura.dir * (p.r * 0.72 + aura.tailTaper * 8), p.y + p.r * 0.9, glowSize * (0.82 + aura.laneSpread * 0.16), glowSize * 0.18, aura.dir * -0.03, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     ctx.save();
     ctx.globalCompositeOperation = "screen";
-    ctx.strokeStyle = colorWithAlpha(style.core, 0.12 + present.halo * 0.16);
-    ctx.lineWidth = 1.2 + present.wake * 1.1;
+    ctx.strokeStyle = colorWithAlpha(style.core, 0.12 + present.halo * 0.16 + aura.wakeRibbon * 0.045);
+    ctx.lineWidth = 1.2 + present.wake * 1.1 + aura.rimShear * 0.6;
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(p.x - present.dir * (p.r * 2.2 + present.wake * 10), p.y - p.r * 0.32);
-    ctx.quadraticCurveTo(p.x - present.dir * p.r * 0.2, p.y - p.r * (1.05 + present.wake * 0.2), p.x + present.dir * (p.r * 1.45 + present.wake * 7), p.y - p.r * 0.12);
+    ctx.moveTo(p.x - present.dir * (p.r * 2.2 + present.wake * 10 + aura.tailTaper * 12), p.y - p.r * (0.32 + aura.laneSpread * 0.08));
+    ctx.quadraticCurveTo(p.x - present.dir * p.r * 0.2, p.y - p.r * (1.05 + present.wake * 0.2 + aura.laneSpread * 0.22), p.x + present.dir * (p.r * 1.45 + present.wake * 7 + aura.rimShear * 5), p.y - p.r * 0.12);
     ctx.stroke();
-    ctx.strokeStyle = `rgba(255,255,255,${0.1 + present.halo * 0.12})`;
-    ctx.lineWidth = 0.8 + present.wake * 0.45;
+    ctx.strokeStyle = `rgba(255,255,255,${0.1 + present.halo * 0.12 + aura.pressureRing * 0.035})`;
+    ctx.lineWidth = 0.8 + present.wake * 0.45 + aura.pressureRing * 0.25;
     ctx.beginPath();
-    ctx.moveTo(p.x - present.dir * p.r * 1.25, p.y + p.r * 0.28);
-    ctx.lineTo(p.x + present.dir * (p.r * 1.55 + present.wake * 4), p.y + p.r * 0.04);
+    ctx.moveTo(p.x - present.dir * (p.r * 1.25 + aura.tailTaper * 5), p.y + p.r * (0.28 + aura.laneSpread * 0.08));
+    ctx.lineTo(p.x + present.dir * (p.r * 1.55 + present.wake * 4 + aura.rimShear * 3), p.y + p.r * 0.04);
     ctx.stroke();
+    if (aura.pressureRing > 0.045) {
+      ctx.strokeStyle = colorWithAlpha(style.rim, 0.055 + aura.pressureRing * 0.08);
+      ctx.lineWidth = 0.8 + aura.pressureRing * 0.35;
+      ctx.beginPath();
+      ctx.ellipse(p.x - aura.dir * aura.tailTaper * 2.4, p.y, glowSize * (0.48 + aura.pressureRing * 0.08), glowSize * (0.23 + aura.laneSpread * 0.04), aura.dir * 0.08, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
 
-    drawSpecialSatellites(p, style, pulse);
+    drawSpecialSatellites(p, style, pulse, present, aura);
     drawSpecialCore(p, style, pulse);
   }
 }
 
-function drawSpecialSatellites(p, style, pulse) {
-  const present = specialProjectilePresentation(p);
+function drawSpecialSatellites(p, style, pulse, present = specialProjectilePresentation(p), aura = specialProjectileAuraProfile(p, present)) {
   const profile = present.profile;
   const age = present.age;
   const dir = present.dir;
@@ -23656,19 +23774,19 @@ function drawSpecialSatellites(p, style, pulse) {
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   for (let i = 0; i < count; i += 1) {
-    const phase = age * (profile.spinRate || 0.08) + i * (Math.PI * 2 / count);
-    const radius = p.r * (p.profileId === "p5" ? 1.55 : p.profileId === "p3" ? 1.32 : 1.18) * (1 + present.orbit * 0.08);
-    const sx = p.x - dir * p.r * 0.22 + Math.cos(phase) * radius * (0.82 + present.wake * 0.05);
-    const sy = p.y + Math.sin(phase) * radius * (p.profileId === "p2" || p.profileId === "p4" ? 0.42 : 0.62);
-    ctx.fillStyle = i % 2 ? colorWithAlpha(style.core, 0.68 + present.halo * 0.06) : colorWithAlpha(style.trail, 0.58 + present.halo * 0.05);
+    const phase = age * (profile.spinRate || 0.08) + i * (Math.PI * 2 / count) + aura.sparkOrbit * 0.12;
+    const radius = p.r * (p.profileId === "p5" ? 1.55 : p.profileId === "p3" ? 1.32 : 1.18) * (1 + present.orbit * 0.08 + aura.sparkOrbit * 0.045);
+    const sx = p.x - dir * (p.r * 0.22 + aura.rimShear * 2.4) + Math.cos(phase) * radius * (0.82 + present.wake * 0.05 + aura.laneSpread * 0.04);
+    const sy = p.y + Math.sin(phase) * radius * (p.profileId === "p2" || p.profileId === "p4" ? 0.42 : 0.62) + Math.sin(aura.orbitClock + i) * aura.laneSpread * 1.4;
+    ctx.fillStyle = i % 2 ? colorWithAlpha(style.core, 0.68 + present.halo * 0.06 + aura.sparkOrbit * 0.04) : colorWithAlpha(style.trail, 0.58 + present.halo * 0.05 + aura.afterglow * 0.04);
     ctx.beginPath();
     if (p.profileId === "p5") {
-      ctx.ellipse(sx, sy, 3.8 + pulse * 0.18 + present.orbit * 0.8, 8.5 + present.orbit * 1.5, phase, 0, Math.PI * 2);
+      ctx.ellipse(sx, sy, 3.8 + pulse * 0.18 + present.orbit * 0.8 + aura.sparkOrbit * 0.45, 8.5 + present.orbit * 1.5 + aura.laneSpread * 1.2, phase, 0, Math.PI * 2);
     } else if (p.profileId === "p6") {
-      const size = 8 + present.orbit * 1.4;
+      const size = 8 + present.orbit * 1.4 + aura.sparkOrbit * 0.9;
       ctx.roundRect(sx - size / 2, sy - size / 2, size, size, 2);
     } else {
-      ctx.arc(sx, sy, 3.5 + Math.max(0, pulse) * 0.12 + present.orbit * 0.55, 0, Math.PI * 2);
+      ctx.arc(sx, sy, 3.5 + Math.max(0, pulse) * 0.12 + present.orbit * 0.55 + aura.sparkOrbit * 0.42, 0, Math.PI * 2);
     }
     ctx.fill();
   }
@@ -23684,7 +23802,8 @@ function drawSpecialCore(p, style, pulse) {
   ctx.globalCompositeOperation = "screen";
   ctx.fillStyle = style.core;
   ctx.strokeStyle = style.rim;
-  ctx.lineWidth = 3 + present.wake * 0.7;
+  const aura = specialProjectileAuraProfile(p, present);
+  ctx.lineWidth = 3 + present.wake * 0.7 + aura.rimShear * 0.45;
 
   if (style.shape === "petal") {
     for (let i = 0; i < 5; i += 1) {
