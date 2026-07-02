@@ -11993,6 +11993,7 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
   ctx.restore();
 
   drawUnifiedBodyLandmarkPolish(f, localCrouch, frameName, motion, phase, walking, stride);
+  drawUnifiedKineticAnatomySilhouette(f, localCrouch, frameName, phase, walking, stride);
   drawUnifiedRoundStartPresence(f, localCrouch, frameName);
   drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting);
   drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase);
@@ -12003,6 +12004,91 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
   drawUnifiedGuardCommitmentPolish(f, localCrouch);
   drawUnifiedWhiffRecoveryPolish(f, localCrouch);
   drawUnifiedHeadAccessoryPolish(f, localCrouch, motion, acting);
+}
+
+function drawUnifiedKineticAnatomySilhouette(f, localCrouch, frameName, phase, walking, stride) {
+  if (f.profileId !== "p1" && f.profileId !== "p2") return;
+
+  const style = kineticAnatomyProfile(f);
+  const type = f.attack?.type ?? "";
+  const attackSpec = attackVisualSpec(type);
+  const attack = f.attack
+    ? clamp(phase.anticipation * 0.38 + phase.strike * 0.72 + phase.snap * 0.62 + phase.followThrough * 0.24, 0, 1.5)
+    : 0;
+  const guard = frameName === "block" || f.blocking ? clamp(0.34 + (f.guardImpact ?? 0) / 18, 0, 1.28) : 0;
+  const hurt = clamp((f.hurt ?? 0) / 24 + (f.reactionPulse ?? 0) / 24, 0, 1.35);
+  const walk = walking ? clamp(Math.abs(stride ?? 0) * 0.58 + Math.abs(f.vx ?? 0) / 7, 0, 1.12) : 0;
+  const active = clamp(Math.max(attack, guard * 0.9, hurt * 0.82, walk * 0.58), 0, 1.45);
+  if (active <= 0.045) return;
+
+  const heavy = f.profileId === "p1";
+  const trim = f.trim ?? "#fff1bd";
+  const outfit = outfitSpec(f) ?? {};
+  const sleeve = outfit.sleeve ?? trim;
+  const pants = outfit.pants ?? trim;
+  const localDir = Math.sign(f.vx || f.dir || 1) === (f.dir || 1) ? 1 : -1;
+  const hitDir = (f.reactionDir || f.impactDir || f.dir || 1) === (f.dir || 1) ? 1 : -1;
+  const strikeSide = attackSpec.kick || attackSpec.sweep ? -1 : 1;
+  const kinetic =
+    attack * (phase.strike + phase.snap * 0.65 - phase.anticipation * 0.28) * strikeSide +
+    walk * localDir * 0.34 -
+    guard * 0.28 +
+    hurt * hitDir * (f.hitZone === "head" ? -0.62 : f.hitZone === "legs" ? 0.54 : 0.38);
+  const twist = clamp(kinetic * style.spine, -1.35, 1.35);
+  const shoulderY = (heavy ? -145 : -150) + localCrouch;
+  const chestY = (heavy ? -118 : -122) + localCrouch;
+  const hipY = (heavy ? -62 : -58) + localCrouch;
+  const footY = -3 + localCrouch;
+  const shoulder = heavy ? 37 : 31;
+  const hip = heavy ? 40 : 34;
+  const handReach = attack * (attackSpec.kick || attackSpec.sweep ? 0.54 : 1) * style.hand;
+  const footBrace = clamp(guard * 0.7 + attack * 0.48 + hurt * 0.38 + walk * 0.36, 0, 1.25) * style.foot;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-78, -164 + localCrouch, 156, 172);
+  ctx.clip();
+
+  ctx.globalCompositeOperation = "multiply";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = `rgba(18, 9, 7, ${clamp(0.035 + active * 0.05, 0.035, 0.11)})`;
+  ctx.lineWidth = 4.8 + active * 2.2;
+  ctx.beginPath();
+  ctx.moveTo(-shoulder - twist * 1.8, shoulderY + guard * 2.2 + hurt * 1.4);
+  ctx.quadraticCurveTo(-18 - twist * 4.4, chestY + guard * 7 + hurt * 3.2, -6 - twist * 2.6, chestY + 26 + guard * 4);
+  ctx.moveTo(shoulder + twist * 2.2, shoulderY + attack * 0.6 + hurt * 1.8);
+  ctx.quadraticCurveTo(22 + twist * 5.6 + handReach * 8, chestY - handReach * 5 + guard * 6, 42 + twist * 7.8 + handReach * 25, chestY - handReach * 8 + guard * 11);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(18, 9, 7, ${clamp(0.03 + footBrace * 0.052, 0.03, 0.098)})`;
+  ctx.lineWidth = 5.2 + footBrace * 2;
+  ctx.beginPath();
+  ctx.moveTo(-hip - twist * 1.4, hipY);
+  ctx.quadraticCurveTo(-26 - footBrace * 7, hipY + 30 + footBrace * 2, -36 - footBrace * 11, footY);
+  ctx.moveTo(hip + twist * 1.2, hipY);
+  ctx.quadraticCurveTo(25 + footBrace * 4 + walk * 5, hipY + 28 - handReach * 3, 38 + footBrace * 10 + handReach * 9, footY - handReach * 2);
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(trim, clamp(0.05 + active * 0.055, 0.05, 0.135));
+  ctx.lineWidth = 1.25 + active * 0.55;
+  ctx.beginPath();
+  ctx.moveTo(-shoulder + 2 - twist, shoulderY - 8);
+  ctx.quadraticCurveTo(-13 - twist * 2, chestY - 1 + guard * 3, -4 - twist * 1.4, chestY + 21);
+  ctx.moveTo(shoulder - 1 + twist, shoulderY - 8);
+  ctx.quadraticCurveTo(22 + twist * 3 + handReach * 9, chestY - 8 - handReach * 4, 49 + twist * 5 + handReach * 18, chestY - 6 - handReach * 5);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(attackSpec.kick || attackSpec.sweep ? pants : sleeve, clamp(0.045 + footBrace * 0.05, 0.045, 0.12));
+  ctx.lineWidth = 1.35 + footBrace * 0.48;
+  ctx.beginPath();
+  ctx.moveTo(-hip + 4, hipY + 4);
+  ctx.quadraticCurveTo(-18 - footBrace * 5, hipY + 34, -34 - footBrace * 9, footY - 4);
+  ctx.moveTo(hip - 4, hipY + 3);
+  ctx.quadraticCurveTo(19 + footBrace * 4 + handReach * 5, hipY + 30 - handReach * 4, 38 + footBrace * 7 + handReach * 13, footY - handReach * 4);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawUnifiedBodyLandmarkPolish(f, localCrouch, frameName, motion, phase, walking, stride) {
@@ -19963,7 +20049,105 @@ function getPose(f, stride) {
     }
   }
 
+  applyKineticAnatomyPose(base, f, spec, {
+    attackType,
+    phase,
+    airborne,
+    walkingPose,
+    guardPresent,
+  });
   return humanizePose(base, spec);
+}
+
+function kineticAnatomyProfile(f) {
+  return {
+    p1: { spine: 0.86, shoulder: 0.82, hip: 1.16, hand: 0.82, foot: 1.18, guard: 0.9, air: 0.82, hurt: 0.78 },
+    p2: { spine: 1.18, shoulder: 1.18, hip: 0.86, hand: 1.2, foot: 0.84, guard: 1.16, air: 1.18, hurt: 1.18 },
+    p3: { spine: 0.76, shoulder: 0.72, hip: 1.3, hand: 0.72, foot: 1.28, guard: 0.76, air: 0.74, hurt: 0.7 },
+    p4: { spine: 1.16, shoulder: 1.14, hip: 0.9, hand: 1.16, foot: 0.88, guard: 1.18, air: 1.22, hurt: 1.12 },
+    p5: { spine: 1.24, shoulder: 1.22, hip: 0.82, hand: 1.26, foot: 0.8, guard: 1.24, air: 1.12, hurt: 1.16 },
+    p6: { spine: 0.92, shoulder: 0.94, hip: 1.06, hand: 0.94, foot: 1.06, guard: 0.96, air: 0.92, hurt: 0.88 },
+  }[f?.profileId] ?? { spine: 1, shoulder: 1, hip: 1, hand: 1, foot: 1, guard: 1, air: 1, hurt: 1 };
+}
+
+function applyKineticAnatomyPose(base, f, spec, context = {}) {
+  if (!base || !f || !spec) return;
+
+  const style = kineticAnatomyProfile(f);
+  const dir = f.dir || 1;
+  const phase = context.phase ?? attackPhase(f.attack);
+  const attackType = context.attackType ?? f.attack?.type;
+  const attackSpec = attackVisualSpec(attackType);
+  const attackActive = f.attack
+    ? clamp(phase.anticipation * 0.52 + phase.strike * 0.92 + phase.snap * 0.78 + phase.followThrough * 0.28, 0, 1.6)
+    : 0;
+  const guard = f.blocking ? clamp((context.guardPresent?.guard ?? 0.5) + (context.guardPresent?.impact ?? 0) * 0.78, 0, 1.45) : 0;
+  const hurt = !winner ? clamp((f.reactionPulse ?? 0) / Math.max(1, f.reactionMax ?? 18), 0, 1.25) : 0;
+  const air = context.airborne ? clamp((Math.abs(f.vy ?? 0) / 12 + Math.abs(f.vx ?? 0) / 7) * style.air, 0, 1.35) : 0;
+  const walk = context.walkingPose ? clamp(Math.abs(f.walkStrideSmooth ?? 0) + Math.abs(f.vx ?? 0) / 7, 0, 1.15) : 0;
+  const live = Math.max(attackActive, guard, hurt, air, walk * 0.62);
+  if (live <= 0.025) return;
+
+  const localMove = Math.sign(f.vx || dir) === dir ? 1 : -1;
+  const hitLocal = (f.reactionDir || f.impactDir || dir) === dir ? 1 : -1;
+  const strikeBias = attackSpec.kick || attackSpec.sweep ? -0.72 : 1;
+  const attackTwist = attackActive * (phase.strike + phase.snap * 0.65 - phase.anticipation * 0.36) * strikeBias;
+  const walkTwist = walk * Math.sin(roundFrame * 0.18 + (f.profileId?.charCodeAt(1) ?? 0)) * localMove * 0.28;
+  const hurtTwist = hurt * hitLocal * (f.hitZone === "head" ? -0.7 : f.hitZone === "legs" ? 0.56 : 0.42) * style.hurt;
+  const guardCoil = guard * 0.36 * style.guard;
+  const twist = clamp(attackTwist + walkTwist + hurtTwist - guardCoil, -1.85, 1.85);
+  const shoulderOpposition = twist * style.shoulder;
+  const hipOpposition = twist * style.hip;
+
+  base.torsoTilt += dir * shoulderOpposition * 0.018 - dir * hipOpposition * 0.01 + air * localMove * 0.01;
+  base.frontArm.shoulder.x += dir * shoulderOpposition * 2.2 * spec.stance;
+  base.frontArm.shoulder.y -= attackActive * 1.2 * style.shoulder - guard * 0.7;
+  base.backArm.shoulder.x -= dir * shoulderOpposition * 1.8 * spec.stance;
+  base.backArm.shoulder.y += guard * 1.2 + hurt * 0.9 - air * 0.5;
+  base.frontLeg.hip.x -= dir * hipOpposition * 1.5 * spec.stance;
+  base.backLeg.hip.x += dir * hipOpposition * 1.8 * spec.stance;
+  base.frontLeg.hip.y += guard * 0.8 + hurt * 1.2;
+  base.backLeg.hip.y += guard * 1.1 + hurt * 1.4;
+
+  if (f.attack) {
+    const handReach = clamp((phase.strike * 0.7 + phase.snap * 0.62 + phase.followThrough * 0.22) * style.hand, 0, 1.35);
+    const load = clamp((phase.anticipation * 0.8 + phase.recovery * 0.22) * style.foot, 0, 1.2);
+    const legAttack = attackSpec.kick || attackSpec.sweep;
+    const supportLeg = legAttack ? "backLeg" : "frontLeg";
+    const freeLeg = supportLeg === "backLeg" ? "frontLeg" : "backLeg";
+
+    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + handReach * (attackSpec.grab ? 0.2 : 0.13), 0, 1);
+    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.48) + load * 0.08, 0, 1);
+    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, handReach * (attackSpec.special ? 0.48 : 0.28));
+    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, load * 0.2);
+    base[supportLeg].plant = Math.max(base[supportLeg].plant ?? 0, clamp(0.58 + load * 0.32 + phase.snap * 0.12, 0, 1));
+    base[supportLeg].toeFlex = Math.max(base[supportLeg].toeFlex ?? 0, clamp(load * 0.42 + phase.snap * 0.18, 0, 0.72));
+    base[freeLeg].toeFlex = Math.max(base[freeLeg].toeFlex ?? 0, clamp(handReach * (legAttack ? 0.42 : 0.18), 0, 0.6));
+    base.backArm.hand.x -= dir * (handReach * 2.8 + load * 2.2) * spec.stance;
+    base.backArm.hand.y += load * 2.2 - handReach * (attackSpec.special ? 1.8 : 0.9);
+  }
+
+  if (guard > 0.025) {
+    const brace = smoothStep01(guard) * style.guard;
+    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + brace * 0.08, 0, 1);
+    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + brace * 0.1, 0, 1);
+    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, brace * 0.2);
+    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, brace * 0.24);
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.62 + brace * 0.2, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.72 + brace * 0.22, 0, 1));
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, brace * 0.2);
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, brace * 0.26);
+  }
+
+  if (hurt > 0.025) {
+    const loose = Math.sin(clamp(hurt, 0, 1) * Math.PI) * style.hurt;
+    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) - loose * 0.08, 0.06, 1);
+    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) - loose * 0.07, 0.06, 1);
+    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, loose * 0.52);
+    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, loose * 0.44);
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, loose * (f.hitZone === "legs" ? 0.42 : 0.22));
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, loose * 0.28);
+  }
 }
 
 function humanizePose(pose, spec) {
