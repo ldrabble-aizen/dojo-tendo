@@ -19195,6 +19195,84 @@ function attackActingPolishProfile(f, attack = attackPresentationProfile(f), ana
   };
 }
 
+function grabClaspActingProfile(f) {
+  const attackState = f?.attack;
+  if (!attackState || attackState.type !== "grab" || (f?.hurt ?? 0) > 0 || winner) return { active: 0 };
+
+  const phase = attackPhase(attackState);
+  const attack = attackPresentationProfile(f);
+  const anatomy = attackAnatomyPolishProfile(f, attack);
+  const silhouette = attackSilhouetteAnatomyProfile(f, attack);
+  const technique = grabTechniqueProfile(f);
+  const mass = attackMassProfile(f);
+  const style = {
+    p1: { hand: 0.88, brace: 1.18, hip: 1.12, free: 0.92 },
+    p2: { hand: 1.18, brace: 0.86, hip: 0.9, free: 1.16 },
+    p3: { hand: 0.78, brace: 1.28, hip: 1.2, free: 0.82 },
+    p4: { hand: 1.14, brace: 0.9, hip: 0.92, free: 1.12 },
+    p5: { hand: 1.24, brace: 0.82, hip: 0.86, free: 1.22 },
+    p6: { hand: 0.96, brace: 1.04, hip: 1.02, free: 1 },
+  }[f?.profileId] ?? { hand: 1, brace: 1, hip: 1, free: 1 };
+
+  const open = clamp(phase.anticipation * 0.72 + attack.load * 0.34, 0, 1.25);
+  const clasp = clamp((phase.snap * 0.72 + anatomy.contact * 0.42 + silhouette.wristSnap * 0.28) * technique.clasp, 0, 1.45);
+  const pull = clamp((phase.followThrough * 0.66 + attack.follow * 0.36 + mass.follow * 0.26) * technique.pull, 0, 1.35);
+  const recover = clamp(phase.recovery * 0.76 + attack.recover * 0.36, 0, 1.25);
+  const brace = clamp((mass.plant * 0.52 + anatomy.supportPlant * 0.34 + open * 0.22 + clasp * 0.16) * style.brace, 0, 1.45);
+  const hip = clamp((mass.load * 0.34 + clasp * 0.28 + pull * 0.44) * technique.hip * style.hip, 0, 1.35);
+  const free = clamp((open * 0.34 + pull * 0.42 + recover * 0.2) * style.free, 0, 1.25);
+  const side = attack.supportSide ?? 1;
+  return { active: clamp(Math.max(open, clasp, pull, recover, brace) * attack.active, 0, 1.65), open, clasp, pull, recover, brace, hip, free, side, freeSide: -side, hand: style.hand };
+}
+
+function applyGrabClaspActingPose(base, f, spec) {
+  const grab = grabClaspActingProfile(f);
+  if (!base || !f || !spec || grab.active <= 0.025) return;
+
+  const stance = spec.stance ?? 1;
+  const side = grab.side;
+  const support = side < 0 ? base.backLeg : base.frontLeg;
+  const free = side < 0 ? base.frontLeg : base.backLeg;
+  const open = grab.open;
+  const clasp = grab.clasp;
+  const pull = grab.pull;
+  const recover = grab.recover;
+  const brace = grab.brace;
+  const hip = grab.hip;
+
+  base.torsoTilt += side * (-open * 0.014 + clasp * 0.018 - pull * 0.028 + recover * 0.012);
+  base.frontArm.shoulder.x += side * (open * 1.4 - clasp * 1.8 - pull * 2.2) * stance;
+  base.frontArm.shoulder.y += open * 0.8 - clasp * 1.6 + pull * 1.1;
+  base.backArm.shoulder.x += side * (open * 0.9 - clasp * 1.4 - pull * 1.8) * stance;
+  base.backArm.shoulder.y += open * 0.6 - clasp * 1.2 + pull * 0.9;
+  base.frontArm.elbow.x += side * (open * 5.2 - clasp * 6.4 - pull * 5.8 + recover * 2.1) * stance * grab.hand;
+  base.frontArm.elbow.y += -open * 2.4 + clasp * 3.4 + pull * 2.2 + recover * 1.2;
+  base.frontArm.hand.x += side * (open * 11.5 - clasp * 12.8 - pull * 10.6 + recover * 4.2) * stance * grab.hand;
+  base.frontArm.hand.y += -open * 4.6 + clasp * 6.8 + pull * 4.2 + recover * 2.4;
+  base.backArm.elbow.x += side * (open * 3.6 - clasp * 7.2 - pull * 6.8 + recover * 2.6) * stance * grab.hand;
+  base.backArm.elbow.y += -open * 1.8 - clasp * 1.8 + pull * 3.4 + recover * 1.4;
+  base.backArm.hand.x += side * (open * 8.2 - clasp * 14.4 - pull * 12.4 + recover * 4.8) * stance * grab.hand;
+  base.backArm.hand.y += -open * 3.6 - clasp * 3.2 + pull * 5.2 + recover * 2.6;
+  base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) - open * 0.18 + clasp * 0.34 + pull * 0.12 - recover * 0.06, 0, 1);
+  base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) - open * 0.12 + clasp * 0.28 + pull * 0.1 - recover * 0.04, 0, 1);
+  base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(open * 0.42 + clasp * 0.24 + recover * 0.18, 0, 0.9));
+  base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(open * 0.32 + clasp * 0.22 + recover * 0.14, 0, 0.78));
+  base.frontLeg.hip.x += side * (hip * 1.7 - pull * 0.8) * stance;
+  base.backLeg.hip.x -= side * (hip * 2.2 + pull * 0.9) * stance;
+  support.knee.x -= side * (brace * 2.7 + pull * 1.4) * stance;
+  support.knee.y += brace * 3.6 + pull * 1.6;
+  support.foot.x -= side * (brace * 6.2 + pull * 4.4 - recover * 1.8) * stance;
+  support.foot.y += brace * 0.65;
+  support.plant = Math.max(support.plant ?? 0, clamp(0.66 + brace * 0.28, 0, 1));
+  support.toeFlex = Math.max(support.toeFlex ?? 0, clamp(brace * 0.62 + clasp * 0.16, 0, 1));
+  support.footAngle = (support.footAngle ?? 0) - side * (brace * 0.026 + pull * 0.012);
+  free.knee.x += grab.freeSide * (grab.free * 3.8 + pull * 1.5 - recover * 1.2) * stance;
+  free.knee.y += grab.free * 1.6 + recover * 1.4;
+  free.foot.x += grab.freeSide * (grab.free * 5.6 + pull * 2.1 - recover * 2.2) * stance;
+  free.foot.y += recover * 1.2;
+  free.lift = Math.max(free.lift ?? 0, clamp(grab.free * 0.18 + recover * 0.12, 0, 0.72));
+}
+
 function whiffActingPolishProfile(f, whiff = whiffRecoveryMotion(f), anatomy = null, silhouette = null) {
   if (!whiff) return { active: 0 };
 
@@ -22125,6 +22203,8 @@ function getPose(f, stride) {
     movePresent,
     stride,
   });
+
+  applyGrabClaspActingPose(base, f, spec);
 
   applyLimbMicroActingPose(base, f, spec, {
     movePresent,
