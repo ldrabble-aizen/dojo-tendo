@@ -18433,6 +18433,76 @@ function attackAnatomyPolishProfile(f, attack = attackPresentationProfile(f)) {
   };
 }
 
+function attackSilhouetteAnatomyProfile(f, attack = attackPresentationProfile(f), whiff = whiffRecoveryMotion(f)) {
+  const attackState = f?.attack;
+  const type = attackState?.type || whiff?.type || attack?.type || "";
+  const spec = attack?.visualSpec ?? whiff?.spec ?? attackVisualSpec(type);
+  const phase = attackPhase(attackState);
+  const body = attackState ? attackBodyWeightProfile(f) : null;
+  const polish = attackState ? attackAnatomyPolishProfile(f, attack) : null;
+  const profile = {
+    p1: { shoulder: 0.86, hip: 1.16, wrist: 0.82, knee: 0.96, ankle: 1.14, line: 0.9, recover: 1.14 },
+    p2: { shoulder: 1.2, hip: 0.86, wrist: 1.24, knee: 1.18, ankle: 0.86, line: 1.18, recover: 0.86 },
+    p3: { shoulder: 0.74, hip: 1.28, wrist: 0.72, knee: 0.84, ankle: 1.28, line: 0.78, recover: 1.28 },
+    p4: { shoulder: 1.16, hip: 0.9, wrist: 1.18, knee: 1.22, ankle: 0.9, line: 1.16, recover: 0.9 },
+    p5: { shoulder: 1.26, hip: 0.82, wrist: 1.3, knee: 1.24, ankle: 0.82, line: 1.24, recover: 0.82 },
+    p6: { shoulder: 0.94, hip: 1.06, wrist: 0.96, knee: 0.98, ankle: 1.06, line: 0.96, recover: 1.04 },
+  }[f?.profileId] ?? { shoulder: 1, hip: 1, wrist: 1, knee: 1, ankle: 1, line: 1, recover: 1 };
+  const leg = spec.kick || spec.sweep;
+  const hand = spec.punch || spec.special || spec.grab;
+  const low = spec.sweep ? 1 : 0;
+  const heavy = spec.heavy || spec.grab;
+  const supportSide = attack?.supportSide ?? (leg ? -1 : 1);
+  const freeSide = attack?.freeSide ?? -supportSide;
+  const attackLine = attackState && attack?.active > 0.025 && (f?.hurt ?? 0) <= 0 && !winner
+    ? clamp(
+        ((polish?.extension ?? 0) * 0.48 + (attack?.reach ?? 0) * 0.42 + phase.snap * 0.36 + phase.strike * 0.18) *
+          profile.line *
+          (heavy ? 1.08 : 0.94),
+        0,
+        1.65
+      )
+    : 0;
+  const lead = attackLine;
+  const follow = attackState ? clamp((polish?.follow ?? 0) * 0.72 + phase.followThrough * 0.38 + phase.recovery * 0.2, 0, 1.45) : 0;
+  const load = attackState ? clamp((attack?.load ?? 0) * 0.56 + phase.anticipation * 0.38, 0, 1.45) : 0;
+  const plant = body ? clamp(body.plant * 0.52 + (polish?.supportPlant ?? 0) * 0.36 + lead * 0.12, 0, 1.6) : 0;
+  const contact = attackState ? clamp((polish?.contact ?? 0) * 0.74 + phase.snap * 0.36, 0, 1.45) : 0;
+  const whiffOver = whiff ? clamp((whiff.over * 0.82 + whiff.stumble * 0.42) * whiff.strength * whiff.style.freeLimb, 0, 1.65) : 0;
+  const whiffRecover = whiff ? clamp((whiff.replant * 0.68 + whiff.settle * 0.26 + whiff.stumble * 0.22) * whiff.strength * whiff.style.plant, 0, 1.55) : 0;
+  const wristFollow = clamp((hand ? lead * 0.68 + follow * 0.52 + contact * 0.22 : lead * 0.24 + follow * 0.18) * profile.wrist + whiffOver * 0.14, 0, 1.55);
+  const wristSnap = clamp((hand ? contact * 0.72 + phase.snap * 0.38 : contact * 0.2) * profile.wrist, 0, 1.4);
+  const shoulderLead = clamp((lead * 0.52 + contact * 0.24 - load * 0.16) * profile.shoulder, -0.4, 1.45);
+  const hipCounter = clamp((plant * 0.5 + load * 0.28 - lead * 0.2 + follow * 0.16) * profile.hip, -0.35, 1.45);
+  const kneeLine = clamp((leg ? lead * 0.68 + contact * 0.28 + follow * 0.16 : plant * 0.24) * profile.knee + whiffOver * (leg ? 0.2 : 0.06), 0, 1.55);
+  const ankleRoll = clamp((leg ? lead * 0.48 + contact * 0.28 + follow * 0.22 : plant * 0.36) * profile.ankle + whiffRecover * 0.18, 0, 1.5);
+  const toePoint = clamp((leg ? lead * 0.5 + contact * 0.2 : plant * 0.3) * profile.ankle + whiffRecover * 0.26, 0, 1.35);
+  const recoveryLine = clamp(follow * profile.recover + whiffRecover * 0.72, 0, 1.6);
+  const active = clamp(Math.max(lead, follow * 0.7, plant * 0.55, whiffOver, whiffRecover * 0.76), 0, 1.8);
+
+  return {
+    active,
+    spec,
+    type,
+    leg,
+    hand,
+    low,
+    supportSide,
+    freeSide,
+    attackLine,
+    shoulderLead,
+    hipCounter,
+    wristFollow,
+    wristSnap,
+    kneeLine,
+    ankleRoll,
+    toePoint,
+    recoveryLine,
+    overextension: whiffOver,
+    whiffRecover,
+  };
+}
+
 function attackChainProfile(f, currentType = "") {
   const max = Math.max(1, f?.attackChainMax ?? 1);
   const raw = clamp((f?.attackChainPulse ?? 0) / max, 0, 1);
@@ -19756,6 +19826,7 @@ function getPose(f, stride) {
     const hipCatch = anatomy?.hipCatch ?? 0;
     const toeCatch = anatomy?.toeCatch ?? 0;
     const counterReach = anatomy?.counterReach ?? 0;
+    const silhouette = attackSilhouetteAnatomyProfile(f, null, whiffPose);
 
     base.torsoTilt += side * (
       overreach * (leg ? 0.034 : 0.026) +
@@ -19818,6 +19889,42 @@ function getPose(f, stride) {
       base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - side * toeRecover * 0.028;
       base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + side * toeRecover * 0.018;
     }
+
+    if (silhouette.active > 0.035) {
+      const line = silhouette.overextension;
+      const catchLine = silhouette.whiffRecover;
+      const wristTrail = silhouette.wristFollow;
+      const toeLine = silhouette.toePoint;
+      base.torsoTilt += side * (line * (leg ? 0.018 : 0.012) - catchLine * 0.014);
+      base.frontArm.shoulder.x += side * silhouette.shoulderLead * 1.5 * spec.stance;
+      base.frontArm.shoulder.y += line * 0.8 + catchLine * 0.45;
+      base.backArm.shoulder.x -= side * silhouette.hipCounter * 1.2 * spec.stance;
+      base.backArm.shoulder.y += catchLine * 0.7;
+      base.frontLeg.hip.x += side * silhouette.hipCounter * (leg ? 1.7 : 0.8) * spec.stance;
+      base.backLeg.hip.x -= side * silhouette.hipCounter * (leg ? 2.1 : 1.1) * spec.stance;
+      if (leg) {
+        base.frontLeg.knee.x += side * silhouette.kneeLine * (low ? 7.4 : 5.2) * spec.stance;
+        base.frontLeg.knee.y += low ? silhouette.kneeLine * 2.8 : -silhouette.kneeLine * 2.9 + catchLine * 2.6;
+        base.frontLeg.foot.x += side * silhouette.kneeLine * (low ? 13.5 : 8.8) * spec.stance;
+        base.frontLeg.foot.y += low ? silhouette.kneeLine * 1.7 : -silhouette.kneeLine * 4.8 + catchLine * 4.2;
+        base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - side * (silhouette.ankleRoll * (low ? 0.038 : 0.052) - catchLine * 0.018);
+        base.frontLeg.extension = Math.max(base.frontLeg.extension ?? 0, clamp(line * 0.26 + silhouette.kneeLine * 0.16, 0, 0.62));
+      } else {
+        base.frontArm.elbow.x += side * wristTrail * (grab ? 5.2 : 3.8) * spec.stance;
+        base.frontArm.elbow.y += wristTrail * (grab ? 2.4 : 1.8) + catchLine * 1.2;
+        base.frontArm.hand.x += side * wristTrail * (grab ? 10.8 : 8.6) * spec.stance;
+        base.frontArm.hand.y += wristTrail * (grab ? 3.8 : 2.8) + catchLine * 1.8;
+        base.backArm.hand.x += side * wristTrail * (grab ? 5.4 : 3.1) * spec.stance;
+        base.backArm.hand.y += wristTrail * 2.2;
+      }
+      base.backLeg.knee.y += catchLine * 2.8;
+      base.backLeg.foot.x -= side * catchLine * 6.8 * spec.stance;
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.58 + catchLine * 0.22, 0, 1));
+      base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, clamp(toeLine * 0.72 + catchLine * 0.18, 0, 1));
+      base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, clamp(toeLine * (leg ? 0.62 : 0.34), 0, 1));
+      base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(wristTrail * 0.34 + line * 0.16, 0, 0.78));
+      base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(wristTrail * 0.26 + catchLine * 0.12, 0, 0.66));
+    }
   }
 
   const attackPresent = attackPresentationProfile(f);
@@ -19827,6 +19934,7 @@ function getPose(f, stride) {
     const freeKey = supportKey === "backLeg" ? "frontLeg" : "backLeg";
     const anticipation = attackAnticipationAnatomyProfile(f, attackPresent);
     const anatomy = attackAnatomyPolishProfile(f, attackPresent);
+    const silhouette = attackSilhouetteAnatomyProfile(f, attackPresent);
     const handTension = clamp(attackPresent.handTension, 0, 0.9);
     const finger = clamp(attackPresent.fingerTension, 0, 0.72);
     const toe = clamp(attackPresent.toeDig, 0, 0.58);
@@ -19907,6 +20015,62 @@ function getPose(f, stride) {
         base.frontArm.hand.y += anatomy.extension * 1.7 + anatomy.follow * 1.9;
         base.backArm.hand.y += anatomy.extension * 2.2 + anatomy.follow * 2.3;
       }
+    }
+
+    if (silhouette.active > 0.035) {
+      const line = silhouette.attackLine;
+      const recoverLine = silhouette.recoveryLine;
+      const shoulderLead = silhouette.shoulderLead;
+      const hipCounter = silhouette.hipCounter;
+      const wrist = silhouette.wristFollow;
+      const snap = silhouette.wristSnap;
+      const kneeLine = silhouette.kneeLine;
+      const ankle = silhouette.ankleRoll;
+      const toePoint = silhouette.toePoint;
+      const legAttack = specPresent.kick || specPresent.sweep;
+      const lowLine = specPresent.sweep ? 1 : 0;
+
+      base.torsoTilt += supportSide * (line * (legAttack ? 0.016 : 0.021) - hipCounter * 0.011 - recoverLine * 0.008);
+      base.frontArm.shoulder.x += supportSide * (shoulderLead * 2.5 - hipCounter * 0.65) * spec.stance;
+      base.frontArm.shoulder.y -= shoulderLead * 0.95 - recoverLine * 0.85;
+      base.backArm.shoulder.x -= supportSide * (shoulderLead * 1.35 + hipCounter * 0.7) * spec.stance;
+      base.backArm.shoulder.y += hipCounter * 0.75 + recoverLine * 0.62;
+      base.frontLeg.hip.x += supportSide * (hipCounter * 1.65 - line * (legAttack ? 0.52 : 0.24)) * spec.stance;
+      base.backLeg.hip.x -= supportSide * (hipCounter * 2.15 + shoulderLead * 0.28) * spec.stance;
+      base[supportKey].knee.y += hipCounter * 2.8 + recoverLine * 1.2;
+      base[supportKey].foot.x -= supportSide * (hipCounter * 5.2 + recoverLine * 2.6) * spec.stance;
+      base[supportKey].foot.y += hipCounter * 0.48 + recoverLine * 0.32;
+      base[supportKey].plant = Math.max(base[supportKey].plant ?? 0, clamp(0.58 + hipCounter * 0.24 + recoverLine * 0.12, 0, 1));
+      base[supportKey].toeFlex = Math.max(base[supportKey].toeFlex ?? 0, clamp(toePoint * 0.74 + hipCounter * 0.16, 0, 1));
+      base[supportKey].footAngle = (base[supportKey].footAngle ?? 0) - supportSide * (ankle * 0.02 + hipCounter * 0.014);
+
+      if (legAttack) {
+        base[freeKey].knee.x += freeSide * kneeLine * (lowLine ? 8.2 : 6.1) * spec.stance;
+        base[freeKey].knee.y += lowLine ? kneeLine * 2.4 : -kneeLine * 4.1 + recoverLine * 2.1;
+        base[freeKey].foot.x += freeSide * kneeLine * (lowLine ? 16.8 : 11.4) * spec.stance;
+        base[freeKey].foot.y += lowLine ? kneeLine * 1.2 : -kneeLine * 7.2 + recoverLine * 3.4;
+        base[freeKey].footAngle = (base[freeKey].footAngle ?? 0) + freeSide * (ankle * (lowLine ? 0.05 : 0.065) - recoverLine * 0.022);
+        base[freeKey].extension = Math.max(base[freeKey].extension ?? 0, clamp(line * 0.34 + kneeLine * 0.2, 0, 0.86));
+        base[freeKey].toeFlex = Math.max(base[freeKey].toeFlex ?? 0, clamp(toePoint * 0.92 + snap * 0.12, 0, 1));
+        base.frontArm.hand.x -= supportSide * wrist * 4.2 * spec.stance;
+        base.backArm.hand.x -= supportSide * (wrist * 5.4 + recoverLine * 1.7) * spec.stance;
+        base.frontArm.hand.y += wrist * 2.1 + recoverLine * 1.6;
+        base.backArm.hand.y += wrist * 2.8 + recoverLine * 1.8;
+      } else {
+        const specialLift = specPresent.special ? 1.18 : 1;
+        const grabReach = specPresent.grab ? 1.22 : 1;
+        base.frontArm.elbow.x += supportSide * (wrist * 4.8 + snap * 2.4) * spec.stance * grabReach;
+        base.frontArm.elbow.y -= (wrist * 1.5 + snap * 2.3) * specialLift - recoverLine * 1.6;
+        base.frontArm.hand.x += supportSide * (wrist * 10.8 + snap * 6.2) * spec.stance * grabReach;
+        base.frontArm.hand.y -= (wrist * 2.2 + snap * 3.6) * specialLift - recoverLine * 2.4;
+        base.backArm.elbow.x -= supportSide * (wrist * 2.8 + snap * 1.2) * spec.stance;
+        base.backArm.hand.x -= supportSide * (wrist * 5.4 + snap * 2.2 + recoverLine * 1.8) * spec.stance;
+        base.backArm.hand.y += recoverLine * 2.5 - snap * 1.2;
+        base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + snap * 0.09 + wrist * 0.05, 0, 1);
+      }
+
+      base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(wrist * 0.38 + snap * 0.28 + recoverLine * 0.08, 0, 0.86));
+      base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(wrist * 0.24 + recoverLine * 0.14, 0, 0.68));
     }
 
     if (specPresent.punch || specPresent.special || specPresent.grab) {
