@@ -1246,6 +1246,68 @@ function aerialVisualMotion(f) {
   return { style, strength, landingStrength, rise, fall, apex, launch, landing, rebound, recover, preLand, airSpineCurve, airKneeGather, airToeReach, airHandBalance, landingHeelBite, landingKneeAbsorb, landingDustBloom };
 }
 
+function aerialLandingAnatomyProfile(f, aerial = aerialVisualMotion(f)) {
+  const style = aerial.style ?? aerialBodyProfile(f);
+  const grounded = !!f?.grounded;
+  const available = !winner && (f?.hurt ?? 0) <= 0;
+  const landingRaw = clamp((f?.landingPulse ?? 0) / 16, 0, 1);
+  const airKickRaw = clamp((f?.airKickLandingPulse ?? 0) / 16, 0, 1);
+  const airKickLanding = smoothStep01(airKickRaw) * clamp(0.72 + (f?.landingStrength ?? 1) * 0.22, 0.62, 1.18);
+  const travel = clamp(Math.abs(f?.vx ?? 0) / 3.45, 0, 1.32);
+  const dir = f?.dir || 1;
+  const travelDir = f?.jumpDir || f?.landingDir || f?.airKickDir || Math.sign(f?.vx ?? 0) || dir;
+  const localDir = travelDir === dir ? 1 : -1;
+  const airborne = !grounded && available;
+  const landingAvailable = grounded && available && !f?.attack;
+
+  const launchCoil = airborne ? clamp((aerial.launch * 0.78 + aerial.rise * 0.34 + travel * 0.12) * style.coil, 0, 1.6) : 0;
+  const airSpineArc = airborne ? clamp((aerial.airSpineCurve * 0.86 + aerial.apex * 0.24 + aerial.fall * 0.16 + travel * 0.1) * style.apex, 0, 1.55) : 0;
+  const shoulderCounterbalance = airborne ? clamp((aerial.rise * 0.3 + aerial.apex * 0.26 + aerial.fall * 0.38 + aerial.preLand * 0.24 + travel * 0.28) * style.arm, 0, 1.55) : 0;
+  const handBalance = airborne ? clamp((aerial.airHandBalance * 0.82 + shoulderCounterbalance * 0.34 + aerial.preLand * 0.2) * style.arm, 0, 1.65) : 0;
+  const kneeGather = airborne ? clamp((aerial.airKneeGather * 0.82 + launchCoil * 0.26 + aerial.apex * 0.22) * style.tuck, 0, 1.62) : 0;
+  const toeReach = airborne ? clamp((aerial.airToeReach * 0.88 + aerial.preLand * 0.4 + aerial.fall * 0.2) * style.foot, 0, 1.72) : 0;
+  const preLandBracing = airborne ? clamp((aerial.preLand * 0.9 + aerial.fall * 0.24 + toeReach * 0.18) * style.plant, 0, 1.55) : 0;
+
+  const heelBite = landingAvailable ? clamp((aerial.landingHeelBite * 0.74 + landingRaw * aerial.landingStrength * 0.24 + airKickLanding * 0.36) * style.plant, 0, 1.92) : 0;
+  const kneeAbsorb = landingAvailable ? clamp((aerial.landingKneeAbsorb * 0.78 + aerial.landing * 0.26 + airKickLanding * 0.32) * style.squash, 0, 1.95) : 0;
+  const ankleFlex = landingAvailable ? clamp((heelBite * 0.42 + kneeAbsorb * 0.16 + airKickLanding * 0.26) * style.foot, 0, 1.45) : 0;
+  const landingSquash = landingAvailable ? clamp((aerial.landing * 0.86 + kneeAbsorb * 0.32 + airKickLanding * 0.25) * style.squash, 0, 1.95) : 0;
+  const landingRebound = landingAvailable ? clamp((aerial.rebound * 0.86 + Math.sin((1 - Math.max(landingRaw, airKickRaw)) * Math.PI) * airKickLanding * 0.22) * style.rebound, 0, 1.7) : 0;
+  const shadowContactWeight = clamp(
+    preLandBracing * 0.22 +
+      toeReach * 0.12 +
+      heelBite * 0.4 +
+      kneeAbsorb * 0.34 +
+      landingSquash * 0.28 +
+      airKickLanding * 0.16,
+    0,
+    1.75
+  ) * style.shadow;
+  const active = clamp(Math.max(launchCoil, airSpineArc, shoulderCounterbalance, handBalance, kneeGather, toeReach, preLandBracing, heelBite, kneeAbsorb, ankleFlex, landingSquash, landingRebound, shadowContactWeight), 0, 1.95);
+
+  return {
+    style,
+    localDir,
+    travel,
+    landingRaw,
+    airKickLanding,
+    active,
+    launchCoil,
+    airSpineArc,
+    shoulderCounterbalance,
+    handBalance,
+    kneeGather,
+    toeReach,
+    preLandBracing,
+    heelBite,
+    kneeAbsorb,
+    ankleFlex,
+    landingSquash,
+    landingRebound,
+    shadowContactWeight,
+  };
+}
+
 function movementPresentationMotion(f, walking = false, stride = 0) {
   const motion = characterMotion(f);
   const pivot = pivotVisualMotion(f);
@@ -10871,9 +10933,11 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const landing = clamp((f.landingPulse ?? 0) / 16, 0, 1);
   const landingWeight = landing * clamp(f.landingStrength ?? 1, 0.42, 1.65);
   const aerial = aerialVisualMotion(f);
+  const aerialAnatomy = aerialLandingAnatomyProfile(f, aerial);
   const preLandShadow = aerial.preLand * aerial.style.shadow;
   const airToeShadow = !f.grounded ? clamp(aerial.airToeReach * aerial.style.shadow, 0, 1.55) : 0;
   const landingDustBloom = f.grounded ? clamp(aerial.landingDustBloom, 0, 1.6) : 0;
+  const aerialContactWeight = clamp(aerialAnatomy.shadowContactWeight, 0, 1.75);
   const pivot = pivotVisualMotion(f);
   const startPresence = roundStartBodyPresence(f);
   const idlePresence = idleVisualMotion(f);
@@ -10917,7 +10981,7 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const defeatOffset = defeatContact.fallDir * (defeatContact.shadowAlign * 5.8 + defeatContact.footDrag * 2.6) * FIGHTER_SCALE;
   const stopOffset = -(f.walkStopDir || 0) * stopStrength * 7 * FIGHTER_SCALE;
   const facingOffset = -(f.facingTurnTo || f.dir || 1) * (facingPress * 5 - facingSnap * 2.5) * FIGHTER_SCALE;
-  const aerialOffset = (f.landingDir || f.jumpDir || Math.sign(f.vx) || f.dir || 1) * (preLandShadow * 6 + airToeShadow * 2.6) * FIGHTER_SCALE;
+  const aerialOffset = (f.landingDir || f.jumpDir || Math.sign(f.vx) || f.dir || 1) * (preLandShadow * 6 + airToeShadow * 2.6 + aerialContactWeight * 1.8) * FIGHTER_SCALE;
   const pivotOffset = -pivot.stopDir * pivot.stop * 4.2 * FIGHTER_SCALE - pivot.faceDir * pivot.faceTurn * 2.6 * FIGHTER_SCALE;
   const movementOffset = (f.dir || 1) * (
     movePresent.walkCounterLean * 2.2 -
@@ -10928,9 +10992,9 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     movePresent.airLocal * movePresent.preLand * 3.2
   ) * FIGHTER_SCALE;
   const idleOffset = (f.dir || 1) * (idlePresence.hipOpp * 1.2 + (idlePresence.frontPress - idlePresence.backPress) * 1.8) * idleGround * FIGHTER_SCALE;
-  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + landingDustBloom * 18 + preLandShadow * 18 + airToeShadow * 12 + facingPress * 34 + facingSnap * 16 + pivot.press * 18 + pivot.snap * 9 + startPresence.floorWeight * 30 + startPresence.snapReach * 10 + idleWeightShift * 13 + idleToeGrip * 8 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + movePresent.walkLoad * 14 + movePresent.walkReach * 8 + movePresent.walkHeelRoll * 10 + movePresent.walkToePush * 9 + movePresent.pivotFootPress * 13 + movePresent.stopHeelCatch * 12 + movePresent.pivotHipTwist * 8 + movePresent.turnShoulderWhip * 7 + movePresent.landingSquash * 16 + movePresent.landingHeelBite * 8 + movePresent.crouchFootPress * 14 + guardPresent.footPress * 23 + guardPresent.footSpread * 16 + guardPresent.impact * 12 + resultPresent.victoryLift * 12 + resultPresent.cheerLift * 9 + resultPresent.heroFootDig * 13 + resultPresent.sprawl * 36 + resultPresent.dust * 22 + resultPresent.koFloorContact * 22 + resultPresent.koSlamEcho * 14 + defeatContact.shadowAlign * 26 + defeatContact.floorCompression * 18 + defeatContact.footDrag * 16 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18 + recoveryShadowWeight * 18 + recoveryToeDrag * 12) * FIGHTER_SCALE * (1 - air * 0.38);
-  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + landingDustBloom * 2.4 + preLandShadow * 2.2 + airToeShadow * 1.2 + facingPress * 4.8 + facingSnap * 1.7 + pivot.press * 2.2 + startPresence.floorWeight * 3.4 + startPresence.footPress * 1.2 + idleWeightShift * 1.3 + idleToeGrip * 0.8 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + movePresent.walkLoad * 1.4 + movePresent.walkHeelRoll * 1.3 + movePresent.walkToePush * 0.8 + movePresent.pivotFootPress * 1.6 + movePresent.stopHeelCatch * 1.5 + movePresent.pivotHipTwist * 1.1 + movePresent.landingPress * 2.2 + movePresent.landingKneeAbsorb * 1.4 + movePresent.crouchFootPress * 1.9 + guardPresent.footPress * 2.7 + guardPresent.brace * 1.1 + resultPresent.victory * 0.8 + resultPresent.heroFootDig * 1.5 + resultPresent.collapse * 3.2 + resultPresent.slam * 2.4 + resultPresent.koFloorContact * 1.6 + resultPresent.koSlamEcho * 2.2 + defeatContact.shadowWeight * 2.4 + defeatContact.floorCompression * 1.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7 + recoveryShadowWeight * 1.8 + recoveryToeDrag * 0.9) * FIGHTER_SCALE * (1 - air * 0.48);
-  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + landingDustBloom * 0.04 + preLandShadow * 0.035 + airToeShadow * 0.018 + facingPress * 0.085 + facingSnap * 0.035 + pivot.press * 0.042 + pivot.snap * 0.02 + startPresence.floorWeight * 0.065 + startPresence.fightSnap * 0.035 + idleWeightShift * 0.026 + idleToeGrip * 0.014 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + movePresent.walkLoad * 0.032 + movePresent.walkHeelRoll * 0.024 + movePresent.walkToePush * 0.018 + movePresent.pivotFootPress * 0.03 + movePresent.stopHeelCatch * 0.032 + movePresent.pivotHipTwist * 0.02 + movePresent.landingSquash * 0.04 + movePresent.landingHeelBite * 0.026 + movePresent.crouchFootPress * 0.026 + guardPresent.footPress * 0.048 + guardPresent.impact * 0.055 + guardPresent.counter * 0.032 + resultPresent.glow * 0.032 + resultPresent.heroPlant * 0.024 + resultPresent.dust * 0.06 + resultPresent.collapse * 0.042 + resultPresent.koFloorContact * 0.045 + resultPresent.koSlamEcho * 0.035 + defeatContact.shadowWeight * 0.054 + defeatContact.finalSettle * 0.024 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052 + recoveryShadowWeight * 0.04, 0.08, 0.64);
+  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + landingDustBloom * 18 + preLandShadow * 18 + airToeShadow * 12 + aerialContactWeight * 14 + facingPress * 34 + facingSnap * 16 + pivot.press * 18 + pivot.snap * 9 + startPresence.floorWeight * 30 + startPresence.snapReach * 10 + idleWeightShift * 13 + idleToeGrip * 8 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + movePresent.walkLoad * 14 + movePresent.walkReach * 8 + movePresent.walkHeelRoll * 10 + movePresent.walkToePush * 9 + movePresent.pivotFootPress * 13 + movePresent.stopHeelCatch * 12 + movePresent.pivotHipTwist * 8 + movePresent.turnShoulderWhip * 7 + movePresent.landingSquash * 16 + movePresent.landingHeelBite * 8 + movePresent.crouchFootPress * 14 + guardPresent.footPress * 23 + guardPresent.footSpread * 16 + guardPresent.impact * 12 + resultPresent.victoryLift * 12 + resultPresent.cheerLift * 9 + resultPresent.heroFootDig * 13 + resultPresent.sprawl * 36 + resultPresent.dust * 22 + resultPresent.koFloorContact * 22 + resultPresent.koSlamEcho * 14 + defeatContact.shadowAlign * 26 + defeatContact.floorCompression * 18 + defeatContact.footDrag * 16 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18 + recoveryShadowWeight * 18 + recoveryToeDrag * 12) * FIGHTER_SCALE * (1 - air * 0.38);
+  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + landingDustBloom * 2.4 + preLandShadow * 2.2 + airToeShadow * 1.2 + aerialContactWeight * 1.6 + facingPress * 4.8 + facingSnap * 1.7 + pivot.press * 2.2 + startPresence.floorWeight * 3.4 + startPresence.footPress * 1.2 + idleWeightShift * 1.3 + idleToeGrip * 0.8 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + movePresent.walkLoad * 1.4 + movePresent.walkHeelRoll * 1.3 + movePresent.walkToePush * 0.8 + movePresent.pivotFootPress * 1.6 + movePresent.stopHeelCatch * 1.5 + movePresent.pivotHipTwist * 1.1 + movePresent.landingPress * 2.2 + movePresent.landingKneeAbsorb * 1.4 + movePresent.crouchFootPress * 1.9 + guardPresent.footPress * 2.7 + guardPresent.brace * 1.1 + resultPresent.victory * 0.8 + resultPresent.heroFootDig * 1.5 + resultPresent.collapse * 3.2 + resultPresent.slam * 2.4 + resultPresent.koFloorContact * 1.6 + resultPresent.koSlamEcho * 2.2 + defeatContact.shadowWeight * 2.4 + defeatContact.floorCompression * 1.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7 + recoveryShadowWeight * 1.8 + recoveryToeDrag * 0.9) * FIGHTER_SCALE * (1 - air * 0.48);
+  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + landingDustBloom * 0.04 + preLandShadow * 0.035 + airToeShadow * 0.018 + aerialContactWeight * 0.026 + facingPress * 0.085 + facingSnap * 0.035 + pivot.press * 0.042 + pivot.snap * 0.02 + startPresence.floorWeight * 0.065 + startPresence.fightSnap * 0.035 + idleWeightShift * 0.026 + idleToeGrip * 0.014 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + movePresent.walkLoad * 0.032 + movePresent.walkHeelRoll * 0.024 + movePresent.walkToePush * 0.018 + movePresent.pivotFootPress * 0.03 + movePresent.stopHeelCatch * 0.032 + movePresent.pivotHipTwist * 0.02 + movePresent.landingSquash * 0.04 + movePresent.landingHeelBite * 0.026 + movePresent.crouchFootPress * 0.026 + guardPresent.footPress * 0.048 + guardPresent.impact * 0.055 + guardPresent.counter * 0.032 + resultPresent.glow * 0.032 + resultPresent.heroPlant * 0.024 + resultPresent.dust * 0.06 + resultPresent.collapse * 0.042 + resultPresent.koFloorContact * 0.045 + resultPresent.koSlamEcho * 0.035 + defeatContact.shadowWeight * 0.054 + defeatContact.finalSettle * 0.024 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052 + recoveryShadowWeight * 0.04, 0.08, 0.64);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -18941,6 +19005,7 @@ function getPose(f, stride) {
   const bodyWeight = f.attack ? attackBodyWeightProfile(f) : null;
   const aerialBody = aerialBodyProfile(f);
   const aerialMotion = aerialVisualMotion(f);
+  const aerialAnatomy = aerialLandingAnatomyProfile(f, aerialMotion);
   const activePulse = phase.strike;
   const windup = phase.anticipation;
   const recovery = phase.recovery;
@@ -19211,26 +19276,28 @@ function getPose(f, stride) {
     const launch = jumpLaunchPose * strength * aerialBody.launch;
     const coil = launch * aerialBody.coil;
     const trail = Math.sin((1 - jumpLaunchPose) * Math.PI) * strength * aerialBody.tuck;
+    const launchCoil = clamp(aerialAnatomy.launchCoil, 0, 1.6);
+    const shoulderBalance = clamp(aerialAnatomy.shoulderCounterbalance, 0, 1.55);
 
-    base.torsoTilt += jumpDir * (-launch * 0.03 - coil * 0.012 + trail * 0.018);
-    base.frontArm.elbow.x -= jumpDir * (launch * 5.6 + coil * 2.8 + trail * 2.2) * spec.stance * aerialBody.arm;
-    base.frontArm.elbow.y -= (launch * 10.2 + coil * 3.4) * aerialBody.arm - trail * 2.4;
-    base.frontArm.hand.x -= jumpDir * (launch * 9.8 + coil * 4.6 + trail * 3.8) * spec.stance * aerialBody.arm;
-    base.frontArm.hand.y -= (launch * 17.4 + coil * 6.2) * aerialBody.arm - trail * 3.8;
-    base.backArm.elbow.x += jumpDir * (launch * 4.8 + coil * 2.4 + trail * 1.8) * spec.stance * aerialBody.arm;
-    base.backArm.elbow.y -= (launch * 7.6 + coil * 2.8) * aerialBody.arm - trail * 1.6;
-    base.backArm.hand.x += jumpDir * (launch * 8.4 + coil * 4 + trail * 3.2) * spec.stance * aerialBody.arm;
-    base.backArm.hand.y -= (launch * 13.2 + coil * 5.2) * aerialBody.arm - trail * 2.8;
-    base.frontLeg.knee.x -= jumpDir * (trail * 7.8 + coil * 2.8) * spec.stance * aerialBody.foot;
-    base.frontLeg.knee.y += trail * 7.4 - launch * 4.6 + coil * 2.2;
-    base.frontLeg.foot.x -= jumpDir * (trail * 13.6 + coil * 4.8) * spec.stance * aerialBody.foot;
-    base.frontLeg.foot.y += trail * 12.8 - launch * 8.2 + coil * 4.6;
-    base.backLeg.knee.x += jumpDir * (trail * 5.6 + coil * 2.2) * spec.stance * aerialBody.foot;
-    base.backLeg.knee.y += trail * 5.2 - launch * 3.4 + coil * 1.8;
-    base.backLeg.foot.x += jumpDir * (trail * 9.4 + coil * 3.4) * spec.stance * aerialBody.foot;
-    base.backLeg.foot.y += trail * 9.8 - launch * 5.8 + coil * 3.2;
-    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - jumpDir * (trail * 0.036 + coil * 0.012) * aerialBody.foot;
-    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) + jumpDir * (trail * 0.03 + coil * 0.01) * aerialBody.foot;
+    base.torsoTilt += jumpDir * (-launch * 0.03 - coil * 0.012 - launchCoil * 0.01 + trail * 0.018 + shoulderBalance * 0.006);
+    base.frontArm.elbow.x -= jumpDir * (launch * 5.6 + coil * 2.8 + launchCoil * 2.3 + trail * 2.2) * spec.stance * aerialBody.arm;
+    base.frontArm.elbow.y -= (launch * 10.2 + coil * 3.4 + launchCoil * 2.7) * aerialBody.arm - trail * 2.4 - shoulderBalance * 0.7;
+    base.frontArm.hand.x -= jumpDir * (launch * 9.8 + coil * 4.6 + launchCoil * 3.8 + trail * 3.8) * spec.stance * aerialBody.arm;
+    base.frontArm.hand.y -= (launch * 17.4 + coil * 6.2 + launchCoil * 4.8) * aerialBody.arm - trail * 3.8 - shoulderBalance * 1.1;
+    base.backArm.elbow.x += jumpDir * (launch * 4.8 + coil * 2.4 + launchCoil * 1.9 + trail * 1.8) * spec.stance * aerialBody.arm;
+    base.backArm.elbow.y -= (launch * 7.6 + coil * 2.8 + launchCoil * 2.2) * aerialBody.arm - trail * 1.6 - shoulderBalance * 0.5;
+    base.backArm.hand.x += jumpDir * (launch * 8.4 + coil * 4 + launchCoil * 3.3 + trail * 3.2) * spec.stance * aerialBody.arm;
+    base.backArm.hand.y -= (launch * 13.2 + coil * 5.2 + launchCoil * 4.1) * aerialBody.arm - trail * 2.8 - shoulderBalance * 0.8;
+    base.frontLeg.knee.x -= jumpDir * (trail * 7.8 + coil * 2.8 + launchCoil * 2.5) * spec.stance * aerialBody.foot;
+    base.frontLeg.knee.y += trail * 7.4 - launch * 4.6 + coil * 2.2 + launchCoil * 2.4;
+    base.frontLeg.foot.x -= jumpDir * (trail * 13.6 + coil * 4.8 + launchCoil * 4.5) * spec.stance * aerialBody.foot;
+    base.frontLeg.foot.y += trail * 12.8 - launch * 8.2 + coil * 4.6 + launchCoil * 4.2;
+    base.backLeg.knee.x += jumpDir * (trail * 5.6 + coil * 2.2 + launchCoil * 1.9) * spec.stance * aerialBody.foot;
+    base.backLeg.knee.y += trail * 5.2 - launch * 3.4 + coil * 1.8 + launchCoil * 1.8;
+    base.backLeg.foot.x += jumpDir * (trail * 9.4 + coil * 3.4 + launchCoil * 3.1) * spec.stance * aerialBody.foot;
+    base.backLeg.foot.y += trail * 9.8 - launch * 5.8 + coil * 3.2 + launchCoil * 3.4;
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - jumpDir * (trail * 0.036 + coil * 0.012 + launchCoil * 0.012) * aerialBody.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) + jumpDir * (trail * 0.03 + coil * 0.01 + launchCoil * 0.01) * aerialBody.foot;
   }
 
   const landingPose = f.grounded && f.hurt <= 0 && !f.attack && !winner
@@ -19254,49 +19321,59 @@ function getPose(f, stride) {
     const heelBite = clamp(aerialMotion.landingHeelBite, 0, 1.8);
     const kneeAbsorb = clamp(aerialMotion.landingKneeAbsorb, 0, 1.8);
     const dustBloom = clamp(aerialMotion.landingDustBloom, 0, 1.6);
+    const anatomyHeel = clamp(aerialAnatomy.heelBite, 0, 1.92);
+    const anatomyKnee = clamp(aerialAnatomy.kneeAbsorb, 0, 1.95);
+    const ankleFlex = clamp(aerialAnatomy.ankleFlex, 0, 1.45);
+    const anatomySquash = clamp(aerialAnatomy.landingSquash, 0, 1.95);
+    const anatomyRebound = clamp(aerialAnatomy.landingRebound, 0, 1.7);
 
-    base.torsoTilt += landingDir * (squash * 0.032 + heelBite * 0.008 - rebound * 0.012) - squash * 0.01 - kneeAbsorb * 0.004;
-    base.frontArm.shoulder.y += squash * 1.8 + kneeAbsorb * 0.55 - rebound * 0.8;
-    base.backArm.shoulder.y += squash * 1.4 + kneeAbsorb * 0.45 - rebound * 0.6;
-    base.frontLeg.hip.y += squash * 1.9 + kneeAbsorb * 0.75;
-    base.backLeg.hip.y += squash * 2.25 + kneeAbsorb * 0.9;
-    base.frontLeg.knee.x += landingDir * (footSpread * 4.5 + heelBite * 2.4 + rebound * 1.8) * spec.stance;
-    base.frontLeg.knee.y += squash * 11.8 + kneeAbsorb * 4.2 - rebound * 2.4;
-    base.frontLeg.foot.x += landingDir * (footSpread * 10 + heelBite * 5.2 + rebound * 2.2) * spec.stance;
-    base.frontLeg.foot.y += squash * 2.15 + heelBite * 0.8;
-    base.backLeg.knee.x -= landingDir * (footSpread * 5.2 + heelBite * 3.1 + rebound * 1.4) * spec.stance;
-    base.backLeg.knee.y += squash * 13.8 + kneeAbsorb * 4.8 - rebound * 1.8;
-    base.backLeg.foot.x -= landingDir * (footSpread * 12 + heelBite * 6.2 + rebound * 2.8) * spec.stance;
-    base.backLeg.foot.y += squash * 2.55 + heelBite * 0.9;
-    base.frontArm.elbow.x -= landingDir * (press * 3.2 + heelBite * 0.9) * spec.stance * landingStyle.arm;
-    base.frontArm.elbow.y += press * 5.5 * landingStyle.arm + kneeAbsorb * 1.6 - rebound * 3.2;
-    base.frontArm.hand.x -= landingDir * (press * 4.6 + heelBite * 1.3) * spec.stance * landingStyle.arm;
-    base.frontArm.hand.y += press * 8.6 * landingStyle.arm + kneeAbsorb * 2.2 - rebound * 4.8;
-    base.backArm.elbow.x += landingDir * (press * 2.8 + heelBite * 0.8) * spec.stance * landingStyle.arm;
-    base.backArm.elbow.y += press * 4.2 * landingStyle.arm + kneeAbsorb * 1.4 - rebound * 2.8;
-    base.backArm.hand.x += landingDir * (press * 3.8 + heelBite * 1.1) * spec.stance * landingStyle.arm;
-    base.backArm.hand.y += press * 6.8 * landingStyle.arm + kneeAbsorb * 1.9 - rebound * 3.8;
-    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(squash * 0.86 + heelBite * 0.08 + dustBloom * 0.035, 0, 1));
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(squash * 0.96 + heelBite * 0.09 + dustBloom * 0.04, 0, 1));
-    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + landingDir * (squash * 0.028 + heelBite * 0.012 - rebound * 0.012) * aerialBody.foot;
-    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - landingDir * (squash * 0.036 + heelBite * 0.014 - rebound * 0.01) * aerialBody.foot;
-    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, heelBite * 0.24 + dustBloom * 0.08);
-    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, heelBite * 0.28 + dustBloom * 0.09);
+    base.torsoTilt += landingDir * (squash * 0.032 + anatomySquash * 0.006 + heelBite * 0.008 + anatomyHeel * 0.007 - rebound * 0.012 - anatomyRebound * 0.006) - squash * 0.01 - kneeAbsorb * 0.004 - anatomyKnee * 0.004;
+    base.frontArm.shoulder.y += squash * 1.8 + kneeAbsorb * 0.55 + anatomyKnee * 0.5 - rebound * 0.8 - anatomyRebound * 0.42;
+    base.backArm.shoulder.y += squash * 1.4 + kneeAbsorb * 0.45 + anatomyKnee * 0.42 - rebound * 0.6 - anatomyRebound * 0.34;
+    base.frontLeg.hip.y += squash * 1.9 + kneeAbsorb * 0.75 + anatomySquash * 0.62 + anatomyKnee * 0.48;
+    base.backLeg.hip.y += squash * 2.25 + kneeAbsorb * 0.9 + anatomySquash * 0.72 + anatomyKnee * 0.56;
+    base.frontLeg.knee.x += landingDir * (footSpread * 4.5 + heelBite * 2.4 + anatomyHeel * 1.8 + rebound * 1.8 + anatomyRebound * 1.1) * spec.stance;
+    base.frontLeg.knee.y += squash * 11.8 + kneeAbsorb * 4.2 + anatomySquash * 4.2 + anatomyKnee * 3.2 - rebound * 2.4 - anatomyRebound * 1.6;
+    base.frontLeg.foot.x += landingDir * (footSpread * 10 + heelBite * 5.2 + anatomyHeel * 4.4 + rebound * 2.2 + ankleFlex * 2.1) * spec.stance;
+    base.frontLeg.foot.y += squash * 2.15 + heelBite * 0.8 + anatomySquash * 0.72 + anatomyHeel * 0.66;
+    base.backLeg.knee.x -= landingDir * (footSpread * 5.2 + heelBite * 3.1 + anatomyHeel * 2.5 + rebound * 1.4 + anatomyRebound * 0.9) * spec.stance;
+    base.backLeg.knee.y += squash * 13.8 + kneeAbsorb * 4.8 + anatomySquash * 4.8 + anatomyKnee * 3.8 - rebound * 1.8 - anatomyRebound * 1.2;
+    base.backLeg.foot.x -= landingDir * (footSpread * 12 + heelBite * 6.2 + anatomyHeel * 5.1 + rebound * 2.8 + ankleFlex * 2.6) * spec.stance;
+    base.backLeg.foot.y += squash * 2.55 + heelBite * 0.9 + anatomySquash * 0.88 + anatomyHeel * 0.72;
+    base.frontArm.elbow.x -= landingDir * (press * 3.2 + heelBite * 0.9 + anatomyHeel * 0.75) * spec.stance * landingStyle.arm;
+    base.frontArm.elbow.y += press * 5.5 * landingStyle.arm + kneeAbsorb * 1.6 + anatomyKnee * 1.1 - rebound * 3.2 - anatomyRebound * 2.2;
+    base.frontArm.hand.x -= landingDir * (press * 4.6 + heelBite * 1.3 + anatomyHeel * 1.05) * spec.stance * landingStyle.arm;
+    base.frontArm.hand.y += press * 8.6 * landingStyle.arm + kneeAbsorb * 2.2 + anatomyKnee * 1.6 - rebound * 4.8 - anatomyRebound * 3.1;
+    base.backArm.elbow.x += landingDir * (press * 2.8 + heelBite * 0.8 + anatomyHeel * 0.62) * spec.stance * landingStyle.arm;
+    base.backArm.elbow.y += press * 4.2 * landingStyle.arm + kneeAbsorb * 1.4 + anatomyKnee * 0.95 - rebound * 2.8 - anatomyRebound * 1.8;
+    base.backArm.hand.x += landingDir * (press * 3.8 + heelBite * 1.1 + anatomyHeel * 0.9) * spec.stance * landingStyle.arm;
+    base.backArm.hand.y += press * 6.8 * landingStyle.arm + kneeAbsorb * 1.9 + anatomyKnee * 1.35 - rebound * 3.8 - anatomyRebound * 2.4;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(squash * 0.86 + anatomySquash * 0.12 + heelBite * 0.08 + anatomyHeel * 0.08 + dustBloom * 0.035, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(squash * 0.96 + anatomySquash * 0.14 + heelBite * 0.09 + anatomyHeel * 0.1 + dustBloom * 0.04, 0, 1));
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + landingDir * (squash * 0.028 + heelBite * 0.012 + anatomyHeel * 0.013 + ankleFlex * 0.018 - rebound * 0.012 - anatomyRebound * 0.008) * aerialBody.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - landingDir * (squash * 0.036 + heelBite * 0.014 + anatomyHeel * 0.016 + ankleFlex * 0.022 - rebound * 0.01 - anatomyRebound * 0.006) * aerialBody.foot;
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, heelBite * 0.24 + anatomyHeel * 0.22 + ankleFlex * 0.16 + dustBloom * 0.08);
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, heelBite * 0.28 + anatomyHeel * 0.26 + ankleFlex * 0.2 + dustBloom * 0.09);
   }
 
   const airKickLandingPose = f.grounded ? smoothStep01(clamp((f.airKickLandingPulse ?? 0) / 16, 0, 1)) : 0;
   if (airKickLandingPose > 0.03 && f.hurt <= 0 && !f.attack && !winner) {
     const press = airKickLandingPose * (f.profileId === "p1" ? 1.12 : f.profileId === "p2" ? 0.84 : 1) * aerialBody.land;
     const landingDir = (f.airKickDir || f.landingDir || f.dir || 1) === (f.dir || 1) ? 1 : -1;
-    base.torsoTilt += landingDir * press * 0.028;
-    base.frontLeg.knee.y += press * 6.5;
-    base.frontLeg.foot.x += landingDir * press * 5 * spec.stance;
-    base.backLeg.knee.y += press * 8.5;
-    base.backLeg.foot.x -= landingDir * press * 9 * spec.stance;
-    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, press * 0.72);
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, press * 0.94);
-    base.frontArm.hand.y += press * 5;
-    base.backArm.hand.y += press * 3;
+    const heelBite = clamp(aerialAnatomy.heelBite, 0, 1.92);
+    const kneeAbsorb = clamp(aerialAnatomy.kneeAbsorb, 0, 1.95);
+    const ankleFlex = clamp(aerialAnatomy.ankleFlex, 0, 1.45);
+    base.torsoTilt += landingDir * (press * 0.028 + heelBite * 0.009) - kneeAbsorb * 0.004;
+    base.frontLeg.knee.y += press * 6.5 + kneeAbsorb * 2.4;
+    base.frontLeg.foot.x += landingDir * (press * 5 + heelBite * 3.6 + ankleFlex * 1.8) * spec.stance;
+    base.backLeg.knee.y += press * 8.5 + kneeAbsorb * 3.1;
+    base.backLeg.foot.x -= landingDir * (press * 9 + heelBite * 4.8 + ankleFlex * 2.2) * spec.stance;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, press * 0.72, clamp(0.48 + heelBite * 0.18, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, press * 0.94, clamp(0.62 + heelBite * 0.2, 0, 1));
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, ankleFlex * 0.68);
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, ankleFlex * 0.82);
+    base.frontArm.hand.y += press * 5 + kneeAbsorb * 1.3;
+    base.backArm.hand.y += press * 3 + kneeAbsorb * 1.1;
   }
 
   const attackEntryT = clamp((f.attackEntryPulse ?? 0) / 14, 0, 1);
@@ -21014,32 +21091,46 @@ function getPose(f, stride) {
     const kneeGather = clamp(aerialMotion.airKneeGather, 0, 1.45);
     const toeReach = clamp(aerialMotion.airToeReach, 0, 1.5);
     const handBalance = clamp(aerialMotion.airHandBalance, 0, 1.4);
+    const anatomySpine = clamp(aerialAnatomy.airSpineArc, 0, 1.55);
+    const anatomyShoulder = clamp(aerialAnatomy.shoulderCounterbalance, 0, 1.55);
+    const anatomyHand = clamp(aerialAnatomy.handBalance, 0, 1.65);
+    const anatomyKnee = clamp(aerialAnatomy.kneeGather, 0, 1.62);
+    const anatomyToe = clamp(aerialAnatomy.toeReach, 0, 1.72);
+    const preLandBrace = clamp(aerialAnatomy.preLandBracing, 0, 1.55);
     const tuck = clamp((visualApex * 0.82 + rise * 0.3 + fall * 0.18) * airStyle.tuck, 0, 1.42);
     const landingReach = (fall * (0.52 + travel * 0.32) + preLand * 0.42) * airStyle.weight * aerialBody.fallReach;
     const armFloat = (rise * 0.86 + visualApex * 0.6 - fall * 0.18 - preLand * 0.18) * airStyle.swing;
 
-    base.torsoTilt += localDir * (-rise * 0.036 + fall * 0.048 + preLand * 0.022 + spineCurve * 0.014 + travel * 0.014) * airStyle.weight;
-    base.frontArm.elbow.x += localDir * (rise * 6 + travel * 4 - fall * 3 + handBalance * 2.4) * spec.stance * airStyle.swing;
-    base.frontArm.elbow.y -= (10 + rise * 11 + apex * 8 + handBalance * 2.2 - fall * 3) * airStyle.swing;
-    base.frontArm.hand.x += localDir * (rise * 12 + travel * 8 - fall * 5 + handBalance * 4.4) * spec.stance * airStyle.swing;
-    base.frontArm.hand.y -= (18 + rise * 17 + apex * 11 + handBalance * 3.6 - fall * 4) * airStyle.swing;
-    base.backArm.elbow.x -= localDir * (8 + rise * 5 + travel * 7 + handBalance * 1.8 - preLand * 2) * spec.stance * airStyle.swing;
-    base.backArm.elbow.y += fall * 8 + preLand * 4 - armFloat * 8 - handBalance * 1.4;
-    base.backArm.hand.x -= localDir * (13 + rise * 7 + travel * 9 + handBalance * 3.4 - preLand * 3) * spec.stance * airStyle.swing;
-    base.backArm.hand.y += fall * 11 + preLand * 5 - armFloat * 10 - handBalance * 2.4;
+    base.torsoTilt += localDir * (-rise * 0.036 + fall * 0.048 + preLand * 0.022 + preLandBrace * 0.012 + spineCurve * 0.014 + anatomySpine * 0.011 + travel * 0.014) * airStyle.weight;
+    base.frontArm.shoulder.x += localDir * anatomyShoulder * 1.6 * spec.stance;
+    base.frontArm.shoulder.y += anatomyShoulder * 0.8 - anatomySpine * 0.35;
+    base.backArm.shoulder.x -= localDir * anatomyShoulder * 1.35 * spec.stance;
+    base.backArm.shoulder.y += anatomyShoulder * 0.65 + preLandBrace * 0.5;
+    base.frontArm.elbow.x += localDir * (rise * 6 + travel * 4 - fall * 3 + handBalance * 2.4 + anatomyHand * 2.3 - preLandBrace * 1.2) * spec.stance * airStyle.swing;
+    base.frontArm.elbow.y -= (10 + rise * 11 + apex * 8 + handBalance * 2.2 + anatomyHand * 1.8 - fall * 3 - preLandBrace * 1.2) * airStyle.swing;
+    base.frontArm.hand.x += localDir * (rise * 12 + travel * 8 - fall * 5 + handBalance * 4.4 + anatomyHand * 4.2 - preLandBrace * 2.2) * spec.stance * airStyle.swing;
+    base.frontArm.hand.y -= (18 + rise * 17 + apex * 11 + handBalance * 3.6 + anatomyHand * 3.2 - fall * 4 - preLandBrace * 1.8) * airStyle.swing;
+    base.backArm.elbow.x -= localDir * (8 + rise * 5 + travel * 7 + handBalance * 1.8 + anatomyHand * 1.9 - preLand * 2 - preLandBrace * 1.6) * spec.stance * airStyle.swing;
+    base.backArm.elbow.y += fall * 8 + preLand * 4 + preLandBrace * 1.7 - armFloat * 8 - handBalance * 1.4 - anatomyHand * 1.2;
+    base.backArm.hand.x -= localDir * (13 + rise * 7 + travel * 9 + handBalance * 3.4 + anatomyHand * 3.6 - preLand * 3 - preLandBrace * 2.4) * spec.stance * airStyle.swing;
+    base.backArm.hand.y += fall * 11 + preLand * 5 + preLandBrace * 2.6 - armFloat * 10 - handBalance * 2.4 - anatomyHand * 1.9;
 
-    base.frontLeg.knee.x += localDir * (tuck * 11 + kneeGather * 2.8 + travel * 7 - landingReach * 5 + toeReach * 1.8) * spec.stance;
-    base.frontLeg.knee.y += tuck * 13 + kneeGather * 5.2 - rise * 7 + landingReach * 8 + preLand * 3 + toeReach * 1.7;
-    base.frontLeg.foot.x += localDir * (tuck * 9 + travel * 14 + landingReach * 14 + toeReach * 6.2) * spec.stance * airStyle.reach;
-    base.frontLeg.foot.y += tuck * 20 + kneeGather * 4.8 - rise * 8 + landingReach * 20 + preLand * 6 + toeReach * 5.5;
-    base.backLeg.knee.x -= localDir * (tuck * 8 + kneeGather * 2.2 + travel * 5 - toeReach * 0.8) * spec.stance;
-    base.backLeg.knee.y += tuck * 8 + kneeGather * 3.8 - visualApex * 5 + fall * 5 + preLand * 4 + toeReach * 1.2;
-    base.backLeg.foot.x -= localDir * (tuck * 14 + travel * 10 - fall * 3 - preLand * 4 - toeReach * 3.8) * spec.stance;
-    base.backLeg.foot.y += tuck * 13 + kneeGather * 3.4 - visualApex * 6 + fall * 9 + preLand * 9 + toeReach * 4.6;
-    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + localDir * (preLand * 0.028 + toeReach * 0.018) * aerialBody.foot;
-    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - localDir * (preLand * 0.024 + toeReach * 0.015) * aerialBody.foot;
-    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + handBalance * 0.08 - toeReach * 0.03, 0, 1);
-    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + handBalance * 0.06 - toeReach * 0.025, 0, 1);
+    base.frontLeg.knee.x += localDir * (tuck * 11 + kneeGather * 2.8 + anatomyKnee * 2.4 + travel * 7 - landingReach * 5 - preLandBrace * 2.1 + toeReach * 1.8 + anatomyToe * 1.4) * spec.stance;
+    base.frontLeg.knee.y += tuck * 13 + kneeGather * 5.2 + anatomyKnee * 4.2 - rise * 7 + landingReach * 8 + preLand * 3 + preLandBrace * 2.8 + toeReach * 1.7 + anatomyToe * 1.1;
+    base.frontLeg.foot.x += localDir * (tuck * 9 + travel * 14 + landingReach * 14 + preLandBrace * 4.8 + toeReach * 6.2 + anatomyToe * 5.3) * spec.stance * airStyle.reach;
+    base.frontLeg.foot.y += tuck * 20 + kneeGather * 4.8 + anatomyKnee * 3.6 - rise * 8 + landingReach * 20 + preLand * 6 + preLandBrace * 5.2 + toeReach * 5.5 + anatomyToe * 4.4;
+    base.backLeg.knee.x -= localDir * (tuck * 8 + kneeGather * 2.2 + anatomyKnee * 1.9 + travel * 5 - toeReach * 0.8 - anatomyToe * 0.7) * spec.stance;
+    base.backLeg.knee.y += tuck * 8 + kneeGather * 3.8 + anatomyKnee * 3.1 - visualApex * 5 + fall * 5 + preLand * 4 + preLandBrace * 3.2 + toeReach * 1.2 + anatomyToe * 0.9;
+    base.backLeg.foot.x -= localDir * (tuck * 14 + travel * 10 - fall * 3 - preLand * 4 - preLandBrace * 3.8 - toeReach * 3.8 - anatomyToe * 3.2) * spec.stance;
+    base.backLeg.foot.y += tuck * 13 + kneeGather * 3.4 + anatomyKnee * 2.8 - visualApex * 6 + fall * 9 + preLand * 9 + preLandBrace * 5.4 + toeReach * 4.6 + anatomyToe * 3.9;
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + localDir * (preLand * 0.028 + preLandBrace * 0.018 + toeReach * 0.018 + anatomyToe * 0.016) * aerialBody.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - localDir * (preLand * 0.024 + preLandBrace * 0.016 + toeReach * 0.015 + anatomyToe * 0.013) * aerialBody.foot;
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, clamp(anatomyToe * 0.26 + preLandBrace * 0.2, 0, 0.82));
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, clamp(anatomyToe * 0.22 + preLandBrace * 0.18, 0, 0.72));
+    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + handBalance * 0.08 + anatomyHand * 0.05 - toeReach * 0.03, 0, 1);
+    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + handBalance * 0.06 + anatomyHand * 0.045 - toeReach * 0.025, 0, 1);
+    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(anatomyHand * 0.22 + preLandBrace * 0.08, 0, 0.58));
+    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(anatomyHand * 0.18 + preLandBrace * 0.06, 0, 0.5));
   }
 
   if (airborne) {
