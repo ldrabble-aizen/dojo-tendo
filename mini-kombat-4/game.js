@@ -605,6 +605,17 @@ function counterReadinessProfile(f) {
   }[f?.profileId] ?? { drive: 1, coil: 1, hand: 1, lift: 1, foot: 1, sink: 1, ring: 1, angle: 1 };
 }
 
+function guardCommitmentProfile(f) {
+  return {
+    p1: { absorb: 1.18, snap: 0.78, hand: 0.88, foot: 1.18, shoulder: 0.9, counter: 0.86 },
+    p2: { absorb: 0.82, snap: 1.22, hand: 1.2, foot: 0.84, shoulder: 1.18, counter: 1.2 },
+    p3: { absorb: 1.32, snap: 0.68, hand: 0.76, foot: 1.3, shoulder: 0.74, counter: 0.78 },
+    p4: { absorb: 0.86, snap: 1.18, hand: 1.16, foot: 0.88, shoulder: 1.18, counter: 1.16 },
+    p5: { absorb: 0.78, snap: 1.26, hand: 1.24, foot: 0.8, shoulder: 1.24, counter: 1.24 },
+    p6: { absorb: 1.06, snap: 0.92, hand: 0.96, foot: 1.06, shoulder: 0.96, counter: 0.98 },
+  }[f?.profileId] ?? { absorb: 1, snap: 1, hand: 1, foot: 1, shoulder: 1, counter: 1 };
+}
+
 function rangePressureProfile(f) {
   return {
     p1: { weight: 1.18, guard: 0.86, reach: 0.9, foot: 1.2, sway: 0.72, lift: 0.82, floor: 1.16 },
@@ -11098,7 +11109,87 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
   drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting);
   drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase);
   drawUnifiedFatiguePolish(f, localCrouch);
+  drawUnifiedGuardCommitmentPolish(f, localCrouch);
   drawUnifiedHeadAccessoryPolish(f, localCrouch, motion, acting);
+}
+
+function drawUnifiedGuardCommitmentPolish(f, localCrouch) {
+  if (!f.grounded || f.hurt > 0 || f.attack || winner) return;
+
+  const guard = f.blocking ? clamp((f.guardPulse ?? 0) / 18, 0, 1) : 0;
+  const impact = smoothStep01(clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1));
+  const counter = smoothStep01(clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1));
+  const active = clamp(Math.max(guard * 0.48, impact, counter * 0.72), 0, 1.35);
+  if (active <= 0.035) return;
+
+  const guardProfile = characterGuard(f);
+  const commitment = guardCommitmentProfile(f);
+  const trim = f.trim ?? "#fff1bd";
+  const guardColor = guardProfile.color ?? trim;
+  const heavy = f.profileId === "p1";
+  const pulse = 0.5 + Math.sin(roundFrame * 0.34 + (heavy ? 0.2 : 0.9)) * 0.5;
+  const snap = Math.sin((1 - clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1)) * Math.PI) * counter * commitment.snap;
+  const shoulderY = heavy ? -145 : -150;
+  const chestY = heavy ? -119 : -121;
+  const waistY = heavy ? -64 : -60;
+  const footY = -4 + localCrouch;
+  const brace = guard * commitment.absorb + impact * 1.25 * commitment.absorb;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(18, 9, 7, ${0.045 + active * 0.09 + impact * 0.06})`;
+  ctx.beginPath();
+  ctx.ellipse(-30 - impact * 2, shoulderY + localCrouch + brace * 1.5, 22 + brace * 4, 9 + impact * 3, -0.32, 0, Math.PI * 2);
+  ctx.ellipse(31 + impact * 2, shoulderY + localCrouch + brace * 1.8, 23 + brace * 4, 9 + impact * 3, 0.32, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(18, 9, 7, ${0.08 + active * 0.11 + impact * 0.09})`;
+  ctx.lineWidth = 7.5 + active * 3.2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-40, -130 + localCrouch + guard * 3);
+  ctx.quadraticCurveTo(-22 - impact * 4, -118 + localCrouch + brace * 5, -8 - impact * 7 + snap * 4, chestY + localCrouch + 19 + brace * 2);
+  ctx.moveTo(40, -130 + localCrouch + guard * 3);
+  ctx.quadraticCurveTo(22 + impact * 4, -118 + localCrouch + brace * 5, 8 + impact * 7 - snap * 4, chestY + localCrouch + 19 + brace * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(18, 9, 7, ${0.035 + active * 0.07})`;
+  ctx.beginPath();
+  ctx.ellipse(0, waistY + localCrouch + brace * 2.4, heavy ? 46 : 38, 11 + brace * 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = colorWithAlpha(guardColor, 0.08 + guard * 0.08 + impact * 0.12 + counter * 0.08);
+  ctx.lineWidth = 1.25 + active * 0.85;
+  ctx.beginPath();
+  ctx.moveTo(-34, shoulderY + localCrouch - 5);
+  ctx.quadraticCurveTo(0, shoulderY + localCrouch - 15 - snap * 5, 35, shoulderY + localCrouch - 5);
+  ctx.stroke();
+
+  if (counter > 0.045) {
+    ctx.strokeStyle = `rgba(255, 241, 189, ${0.065 + counter * 0.13 + pulse * 0.025})`;
+    ctx.lineWidth = 1 + counter * 0.9;
+    ctx.beginPath();
+    ctx.moveTo(-30, chestY + localCrouch - 9 - snap * 1.2);
+    ctx.quadraticCurveTo(0, chestY + localCrouch - 20 - snap * 8, 32 + snap * 4, chestY + localCrouch - 7);
+    ctx.moveTo(-28, waistY + localCrouch + 5);
+    ctx.quadraticCurveTo(2, waistY + localCrouch + 13 + snap * 2, 34 + snap * 5, waistY + localCrouch + 2);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = colorWithAlpha(trim, 0.045 + active * 0.075);
+  ctx.lineWidth = 1 + active * 0.55;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * (24 + brace * 1.8), footY);
+    ctx.quadraticCurveTo(side * (39 + brace * 6), footY + 4.5 + impact * 1.5, side * (55 + brace * 9), footY + 3);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawUnifiedFatiguePolish(f, localCrouch) {
@@ -16145,6 +16236,50 @@ function getPose(f, stride) {
     base.backLeg.footAngle = Math.min(base.backLeg.footAngle ?? Infinity, -guardLow * 0.075 * guardLowStyle.angle);
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.68 + sink * 0.2 + coil * 0.12, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.78 + sink * 0.22 + coil * 0.14, 0, 1));
+  }
+
+  const guardImpactBody = smoothStep01(clamp((f.guardImpact ?? 0) / GUARD_IMPACT_FRAMES, 0, 1));
+  const guardHoldBody = f.blocking ? smoothStep01(clamp((f.guardPulse ?? 0) / 18, 0, 1)) : 0;
+  const guardEntryBody = f.blocking ? smoothStep01(clamp((f.guardEntryPulse ?? 0) / 12, 0, 1)) : 0;
+  const counterBody = !winner && f.hurt <= 0 && !f.attack ? smoothStep01(counterReadyT) : 0;
+  const guardCommitBody = Math.max(guardImpactBody, guardEntryBody * 0.72, guardHoldBody * 0.38, counterBody * 0.7);
+  if (guardCommitBody > 0.025 && f.grounded && f.hurt <= 0 && !f.attack && !winner) {
+    const commitment = guardCommitmentProfile(f);
+    const pulse = Math.sin(roundFrame * 0.22 + (f.profileId?.charCodeAt(1) ?? 0)) * guardCommitBody;
+    const absorb = guardImpactBody * commitment.absorb;
+    const coil = Math.max(guardEntryBody * 0.64, counterBody * commitment.counter);
+    const snap = Math.sin((1 - clamp(counterReadyT, 0, 1)) * Math.PI) * counterBody * commitment.snap;
+    const handGuard = (guardHoldBody * 0.42 + absorb * 0.88 + coil * 0.56) * commitment.hand;
+    const footBrace = (guardHoldBody * 0.34 + absorb * 1.05 + coil * 0.44) * commitment.foot;
+
+    base.torsoTilt -= absorb * 0.024 + guardEntryBody * 0.011 * commitment.absorb;
+    base.torsoTilt += snap * 0.018 * commitment.snap + pulse * 0.004;
+    base.frontArm.shoulder.y += absorb * 2.2 * commitment.shoulder - snap * 0.9;
+    base.backArm.shoulder.y += absorb * 2.6 * commitment.shoulder - snap * 0.7;
+    base.frontArm.shoulder.x -= (absorb * 1.8 - snap * 0.8) * spec.stance * commitment.shoulder;
+    base.backArm.shoulder.x += (absorb * 1.5 - snap * 0.6) * spec.stance * commitment.shoulder;
+    base.frontArm.elbow.x -= (handGuard * 4.2 - snap * 4.8 + pulse * 0.8) * spec.stance;
+    base.frontArm.elbow.y += absorb * 3.2 - coil * 1.2 - snap * 2.4;
+    base.frontArm.hand.x -= (handGuard * 7.8 - snap * 9.4 + pulse * 1.2) * spec.stance;
+    base.frontArm.hand.y += absorb * 4.4 - coil * 2.2 - snap * 5.6;
+    base.backArm.elbow.x += (handGuard * 3.6 + snap * 3.8 - pulse * 0.6) * spec.stance;
+    base.backArm.elbow.y += absorb * 2.8 - coil * 0.8 - snap * 1.8;
+    base.backArm.hand.x += (handGuard * 6.4 + snap * 7.2 - pulse * 0.9) * spec.stance;
+    base.backArm.hand.y += absorb * 3.6 - coil * 1.8 - snap * 4.2;
+    base.frontLeg.hip.y += absorb * 1.4 + footBrace * 0.7;
+    base.backLeg.hip.y += absorb * 2.1 + footBrace * 0.9;
+    base.frontLeg.knee.x += (footBrace * 3.8 + snap * 2.4) * spec.stance;
+    base.frontLeg.knee.y += footBrace * 4.8 + absorb * 2.2 - snap * 1.4;
+    base.frontLeg.foot.x += (footBrace * 5.8 + snap * 4.2) * spec.stance;
+    base.frontLeg.foot.y += absorb * 0.8;
+    base.backLeg.knee.x -= (footBrace * 5.2 + absorb * 3.4) * spec.stance;
+    base.backLeg.knee.y += footBrace * 6.2 + absorb * 3.2 - snap * 0.8;
+    base.backLeg.foot.x -= (footBrace * 10.6 + absorb * 4.8 - snap * 1.6) * spec.stance;
+    base.backLeg.foot.y += absorb * 1.1;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.62 + footBrace * 0.32 + snap * 0.12, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.78 + footBrace * 0.22 + absorb * 0.16, 0, 1));
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + (absorb * 0.024 + snap * 0.018) * commitment.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - (absorb * 0.038 + footBrace * 0.012) * commitment.foot;
   }
 
   if (attackType === "punch" || attackType === "airPunch") {
