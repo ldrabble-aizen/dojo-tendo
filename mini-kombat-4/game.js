@@ -670,13 +670,13 @@ function specialTechniqueProfile(f) {
 
 function hitReactionAnatomyProfile(f) {
   return {
-    p1: { shoulder: 0.86, hip: 1.14, armLag: 0.78, footLag: 0.9, settle: 1.18, twist: 0.82, handWhip: 0.78, kneeWhip: 0.92, spine: 0.82 },
-    p2: { shoulder: 1.16, hip: 0.82, armLag: 1.24, footLag: 1.18, settle: 0.82, twist: 1.18, handWhip: 1.28, kneeWhip: 1.16, spine: 1.18 },
-    p3: { shoulder: 0.74, hip: 1.28, armLag: 0.66, footLag: 0.78, settle: 1.32, twist: 0.72, handWhip: 0.66, kneeWhip: 0.82, spine: 0.74 },
-    p4: { shoulder: 1.2, hip: 0.86, armLag: 1.18, footLag: 1.24, settle: 0.88, twist: 1.22, handWhip: 1.18, kneeWhip: 1.24, spine: 1.16 },
-    p5: { shoulder: 1.26, hip: 0.76, armLag: 1.3, footLag: 1.22, settle: 0.78, twist: 1.28, handWhip: 1.34, kneeWhip: 1.28, spine: 1.22 },
-    p6: { shoulder: 0.96, hip: 1.08, armLag: 0.9, footLag: 0.92, settle: 1.08, twist: 0.9, handWhip: 0.92, kneeWhip: 0.94, spine: 0.94 },
-  }[f?.profileId] ?? { shoulder: 1, hip: 1, armLag: 1, footLag: 1, settle: 1, twist: 1, handWhip: 1, kneeWhip: 1, spine: 1 };
+    p1: { shoulder: 0.86, hip: 1.14, armLag: 0.78, footLag: 0.9, settle: 1.18, twist: 0.82, handWhip: 0.78, kneeWhip: 0.92, spine: 0.82, fingerShock: 0.82, toeClaw: 1.16, crease: 0.9, shadowWeight: 1.18 },
+    p2: { shoulder: 1.16, hip: 0.82, armLag: 1.24, footLag: 1.18, settle: 0.82, twist: 1.18, handWhip: 1.28, kneeWhip: 1.16, spine: 1.18, fingerShock: 1.26, toeClaw: 0.86, crease: 1.14, shadowWeight: 0.82 },
+    p3: { shoulder: 0.74, hip: 1.28, armLag: 0.66, footLag: 0.78, settle: 1.32, twist: 0.72, handWhip: 0.66, kneeWhip: 0.82, spine: 0.74, fingerShock: 0.74, toeClaw: 1.3, crease: 0.84, shadowWeight: 1.32 },
+    p4: { shoulder: 1.2, hip: 0.86, armLag: 1.18, footLag: 1.24, settle: 0.88, twist: 1.22, handWhip: 1.18, kneeWhip: 1.24, spine: 1.16, fingerShock: 1.18, toeClaw: 0.88, crease: 1.16, shadowWeight: 0.88 },
+    p5: { shoulder: 1.26, hip: 0.76, armLag: 1.3, footLag: 1.22, settle: 0.78, twist: 1.28, handWhip: 1.34, kneeWhip: 1.28, spine: 1.22, fingerShock: 1.3, toeClaw: 0.78, crease: 1.2, shadowWeight: 0.78 },
+    p6: { shoulder: 0.96, hip: 1.08, armLag: 0.9, footLag: 0.92, settle: 1.08, twist: 0.9, handWhip: 0.92, kneeWhip: 0.94, spine: 0.94, fingerShock: 0.96, toeClaw: 1.06, crease: 0.98, shadowWeight: 1.06 },
+  }[f?.profileId] ?? { shoulder: 1, hip: 1, armLag: 1, footLag: 1, settle: 1, twist: 1, handWhip: 1, kneeWhip: 1, spine: 1, fingerShock: 1, toeClaw: 1, crease: 1, shadowWeight: 1 };
 }
 
 function entrancePoseProfile(f) {
@@ -9144,6 +9144,66 @@ function hitReactionMassProfile(f) {
   };
 }
 
+function reactionPresentationProfile(f) {
+  const mass = hitReactionMassProfile(f);
+  const localized = localizedImpactProfile(f);
+  const anatomy = hitReactionAnatomyProfile(f);
+  const active = Math.max(mass.active, localized.t * 0.82);
+  const zone = mass.zone === "head" || mass.zone === "legs" ? mass.zone : "torso";
+  const kind = mass.kind || "light";
+  const worldDir = mass.worldDir || f.impactDir || f.dir || 1;
+  const localDir = worldDir === (f.dir || 1) ? 1 : -1;
+  if (active <= 0.012 || kind === "guard") {
+    return {
+      active: 0,
+      zone,
+      kind,
+      localDir,
+      worldDir,
+      force: 0,
+      follow: 0,
+      contactX: 0,
+      contactY: zone === "head" ? -140 : zone === "legs" ? -46 : -100,
+      handShock: 0,
+      toeShock: 0,
+      creaseAlpha: 0,
+      shadowWeight: 0,
+    };
+  }
+
+  const heavy = kind === "finish" || kind === "counter" || kind === "blast" || kind === "heavy";
+  const zoneWeight = zone === "head" ? 1.08 : zone === "legs" ? 1.14 : 1;
+  const force = clamp(
+    (mass.snap * 0.46 + mass.rebound * 0.3 + mass.floor * 0.16 + mass.skid * 0.12 + localized.snap * 0.22) *
+      (heavy ? 1.12 : 0.9) *
+      zoneWeight,
+    0,
+    1.75
+  );
+  const follow = clamp(
+    Math.sin((1 - clamp(active, 0, 1)) * Math.PI) * clamp(mass.strength, 0.35, 1.9) * (heavy ? 1.12 : 0.86),
+    0,
+    1.45
+  );
+  const contactY = zone === "head" ? -142 : zone === "legs" ? -47 : -101;
+  const contactX = -localDir * (zone === "head" ? 18 : zone === "legs" ? 12 : 15);
+  return {
+    active,
+    zone,
+    kind,
+    localDir,
+    worldDir,
+    force,
+    follow,
+    contactX,
+    contactY,
+    handShock: clamp((force * 0.55 + follow * 0.32 + localized.t * 0.12) * anatomy.fingerShock, 0, 1.18),
+    toeShock: clamp((mass.floor * 0.5 + mass.skid * 0.24 + follow * 0.2 + (zone === "legs" ? force * 0.28 : 0)) * anatomy.toeClaw, 0, 1.22),
+    creaseAlpha: clamp((active * 0.34 + force * 0.2 + localized.t * 0.18) * anatomy.crease, 0, 0.92),
+    shadowWeight: clamp((mass.floor * 0.54 + force * 0.18 + active * 0.12) * anatomy.shadowWeight, 0, 1.25),
+  };
+}
+
 function isAttackPoseState(state) {
   return state === "punch" || state === "kick" || state === "sweep" || state === "special" || state === "grab";
 }
@@ -11998,6 +12058,8 @@ function drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting) {
       ctx.stroke();
     }
     ctx.restore();
+
+    drawReactionCompressionEcho(f, localCrouch);
   }
 
   if (strike > 0.055 && f.hurt <= 0) {
@@ -12042,6 +12104,51 @@ function drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting) {
     }
     ctx.restore();
   }
+}
+
+function drawReactionCompressionEcho(f, localCrouch, reaction = reactionPresentationProfile(f), accent = null) {
+  if (reaction.active <= 0.04 || reaction.kind === "guard") return;
+  const force = clamp(reaction.force, 0, 1.55);
+  const crease = clamp(reaction.creaseAlpha, 0, 0.9);
+  const shadow = clamp(reaction.shadowWeight, 0, 1.2);
+  const zone = reaction.zone;
+  const dir = reaction.localDir || 1;
+  const contactX = reaction.contactX;
+  const contactY = reaction.contactY + localCrouch;
+  const trim = accent ?? f.trim ?? "#fff1bd";
+  const rx = zone === "head" ? 26 : zone === "legs" ? 34 : 31;
+  const ry = zone === "head" ? 10 : zone === "legs" ? 8 : 12;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(24, 12, 9, ${clamp(0.032 + shadow * 0.064 + force * 0.018, 0.025, 0.12)})`;
+  ctx.beginPath();
+  ctx.ellipse(contactX - dir * force * 4, contactY + force * (zone === "head" ? 0.5 : 1.4), rx + force * 8, ry + force * 2.2, -dir * 0.13, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (f.grounded && shadow > 0.04) {
+    ctx.fillStyle = `rgba(18, 10, 7, ${clamp(0.03 + shadow * 0.05, 0.02, 0.095)})`;
+    ctx.beginPath();
+    ctx.ellipse(-dir * (22 + force * 4), -3 + localCrouch + shadow * 0.8, 34 + shadow * 12, 4.6 + shadow * 1.8, -dir * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  if (crease <= 0.035) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = colorWithAlpha(trim, clamp(0.045 + crease * 0.11, 0.04, 0.145));
+  ctx.lineWidth = 0.9 + force * 0.55;
+  ctx.beginPath();
+  ctx.moveTo(contactX - dir * (rx * 0.75 + force * 3), contactY - ry * 0.65);
+  ctx.quadraticCurveTo(contactX - dir * 3, contactY - ry * 1.05 - reaction.follow * 2.2, contactX + dir * (rx * 0.62 + force * 3), contactY - ry * 0.25);
+  ctx.moveTo(contactX - dir * (rx * 0.55 + force * 2), contactY + ry * 0.52);
+  ctx.quadraticCurveTo(contactX - dir * 1.5, contactY + ry * 0.78 + reaction.follow * 1.6, contactX + dir * (rx * 0.48 + force * 2), contactY + ry * 0.28);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase) {
@@ -13399,6 +13506,7 @@ function drawSpriteExtremityDetails(f, crouch, frameName, stride, options = {}) 
   applyPivotFootPressure(feet, f);
   applyFacingTurnFootPressure(feet, f);
   applyReactionFootPressure(feet, f);
+  applyReactionExtremityPresence(hands, feet, f, frameName);
   if (!options.unified) applyWhiffFootPressure(feet, f);
   applyRoundStartExtremityPresence(hands, feet, f, frameName);
 
@@ -13640,6 +13748,57 @@ function applyRoundStartExtremityPresence(hands, feet, f, frameName) {
   }
 }
 
+function applyReactionExtremityPresence(hands, feet, f, frameName) {
+  if (!f?.grounded || f.hurt <= 0 || !Array.isArray(hands) || !Array.isArray(feet) || hands.length < 2 || feet.length < 2) return;
+  if (frameName !== "hurt" && frameName !== "defeat") return;
+  const reaction = reactionPresentationProfile(f);
+  if (reaction.active <= 0.03 || reaction.kind === "guard") return;
+
+  const headHit = reaction.zone === "head";
+  const lowHit = reaction.zone === "legs";
+  const handShock = clamp(reaction.handShock, 0, 1.12);
+  const toeShock = clamp(reaction.toeShock, 0, 1.15);
+  const recoilSide = headHit ? reaction.localDir : -reaction.localDir;
+  const lift = headHit ? -1 : lowHit ? 1 : 0.45;
+
+  hands[0].x += recoilSide * handShock * (headHit ? 5.2 : lowHit ? 2.6 : 4.1);
+  hands[0].y += lift * handShock * (headHit ? 5.4 : lowHit ? 4.2 : 3.1);
+  hands[0].sx += handShock * 0.045;
+  hands[0].sy -= handShock * 0.028;
+  hands[0].angle += recoilSide * handShock * (headHit ? 0.08 : 0.052);
+  hands[0].curl = clamp((hands[0].curl ?? 0.68) + handShock * (headHit ? 0.18 : 0.12), 0, 1.12);
+  hands[0].shock = Math.max(hands[0].shock ?? 0, handShock);
+
+  hands[1].x += recoilSide * handShock * (headHit ? 4.2 : lowHit ? 2.1 : 3.3);
+  hands[1].y += lift * handShock * (headHit ? 4.5 : lowHit ? 3.5 : 2.5);
+  hands[1].sx += handShock * 0.036;
+  hands[1].sy -= handShock * 0.022;
+  hands[1].angle += recoilSide * handShock * (headHit ? 0.066 : 0.044);
+  hands[1].curl = clamp((hands[1].curl ?? 0.68) + handShock * (headHit ? 0.15 : 0.1), 0, 1.1);
+  hands[1].shock = Math.max(hands[1].shock ?? 0, handShock * 0.86);
+
+  const supportIndex = reaction.localDir > 0 ? 0 : 1;
+  const freeIndex = supportIndex === 0 ? 1 : 0;
+  const support = feet[supportIndex];
+  const free = feet[freeIndex];
+  const press = clamp(reaction.shadowWeight * 0.64 + toeShock * 0.28, 0, 1.08);
+
+  support.press = Math.max(support.press ?? 0, press);
+  support.plant = Math.max(support.plant ?? 0, 0.68 + press * 0.25);
+  support.w += press * 3.8 + toeShock * (lowHit ? 2.2 : 1.2);
+  support.h = Math.max(7.1, support.h - press * 0.85);
+  support.y += press * 0.95;
+  support.x -= reaction.localDir * (press * 1.5 + toeShock * 1.8);
+  support.angle += supportIndex === 0 ? -press * 0.03 : press * 0.03;
+  support.toeFlex = Math.max(support.toeFlex ?? 0, toeShock);
+
+  free.plant = Math.max(0.14, (free.plant ?? 0.7) - toeShock * 0.08);
+  free.y += lowHit ? toeShock * 0.5 : -toeShock * 0.45;
+  free.x += reaction.localDir * toeShock * (lowHit ? 3.2 : 1.8);
+  free.angle += freeIndex === 0 ? toeShock * 0.026 : -toeShock * 0.026;
+  free.toeFlex = Math.max(free.toeFlex ?? 0, toeShock * (lowHit ? 0.78 : 0.55));
+}
+
 function applyReactionFootPressure(feet, f) {
   if (!f?.grounded || f.hurt <= 0 || !Array.isArray(feet) || feet.length < 2) return;
   const mass = hitReactionMassProfile(f);
@@ -13740,34 +13899,43 @@ function applyFacingTurnFootPressure(feet, f) {
 }
 
 function drawSpriteHandDetail(hand, skin, trim) {
+  const shock = clamp(hand.shock ?? 0, 0, 1.15);
   ctx.save();
   ctx.translate(hand.x, hand.y);
   ctx.rotate(hand.angle);
   ctx.scale(hand.sx, hand.sy);
 
   ctx.globalCompositeOperation = "multiply";
-  ctx.fillStyle = "rgba(32, 16, 12, 0.16)";
+  ctx.fillStyle = `rgba(32, 16, 12, ${0.16 + shock * 0.07})`;
   ctx.beginPath();
-  ctx.ellipse(1, 3, 14, 7, 0.1, 0, Math.PI * 2);
+  ctx.ellipse(1 - shock * 0.6, 3 + shock * 0.5, 14 + shock * 1.8, 7 - shock * 0.45, 0.1, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = "rgba(47, 25, 18, 0.34)";
-  ctx.lineWidth = 1.25;
+  ctx.lineWidth = 1.25 + shock * 0.3;
   ctx.lineCap = "round";
   for (let i = -1; i <= 1; i += 1) {
     const x = i * 4.2;
     ctx.beginPath();
-    ctx.moveTo(x - 1.2, -5.4);
-    ctx.quadraticCurveTo(x + hand.curl * 0.8, -0.5, x + 1.1, 4.2);
+    ctx.moveTo(x - 1.2 - shock * 0.25, -5.4 - shock * 0.4);
+    ctx.quadraticCurveTo(x + hand.curl * 0.8 + shock * 0.7, -0.5 + shock * 0.35, x + 1.1 + shock * 0.6, 4.2 - shock * 0.25);
     ctx.stroke();
   }
 
   ctx.strokeStyle = "rgba(35, 18, 13, 0.44)";
-  ctx.lineWidth = 1.4;
+  ctx.lineWidth = 1.4 + shock * 0.25;
   ctx.beginPath();
   ctx.moveTo(-8.5, -2.5);
   ctx.quadraticCurveTo(-2, -7.4, 8.5, -2.6);
   ctx.stroke();
+  if (shock > 0.08) {
+    ctx.strokeStyle = `rgba(24, 12, 9, ${0.12 + shock * 0.16})`;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(-6.5, 2.4 + shock * 0.8);
+    ctx.quadraticCurveTo(-1, 5.2 + shock * 0.7, 6.2, 2.8);
+    ctx.stroke();
+  }
   ctx.restore();
 
   ctx.save();
@@ -13775,13 +13943,13 @@ function drawSpriteHandDetail(hand, skin, trim) {
   ctx.rotate(hand.angle);
   ctx.scale(hand.sx, hand.sy);
   ctx.globalCompositeOperation = "screen";
-  ctx.strokeStyle = colorWithAlpha(lighten(skin, 26), 0.18);
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = colorWithAlpha(lighten(skin, 26), 0.18 + shock * 0.08);
+  ctx.lineWidth = 1.2 + shock * 0.18;
   ctx.beginPath();
   ctx.moveTo(-7, -5.8);
   ctx.quadraticCurveTo(0, -9.6, 8.2, -4.5);
   ctx.stroke();
-  ctx.strokeStyle = colorWithAlpha(trim, 0.09);
+  ctx.strokeStyle = colorWithAlpha(trim, 0.09 + shock * 0.06);
   ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.arc(0, 0, 13.5, Math.PI * 1.1, Math.PI * 1.85);
@@ -13791,12 +13959,13 @@ function drawSpriteHandDetail(hand, skin, trim) {
 
 function drawSpriteFootDetail(foot, shoe, trim) {
   const press = clamp(foot.press ?? 0, 0, 1);
+  const toeFlex = clamp(foot.toeFlex ?? 0, 0, 1.2);
   if (foot.plant > 0.24 && foot.y > -16) {
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
-    ctx.fillStyle = `rgba(20, 12, 8, ${0.08 + foot.plant * 0.12 + press * 0.05})`;
+    ctx.fillStyle = `rgba(20, 12, 8, ${0.08 + foot.plant * 0.12 + press * 0.05 + toeFlex * 0.035})`;
     ctx.beginPath();
-    ctx.ellipse(foot.x, foot.y + 8 + press * 0.8, foot.w * (0.54 + foot.plant * 0.16 + press * 0.08), 4.6 + press * 0.8, foot.angle, 0, Math.PI * 2);
+    ctx.ellipse(foot.x, foot.y + 8 + press * 0.8 + toeFlex * 0.3, foot.w * (0.54 + foot.plant * 0.16 + press * 0.08 + toeFlex * 0.025), 4.6 + press * 0.8, foot.angle, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -13806,20 +13975,20 @@ function drawSpriteFootDetail(foot, shoe, trim) {
   ctx.rotate(foot.angle);
   ctx.globalCompositeOperation = "multiply";
   ctx.strokeStyle = "rgba(22, 13, 10, 0.38)";
-  ctx.lineWidth = 1.7 + press * 0.7;
+  ctx.lineWidth = 1.7 + press * 0.7 + toeFlex * 0.28;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(-foot.w * 0.47, foot.h * (0.18 + press * 0.08));
-  ctx.quadraticCurveTo(-foot.w * 0.04, foot.h * (0.62 + foot.sole * 0.1 + press * 0.08), foot.w * 0.48, foot.h * (0.16 + press * 0.08));
+  ctx.quadraticCurveTo(-foot.w * 0.04, foot.h * (0.62 + foot.sole * 0.1 + press * 0.08 + toeFlex * 0.06), foot.w * 0.48, foot.h * (0.16 + press * 0.08 - toeFlex * 0.03));
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(22, 13, 10, 0.28)";
-  ctx.lineWidth = 1.15;
+  ctx.strokeStyle = `rgba(22, 13, 10, ${0.28 + toeFlex * 0.08})`;
+  ctx.lineWidth = 1.15 + toeFlex * 0.12;
   for (let i = 0; i < 3; i += 1) {
     const x = foot.w * (0.13 + i * 0.11);
     ctx.beginPath();
     ctx.moveTo(x, -foot.h * 0.26);
-    ctx.lineTo(x + 1.8, foot.h * 0.24);
+    ctx.quadraticCurveTo(x + 1.1 + toeFlex * 0.5, foot.h * 0.02 + toeFlex * 0.6, x + 1.8 + toeFlex * 1.1, foot.h * 0.24 - toeFlex * 0.2);
     ctx.stroke();
   }
   ctx.restore();
@@ -13828,12 +13997,12 @@ function drawSpriteFootDetail(foot, shoe, trim) {
   ctx.translate(foot.x, foot.y);
   ctx.rotate(foot.angle);
   ctx.globalCompositeOperation = "screen";
-  ctx.strokeStyle = colorWithAlpha(lighten(shoe, 28), 0.16 + press * 0.04);
+  ctx.strokeStyle = colorWithAlpha(lighten(shoe, 28), 0.16 + press * 0.04 + toeFlex * 0.04);
   ctx.lineWidth = 1.35;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(-foot.w * 0.35, -foot.h * (0.35 - press * 0.03));
-  ctx.quadraticCurveTo(foot.w * 0.08, -foot.h * (0.62 - press * 0.05), foot.w * 0.36, -foot.h * (0.25 - press * 0.03));
+  ctx.quadraticCurveTo(foot.w * 0.08, -foot.h * (0.62 - press * 0.05 + toeFlex * 0.04), foot.w * 0.36, -foot.h * (0.25 - press * 0.03 + toeFlex * 0.02));
   ctx.stroke();
   ctx.strokeStyle = colorWithAlpha(trim, foot.plant > 0.5 ? 0.1 : 0.16);
   ctx.lineWidth = 1.2;
@@ -15664,6 +15833,8 @@ function drawDamageReactionFX(f, crouch) {
       );
       ctx.stroke();
     }
+
+    drawReactionCompressionEcho(f, crouch, reactionPresentationProfile(f), flavor.highlight);
   }
 
   if (ko > 0.03) {
@@ -18399,6 +18570,29 @@ function getPose(f, stride) {
       base[freeFoot].knee.y += freeKick * (lowHit ? 7.8 : 3.6);
       base[freeFoot].foot.x += worldLocal * freeKick * (lowHit ? 8.8 : 5.2) * spec.stance;
       base[freeFoot].foot.y += freeKick * (lowHit ? 5.2 : 2.4);
+    }
+
+    const present = reactionPresentationProfile(f);
+    if (present.active > 0.035) {
+      const fingerShock = clamp(present.handShock * (heavyHit ? 1.08 : 0.92), 0, heavyHit ? 0.72 : 0.58);
+      const toeShock = clamp(present.toeShock * (lowHit ? 1.14 : 0.9), 0, lowHit ? 0.55 : 0.42);
+      const wristCurl = clamp(0.1 + present.force * 0.08 + present.follow * 0.06, 0, 0.24);
+      const palmSide = hitMass.zone === "head" ? localDir : -localDir;
+
+      base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + wristCurl + (headHit ? 0.04 : 0), 0, 1);
+      base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + wristCurl * 0.86 + (lowHit ? 0.03 : 0), 0, 1);
+      base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, fingerShock);
+      base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, fingerShock * 0.82);
+      base.frontArm.hand.x += palmSide * present.handShock * 2.2 * spec.stance;
+      base.backArm.hand.x += palmSide * present.handShock * 1.7 * spec.stance;
+      base.frontArm.hand.y += present.handShock * (headHit ? -1.8 : lowHit ? 2.2 : 1.4);
+      base.backArm.hand.y += present.handShock * (headHit ? -1.3 : lowHit ? 1.8 : 1.1);
+
+      base[braceFoot].toeFlex = Math.max(base[braceFoot].toeFlex ?? 0, toeShock);
+      base[freeFoot].toeFlex = Math.max(base[freeFoot].toeFlex ?? 0, toeShock * (lowHit ? 0.86 : 0.64));
+      base[braceFoot].plant = Math.max(base[braceFoot].plant ?? 0, clamp(0.58 + present.shadowWeight * 0.26, 0, 1));
+      base[braceFoot].footAngle = (base[braceFoot].footAngle ?? 0) - worldLocal * toeShock * 0.028;
+      base[freeFoot].footAngle = (base[freeFoot].footAngle ?? 0) + worldLocal * toeShock * 0.018;
     }
   }
 
