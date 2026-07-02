@@ -721,13 +721,32 @@ function aerialBodyProfile(f) {
 
 function whiffRecoveryProfile(f) {
   return {
-    p1: { torso: 1.14, arm: 0.86, foot: 1.2, rebound: 0.82, trail: 0.9, settle: 1.18 },
-    p2: { torso: 0.86, arm: 1.22, foot: 0.82, rebound: 1.22, trail: 1.16, settle: 0.84 },
-    p3: { torso: 1.28, arm: 0.76, foot: 1.3, rebound: 0.68, trail: 0.82, settle: 1.28 },
-    p4: { torso: 0.88, arm: 1.18, foot: 0.88, rebound: 1.16, trail: 1.18, settle: 0.9 },
-    p5: { torso: 0.78, arm: 1.28, foot: 0.78, rebound: 1.28, trail: 1.24, settle: 0.8 },
-    p6: { torso: 1.04, arm: 0.96, foot: 1.06, rebound: 0.92, trail: 1.02, settle: 1.04 },
-  }[f?.profileId] ?? { torso: 1, arm: 1, foot: 1, rebound: 1, trail: 1, settle: 1 };
+    p1: { torso: 1.14, arm: 0.86, foot: 1.2, rebound: 0.82, trail: 0.9, settle: 1.18, balance: 0.8, shoulderLag: 0.86, hipSlip: 1.18, freeLimb: 0.9, plant: 1.22 },
+    p2: { torso: 0.86, arm: 1.22, foot: 0.82, rebound: 1.22, trail: 1.16, settle: 0.84, balance: 1.18, shoulderLag: 1.22, hipSlip: 0.84, freeLimb: 1.22, plant: 0.84 },
+    p3: { torso: 1.28, arm: 0.76, foot: 1.3, rebound: 0.68, trail: 0.82, settle: 1.28, balance: 0.74, shoulderLag: 0.72, hipSlip: 1.3, freeLimb: 0.78, plant: 1.3 },
+    p4: { torso: 0.88, arm: 1.18, foot: 0.88, rebound: 1.16, trail: 1.18, settle: 0.9, balance: 1.16, shoulderLag: 1.18, hipSlip: 0.88, freeLimb: 1.18, plant: 0.88 },
+    p5: { torso: 0.78, arm: 1.28, foot: 0.78, rebound: 1.28, trail: 1.24, settle: 0.8, balance: 1.24, shoulderLag: 1.26, hipSlip: 0.78, freeLimb: 1.26, plant: 0.8 },
+    p6: { torso: 1.04, arm: 0.96, foot: 1.06, rebound: 0.92, trail: 1.02, settle: 1.04, balance: 0.96, shoulderLag: 0.96, hipSlip: 1.04, freeLimb: 0.98, plant: 1.04 },
+  }[f?.profileId] ?? { torso: 1, arm: 1, foot: 1, rebound: 1, trail: 1, settle: 1, balance: 1, shoulderLag: 1, hipSlip: 1, freeLimb: 1, plant: 1 };
+}
+
+function whiffRecoveryMotion(f) {
+  const raw = clamp((f?.whiffPulse ?? 0) / Math.max(1, f?.whiffPulseMax ?? 1), 0, 1);
+  if (raw <= 0.025 || f?.attack || winner || (f?.hurt ?? 0) > 0) return null;
+
+  const type = f.whiffType || f.lastAttackType || "punch";
+  const spec = attackVisualSpec(type);
+  const style = whiffRecoveryProfile(f);
+  const strength = clamp(f.whiffStrength ?? 1, 0.65, 1.45);
+  const side = f.whiffSide || f.dir || 1;
+  const localSide = side === (f.dir || 1) ? 1 : -1;
+  const t = 1 - raw;
+  const over = Math.sin(clamp(t / 0.38, 0, 1) * Math.PI * 0.5);
+  const stumble = Math.sin(clamp((t - 0.18) / 0.52, 0, 1) * Math.PI);
+  const settle = smoothStep01(clamp((t - 0.52) / 0.48, 0, 1));
+  const replant = Math.sin(clamp((t - 0.42) / 0.46, 0, 1) * Math.PI);
+
+  return { raw, t, type, spec, style, strength, side, localSide, over, stumble, settle, replant };
 }
 
 const BODY_SPECS = {
@@ -9439,18 +9458,25 @@ function fighterTransitionMotion(f, walking) {
       motion.scaleY *= 1 - settle * 0.008;
     }
 
-    const whiffRecover = clamp((f.whiffPulse ?? 0) / Math.max(1, f.whiffPulseMax ?? 1), 0, 1);
-    if (whiffRecover > 0.02 && f.hurt <= 0) {
-      const side = f.whiffSide || dir;
-      const whiffStyle = whiffRecoveryProfile(f);
-      const pull = smoothStep01(whiffRecover) * clamp(f.whiffStrength ?? 1, 0.65, 1.4);
-      const rebound = Math.sin((1 - whiffRecover) * Math.PI) * 0.42 * whiffStyle.rebound;
-      motion.x += side * (pull * 1.05 * whiffStyle.torso - rebound * 0.45);
-      motion.y += pull * 0.45 * whiffStyle.settle - rebound * 0.3;
-      motion.rotation += side * (pull * 0.014 * whiffStyle.torso - rebound * 0.009);
-      motion.scaleX *= 1 + pull * 0.006 * whiffStyle.arm;
-      motion.scaleY *= 1 - pull * 0.007 * whiffStyle.settle;
-      motion.afterimage = Math.max(motion.afterimage, pull * 0.018 * whiffStyle.trail);
+    const whiffMotion = whiffRecoveryMotion(f);
+    if (whiffMotion) {
+      const { side, style: whiffStyle, strength, over, stumble, replant, settle } = whiffMotion;
+      const pull = (over * 0.76 + stumble * 0.46) * strength;
+      const plant = replant * strength * whiffStyle.plant;
+      motion.x += side * (
+        over * 1.82 * whiffStyle.torso -
+        stumble * 0.88 * whiffStyle.balance -
+        plant * 0.52
+      ) * strength;
+      motion.y += stumble * 1.05 * whiffStyle.settle + plant * 0.72 - settle * 0.24;
+      motion.rotation += side * (
+        over * 0.017 * whiffStyle.torso +
+        stumble * 0.024 * whiffStyle.balance -
+        replant * 0.014 * whiffStyle.plant
+      );
+      motion.scaleX *= 1 + pull * 0.006 * whiffStyle.arm + stumble * 0.004;
+      motion.scaleY *= 1 - stumble * 0.011 * whiffStyle.settle - plant * 0.005;
+      motion.afterimage = Math.max(motion.afterimage, (over * 0.018 + stumble * 0.012) * whiffStyle.trail * strength);
     }
 
     if (guardEntry > 0.02) {
@@ -11110,7 +11136,89 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
   drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase);
   drawUnifiedFatiguePolish(f, localCrouch);
   drawUnifiedGuardCommitmentPolish(f, localCrouch);
+  drawUnifiedWhiffRecoveryPolish(f, localCrouch);
   drawUnifiedHeadAccessoryPolish(f, localCrouch, motion, acting);
+}
+
+function drawUnifiedWhiffRecoveryPolish(f, localCrouch) {
+  const whiff = whiffRecoveryMotion(f);
+  if (!whiff || !f.grounded) return;
+
+  const { spec, style, strength, localSide, over, stumble, replant, settle } = whiff;
+  const active = clamp(Math.max(over * 0.76, stumble, replant * 0.82), 0, 1.35) * strength;
+  if (active <= 0.035) return;
+
+  const heavy = f.profileId === "p1";
+  const trim = f.trim ?? "#fff1bd";
+  const shoulderY = heavy ? -145 : -150;
+  const chestY = heavy ? -119 : -121;
+  const hipY = heavy ? -62 : -58;
+  const footY = -3 + localCrouch;
+  const side = localSide;
+  const torsoPull = (over * 0.88 + stumble * 0.62 - settle * 0.3) * style.torso;
+  const hipSlip = stumble * style.hipSlip;
+  const plant = replant * style.plant;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(18, 9, 7, ${0.038 + active * 0.082})`;
+  ctx.beginPath();
+  ctx.ellipse(
+    side * (24 + torsoPull * 7),
+    shoulderY + localCrouch + stumble * 2.5,
+    (heavy ? 25 : 21) + active * 7,
+    8 + active * 3,
+    side * -0.22,
+    0,
+    Math.PI * 2
+  );
+  ctx.ellipse(
+    -side * (18 + hipSlip * 6),
+    hipY + localCrouch + plant * 2.5,
+    (heavy ? 44 : 36) + stumble * 7,
+    11 + plant * 3,
+    side * 0.05,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  if (plant > 0.035) {
+    ctx.fillStyle = `rgba(18, 9, 7, ${0.045 + plant * 0.1})`;
+    ctx.beginPath();
+    ctx.ellipse(-side * (32 + plant * 8), footY + 5, 24 + plant * 15, 5 + plant * 2.2, side * -0.04, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = colorWithAlpha(trim, 0.055 + active * 0.105);
+  ctx.lineWidth = 1 + active * 0.72;
+  ctx.beginPath();
+  ctx.moveTo(-side * (27 + stumble * 2), chestY + localCrouch - 12);
+  ctx.quadraticCurveTo(
+    side * (4 + torsoPull * 7),
+    chestY + localCrouch - 21 - over * 3,
+    side * (31 + over * 11 - settle * 3),
+    chestY + localCrouch - 4 + stumble * 2
+  );
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(spec.core ?? trim, 0.035 + Math.max(stumble, replant) * 0.075);
+  ctx.lineWidth = 0.9 + Math.max(stumble, replant) * 0.55;
+  ctx.beginPath();
+  ctx.moveTo(-side * (28 + hipSlip * 3), hipY + localCrouch - 7);
+  ctx.quadraticCurveTo(
+    -side * (5 + hipSlip * 4),
+    hipY + localCrouch + 5 + plant * 4,
+    side * (28 + over * 5),
+    hipY + localCrouch + 1
+  );
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawUnifiedGuardCommitmentPolish(f, localCrouch) {
@@ -12555,6 +12663,7 @@ function drawSpriteExtremityDetails(f, crouch, frameName, stride, options = {}) 
   applyAttackFootPressure(feet, f);
   applyFacingTurnFootPressure(feet, f);
   applyReactionFootPressure(feet, f);
+  if (!options.unified) applyWhiffFootPressure(feet, f);
 
   for (const foot of feet) drawSpriteFootDetail(foot, shoe, trim);
   for (const hand of hands) drawSpriteHandDetail(hand, skin, trim);
@@ -12700,6 +12809,41 @@ function applyReactionFootPressure(feet, f) {
     free.plant = Math.max(0.14, (free.plant ?? 0.7) - skid * 0.12);
     free.y -= mass.zone === "head" ? skid * 0.9 : 0;
     free.x += localImpactDir * skid * 2.6;
+  }
+}
+
+function applyWhiffFootPressure(feet, f) {
+  if (!Array.isArray(feet) || feet.length < 2) return;
+  const whiff = whiffRecoveryMotion(f);
+  if (!whiff || !f.grounded) return;
+
+  const { spec, style, strength, localSide, over, stumble, replant } = whiff;
+  const plant = replant * strength * style.plant;
+  const drag = Math.max(over * 0.42, stumble * 0.68) * strength;
+  const legWhiff = spec.kick || spec.sweep;
+  if (plant <= 0.025 && drag <= 0.025) return;
+
+  let support = feet[0];
+  let free = feet[1];
+  for (const foot of feet) {
+    if (foot.x * localSide < support.x * localSide) support = foot;
+    if (foot.x * localSide > free.x * localSide) free = foot;
+  }
+
+  support.x -= localSide * (plant * 5.6 + drag * 2.2);
+  support.y += plant * 1.4 + stumble * 0.5;
+  support.w += plant * 8.5 + drag * 2.4;
+  support.h = Math.max(7, support.h - plant * 1.2);
+  support.angle -= localSide * (plant * 0.055 + stumble * 0.02);
+  support.plant = clamp(Math.max(support.plant, 0.66 + plant * 0.28), 0, 1);
+  support.press = Math.max(support.press ?? 0, clamp(plant * 0.82 + drag * 0.32, 0, 1));
+  support.sole = Math.max(support.sole ?? 1, 1 + plant * 0.1);
+
+  if (legWhiff) {
+    free.x += localSide * (drag * 4.8 - plant * 2.4);
+    free.y += stumble * 2.2 + plant * 0.7;
+    free.angle += localSide * (drag * 0.07 - plant * 0.035);
+    free.plant = clamp((free.plant ?? 0.35) - drag * 0.18 + plant * 0.16, 0.12, 0.9);
   }
 }
 
@@ -15238,18 +15382,13 @@ function drawAttackArc(f, box) {
 
 function drawWhiffRecoveryFX(f, crouch, baseX = f.x, baseY = f.y) {
   if (!f || winner || f.attack || f.hurt > 0) return;
-  const raw = clamp((f.whiffPulse ?? 0) / Math.max(1, f.whiffPulseMax ?? 1), 0, 1);
-  if (raw <= 0.025) return;
+  const whiff = whiffRecoveryMotion(f);
+  if (!whiff) return;
 
-  const type = f.whiffType || f.lastAttackType || "punch";
-  const spec = attackVisualSpec(type);
+  const { raw, spec, style: whiffStyle, strength, localSide: localDir, over, stumble, replant } = whiff;
   const motion = characterMotion(f);
-  const dir = f.whiffSide || f.dir || 1;
-  const localDir = dir === (f.dir || 1) ? 1 : -1;
-  const strength = clamp(f.whiffStrength ?? 1, 0.65, 1.45);
-  const whiffStyle = whiffRecoveryProfile(f);
   const fade = smoothStep01(raw);
-  const rebound = Math.sin((1 - raw) * Math.PI) * whiffStyle.rebound;
+  const rebound = replant * whiffStyle.rebound;
   const reach = spec.sweep ? 104 : spec.kick ? 94 : spec.grab ? 76 : 66;
   const trailReach = reach * whiffStyle.trail;
   const y = spec.sweep ? -34 : spec.kick ? -82 : spec.grab ? -112 : -124;
@@ -15259,10 +15398,10 @@ function drawWhiffRecoveryFX(f, crouch, baseX = f.x, baseY = f.y) {
   ctx.globalCompositeOperation = "screen";
   ctx.translate(baseX, baseY);
   ctx.scale(f.dir * FIGHTER_SCALE, FIGHTER_SCALE);
-  ctx.rotate(localDir * (spec.sweep ? 0.04 : spec.kick ? -0.09 : -0.035) * motion.rotation * whiffStyle.torso);
+  ctx.rotate(localDir * (spec.sweep ? 0.04 : spec.kick ? -0.09 : -0.035) * motion.rotation * whiffStyle.torso + localDir * stumble * 0.012 * whiffStyle.balance);
 
-  const x = localDir * (34 + fade * 10 * whiffStyle.arm - rebound * 4);
-  ctx.globalAlpha = clamp(0.08 + fade * 0.12, 0, 0.22) * strength * whiffStyle.trail;
+  const x = localDir * (34 + fade * 8 * whiffStyle.arm + over * 5 - rebound * 4);
+  ctx.globalAlpha = clamp(0.06 + fade * 0.08 + over * 0.08, 0, 0.22) * strength * whiffStyle.trail;
   const glow = ctx.createRadialGradient(x + localDir * 28, y + crouch * 0.42, 4, x + localDir * 28, y + crouch * 0.42, trailReach);
   glow.addColorStop(0, colorWithAlpha(spec.core, 0.2));
   glow.addColorStop(0.52, colorWithAlpha(spec.color, 0.08));
@@ -15273,14 +15412,14 @@ function drawWhiffRecoveryFX(f, crouch, baseX = f.x, baseY = f.y) {
   ctx.fill();
 
   ctx.lineCap = "round";
-  ctx.globalAlpha = clamp(0.1 + fade * 0.22, 0, 0.32) * strength * whiffStyle.trail;
+  ctx.globalAlpha = clamp(0.08 + fade * 0.16 + over * 0.1, 0, 0.32) * strength * whiffStyle.trail;
   ctx.strokeStyle = colorWithAlpha(spec.core, 0.72);
   ctx.lineWidth = (spec.kick || spec.sweep ? 2.2 : 1.6) + fade * 1.3;
   ctx.beginPath();
   ctx.moveTo(x - localDir * 16, y + crouch * 0.42 + height * 0.55);
   ctx.quadraticCurveTo(
     x + localDir * trailReach * 0.28,
-    y + crouch * 0.42 - height * (1.25 + fade * 0.55) * whiffStyle.arm,
+    y + crouch * 0.42 - height * (1.25 + fade * 0.45 + over * 0.16) * whiffStyle.arm,
     x + localDir * trailReach * (0.82 + fade * 0.12),
     y + crouch * 0.42 - height * 0.22 + rebound * 5
   );
@@ -15299,6 +15438,17 @@ function drawWhiffRecoveryFX(f, crouch, baseX = f.x, baseY = f.y) {
   );
   ctx.stroke();
 
+  if (stumble > 0.04) {
+    ctx.globalAlpha = clamp(stumble * 0.08, 0, 0.14) * strength * whiffStyle.balance;
+    ctx.strokeStyle = colorWithAlpha("#fff1bd", 0.58);
+    ctx.lineWidth = 0.85 + stumble * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(localDir * 8, -124 + crouch * 0.32 + stumble * 2);
+    ctx.lineTo(localDir * (24 + stumble * 7), -111 + crouch * 0.32);
+    ctx.lineTo(localDir * (14 + stumble * 4), -91 + crouch * 0.32 + stumble * 5);
+    ctx.stroke();
+  }
+
   if (rebound > 0.04) {
     ctx.globalAlpha = clamp(rebound * 0.12, 0, 0.18) * strength * whiffStyle.rebound;
     ctx.strokeStyle = colorWithAlpha(spec.core, 0.64);
@@ -15310,6 +15460,15 @@ function drawWhiffRecoveryFX(f, crouch, baseX = f.x, baseY = f.y) {
       ctx.lineTo(x + localDir * trailReach * (0.12 + i * 0.07), y + crouch * 0.42 + height * (lane + 0.24));
       ctx.stroke();
     }
+  }
+
+  if (replant > 0.035 && f.grounded) {
+    ctx.globalCompositeOperation = "multiply";
+    ctx.globalAlpha = clamp(0.045 + replant * 0.1, 0, 0.16) * strength * whiffStyle.plant;
+    ctx.fillStyle = "rgba(26, 14, 9, 0.9)";
+    ctx.beginPath();
+    ctx.ellipse(-localDir * (34 + replant * 8), 3 + crouch * 0.12, 31 + replant * 18, 5.5 + replant * 2.5, -localDir * 0.04, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
@@ -16713,49 +16872,60 @@ function getPose(f, stride) {
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, mass.plant * 0.86);
   }
 
-  const whiffPose = !f.attack && !winner && f.hurt <= 0
-    ? smoothStep01(clamp((f.whiffPulse ?? 0) / Math.max(1, f.whiffPulseMax ?? 1), 0, 1))
-    : 0;
-  if (whiffPose > 0.025) {
-    const whiffType = f.whiffType || f.lastAttackType || "punch";
-    const whiffSpec = attackVisualSpec(whiffType);
-    const side = (f.whiffSide || f.dir || 1) === (f.dir || 1) ? 1 : -1;
-    const strength = clamp(f.whiffStrength ?? 1, 0.65, 1.45);
-    const whiffStyle = whiffRecoveryProfile(f);
-    const overreach = whiffPose * strength;
-    const rebound = Math.sin((1 - whiffPose) * Math.PI) * strength * whiffStyle.rebound;
-    const torsoReach = overreach * whiffStyle.torso;
-    const armReach = overreach * whiffStyle.arm;
-    const footReach = overreach * whiffStyle.foot;
+  const whiffPose = whiffRecoveryMotion(f);
+  if (whiffPose) {
+    const { spec: whiffSpec, style: whiffStyle, strength, localSide: side, over, stumble, replant, settle } = whiffPose;
+    const overreach = over * strength;
+    const imbalance = stumble * strength * whiffStyle.balance;
+    const plant = replant * strength * whiffStyle.plant;
+    const armReach = (over * 0.86 + stumble * 0.28) * strength * whiffStyle.arm;
+    const footReach = (over * 0.62 + stumble * 0.36) * strength * whiffStyle.foot;
+    const shoulderLag = (over * 0.72 + stumble * 0.64) * whiffStyle.shoulderLag;
+    const hipSlip = stumble * whiffStyle.hipSlip;
     const low = whiffSpec.sweep ? 1 : 0;
     const leg = whiffSpec.kick || whiffSpec.sweep;
     const grab = whiffSpec.grab ? 1 : 0;
 
-    base.torsoTilt += side * (torsoReach * (leg ? 0.026 : 0.018) - rebound * 0.012);
-    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.42 + footReach * 0.38, 0, 1));
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.62 + footReach * 0.32, 0, 1));
-    base.backLeg.knee.y += footReach * (5.5 + low * 4);
-    base.backLeg.foot.x -= side * footReach * (8 + low * 7) * spec.stance;
-    base.frontLeg.knee.y += footReach * (leg ? 3.2 : 1.8);
+    base.torsoTilt += side * (
+      overreach * (leg ? 0.034 : 0.026) +
+      imbalance * 0.022 -
+      plant * 0.018 -
+      settle * 0.006
+    ) * whiffStyle.torso;
+    base.frontArm.shoulder.x += side * shoulderLag * 2.1 * spec.stance;
+    base.frontArm.shoulder.y += stumble * 1.4;
+    base.backArm.shoulder.x -= side * imbalance * 1.9 * spec.stance;
+    base.backArm.shoulder.y += stumble * 1.1;
+    base.frontLeg.hip.x += side * hipSlip * 1.8 * spec.stance;
+    base.backLeg.hip.x -= side * hipSlip * 2.2 * spec.stance;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.42 + footReach * 0.28 + plant * 0.22, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.64 + footReach * 0.2 + plant * 0.28, 0, 1));
+    base.backLeg.knee.x -= side * (plant * 4.6 + hipSlip * 2.4) * spec.stance;
+    base.backLeg.knee.y += footReach * (4.6 + low * 3) + plant * (5.4 + leg * 2.2);
+    base.backLeg.foot.x -= side * (footReach * (6 + low * 5) + plant * 10.2) * spec.stance;
+    base.backLeg.foot.y += plant * 1.2 + stumble * 0.8;
+    base.frontLeg.knee.y += footReach * (leg ? 2.8 : 1.5) + plant * 1.3;
 
     if (leg) {
-      base.frontLeg.knee.x += side * footReach * (13 + low * 9) * spec.stance;
-      base.frontLeg.knee.y += low ? footReach * 7 : -footReach * 5 + rebound * 4;
-      base.frontLeg.foot.x += side * footReach * (26 + low * 28) * spec.stance - side * rebound * 8 * spec.stance;
-      base.frontLeg.foot.y += low ? footReach * 3 : -footReach * 10 + rebound * 9;
-      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - side * (footReach * 0.035 - rebound * 0.02);
-      base.frontArm.hand.x -= side * armReach * 7 * spec.stance;
-      base.backArm.hand.x -= side * armReach * 9 * spec.stance;
-      base.frontArm.hand.y += armReach * 4;
-      base.backArm.hand.y += armReach * 5;
+      const freeLeg = (over * 0.86 + stumble * 0.5) * strength * whiffStyle.freeLimb;
+      base.frontLeg.knee.x += side * freeLeg * (12 + low * 8) * spec.stance;
+      base.frontLeg.knee.y += low ? freeLeg * 6.4 : -freeLeg * 4.8 + plant * 2.2;
+      base.frontLeg.foot.x += side * freeLeg * (24 + low * 26) * spec.stance - side * plant * 5.2 * spec.stance;
+      base.frontLeg.foot.y += low ? freeLeg * 2.6 : -freeLeg * 9.4 + plant * 6.2;
+      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - side * (freeLeg * 0.034 - plant * 0.018);
+      base.frontArm.hand.x -= side * armReach * 7.2 * spec.stance;
+      base.backArm.hand.x -= side * (armReach * 8.4 + imbalance * 2.2) * spec.stance;
+      base.frontArm.hand.y += armReach * 3.6 + stumble * 2;
+      base.backArm.hand.y += armReach * 4.8 + stumble * 2.4;
     } else {
-      base.frontArm.elbow.x += side * armReach * (17 + grab * 13) * spec.stance - side * rebound * 5 * spec.stance;
-      base.frontArm.hand.x += side * armReach * (30 + grab * 24) * spec.stance - side * rebound * 9 * spec.stance;
-      base.frontArm.hand.y += armReach * (5 + grab * 2) + rebound * 2;
-      base.backArm.elbow.x += side * armReach * (5 + grab * 18) * spec.stance;
-      base.backArm.hand.x += side * armReach * (8 + grab * 28) * spec.stance;
-      base.backArm.hand.y += armReach * (3 + grab * 3);
-      base.frontLeg.foot.x += side * footReach * 4 * spec.stance;
+      base.frontArm.elbow.x += side * armReach * (17 + grab * 12) * spec.stance - side * plant * 3.2 * spec.stance;
+      base.frontArm.elbow.y += armReach * 2.8 + stumble * 1.5 - plant * 1.6;
+      base.frontArm.hand.x += side * armReach * (30 + grab * 22) * spec.stance - side * plant * 6.8 * spec.stance;
+      base.frontArm.hand.y += armReach * (5 + grab * 2) + stumble * 2.8 - plant * 2.4;
+      base.backArm.elbow.x += side * armReach * (5 + grab * 16) * spec.stance - side * imbalance * 2.4 * spec.stance;
+      base.backArm.hand.x += side * armReach * (8 + grab * 25) * spec.stance - side * imbalance * 3.6 * spec.stance;
+      base.backArm.hand.y += armReach * (3 + grab * 3) + stumble * 2.2;
+      base.frontLeg.foot.x += side * (footReach * 3.5 + plant * 2.4) * spec.stance;
     }
   }
 
