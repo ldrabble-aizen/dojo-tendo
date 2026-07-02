@@ -21048,9 +21048,12 @@ function drawLeg(f, leg, front) {
   const kneeAngle = Math.atan2(leg.foot.y - leg.knee.y, leg.foot.x - leg.knee.x);
   const legExtension = clamp(leg.extension ?? 0, 0, 1.2);
   const legLift = clamp(leg.lift ?? 0, 0, 1);
+  const legEmphasis = clamp(legExtension * 0.48 + (leg.plant ?? 0) * 0.28 + legLift * 0.3 + (leg.toeFlex ?? 0) * 0.16, 0, 1.35);
 
   drawLimbSegment(leg.hip, leg.knee, pant, 24 * thighWidth, 16 * thighWidth, 1 + legExtension * 0.08);
   drawLimbSegment(leg.knee, leg.foot, pant, 19 * calfWidth, 10 * calfWidth, 1 + legExtension * 0.05);
+  drawVectorLimbAnatomy(f, leg.hip, leg.knee, pant, 24 * thighWidth, 16 * thighWidth, { kind: "leg", front, emphasis: legEmphasis * 0.9 });
+  drawVectorLimbAnatomy(f, leg.knee, leg.foot, pant, 19 * calfWidth, 10 * calfWidth, { kind: "leg", front, emphasis: legEmphasis });
   drawSpriteJointCover(leg.hip, pant, 12 * thighWidth, 9 * thighWidth, hipAngle, front ? 0.96 : 0.82);
   drawSpriteJointCover(leg.knee, pant, (9 + legExtension * 1.3) * calfWidth, (7 + legExtension * 0.7) * calfWidth, kneeAngle, front ? 1 : 0.84);
   drawSpriteCuff(leg.knee, leg.foot, pant, 16 * calfWidth, 0.82);
@@ -21134,9 +21137,12 @@ function drawArm(f, arm, front) {
   const forearmWidth = (spec.forearmWidth ?? spec.limb ?? 1);
   const shoulderAngle = Math.atan2(arm.elbow.y - arm.shoulder.y, arm.elbow.x - arm.shoulder.x);
   const elbowAngle = Math.atan2(arm.hand.y - arm.elbow.y, arm.hand.x - arm.elbow.x);
+  const armEmphasis = clamp((arm.handCurl ?? 0) * 0.32 + (arm.fingerFidget ?? 0) * 0.42 + (f.attack ? attackPhase(f.attack).power * 0.42 : 0), 0, 1.45);
 
   drawLimbSegment(arm.shoulder, arm.elbow, sleeve, 20 * upperArmWidth, 13 * upperArmWidth);
   drawLimbSegment(arm.elbow, arm.hand, sleeve, 16 * forearmWidth, 9 * forearmWidth);
+  drawVectorLimbAnatomy(f, arm.shoulder, arm.elbow, sleeve, 20 * upperArmWidth, 13 * upperArmWidth, { kind: "arm", front, emphasis: armEmphasis * 0.82 });
+  drawVectorLimbAnatomy(f, arm.elbow, arm.hand, sleeve, 16 * forearmWidth, 9 * forearmWidth, { kind: "arm", front, emphasis: armEmphasis });
   drawSpriteJointCover(arm.shoulder, sleeve, 11 * upperArmWidth, 8 * upperArmWidth, shoulderAngle, front ? 1 : 0.8);
   drawSpriteJointCover(arm.elbow, sleeve, 8 * forearmWidth, 6.5 * forearmWidth, elbowAngle, front ? 1 : 0.82);
   drawSpriteCuff(arm.elbow, arm.hand, sleeve, 15 * forearmWidth, 0.78);
@@ -21281,6 +21287,121 @@ function drawVectorHandAnatomy(f, arm, spec, front) {
   ctx.moveTo(arm.hand.x - 7 * spec.hand + tremor * 0.5, arm.hand.y - 5.5 * spec.hand + fatigue * 0.8);
   ctx.quadraticCurveTo(arm.hand.x - 1 * spec.hand + tremor * 0.35, arm.hand.y - 10 * spec.hand + fatigue * 0.6, arm.hand.x + 8 * spec.hand + tremor * 0.2, arm.hand.y - 4.8 * spec.hand + fatigue * 0.9);
   ctx.stroke();
+  ctx.restore();
+}
+
+function vectorLimbPresentationState(f, kind, front, emphasis = 0) {
+  const phase = attackPhase(f?.attack);
+  const attack = f?.attack
+    ? clamp(phase.anticipation * 0.28 + phase.strike * 0.74 + phase.snap * 0.58 + phase.followThrough * 0.24, 0, 1.7)
+    : 0;
+  const hurt = clamp(((f?.hurt ?? 0) / 22) + ((f?.reactionPulse ?? 0) / 18), 0, 1.45);
+  const walk = f?.grounded && !f?.attack ? clamp(Math.abs(f?.vx ?? 0) / 5.8 + Math.abs(f?.walkStrideSmooth ?? 0) * 0.18, 0, 1.2) : 0;
+  const guard = f?.blocking ? clamp(0.35 + ((f?.guardImpact ?? 0) / 16), 0, 1.1) : 0;
+  const fatigue = !winner && f?.grounded && (f?.hurt ?? 0) <= 0 && !f?.attack ? fighterFatigueAmount(f) : 0;
+  const profile = kind === "leg"
+    ? (front ? 1.06 : 0.88) * (f?.profileId === "p3" ? 1.16 : f?.profileId === "p5" ? 0.84 : 1)
+    : (front ? 1.04 : 0.9) * (f?.profileId === "p4" || f?.profileId === "p5" ? 1.12 : 1);
+  const tension = clamp((0.2 + attack * 0.62 + hurt * 0.5 + walk * 0.28 + guard * 0.34 + fatigue * 0.22 + emphasis * 0.42) * profile, 0, 1.85);
+  const pulse = Math.sin(roundFrame * (kind === "leg" ? 0.115 : 0.145) + (front ? 0.4 : 1.9) + (f?.x ?? 0) * 0.01) * tension;
+
+  return {
+    tension,
+    attack,
+    hurt,
+    walk,
+    guard,
+    fatigue,
+    pulse,
+    shadow: clamp(0.1 + tension * 0.13 + hurt * 0.08, 0.08, 0.38),
+    light: clamp(0.1 + tension * 0.09 + attack * 0.04, 0.08, 0.3),
+    compression: clamp(emphasis * 0.55 + hurt * 0.32 + guard * 0.2, 0, 1.2),
+  };
+}
+
+function drawVectorLimbAnatomy(f, a, b, color, widthA, widthB, options = {}) {
+  const length = Math.hypot(b.y - a.y, b.x - a.x);
+  if (length < 18) return;
+
+  const kind = options.kind ?? "arm";
+  const front = options.front ?? true;
+  const state = vectorLimbPresentationState(f, kind, front, options.emphasis ?? 0);
+  if (state.tension <= 0.04) return;
+
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const ux = dx / length;
+  const uy = dy / length;
+  const nx = -uy;
+  const ny = ux;
+  const width = (widthA + widthB) * 0.5;
+  const side = front ? 1 : -1;
+  const lift = state.pulse * (kind === "leg" ? 0.65 : 0.9);
+  const coreA = { x: a.x + dx * 0.18, y: a.y + dy * 0.18 };
+  const coreB = { x: a.x + dx * 0.83, y: a.y + dy * 0.83 };
+  const mid = { x: a.x + dx * 0.52, y: a.y + dy * 0.52 };
+  const surfaceOffset = width * (kind === "leg" ? 0.2 : 0.24) * side;
+  const shadowOffset = -width * (kind === "leg" ? 0.24 : 0.28) * side;
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.globalCompositeOperation = "multiply";
+  ctx.strokeStyle = colorWithAlpha(darken(color, 34), state.shadow);
+  ctx.lineWidth = Math.max(1.15, width * (0.13 + state.compression * 0.035));
+  ctx.beginPath();
+  ctx.moveTo(coreA.x + nx * shadowOffset, coreA.y + ny * shadowOffset);
+  ctx.bezierCurveTo(
+    a.x + dx * 0.36 + nx * (shadowOffset * 1.05 + lift * 0.5),
+    a.y + dy * 0.36 + ny * (shadowOffset * 1.05 + lift * 0.5),
+    a.x + dx * 0.66 + nx * (shadowOffset * 0.82 - lift * 0.35),
+    a.y + dy * 0.66 + ny * (shadowOffset * 0.82 - lift * 0.35),
+    coreB.x + nx * shadowOffset * 0.62,
+    coreB.y + ny * shadowOffset * 0.62
+  );
+  ctx.stroke();
+
+  if (state.compression > 0.06 || state.attack > 0.08) {
+    ctx.strokeStyle = `rgba(28, 14, 10, ${0.08 + state.compression * 0.09 + state.attack * 0.035})`;
+    ctx.lineWidth = Math.max(0.85, width * 0.08);
+    const crease = kind === "leg" ? 0.58 : 0.48;
+    const cx = a.x + dx * crease;
+    const cy = a.y + dy * crease;
+    ctx.beginPath();
+    ctx.moveTo(cx - nx * width * 0.28 - ux * 2, cy - ny * width * 0.28 - uy * 2);
+    ctx.quadraticCurveTo(cx + lift * 0.25, cy - lift * 0.2, cx + nx * width * 0.3 + ux * 2, cy + ny * width * 0.3 + uy * 2);
+    ctx.stroke();
+  }
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(lighten(color, 30), state.light);
+  ctx.lineWidth = Math.max(0.9, width * (0.09 + state.attack * 0.025));
+  ctx.beginPath();
+  ctx.moveTo(coreA.x + nx * surfaceOffset, coreA.y + ny * surfaceOffset);
+  ctx.bezierCurveTo(
+    a.x + dx * 0.34 + nx * (surfaceOffset * 1.15 - lift * 0.35),
+    a.y + dy * 0.34 + ny * (surfaceOffset * 1.15 - lift * 0.35),
+    a.x + dx * 0.68 + nx * (surfaceOffset * 0.76 + lift * 0.25),
+    a.y + dy * 0.68 + ny * (surfaceOffset * 0.76 + lift * 0.25),
+    coreB.x + nx * surfaceOffset * 0.58,
+    coreB.y + ny * surfaceOffset * 0.58
+  );
+  ctx.stroke();
+
+  if (state.tension > 0.45) {
+    ctx.fillStyle = `rgba(255,255,255,${0.035 + state.tension * 0.025})`;
+    ctx.beginPath();
+    ctx.ellipse(
+      mid.x + nx * surfaceOffset * 0.7,
+      mid.y + ny * surfaceOffset * 0.7,
+      Math.max(2.6, width * 0.18),
+      Math.max(1.2, width * 0.07),
+      Math.atan2(dy, dx),
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+  }
   ctx.restore();
 }
 
