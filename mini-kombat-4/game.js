@@ -1152,6 +1152,39 @@ function whiffRecoveryMotion(f) {
   return { raw, t, type, spec, style, strength, side, localSide, over, stumble, settle, replant };
 }
 
+function whiffAnatomyProfile(f, whiff = whiffRecoveryMotion(f)) {
+  if (!whiff) return null;
+
+  const { spec, style, strength, over, stumble, replant, settle } = whiff;
+  const leg = spec.kick || spec.sweep;
+  const low = spec.sweep ? 1 : 0;
+  const grab = spec.grab ? 1 : 0;
+  const overreach = over * strength;
+  const imbalance = stumble * strength * style.balance;
+  const replantWeight = replant * strength * style.plant;
+  const limbDrag = clamp((over * 0.58 + stumble * 0.34) * strength * style.freeLimb, 0, 1.45);
+  const shoulderDrop = clamp((over * 0.34 + stumble * 0.52 - settle * 0.16) * strength * style.shoulderLag, 0, 1.35);
+  const hipCatch = clamp((stumble * 0.64 + replant * 0.42) * strength * style.hipSlip, 0, 1.4);
+  const toeCatch = clamp((replant * 0.72 + stumble * 0.26) * strength * style.plant, 0, 1.35);
+  const handLoose = clamp((over * 0.48 + stumble * 0.44 + replant * 0.12) * strength * style.arm, 0, 1.25);
+  const counterReach = clamp((overreach * 0.56 + imbalance * 0.32 - replantWeight * 0.14) * style.torso, 0, 1.4);
+  const active = clamp(Math.max(overreach * 0.62, imbalance, replantWeight * 0.72), 0, 1.6);
+
+  return {
+    active,
+    leg,
+    low,
+    grab,
+    limbDrag,
+    shoulderDrop,
+    hipCatch,
+    toeCatch,
+    handLoose,
+    counterReach,
+    replantWeight,
+  };
+}
+
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
@@ -12523,7 +12556,8 @@ function drawUnifiedWhiffRecoveryPolish(f, localCrouch) {
   if (!whiff || !f.grounded) return;
 
   const { spec, style, strength, localSide, over, stumble, replant, settle } = whiff;
-  const active = clamp(Math.max(over * 0.76, stumble, replant * 0.82), 0, 1.35) * strength;
+  const anatomy = whiffAnatomyProfile(f, whiff);
+  const active = Math.max(clamp(Math.max(over * 0.76, stumble, replant * 0.82), 0, 1.35) * strength, anatomy?.active ?? 0);
   if (active <= 0.035) return;
 
   const heavy = f.profileId === "p1";
@@ -12536,6 +12570,10 @@ function drawUnifiedWhiffRecoveryPolish(f, localCrouch) {
   const torsoPull = (over * 0.88 + stumble * 0.62 - settle * 0.3) * style.torso;
   const hipSlip = stumble * style.hipSlip;
   const plant = replant * style.plant;
+  const shoulderDrop = anatomy?.shoulderDrop ?? 0;
+  const limbDrag = anatomy?.limbDrag ?? 0;
+  const toeCatch = anatomy?.toeCatch ?? 0;
+  const counterReach = anatomy?.counterReach ?? 0;
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -12561,10 +12599,10 @@ function drawUnifiedWhiffRecoveryPolish(f, localCrouch) {
   );
   ctx.fill();
 
-  if (plant > 0.035) {
-    ctx.fillStyle = `rgba(18, 9, 7, ${0.045 + plant * 0.1})`;
+  if (plant > 0.035 || toeCatch > 0.035) {
+    ctx.fillStyle = `rgba(18, 9, 7, ${0.045 + plant * 0.1 + toeCatch * 0.045})`;
     ctx.beginPath();
-    ctx.ellipse(-side * (32 + plant * 8), footY + 5, 24 + plant * 15, 5 + plant * 2.2, side * -0.04, 0, Math.PI * 2);
+    ctx.ellipse(-side * (32 + plant * 8 + toeCatch * 3), footY + 5, 24 + plant * 15 + toeCatch * 8, 5 + plant * 2.2 + toeCatch * 1.1, side * -0.04, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -12585,6 +12623,27 @@ function drawUnifiedWhiffRecoveryPolish(f, localCrouch) {
   );
   ctx.stroke();
 
+  if (limbDrag > 0.04 || shoulderDrop > 0.04) {
+    ctx.strokeStyle = colorWithAlpha("#ffffff", 0.034 + limbDrag * 0.052 + shoulderDrop * 0.028);
+    ctx.lineWidth = 0.72 + limbDrag * 0.42;
+    ctx.beginPath();
+    ctx.moveTo(side * (22 + counterReach * 4), shoulderY + localCrouch + shoulderDrop * 2);
+    ctx.quadraticCurveTo(
+      side * (38 + limbDrag * (spec.kick || spec.sweep ? 7 : 11)),
+      chestY + localCrouch - 20 + stumble * 5,
+      side * (47 + limbDrag * (spec.grab ? 18 : spec.kick || spec.sweep ? -8 : 12)),
+      chestY + localCrouch - 3 + limbDrag * 4
+    );
+    ctx.moveTo(-side * (20 + shoulderDrop * 3), shoulderY + localCrouch + shoulderDrop * 1.4);
+    ctx.quadraticCurveTo(
+      -side * (30 + limbDrag * 4),
+      chestY + localCrouch - 12 + stumble * 5,
+      -side * (21 + counterReach * 6),
+      chestY + localCrouch + 5 + shoulderDrop * 4
+    );
+    ctx.stroke();
+  }
+
   ctx.strokeStyle = colorWithAlpha(spec.core ?? trim, 0.035 + Math.max(stumble, replant) * 0.075);
   ctx.lineWidth = 0.9 + Math.max(stumble, replant) * 0.55;
   ctx.beginPath();
@@ -12596,6 +12655,14 @@ function drawUnifiedWhiffRecoveryPolish(f, localCrouch) {
     hipY + localCrouch + 1
   );
   ctx.stroke();
+
+  if (toeCatch > 0.04) {
+    ctx.strokeStyle = colorWithAlpha(trim, 0.035 + toeCatch * 0.07);
+    ctx.lineWidth = 0.75 + toeCatch * 0.48;
+    ctx.beginPath();
+    ctx.ellipse(-side * (34 + toeCatch * 5), footY + 2.5, 18 + toeCatch * 11, 3.2 + toeCatch * 1.2, side * -0.06, 0, Math.PI * 1.86);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -14815,10 +14882,13 @@ function applyWhiffFootPressure(feet, f) {
   if (!whiff || !f.grounded) return;
 
   const { spec, style, strength, localSide, over, stumble, replant } = whiff;
+  const anatomy = whiffAnatomyProfile(f, whiff);
   const plant = replant * strength * style.plant;
   const drag = Math.max(over * 0.42, stumble * 0.68) * strength;
+  const toeCatch = anatomy?.toeCatch ?? 0;
+  const hipCatch = anatomy?.hipCatch ?? 0;
   const legWhiff = spec.kick || spec.sweep;
-  if (plant <= 0.025 && drag <= 0.025) return;
+  if (plant <= 0.025 && drag <= 0.025 && toeCatch <= 0.025) return;
 
   let support = feet[0];
   let free = feet[1];
@@ -14827,20 +14897,22 @@ function applyWhiffFootPressure(feet, f) {
     if (foot.x * localSide > free.x * localSide) free = foot;
   }
 
-  support.x -= localSide * (plant * 5.6 + drag * 2.2);
-  support.y += plant * 1.4 + stumble * 0.5;
-  support.w += plant * 8.5 + drag * 2.4;
-  support.h = Math.max(7, support.h - plant * 1.2);
-  support.angle -= localSide * (plant * 0.055 + stumble * 0.02);
-  support.plant = clamp(Math.max(support.plant, 0.66 + plant * 0.28), 0, 1);
-  support.press = Math.max(support.press ?? 0, clamp(plant * 0.82 + drag * 0.32, 0, 1));
-  support.sole = Math.max(support.sole ?? 1, 1 + plant * 0.1);
+  support.x -= localSide * (plant * 5.6 + drag * 2.2 + toeCatch * 1.8);
+  support.y += plant * 1.4 + stumble * 0.5 + toeCatch * 0.55;
+  support.w += plant * 8.5 + drag * 2.4 + toeCatch * 3.8;
+  support.h = Math.max(7, support.h - plant * 1.2 - toeCatch * 0.42);
+  support.angle -= localSide * (plant * 0.055 + stumble * 0.02 + toeCatch * 0.024);
+  support.plant = clamp(Math.max(support.plant, 0.66 + plant * 0.28 + toeCatch * 0.08), 0, 1);
+  support.press = Math.max(support.press ?? 0, clamp(plant * 0.82 + drag * 0.32 + toeCatch * 0.28, 0, 1));
+  support.toeFlex = Math.max(support.toeFlex ?? 0, toeCatch * 0.92);
+  support.sole = Math.max(support.sole ?? 1, 1 + plant * 0.1 + toeCatch * 0.04);
 
   if (legWhiff) {
-    free.x += localSide * (drag * 4.8 - plant * 2.4);
-    free.y += stumble * 2.2 + plant * 0.7;
-    free.angle += localSide * (drag * 0.07 - plant * 0.035);
-    free.plant = clamp((free.plant ?? 0.35) - drag * 0.18 + plant * 0.16, 0.12, 0.9);
+    free.x += localSide * (drag * 4.8 - plant * 2.4 + hipCatch * 1.4);
+    free.y += stumble * 2.2 + plant * 0.7 + hipCatch * 0.6;
+    free.angle += localSide * (drag * 0.07 - plant * 0.035 + hipCatch * 0.018);
+    free.plant = clamp((free.plant ?? 0.35) - drag * 0.18 + plant * 0.16 + toeCatch * 0.04, 0.12, 0.9);
+    free.toeFlex = Math.max(free.toeFlex ?? 0, toeCatch * 0.38);
   }
 }
 
@@ -14850,23 +14922,27 @@ function applyWhiffExtremityPresence(hands, feet, f) {
   if (!whiff) return;
 
   const { spec, style, strength, localSide, over, stumble, replant } = whiff;
+  const anatomy = whiffAnatomyProfile(f, whiff);
   const loose = clamp((over * 0.5 + stumble * 0.46 + replant * 0.18) * strength, 0, 1.15);
   if (loose <= 0.025) return;
 
   const frontHand = hands[1];
   const backHand = hands[0];
-  const armLag = loose * style.arm;
+  const limbDrag = anatomy?.limbDrag ?? 0;
+  const handLoose = anatomy?.handLoose ?? loose;
+  const shoulderDrop = anatomy?.shoulderDrop ?? 0;
+  const armLag = Math.max(loose * style.arm, limbDrag * 0.72);
   frontHand.x += localSide * armLag * (spec.grab ? 5.8 : spec.kick || spec.sweep ? -2.4 : 4.4);
-  frontHand.y += armLag * (spec.kick || spec.sweep ? 3.4 : 2.1) - replant * 1.2;
-  frontHand.angle += localSide * armLag * (spec.kick || spec.sweep ? -0.035 : 0.052);
-  frontHand.curl = clamp((frontHand.curl ?? 0.68) + armLag * (spec.grab ? 0.16 : 0.09), 0, 1.12);
-  frontHand.shock = Math.max(frontHand.shock ?? 0, armLag * 0.42);
+  frontHand.y += armLag * (spec.kick || spec.sweep ? 3.4 : 2.1) - replant * 1.2 + shoulderDrop * 0.75;
+  frontHand.angle += localSide * armLag * (spec.kick || spec.sweep ? -0.035 : 0.052) + localSide * handLoose * 0.018;
+  frontHand.curl = clamp((frontHand.curl ?? 0.68) + handLoose * (spec.grab ? 0.16 : 0.09), 0, 1.12);
+  frontHand.shock = Math.max(frontHand.shock ?? 0, armLag * 0.42 + handLoose * 0.12);
 
   backHand.x += localSide * armLag * (spec.grab ? 4.2 : spec.kick || spec.sweep ? -3.8 : 2.8);
-  backHand.y += armLag * (spec.kick || spec.sweep ? 3.8 : 1.8);
-  backHand.angle -= localSide * armLag * 0.04;
-  backHand.curl = clamp((backHand.curl ?? 0.68) + armLag * 0.07, 0, 1.08);
-  backHand.shock = Math.max(backHand.shock ?? 0, armLag * 0.3);
+  backHand.y += armLag * (spec.kick || spec.sweep ? 3.8 : 1.8) + shoulderDrop * 0.65;
+  backHand.angle -= localSide * (armLag * 0.04 + handLoose * 0.012);
+  backHand.curl = clamp((backHand.curl ?? 0.68) + handLoose * 0.07, 0, 1.08);
+  backHand.shock = Math.max(backHand.shock ?? 0, armLag * 0.3 + handLoose * 0.08);
 
   const toeDrag = clamp((replant * 0.72 + stumble * 0.28) * strength * style.plant, 0, 1.1);
   if (toeDrag <= 0.025) return;
@@ -19146,6 +19222,7 @@ function getPose(f, stride) {
   const whiffPose = whiffRecoveryMotion(f);
   if (whiffPose) {
     const { spec: whiffSpec, style: whiffStyle, strength, localSide: side, over, stumble, replant, settle } = whiffPose;
+    const anatomy = whiffAnatomyProfile(f, whiffPose);
     const overreach = over * strength;
     const imbalance = stumble * strength * whiffStyle.balance;
     const plant = replant * strength * whiffStyle.plant;
@@ -19156,51 +19233,59 @@ function getPose(f, stride) {
     const low = whiffSpec.sweep ? 1 : 0;
     const leg = whiffSpec.kick || whiffSpec.sweep;
     const grab = whiffSpec.grab ? 1 : 0;
+    const shoulderDrop = anatomy?.shoulderDrop ?? 0;
+    const limbDrag = anatomy?.limbDrag ?? 0;
+    const hipCatch = anatomy?.hipCatch ?? 0;
+    const toeCatch = anatomy?.toeCatch ?? 0;
+    const counterReach = anatomy?.counterReach ?? 0;
 
     base.torsoTilt += side * (
       overreach * (leg ? 0.034 : 0.026) +
       imbalance * 0.022 -
       plant * 0.018 -
-      settle * 0.006
+      settle * 0.006 +
+      counterReach * 0.008
     ) * whiffStyle.torso;
-    base.frontArm.shoulder.x += side * shoulderLag * 2.1 * spec.stance;
-    base.frontArm.shoulder.y += stumble * 1.4;
+    base.frontArm.shoulder.x += side * (shoulderLag * 2.1 + counterReach * 1.3) * spec.stance;
+    base.frontArm.shoulder.y += stumble * 1.4 + shoulderDrop * 1.5;
     base.backArm.shoulder.x -= side * imbalance * 1.9 * spec.stance;
-    base.backArm.shoulder.y += stumble * 1.1;
-    base.frontLeg.hip.x += side * hipSlip * 1.8 * spec.stance;
-    base.backLeg.hip.x -= side * hipSlip * 2.2 * spec.stance;
-    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.42 + footReach * 0.28 + plant * 0.22, 0, 1));
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.64 + footReach * 0.2 + plant * 0.28, 0, 1));
-    base.backLeg.knee.x -= side * (plant * 4.6 + hipSlip * 2.4) * spec.stance;
-    base.backLeg.knee.y += footReach * (4.6 + low * 3) + plant * (5.4 + leg * 2.2);
-    base.backLeg.foot.x -= side * (footReach * (6 + low * 5) + plant * 10.2) * spec.stance;
-    base.backLeg.foot.y += plant * 1.2 + stumble * 0.8;
-    base.frontLeg.knee.y += footReach * (leg ? 2.8 : 1.5) + plant * 1.3;
+    base.backArm.shoulder.y += stumble * 1.1 + shoulderDrop * 1.2;
+    base.frontLeg.hip.x += side * (hipSlip * 1.8 + hipCatch * 1.4) * spec.stance;
+    base.frontLeg.hip.y += hipCatch * 0.8;
+    base.backLeg.hip.x -= side * (hipSlip * 2.2 + hipCatch * 1.7) * spec.stance;
+    base.backLeg.hip.y += hipCatch * 0.95;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.42 + footReach * 0.28 + plant * 0.22 + toeCatch * 0.06, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.64 + footReach * 0.2 + plant * 0.28 + toeCatch * 0.1, 0, 1));
+    base.backLeg.knee.x -= side * (plant * 4.6 + hipSlip * 2.4 + hipCatch * 2.2) * spec.stance;
+    base.backLeg.knee.y += footReach * (4.6 + low * 3) + plant * (5.4 + leg * 2.2) + hipCatch * 1.8;
+    base.backLeg.foot.x -= side * (footReach * (6 + low * 5) + plant * 10.2 + toeCatch * 3.2) * spec.stance;
+    base.backLeg.foot.y += plant * 1.2 + stumble * 0.8 + toeCatch * 0.7;
+    base.frontLeg.knee.y += footReach * (leg ? 2.8 : 1.5) + plant * 1.3 + hipCatch * 0.9;
 
     if (leg) {
-      const freeLeg = (over * 0.86 + stumble * 0.5) * strength * whiffStyle.freeLimb;
+      const freeLeg = Math.max((over * 0.86 + stumble * 0.5) * strength * whiffStyle.freeLimb, limbDrag * 0.82);
       base.frontLeg.knee.x += side * freeLeg * (12 + low * 8) * spec.stance;
       base.frontLeg.knee.y += low ? freeLeg * 6.4 : -freeLeg * 4.8 + plant * 2.2;
       base.frontLeg.foot.x += side * freeLeg * (24 + low * 26) * spec.stance - side * plant * 5.2 * spec.stance;
       base.frontLeg.foot.y += low ? freeLeg * 2.6 : -freeLeg * 9.4 + plant * 6.2;
-      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - side * (freeLeg * 0.034 - plant * 0.018);
-      base.frontArm.hand.x -= side * armReach * 7.2 * spec.stance;
-      base.backArm.hand.x -= side * (armReach * 8.4 + imbalance * 2.2) * spec.stance;
-      base.frontArm.hand.y += armReach * 3.6 + stumble * 2;
-      base.backArm.hand.y += armReach * 4.8 + stumble * 2.4;
+      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - side * (freeLeg * 0.034 - plant * 0.018 + toeCatch * 0.012);
+      base.frontArm.hand.x -= side * (armReach * 7.2 + limbDrag * 2.8) * spec.stance;
+      base.backArm.hand.x -= side * (armReach * 8.4 + imbalance * 2.2 + limbDrag * 2.2) * spec.stance;
+      base.frontArm.hand.y += armReach * 3.6 + stumble * 2 + shoulderDrop * 0.8;
+      base.backArm.hand.y += armReach * 4.8 + stumble * 2.4 + shoulderDrop * 0.9;
     } else {
       base.frontArm.elbow.x += side * armReach * (17 + grab * 12) * spec.stance - side * plant * 3.2 * spec.stance;
-      base.frontArm.elbow.y += armReach * 2.8 + stumble * 1.5 - plant * 1.6;
-      base.frontArm.hand.x += side * armReach * (30 + grab * 22) * spec.stance - side * plant * 6.8 * spec.stance;
-      base.frontArm.hand.y += armReach * (5 + grab * 2) + stumble * 2.8 - plant * 2.4;
-      base.backArm.elbow.x += side * armReach * (5 + grab * 16) * spec.stance - side * imbalance * 2.4 * spec.stance;
-      base.backArm.hand.x += side * armReach * (8 + grab * 25) * spec.stance - side * imbalance * 3.6 * spec.stance;
-      base.backArm.hand.y += armReach * (3 + grab * 3) + stumble * 2.2;
-      base.frontLeg.foot.x += side * (footReach * 3.5 + plant * 2.4) * spec.stance;
+      base.frontArm.elbow.y += armReach * 2.8 + stumble * 1.5 - plant * 1.6 + shoulderDrop * 0.9;
+      base.frontArm.hand.x += side * (armReach * (30 + grab * 22) + limbDrag * (grab ? 7.2 : 4.8)) * spec.stance - side * plant * 6.8 * spec.stance;
+      base.frontArm.hand.y += armReach * (5 + grab * 2) + stumble * 2.8 - plant * 2.4 + shoulderDrop * 1.2;
+      base.backArm.elbow.x += side * (armReach * (5 + grab * 16) + limbDrag * 1.4) * spec.stance - side * imbalance * 2.4 * spec.stance;
+      base.backArm.hand.x += side * (armReach * (8 + grab * 25) + limbDrag * 2.4) * spec.stance - side * imbalance * 3.6 * spec.stance;
+      base.backArm.hand.y += armReach * (3 + grab * 3) + stumble * 2.2 + shoulderDrop * 0.8;
+      base.frontLeg.foot.x += side * (footReach * 3.5 + plant * 2.4 + toeCatch * 1.2) * spec.stance;
     }
 
-    const looseFingers = clamp((over * 0.42 + stumble * 0.38 + replant * 0.16) * strength * whiffStyle.arm, 0, 0.62);
-    const toeRecover = clamp((replant * 0.66 + stumble * 0.22) * strength * whiffStyle.plant, 0, 0.58);
+    const looseFingers = clamp(Math.max((over * 0.42 + stumble * 0.38 + replant * 0.16) * strength * whiffStyle.arm, anatomy?.handLoose ?? 0), 0, 0.72);
+    const toeRecover = clamp(Math.max((replant * 0.66 + stumble * 0.22) * strength * whiffStyle.plant, toeCatch), 0, 0.72);
     if (looseFingers > 0.025) {
       base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + looseFingers * (grab ? 0.18 : 0.1), 0, 1);
       base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + looseFingers * 0.08, 0, 1);
