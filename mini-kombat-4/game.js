@@ -692,13 +692,13 @@ function entrancePoseProfile(f) {
 
 function roundStartReadinessProfile(f) {
   return {
-    p1: { brace: 1.18, breath: 0.82, guard: 0.9, foot: 1.18, snap: 0.72, shoulder: 0.86, hip: 1.14, torso: 1.08, handLift: 0.85, kneeSink: 1.18, stanceWide: 1.12, twitch: 0.7 },
-    p2: { brace: 0.82, breath: 1.2, guard: 1.18, foot: 0.82, snap: 1.24, shoulder: 1.18, hip: 0.86, torso: 0.88, handLift: 1.25, kneeSink: 0.82, stanceWide: 0.86, twitch: 1.25 },
-    p3: { brace: 1.32, breath: 0.72, guard: 0.78, foot: 1.28, snap: 0.62, shoulder: 0.72, hip: 1.28, torso: 1.22, handLift: 0.72, kneeSink: 1.32, stanceWide: 1.24, twitch: 0.55 },
-    p4: { brace: 0.88, breath: 1.16, guard: 1.2, foot: 0.86, snap: 1.18, shoulder: 1.16, hip: 0.9, torso: 0.9, handLift: 1.16, kneeSink: 0.86, stanceWide: 0.84, twitch: 1.2 },
-    p5: { brace: 0.78, breath: 1.24, guard: 1.24, foot: 0.78, snap: 1.3, shoulder: 1.24, hip: 0.82, torso: 0.82, handLift: 1.28, kneeSink: 0.8, stanceWide: 0.78, twitch: 1.32 },
-    p6: { brace: 1.06, breath: 0.92, guard: 0.94, foot: 1.06, snap: 0.9, shoulder: 0.96, hip: 1.06, torso: 1.02, handLift: 0.92, kneeSink: 1.08, stanceWide: 1.02, twitch: 0.86 },
-  }[f?.profileId] ?? { brace: 1, breath: 1, guard: 1, foot: 1, snap: 1, shoulder: 1, hip: 1, torso: 1, handLift: 1, kneeSink: 1, stanceWide: 1, twitch: 1 };
+    p1: { brace: 1.18, breath: 0.82, guard: 0.9, foot: 1.18, snap: 0.72, shoulder: 0.86, hip: 1.14, torso: 1.08, handLift: 0.85, kneeSink: 1.18, stanceWide: 1.12, twitch: 0.7, armPresence: 0.84, legPresence: 1.18, handSize: 0.86, footWeight: 1.2, snapReach: 0.78 },
+    p2: { brace: 0.82, breath: 1.2, guard: 1.18, foot: 0.82, snap: 1.24, shoulder: 1.18, hip: 0.86, torso: 0.88, handLift: 1.25, kneeSink: 0.82, stanceWide: 0.86, twitch: 1.25, armPresence: 1.2, legPresence: 0.86, handSize: 1.16, footWeight: 0.84, snapReach: 1.24 },
+    p3: { brace: 1.32, breath: 0.72, guard: 0.78, foot: 1.28, snap: 0.62, shoulder: 0.72, hip: 1.28, torso: 1.22, handLift: 0.72, kneeSink: 1.32, stanceWide: 1.24, twitch: 0.55, armPresence: 0.72, legPresence: 1.3, handSize: 0.74, footWeight: 1.32, snapReach: 0.68 },
+    p4: { brace: 0.88, breath: 1.16, guard: 1.2, foot: 0.86, snap: 1.18, shoulder: 1.16, hip: 0.9, torso: 0.9, handLift: 1.16, kneeSink: 0.86, stanceWide: 0.84, twitch: 1.2, armPresence: 1.16, legPresence: 0.88, handSize: 1.12, footWeight: 0.88, snapReach: 1.18 },
+    p5: { brace: 0.78, breath: 1.24, guard: 1.24, foot: 0.78, snap: 1.3, shoulder: 1.24, hip: 0.82, torso: 0.82, handLift: 1.28, kneeSink: 0.8, stanceWide: 0.78, twitch: 1.32, armPresence: 1.28, legPresence: 0.8, handSize: 1.22, footWeight: 0.8, snapReach: 1.28 },
+    p6: { brace: 1.06, breath: 0.92, guard: 0.94, foot: 1.06, snap: 0.9, shoulder: 0.96, hip: 1.06, torso: 1.02, handLift: 0.92, kneeSink: 1.08, stanceWide: 1.02, twitch: 0.86, armPresence: 0.92, legPresence: 1.08, handSize: 0.94, footWeight: 1.08, snapReach: 0.92 },
+  }[f?.profileId] ?? { brace: 1, breath: 1, guard: 1, foot: 1, snap: 1, shoulder: 1, hip: 1, torso: 1, handLift: 1, kneeSink: 1, stanceWide: 1, twitch: 1, armPresence: 1, legPresence: 1, handSize: 1, footWeight: 1, snapReach: 1 };
 }
 
 function fatigueBodyProfile(f) {
@@ -9256,6 +9256,62 @@ function fighterEntranceCue(f) {
   };
 }
 
+function roundStartBodyPresence(f) {
+  const entrance = fighterEntranceCue(f);
+  if (!entrance || !f?.grounded || f.hurt > 0 || f.attack) {
+    const readiness = roundStartReadinessProfile(f);
+    return {
+      active: 0,
+      entrance: null,
+      readiness,
+      guard: 0,
+      beat: 0,
+      fightSnap: 0,
+      shoulderMass: 0,
+      elbowPresence: 0,
+      handPresence: 0,
+      kneeLoad: 0,
+      footPress: 0,
+      floorWeight: 0,
+      snapReach: 0,
+      pulse: 0,
+      side: f?.id === "left" ? -1 : 1,
+    };
+  }
+
+  const readiness = entrance.readiness ?? roundStartReadinessProfile(f);
+  const clock = 180 - countdownFrames;
+  const guard = entrance.ease;
+  const beat = Math.max(0, Math.sin(clock * Math.PI / 48)) * guard;
+  const fightSnap = countdownFrames <= 48 ? smoothStep01(clamp((48 - countdownFrames) / 36, 0, 1)) : 0;
+  const pulse = Math.sin(clock * 0.18 + (f.profileId?.charCodeAt(1) ?? 0)) * guard;
+  const footPress = clamp((guard * 0.72 + entrance.step * 0.28 + beat * 0.2 + fightSnap * 0.34) * readiness.footWeight, 0, 1.55);
+  const kneeLoad = clamp((guard * 0.62 + beat * 0.3 + fightSnap * 0.46) * readiness.legPresence * readiness.kneeSink, 0, 1.55);
+  const shoulderMass = clamp((guard * 0.46 + entrance.step * 0.24 + beat * 0.16 + fightSnap * 0.28) * readiness.shoulder, 0, 1.45);
+  const elbowPresence = clamp((guard * 0.5 + entrance.step * 0.28 + fightSnap * 0.32) * readiness.armPresence, 0, 1.45);
+  const handPresence = clamp((guard * 0.48 + beat * 0.18 + fightSnap * 0.44) * readiness.handSize, 0, 1.55);
+  const floorWeight = clamp((footPress * 0.72 + kneeLoad * 0.28) * readiness.brace, 0, 1.75);
+  const snapReach = clamp(fightSnap * readiness.snapReach * readiness.snap, 0, 1.5);
+
+  return {
+    active: Math.max(guard, footPress, fightSnap),
+    entrance,
+    readiness,
+    guard,
+    beat,
+    fightSnap,
+    shoulderMass,
+    elbowPresence,
+    handPresence,
+    kneeLoad,
+    footPress,
+    floorWeight,
+    snapReach,
+    pulse,
+    side: entrance.side,
+  };
+}
+
 function fighterTransitionMotion(f, walking) {
   const motion = {
     x: 0,
@@ -9880,6 +9936,7 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const aerial = aerialVisualMotion(f);
   const preLandShadow = aerial.preLand * aerial.style.shadow;
   const pivot = pivotVisualMotion(f);
+  const startPresence = roundStartBodyPresence(f);
   const facingTurn = f.grounded ? clamp((f.facingTurnPulse ?? 0) / 14, 0, 1) : 0;
   const facingStyle = {
     p1: { weight: 1.18, snap: 0.78 },
@@ -9911,9 +9968,9 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const facingOffset = -(f.facingTurnTo || f.dir || 1) * (facingPress * 5 - facingSnap * 2.5) * FIGHTER_SCALE;
   const aerialOffset = (f.landingDir || f.jumpDir || Math.sign(f.vx) || f.dir || 1) * preLandShadow * 6 * FIGHTER_SCALE;
   const pivotOffset = -pivot.stopDir * pivot.stop * 4.2 * FIGHTER_SCALE - pivot.faceDir * pivot.faceTurn * 2.6 * FIGHTER_SCALE;
-  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + preLandShadow * 18 + facingPress * 34 + facingSnap * 16 + pivot.press * 18 + pivot.snap * 9 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
-  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + preLandShadow * 2.2 + facingPress * 4.8 + facingSnap * 1.7 + pivot.press * 2.2 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
-  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + preLandShadow * 0.035 + facingPress * 0.085 + facingSnap * 0.035 + pivot.press * 0.042 + pivot.snap * 0.02 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.58);
+  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + preLandShadow * 18 + facingPress * 34 + facingSnap * 16 + pivot.press * 18 + pivot.snap * 9 + startPresence.floorWeight * 30 + startPresence.snapReach * 10 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
+  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + preLandShadow * 2.2 + facingPress * 4.8 + facingSnap * 1.7 + pivot.press * 2.2 + startPresence.floorWeight * 3.4 + startPresence.footPress * 1.2 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
+  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + preLandShadow * 0.035 + facingPress * 0.085 + facingSnap * 0.035 + pivot.press * 0.042 + pivot.snap * 0.02 + startPresence.floorWeight * 0.065 + startPresence.fightSnap * 0.035 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.58);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -9938,6 +9995,41 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     ctx.ellipse(baseX, FLOOR + 7, 42 + landing * 30 + landingWeight * 42, 6 + landing * 5 + landingWeight * 7, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
+  }
+
+  if (startPresence.active > 0.04) {
+    const trim = f.trim ?? "#fff1bd";
+    const load = clamp(startPresence.floorWeight, 0, 1.65);
+    const snap = clamp(startPresence.snapReach, 0, 1.35);
+    const footSpread = (30 + load * 8) * FIGHTER_SCALE;
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = `rgba(38, 22, 12, ${0.04 + load * 0.055})`;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(
+        baseX + side * footSpread * (f.dir || 1),
+        FLOOR + 8,
+        17 + load * 11,
+        3.8 + load * 1.5,
+        side * 0.035,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
+    ctx.restore();
+
+    if (snap > 0.04 || startPresence.beat > 0.05) {
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.strokeStyle = colorWithAlpha(trim, 0.035 + startPresence.active * 0.04 + snap * 0.035);
+      ctx.lineWidth = 0.9 + load * 0.55 + snap * 0.45;
+      ctx.beginPath();
+      ctx.ellipse(baseX, FLOOR + 6, 34 + load * 16 + snap * 9, 4.2 + load * 1.6, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   if (facingTurn > 0.04) {
@@ -10057,7 +10149,7 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     ctx.restore();
   }
 
-  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.75, stop * 0.68, landingWeight * 0.72, facingPress * 0.78, pivot.press * 0.7, pivot.snap * 0.36, attackPlant * 0.46, attackCompression * 0.36, reactionFloor * 0.34);
+  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.75, stop * 0.68, landingWeight * 0.72, facingPress * 0.78, pivot.press * 0.7, pivot.snap * 0.36, startPresence.footPress * 0.72, attackPlant * 0.46, attackCompression * 0.36, reactionFloor * 0.34);
   if (f.grounded && footPlant > 0.04) {
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
@@ -10102,6 +10194,7 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   const facingPress = smoothStep01(facingTurn) * facingStyle.weight;
   const facingSnap = Math.sin((1 - facingTurn) * Math.PI) * facingStyle.snap;
   const pivot = pivotVisualMotion(f);
+  const startPresence = roundStartBodyPresence(f);
   const air = !f.grounded ? clamp((FLOOR - f.y) / 155, 0, 1) : 0;
   const plant = walking ? clamp(f.walkPlant ?? 0, 0, 1) : 0;
   const anchor = walking ? clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1) : 0;
@@ -10116,8 +10209,8 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   const hitMass = f.hurt > 0 || (f.reactionPulse ?? 0) > 0 ? hitReactionMassProfile(f) : null;
   const reactionFloor = hitMass ? clamp(hitMass.floor, 0, 1.7) : 0;
   const reactionSkid = hitMass ? clamp(hitMass.skid, 0, 1.85) : 0;
-  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.78, stop * 0.65, landingWeight * 0.7, facingPress * 0.78, pivot.press * 0.68, pivot.snap * 0.35, attackPlant * 0.45, attackCompression * 0.34, reactionFloor * 0.34);
-  if (jump <= 0.03 && aerialTuck <= 0.03 && preLand <= 0.03 && landing <= 0.03 && facingTurn <= 0.03 && pivot.activeAmount <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && stopStrength <= 0.03 && attackPlant <= 0.03 && attackCompression <= 0.03 && reactionSkid <= 0.03) return;
+  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.78, stop * 0.65, landingWeight * 0.7, facingPress * 0.78, pivot.press * 0.68, pivot.snap * 0.35, startPresence.footPress * 0.72, attackPlant * 0.45, attackCompression * 0.34, reactionFloor * 0.34);
+  if (jump <= 0.03 && aerialTuck <= 0.03 && preLand <= 0.03 && landing <= 0.03 && facingTurn <= 0.03 && pivot.activeAmount <= 0.03 && startPresence.active <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && stopStrength <= 0.03 && attackPlant <= 0.03 && attackCompression <= 0.03 && reactionSkid <= 0.03) return;
 
   const localCrouch = crouch * 0.18;
   const trim = f.trim ?? "#fff1bd";
@@ -10248,6 +10341,31 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
       ctx.beginPath();
       ctx.moveTo(release + pivotDir * 3, 1 + localCrouch);
       ctx.quadraticCurveTo(release + pivotDir * (9 + pivot.snap * 8), -1 + localCrouch, release + pivotDir * (18 + pivot.snap * 10), 4 + localCrouch);
+      ctx.stroke();
+    }
+  }
+
+  if (startPresence.active > 0.04) {
+    const load = clamp(startPresence.footPress + startPresence.kneeLoad * 0.35, 0, 1.75);
+    const snap = clamp(startPresence.snapReach, 0, 1.35);
+    const pulse = Math.abs(startPresence.pulse);
+    ctx.strokeStyle = colorWithAlpha(trim, 0.04 + load * 0.04 + snap * 0.035);
+    ctx.lineWidth = 0.85 + load * 0.58 + snap * 0.42;
+    for (const side of [-1, 1]) {
+      const footX = side * (29 + startPresence.floorWeight * 5);
+      ctx.beginPath();
+      ctx.ellipse(footX, 5 + localCrouch, 15 + load * 7, 3.1 + load * 1.1, side * 0.035, 0, Math.PI * 1.86);
+      ctx.stroke();
+    }
+
+    if (snap > 0.05 || startPresence.beat > 0.06) {
+      ctx.strokeStyle = `rgba(255, 244, 205, ${0.032 + snap * 0.055 + startPresence.beat * 0.025})`;
+      ctx.lineWidth = 0.8 + snap * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(-34, -116 + localCrouch + pulse * 1.2);
+      ctx.quadraticCurveTo(-13, -131 + localCrouch - snap * 5, 4, -126 + localCrouch - startPresence.handPresence * 1.3);
+      ctx.moveTo(34, -114 + localCrouch - pulse * 0.8);
+      ctx.quadraticCurveTo(12, -130 + localCrouch - snap * 4, -4, -125 + localCrouch - startPresence.handPresence);
       ctx.stroke();
     }
   }
@@ -10628,6 +10746,7 @@ function drawFighterIdentityAura(f, crouch, walking = false, stride = 0) {
   const strike = attack ? Math.max(attack.anticipation * 0.58, attack.strike, attack.snap * 0.75) : 0;
   const special = f.attack?.type === "special" ? Math.max(strike, attack?.power ?? 0) : 0;
   const entrance = fighterEntranceCue(f);
+  const startPresence = roundStartBodyPresence(f);
   const intro = entrance?.ease ?? 0;
   const startReady = entrance?.readiness ?? roundStartReadinessProfile(f);
   const startBeat = entrance ? Math.max(0, Math.sin((180 - countdownFrames) * Math.PI / 48)) * intro : 0;
@@ -10694,6 +10813,23 @@ function drawFighterIdentityAura(f, crouch, walking = false, stride = 0) {
       ctx.moveTo(side * (24 + startBeat * 4) * scale, -16 + localCrouch);
       ctx.quadraticCurveTo(side * (31 + startSnap * 10) * scale, -51 + localCrouch - startBeat * 4, side * (21 + startReady.shoulder * 8) * scale, -96 + localCrouch);
       ctx.stroke();
+    }
+
+    if (!cleanSprite && startPresence.active > 0.04) {
+      const arms = clamp(startPresence.handPresence + startPresence.snapReach * 0.65, 0, 1.45);
+      ctx.strokeStyle = colorWithAlpha(trim, 0.028 + arms * 0.04 + startSnap * 0.035);
+      ctx.lineWidth = 0.75 + arms * 0.42;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * (35 + startSnap * 4) * scale, -118 + localCrouch);
+        ctx.quadraticCurveTo(
+          side * (20 + startPresence.elbowPresence * 7) * scale,
+          -134 + localCrouch - startPresence.snapReach * 5,
+          side * (5 + startPresence.snapReach * 4) * scale,
+          -126 + localCrouch
+        );
+        ctx.stroke();
+      }
     }
   }
 
@@ -11360,6 +11496,7 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
   ctx.stroke();
   ctx.restore();
 
+  drawUnifiedRoundStartPresence(f, localCrouch, frameName);
   drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting);
   drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase);
   drawUnifiedAerialBodyPolish(f, localCrouch, frameName);
@@ -11369,6 +11506,70 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
   drawUnifiedGuardCommitmentPolish(f, localCrouch);
   drawUnifiedWhiffRecoveryPolish(f, localCrouch);
   drawUnifiedHeadAccessoryPolish(f, localCrouch, motion, acting);
+}
+
+function drawUnifiedRoundStartPresence(f, localCrouch, frameName) {
+  const start = roundStartBodyPresence(f);
+  if (start.active <= 0.035 || frameName === "walk" || f.attack || f.hurt > 0) return;
+
+  const heavy = f.profileId === "p1";
+  const agile = f.profileId === "p2";
+  const trim = f.trim ?? "#fff1bd";
+  const shoulderY = heavy ? -145 : -150;
+  const chestY = heavy ? -119 : -122;
+  const hipY = heavy ? -62 : -58;
+  const footY = -2 + localCrouch;
+  const side = start.side;
+  const load = clamp(start.floorWeight * (heavy ? 1.05 : 0.82), 0, 1.55);
+  const arms = clamp(start.elbowPresence + start.handPresence * 0.35, 0, 1.55);
+  const snap = clamp(start.snapReach * (agile ? 1.08 : 0.88), 0, 1.35);
+  const pulse = start.pulse;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(18, 9, 7, ${0.026 + load * 0.052})`;
+  ctx.beginPath();
+  ctx.ellipse(0, hipY + localCrouch + load * 1.2, (heavy ? 44 : 35) + load * 8, (heavy ? 10.5 : 8.5) + load * 1.8, side * 0.012, 0, Math.PI * 2);
+  ctx.ellipse(-side * snap * 1.5, shoulderY + localCrouch + start.beat * 0.8, (heavy ? 30 : 25) + arms * 3.2, (heavy ? 8.3 : 7.2) + arms * 0.9, -side * 0.012, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(22, 11, 7, ${0.035 + start.footPress * 0.058})`;
+  for (const footSide of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(
+      footSide * (heavy ? 34 : 29) + side * snap * 1.2,
+      footY + 5 + load * 0.65,
+      (heavy ? 22 : 18) + load * 7,
+      4.1 + load * 1.2,
+      footSide * 0.035,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = colorWithAlpha(trim, 0.036 + arms * 0.052 + snap * 0.03);
+  ctx.lineWidth = 0.82 + arms * 0.45 + snap * 0.3;
+  ctx.beginPath();
+  ctx.moveTo(-29 - side * snap * 1.2, chestY + localCrouch + pulse * 0.8);
+  ctx.quadraticCurveTo(-16 - side * (arms * 3 + snap * 3), -105 + localCrouch - start.handPresence * 2, -40 - side * snap * 2, -105 + localCrouch - start.handPresence * 3);
+  ctx.moveTo(29 - side * snap, chestY + localCrouch - pulse * 0.5);
+  ctx.quadraticCurveTo(16 - side * (arms * 2.5 + snap * 2), -105 + localCrouch - start.handPresence * 1.5, 40 - side * snap * 2, -106 + localCrouch - start.handPresence * 2.5);
+  ctx.stroke();
+
+  if (snap > 0.05 || start.beat > 0.08) {
+    ctx.strokeStyle = `rgba(255, 236, 172, ${0.032 + snap * 0.055 + start.beat * 0.028})`;
+    ctx.lineWidth = 0.74 + snap * 0.46;
+    ctx.beginPath();
+    ctx.ellipse(0, footY + 2, 36 + load * 10 + snap * 8, 3.3 + load * 0.8, 0, 0, Math.PI * 1.9);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawUnifiedPivotMotionPolish(f, localCrouch, walking, stride) {
@@ -13199,6 +13400,7 @@ function drawSpriteExtremityDetails(f, crouch, frameName, stride, options = {}) 
   applyFacingTurnFootPressure(feet, f);
   applyReactionFootPressure(feet, f);
   if (!options.unified) applyWhiffFootPressure(feet, f);
+  applyRoundStartExtremityPresence(hands, feet, f, frameName);
 
   for (const foot of feet) drawSpriteFootDetail(foot, shoe, trim);
   for (const hand of hands) drawSpriteHandDetail(hand, skin, trim);
@@ -13397,6 +13599,44 @@ function applyPivotFootPressure(feet, f) {
     release.y -= snap * 1.25;
     release.x += localDir * (snap * 2.6 + press * 0.7);
     release.angle += releaseIndex === 0 ? snap * 0.035 : -snap * 0.035;
+  }
+}
+
+function applyRoundStartExtremityPresence(hands, feet, f, frameName) {
+  if (frameName !== "idle" || !Array.isArray(hands) || !Array.isArray(feet) || hands.length < 2 || feet.length < 2) return;
+  const start = roundStartBodyPresence(f);
+  if (start.active <= 0.035) return;
+
+  const arms = clamp(start.elbowPresence + start.handPresence * 0.42, 0, 1.45);
+  const handsReady = clamp(start.handPresence + start.snapReach * 0.55, 0, 1.5);
+  const footLoad = clamp(start.footPress + start.kneeLoad * 0.22, 0, 1.55);
+  const side = start.side;
+
+  hands[0].x -= side * (arms * 1.6 + start.snapReach * 1.8);
+  hands[0].y -= handsReady * 2.8 + start.beat * 1.2;
+  hands[0].sx += handsReady * 0.035;
+  hands[0].sy += handsReady * 0.025;
+  hands[0].curl = clamp((hands[0].curl ?? 0.68) + handsReady * 0.12, 0, 1.08);
+  hands[0].angle -= side * (handsReady * 0.025 + start.snapReach * 0.02);
+
+  hands[1].x -= side * (arms * 1.2 + start.snapReach * 2.1);
+  hands[1].y -= handsReady * 3.2 + start.fightSnap * 1.8;
+  hands[1].sx += handsReady * 0.04;
+  hands[1].sy += handsReady * 0.026;
+  hands[1].curl = clamp((hands[1].curl ?? 0.68) + handsReady * 0.13, 0, 1.08);
+  hands[1].angle -= side * (handsReady * 0.022 + start.snapReach * 0.028);
+
+  for (let i = 0; i < feet.length; i += 1) {
+    const localSide = i === 0 ? -1 : 1;
+    const press = clamp(footLoad * (localSide === side ? 0.82 : 1), 0, 1.28);
+    feet[i].press = Math.max(feet[i].press ?? 0, press * 0.72);
+    feet[i].plant = Math.max(feet[i].plant ?? 0, 0.7 + press * 0.24);
+    feet[i].w += press * 4.6 + start.snapReach * 1.4;
+    feet[i].h = Math.max(7.1, feet[i].h - press * 0.95);
+    feet[i].x += localSide * (start.readiness.stanceWide - 1) * 2.8 - side * start.snapReach * 0.9;
+    feet[i].y += press * 1.1;
+    feet[i].sole = Math.max(feet[i].sole ?? 1, 1 + press * 0.08);
+    feet[i].angle += localSide * (press * 0.026 + start.snapReach * 0.012);
   }
 }
 
@@ -18272,6 +18512,39 @@ function getPose(f, stride) {
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.64 + guard * 0.28 * ready.foot + settle * 0.2 + fightSnap * 0.1, 0, 1));
     base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + entrance.side * guard * 0.018 * footSet * ready.foot + entrance.side * fightSnap * 0.008 * ready.snap;
     base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - entrance.side * guard * 0.026 * footSet * ready.foot - entrance.side * fightSnap * 0.01 * ready.snap;
+
+    const start = roundStartBodyPresence(f);
+    if (start.active > 0.035) {
+      const arms = start.elbowPresence;
+      const hands = start.handPresence;
+      const load = start.kneeLoad;
+      const press = start.footPress;
+      const snapReach = start.snapReach;
+      const presenceSide = entrance.side;
+      base.torsoTilt += presenceSide * (snapReach * 0.009 + start.pulse * 0.003) - load * 0.002;
+      base.frontArm.shoulder.x += presenceSide * start.shoulderMass * 1.7 * spec.stance;
+      base.backArm.shoulder.x -= presenceSide * start.shoulderMass * 1.3 * spec.stance;
+      base.frontArm.elbow.x += presenceSide * (arms * 3.6 + snapReach * 4.2) * spec.stance;
+      base.frontArm.elbow.y -= hands * 2.8 + snapReach * 2.2;
+      base.frontArm.hand.x += presenceSide * (hands * 4.5 + snapReach * 6.4) * spec.stance;
+      base.frontArm.hand.y -= hands * 4.2 + snapReach * 3.8;
+      base.backArm.elbow.x -= presenceSide * (arms * 2.8 + snapReach * 2.4) * spec.stance;
+      base.backArm.elbow.y -= hands * 1.7 + start.beat * 1.2;
+      base.backArm.hand.x -= presenceSide * (hands * 3.5 + snapReach * 3.8) * spec.stance;
+      base.backArm.hand.y -= hands * 2.6 + start.beat * 1.8;
+      base.frontLeg.knee.x += presenceSide * load * 2.2 * spec.stance;
+      base.frontLeg.knee.y += load * 3.8 + press * 1.4;
+      base.frontLeg.foot.x += (ready.stanceWide - 1) * 3.4 * spec.stance - presenceSide * snapReach * 1.6;
+      base.frontLeg.foot.y += press * 1.1;
+      base.backLeg.knee.x -= presenceSide * load * 2.9 * spec.stance;
+      base.backLeg.knee.y += load * 4.6 + press * 1.6;
+      base.backLeg.foot.x -= (ready.stanceWide - 1) * 4.2 * spec.stance + presenceSide * snapReach * 1.8;
+      base.backLeg.foot.y += press * 1.35;
+      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.66 + press * 0.24 + snapReach * 0.08, 0, 1));
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.72 + press * 0.24 + snapReach * 0.1, 0, 1));
+      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + presenceSide * (press * 0.014 + snapReach * 0.01);
+      base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - presenceSide * (press * 0.018 + snapReach * 0.012);
+    }
   }
 
   if (winner) {
