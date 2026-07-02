@@ -1111,6 +1111,9 @@ function movementPresentationMotion(f, walking = false, stride = 0) {
   const walkLift = clamp(((1 - walkPlant * 0.38) * walkWeight * motion.walkLift + walkSwing * 0.18) * (walking ? 1 : 0), 0, 1.45);
   const walkReach = clamp((Math.abs(stride) * 0.55 + walkPush * 0.62 + walkSpeed * 0.22) * walkWeight, 0, 1.55);
   const walkCounterLean = moveLocal * clamp((walkReach * 0.55 + walkPush * 0.42 - walkAnchor * 0.2) * motion.walkPush, -1.4, 1.4);
+  const walkHeelRoll = walking ? clamp((walkPlant * 0.48 + walkAnchor * 0.36 + walkSpeed * 0.12) * (0.62 + walkWeight * 0.48) * motion.walkWeight, 0, 1.55) : 0;
+  const walkToePush = walking ? clamp((walkPush * 0.68 + Math.max(0, Math.sin((f?.walkCycle ?? 0) * 2)) * 0.24 + walkReach * 0.18) * motion.walkPush, 0, 1.45) : 0;
+  const walkShoulderCounter = walking ? clamp(walkCounterLean * 0.62 + moveLocal * (walkSwing - walkPlant * 0.28) * 0.24 * motion.walkPush, -1.45, 1.45) : 0;
 
   const pivotDir = pivot.faceRaw > 0.03 ? pivot.faceDir : pivot.stopRaw > 0.03 ? pivot.stopDir : pivot.moveDir;
   const pivotLocal = pivotDir === dir ? 1 : -1;
@@ -1122,6 +1125,9 @@ function movementPresentationMotion(f, walking = false, stride = 0) {
   const pivotShoulderLag = pivotLoad * pivot.style.shoulder;
   const pivotHipSet = pivotPress * pivot.style.hip;
   const pivotFootPress = clamp(pivotPress * pivot.style.foot + pivotSnap * 0.18, 0, 1.75);
+  const stopHeelCatch = grounded && available && !f?.attack ? clamp((pivot.stop * 0.62 + pivot.press * 0.26 + pivot.stopRebound * 0.16) * pivot.style.foot, 0, 1.65) : 0;
+  const pivotHipTwist = grounded && available && !f?.attack ? clamp((pivotPress * 0.54 + pivotSnap * 0.32) * pivot.style.hip, 0, 1.55) : 0;
+  const turnShoulderWhip = grounded && available && !f?.attack ? clamp((pivot.faceSnap * 0.66 + pivot.moveSnap * 0.38 + pivotSnap * 0.22) * pivot.style.shoulder, 0, 1.45) : 0;
 
   const airDir = f?.jumpDir || f?.landingDir || f?.airKickDir || Math.sign(vx) || dir;
   const airLocal = airDir === dir ? 1 : -1;
@@ -1144,7 +1150,7 @@ function movementPresentationMotion(f, walking = false, stride = 0) {
   const crouchEase = grounded && available ? smoothStep01(clamp(f?.crouch ?? 0, 0, 1)) : 0;
   const crouchSettle = crouchEase * (f?.blocking ? 0.9 : 0.58);
   const crouchFootPress = crouchSettle * (f?.blocking ? 1.05 : 0.72);
-  const active = clamp(Math.max(walkLoad, walkLift, walkReach, pivotLoad, airRise, airFall, airFloat, airTuck, preLand, airSpineCurve, airKneeGather, airToeReach, airHandBalance, landingSquash, landingRebound, landingHeelBite, landingKneeAbsorb, crouchFootPress), 0, 1.9);
+  const active = clamp(Math.max(walkLoad, walkLift, walkReach, walkHeelRoll, walkToePush, Math.abs(walkShoulderCounter), pivotLoad, stopHeelCatch, pivotHipTwist, turnShoulderWhip, airRise, airFall, airFloat, airTuck, preLand, airSpineCurve, airKneeGather, airToeReach, airHandBalance, landingSquash, landingRebound, landingHeelBite, landingKneeAbsorb, crouchFootPress), 0, 1.9);
 
   return {
     walking,
@@ -1159,6 +1165,9 @@ function movementPresentationMotion(f, walking = false, stride = 0) {
     walkLift,
     walkReach,
     walkCounterLean,
+    walkHeelRoll,
+    walkToePush,
+    walkShoulderCounter,
     pivot,
     pivotDir,
     pivotLocal,
@@ -1170,6 +1179,9 @@ function movementPresentationMotion(f, walking = false, stride = 0) {
     pivotShoulderLag,
     pivotHipSet,
     pivotFootPress,
+    stopHeelCatch,
+    pivotHipTwist,
+    turnShoulderWhip,
     air: aerial,
     airDir,
     airLocal,
@@ -10036,25 +10048,32 @@ function fighterTransitionMotion(f, walking) {
     const plantedWorldSide = (f.walkAnchorSide || f.footPlantSide || 1) * dir;
     const plantedPress = smoothStep01(footPlant) * profileWeight;
     const push = Math.max(0, Math.sin(cycle * 2)) * weight * profilePush;
+    const movePresent = movementPresentationMotion(f, true, step);
     motion.x +=
       step * (0.18 + weight * 0.5) -
       moveDir * footPlant * (0.32 + weight * 0.34) -
-      plantedWorldSide * anchor * (0.48 + profileWeight * 0.08) +
-      moveDir * pushPulse * (0.36 + profilePush * 0.08);
+      plantedWorldSide * anchor * (0.48 + profileWeight * 0.08) -
+      plantedWorldSide * movePresent.walkHeelRoll * 0.16 +
+      moveDir * pushPulse * (0.36 + profilePush * 0.08) +
+      moveDir * movePresent.walkToePush * 0.18;
     motion.y +=
       footPlant * (0.48 + weight * 1.02) +
       plantedPress * 0.42 +
+      movePresent.walkHeelRoll * 0.36 -
       anchor * (0.58 + profileWeight * 0.12) -
       swing * (0.16 + weight * 0.24 + profileLift * 0.06) -
       push * 0.32 -
-      pushPulse * 0.24;
+      pushPulse * 0.24 -
+      movePresent.walkToePush * 0.18;
     motion.rotation +=
       moveDir * (0.008 + weight * 0.016) * (retreat ? -0.64 : 1) +
       step * 0.0038 * weight -
       plantedWorldSide * anchor * 0.005 -
-      moveDir * plantedPress * 0.004;
-    motion.scaleX *= 1 + anchor * 0.014 + footPlant * 0.008 + plantedPress * 0.006 + weight * 0.002;
-    motion.scaleY *= 1 - anchor * 0.017 - footPlant * 0.006 - plantedPress * 0.01 + swing * 0.004 + push * 0.003;
+      moveDir * plantedPress * 0.004 +
+      movePresent.walkShoulderCounter * 0.003 -
+      plantedWorldSide * movePresent.walkHeelRoll * 0.002;
+    motion.scaleX *= 1 + anchor * 0.014 + footPlant * 0.008 + plantedPress * 0.006 + movePresent.walkHeelRoll * 0.003 + weight * 0.002;
+    motion.scaleY *= 1 - anchor * 0.017 - footPlant * 0.006 - plantedPress * 0.01 - movePresent.walkHeelRoll * 0.003 + swing * 0.004 + push * 0.003 + movePresent.walkToePush * 0.002;
     if (retreat) {
       motion.x -= dir * 0.7 * weight;
       motion.y += 0.35 * weight;
@@ -10080,12 +10099,13 @@ function fighterTransitionMotion(f, walking) {
     const stopDir = f.walkStopDir || Math.sign(f.vx) || dir;
     const stopWeight = clamp(f.walkStopSpeed ?? 0.45, 0, 1.45) * (style.walkWeight ?? 1);
     const supportSide = (f.walkAnchorSide || f.footPlantSide || 1) * dir;
-    motion.x -= stopDir * stopT * (0.72 + stopWeight * 1.22);
-    motion.y += stopT * (0.9 + stopWeight * 1.35);
-    motion.rotation -= stopDir * stopT * (0.012 + stopWeight * 0.016);
-    motion.rotation += supportSide * stopT * 0.004;
-    motion.scaleX *= 1 + stopT * (0.012 + stopWeight * 0.012);
-    motion.scaleY *= 1 - stopT * (0.014 + stopWeight * 0.018);
+    const pivotPresent = movementPresentationMotion(f, false, 0);
+    motion.x -= stopDir * (stopT * (0.72 + stopWeight * 1.22) + pivotPresent.stopHeelCatch * 0.28);
+    motion.y += stopT * (0.9 + stopWeight * 1.35) + pivotPresent.stopHeelCatch * 0.42;
+    motion.rotation -= stopDir * (stopT * (0.012 + stopWeight * 0.016) + pivotPresent.stopHeelCatch * 0.004);
+    motion.rotation += supportSide * (stopT * 0.004 + pivotPresent.pivotHipTwist * 0.002);
+    motion.scaleX *= 1 + stopT * (0.012 + stopWeight * 0.012) + pivotPresent.stopHeelCatch * 0.003;
+    motion.scaleY *= 1 - stopT * (0.014 + stopWeight * 0.018) - pivotPresent.stopHeelCatch * 0.004;
   }
 
   if (!f.grounded && f.hurt <= 0) {
@@ -10258,12 +10278,13 @@ function fighterTransitionMotion(f, walking) {
       const coil = smoothStep01(facingTurn) * turnStyle.weight;
       const unwind = Math.sin((1 - facingTurn) * Math.PI) * turnStyle.snap;
       const turnDir = f.facingTurnTo || dir;
-      motion.x -= turnDir * (coil * 1.2 - unwind * 0.35);
-      motion.y += coil * 1.05 - unwind * 0.38;
-      motion.rotation += turnDir * (coil * 0.03 - unwind * 0.014);
-      motion.scaleX *= 1 + coil * 0.018 - unwind * 0.004;
-      motion.scaleY *= 1 - coil * 0.02 + unwind * 0.008;
-      motion.afterimage = Math.max(motion.afterimage, unwind * 0.02);
+      const pivotPresent = movementPresentationMotion(f, false, 0);
+      motion.x -= turnDir * (coil * 1.2 + pivotPresent.pivotHipTwist * 0.35 - unwind * 0.35);
+      motion.y += coil * 1.05 + pivotPresent.stopHeelCatch * 0.26 - unwind * 0.38;
+      motion.rotation += turnDir * (coil * 0.03 + pivotPresent.pivotHipTwist * 0.006 - unwind * 0.014 - pivotPresent.turnShoulderWhip * 0.004);
+      motion.scaleX *= 1 + coil * 0.018 + pivotPresent.pivotHipTwist * 0.003 - unwind * 0.004;
+      motion.scaleY *= 1 - coil * 0.02 - pivotPresent.stopHeelCatch * 0.003 + unwind * 0.008;
+      motion.afterimage = Math.max(motion.afterimage, unwind * 0.02 + pivotPresent.turnShoulderWhip * 0.008);
     }
 
     if (attackEntry > 0.02) {
@@ -10660,12 +10681,15 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const pivotOffset = -pivot.stopDir * pivot.stop * 4.2 * FIGHTER_SCALE - pivot.faceDir * pivot.faceTurn * 2.6 * FIGHTER_SCALE;
   const movementOffset = (f.dir || 1) * (
     movePresent.walkCounterLean * 2.2 -
+    movePresent.walkHeelRoll * 0.8 +
+    movePresent.walkToePush * 1.1 -
     movePresent.pivotLocal * movePresent.pivotLoad * 2.4 +
+    movePresent.turnShoulderWhip * 0.7 -
     movePresent.airLocal * movePresent.preLand * 3.2
   ) * FIGHTER_SCALE;
-  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + landingDustBloom * 18 + preLandShadow * 18 + airToeShadow * 12 + facingPress * 34 + facingSnap * 16 + pivot.press * 18 + pivot.snap * 9 + startPresence.floorWeight * 30 + startPresence.snapReach * 10 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + movePresent.walkLoad * 14 + movePresent.walkReach * 8 + movePresent.pivotFootPress * 13 + movePresent.landingSquash * 16 + movePresent.landingHeelBite * 8 + movePresent.crouchFootPress * 14 + guardPresent.footPress * 23 + guardPresent.footSpread * 16 + guardPresent.impact * 12 + resultPresent.victoryLift * 12 + resultPresent.cheerLift * 9 + resultPresent.heroFootDig * 13 + resultPresent.sprawl * 36 + resultPresent.dust * 22 + resultPresent.koFloorContact * 22 + resultPresent.koSlamEcho * 14 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
-  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + landingDustBloom * 2.4 + preLandShadow * 2.2 + airToeShadow * 1.2 + facingPress * 4.8 + facingSnap * 1.7 + pivot.press * 2.2 + startPresence.floorWeight * 3.4 + startPresence.footPress * 1.2 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + movePresent.walkLoad * 1.4 + movePresent.pivotFootPress * 1.6 + movePresent.landingPress * 2.2 + movePresent.landingKneeAbsorb * 1.4 + movePresent.crouchFootPress * 1.9 + guardPresent.footPress * 2.7 + guardPresent.brace * 1.1 + resultPresent.victory * 0.8 + resultPresent.heroFootDig * 1.5 + resultPresent.collapse * 3.2 + resultPresent.slam * 2.4 + resultPresent.koFloorContact * 1.6 + resultPresent.koSlamEcho * 2.2 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
-  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + landingDustBloom * 0.04 + preLandShadow * 0.035 + airToeShadow * 0.018 + facingPress * 0.085 + facingSnap * 0.035 + pivot.press * 0.042 + pivot.snap * 0.02 + startPresence.floorWeight * 0.065 + startPresence.fightSnap * 0.035 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + movePresent.walkLoad * 0.032 + movePresent.pivotFootPress * 0.03 + movePresent.landingSquash * 0.04 + movePresent.landingHeelBite * 0.026 + movePresent.crouchFootPress * 0.026 + guardPresent.footPress * 0.048 + guardPresent.impact * 0.055 + guardPresent.counter * 0.032 + resultPresent.glow * 0.032 + resultPresent.heroPlant * 0.024 + resultPresent.dust * 0.06 + resultPresent.collapse * 0.042 + resultPresent.koFloorContact * 0.045 + resultPresent.koSlamEcho * 0.035 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.64);
+  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + landingDustBloom * 18 + preLandShadow * 18 + airToeShadow * 12 + facingPress * 34 + facingSnap * 16 + pivot.press * 18 + pivot.snap * 9 + startPresence.floorWeight * 30 + startPresence.snapReach * 10 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + movePresent.walkLoad * 14 + movePresent.walkReach * 8 + movePresent.walkHeelRoll * 10 + movePresent.walkToePush * 9 + movePresent.pivotFootPress * 13 + movePresent.stopHeelCatch * 12 + movePresent.pivotHipTwist * 8 + movePresent.turnShoulderWhip * 7 + movePresent.landingSquash * 16 + movePresent.landingHeelBite * 8 + movePresent.crouchFootPress * 14 + guardPresent.footPress * 23 + guardPresent.footSpread * 16 + guardPresent.impact * 12 + resultPresent.victoryLift * 12 + resultPresent.cheerLift * 9 + resultPresent.heroFootDig * 13 + resultPresent.sprawl * 36 + resultPresent.dust * 22 + resultPresent.koFloorContact * 22 + resultPresent.koSlamEcho * 14 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
+  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + landingDustBloom * 2.4 + preLandShadow * 2.2 + airToeShadow * 1.2 + facingPress * 4.8 + facingSnap * 1.7 + pivot.press * 2.2 + startPresence.floorWeight * 3.4 + startPresence.footPress * 1.2 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + movePresent.walkLoad * 1.4 + movePresent.walkHeelRoll * 1.3 + movePresent.walkToePush * 0.8 + movePresent.pivotFootPress * 1.6 + movePresent.stopHeelCatch * 1.5 + movePresent.pivotHipTwist * 1.1 + movePresent.landingPress * 2.2 + movePresent.landingKneeAbsorb * 1.4 + movePresent.crouchFootPress * 1.9 + guardPresent.footPress * 2.7 + guardPresent.brace * 1.1 + resultPresent.victory * 0.8 + resultPresent.heroFootDig * 1.5 + resultPresent.collapse * 3.2 + resultPresent.slam * 2.4 + resultPresent.koFloorContact * 1.6 + resultPresent.koSlamEcho * 2.2 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
+  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + landingDustBloom * 0.04 + preLandShadow * 0.035 + airToeShadow * 0.018 + facingPress * 0.085 + facingSnap * 0.035 + pivot.press * 0.042 + pivot.snap * 0.02 + startPresence.floorWeight * 0.065 + startPresence.fightSnap * 0.035 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + movePresent.walkLoad * 0.032 + movePresent.walkHeelRoll * 0.024 + movePresent.walkToePush * 0.018 + movePresent.pivotFootPress * 0.03 + movePresent.stopHeelCatch * 0.032 + movePresent.pivotHipTwist * 0.02 + movePresent.landingSquash * 0.04 + movePresent.landingHeelBite * 0.026 + movePresent.crouchFootPress * 0.026 + guardPresent.footPress * 0.048 + guardPresent.impact * 0.055 + guardPresent.counter * 0.032 + resultPresent.glow * 0.032 + resultPresent.heroPlant * 0.024 + resultPresent.dust * 0.06 + resultPresent.collapse * 0.042 + resultPresent.koFloorContact * 0.045 + resultPresent.koSlamEcho * 0.035 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.64);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -10911,7 +10935,7 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   const reactionFloor = hitMass ? clamp(hitMass.floor, 0, 1.7) : 0;
   const reactionSkid = hitMass ? clamp(hitMass.skid, 0, 1.85) : 0;
   const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.78, stop * 0.65, landingWeight * 0.7, facingPress * 0.78, pivot.press * 0.68, pivot.snap * 0.35, movePresent.walkLoad * 0.68, movePresent.pivotFootPress * 0.6, movePresent.crouchFootPress * 0.44, guardPresent.footPress * 0.68, guardPresent.counterCoil * 0.42, startPresence.footPress * 0.72, attackPlant * 0.45, attackCompression * 0.34, reactionFloor * 0.34);
-  if (jump <= 0.03 && aerialTuck <= 0.03 && preLand <= 0.03 && airToeReach <= 0.03 && landing <= 0.03 && landingHeelBite <= 0.03 && facingTurn <= 0.03 && pivot.activeAmount <= 0.03 && startPresence.active <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && stopStrength <= 0.03 && movePresent.active <= 0.03 && guardPresent.active <= 0.03 && attackPlant <= 0.03 && attackCompression <= 0.03 && reactionSkid <= 0.03) return;
+  if (jump <= 0.03 && aerialTuck <= 0.03 && preLand <= 0.03 && airToeReach <= 0.03 && landing <= 0.03 && landingHeelBite <= 0.03 && facingTurn <= 0.03 && pivot.activeAmount <= 0.03 && startPresence.active <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && stopStrength <= 0.03 && movePresent.walkHeelRoll <= 0.03 && movePresent.walkToePush <= 0.03 && movePresent.stopHeelCatch <= 0.03 && movePresent.turnShoulderWhip <= 0.03 && movePresent.active <= 0.03 && guardPresent.active <= 0.03 && attackPlant <= 0.03 && attackCompression <= 0.03 && reactionSkid <= 0.03) return;
 
   const localCrouch = crouch * 0.18;
   const trim = f.trim ?? "#fff1bd";
@@ -10924,19 +10948,20 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   if (movePresent.walkLoad > 0.04 || movePresent.walkReach > 0.04) {
     const support = (movePresent.pivotSide || f.walkAnchorSide || f.footPlantSide || (stride >= 0 ? 1 : -1)) * 30;
     const sweepDir = (f.dir || 1) * movePresent.moveLocal;
-    const load = clamp(movePresent.walkLoad + movePresent.walkReach * 0.42, 0, 1.55);
-    ctx.strokeStyle = colorWithAlpha(trim, 0.045 + load * 0.06);
-    ctx.lineWidth = 0.85 + load * 0.7;
+    const load = clamp(movePresent.walkLoad + movePresent.walkReach * 0.42 + movePresent.walkHeelRoll * 0.32, 0, 1.55);
+    ctx.strokeStyle = colorWithAlpha(trim, 0.045 + load * 0.06 + movePresent.walkToePush * 0.025);
+    ctx.lineWidth = 0.85 + load * 0.7 + movePresent.walkHeelRoll * 0.28;
     ctx.beginPath();
-    ctx.ellipse(support, 4 + localCrouch + load * 0.5, 15 + load * 8, 3.2 + load * 1.2, -sweepDir * 0.035, 0, Math.PI * 1.82);
+    ctx.ellipse(support - sweepDir * movePresent.walkHeelRoll * 2.6, 4 + localCrouch + load * 0.5, 15 + load * 8 + movePresent.walkHeelRoll * 5, 3.2 + load * 1.2 + movePresent.walkHeelRoll * 0.8, -sweepDir * 0.035, 0, Math.PI * 1.82);
     ctx.stroke();
 
-    if (movePresent.walkPush > 0.04) {
-      ctx.strokeStyle = `rgba(255, 246, 209, ${0.035 + movePresent.walkPush * 0.07})`;
-      ctx.lineWidth = 0.75 + movePresent.walkPush * 0.62;
+    if (movePresent.walkPush > 0.04 || movePresent.walkToePush > 0.04) {
+      const toe = Math.max(movePresent.walkPush, movePresent.walkToePush);
+      ctx.strokeStyle = `rgba(255, 246, 209, ${0.035 + toe * 0.07})`;
+      ctx.lineWidth = 0.75 + toe * 0.62;
       ctx.beginPath();
       ctx.moveTo(support - sweepDir * 5, 5 + localCrouch);
-      ctx.quadraticCurveTo(support - sweepDir * (16 + movePresent.walkPush * 11), 9 + localCrouch, support - sweepDir * (31 + movePresent.walkReach * 14), 6 + localCrouch);
+      ctx.quadraticCurveTo(support - sweepDir * (16 + toe * 11), 9 + localCrouch, support - sweepDir * (31 + movePresent.walkReach * 14 + movePresent.walkToePush * 10), 6 + localCrouch);
       ctx.stroke();
     }
   }
@@ -11059,19 +11084,19 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
 
   if (facingTurn > 0.03) {
     const turnDir = f.facingTurnTo || f.dir || 1;
-    const twist = facingPress + facingSnap * 0.45;
+    const twist = facingPress + facingSnap * 0.45 + movePresent.turnShoulderWhip * 0.32;
     const pivotSide = -(f.facingTurnTo || f.dir || 1) === (f.dir || 1) ? -1 : 1;
     ctx.strokeStyle = `rgba(255, 230, 156, ${0.12 * twist})`;
     ctx.lineWidth = 1.5 + twist * 1.8;
     ctx.beginPath();
-    ctx.ellipse(pivotSide * 30, 4 + localCrouch, 22 + twist * 12, 5 + twist * 2.6, -turnDir * 0.08, Math.PI * 0.1, Math.PI * 1.85);
+    ctx.ellipse(pivotSide * 30, 4 + localCrouch + movePresent.stopHeelCatch * 0.5, 22 + twist * 12 + movePresent.pivotHipTwist * 5, 5 + twist * 2.6 + movePresent.stopHeelCatch * 0.9, -turnDir * 0.08, Math.PI * 0.1, Math.PI * 1.85);
     ctx.stroke();
 
     ctx.strokeStyle = colorWithAlpha(trim, 0.075 + facingSnap * 0.1);
-    ctx.lineWidth = 1.15 + facingSnap * 1.3;
+    ctx.lineWidth = 1.15 + facingSnap * 1.3 + movePresent.turnShoulderWhip * 0.45;
     ctx.beginPath();
     ctx.moveTo(-pivotSide * 20, 1 + localCrouch);
-    ctx.quadraticCurveTo(-turnDir * (4 + facingSnap * 12), 10 + localCrouch, pivotSide * (36 + facingPress * 16), 5 + localCrouch);
+    ctx.quadraticCurveTo(-turnDir * (4 + facingSnap * 12 + movePresent.turnShoulderWhip * 8), 10 + localCrouch, pivotSide * (36 + facingPress * 16 + movePresent.pivotHipTwist * 6), 5 + localCrouch);
     ctx.stroke();
 
     ctx.fillStyle = `rgba(255, 236, 184, ${0.045 + facingPress * 0.04})`;
@@ -11084,11 +11109,11 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
     const pivotDir = pivot.faceRaw > 0.03 ? pivot.faceDir : pivot.stopRaw > 0.03 ? pivot.stopDir : pivot.moveDir;
     const support = (pivot.pivotSide || 1) * (f.dir || 1) * 30;
     const release = -support;
-    const drag = clamp(pivot.press + pivot.snap * 0.5, 0, 1.75);
+    const drag = clamp(pivot.press + pivot.snap * 0.5 + movePresent.stopHeelCatch * 0.34, 0, 1.75);
     ctx.strokeStyle = `rgba(255, 236, 184, ${0.055 + drag * 0.055})`;
-    ctx.lineWidth = 1.05 + drag * 0.85;
+    ctx.lineWidth = 1.05 + drag * 0.85 + movePresent.stopHeelCatch * 0.32;
     ctx.beginPath();
-    ctx.ellipse(support, 5 + localCrouch, 17 + pivot.press * 9, 3.7 + pivot.press * 1.6, -pivotDir * 0.06, Math.PI * 0.05, Math.PI * 1.82);
+    ctx.ellipse(support - pivotDir * movePresent.stopHeelCatch * 2.2, 5 + localCrouch + movePresent.stopHeelCatch * 0.5, 17 + pivot.press * 9 + movePresent.stopHeelCatch * 5, 3.7 + pivot.press * 1.6 + movePresent.stopHeelCatch * 0.9, -pivotDir * 0.06, Math.PI * 0.05, Math.PI * 1.82);
     ctx.stroke();
 
     if (pivot.stopRaw > 0.03 || pivot.moveRaw > 0.03) {
@@ -12600,8 +12625,11 @@ function drawUnifiedPivotMotionPolish(f, localCrouch, walking, stride) {
   const pivotDir = pivot.faceRaw > 0.03 ? pivot.faceDir : pivot.stopRaw > 0.03 ? pivot.stopDir : pivot.moveDir;
   const press = clamp(movePresent.pivotFootPress * (heavy ? 1.08 : 0.82), 0, 1.55);
   const snap = clamp(movePresent.pivotSnap * (agile ? 1.1 : 0.84), 0, 1.35);
-  const load = clamp(movePresent.pivotLoad + movePresent.walkLoad * 0.14 + (walking ? Math.abs(stride ?? 0) * 0.08 : 0), 0, 1.7);
-  const counter = pivotDir * (movePresent.pivotShoulderLag * (heavy ? 3.4 : 2.6) - snap * (agile ? 2.4 : 1.7));
+  const heel = clamp(Math.max(movePresent.stopHeelCatch, movePresent.walkHeelRoll), 0, 1.55);
+  const toe = clamp(movePresent.walkToePush, 0, 1.45);
+  const twist = clamp(movePresent.pivotHipTwist + movePresent.turnShoulderWhip * 0.42, 0, 1.55);
+  const load = clamp(movePresent.pivotLoad + movePresent.walkLoad * 0.14 + heel * 0.26 + toe * 0.16 + (walking ? Math.abs(stride ?? 0) * 0.08 : 0), 0, 1.7);
+  const counter = pivotDir * (movePresent.pivotShoulderLag * (heavy ? 3.4 : 2.6) + movePresent.turnShoulderWhip * 1.9 - snap * (agile ? 2.4 : 1.7));
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -12609,17 +12637,17 @@ function drawUnifiedPivotMotionPolish(f, localCrouch, walking, stride) {
   ctx.beginPath();
   ctx.ellipse(
     counter * 0.28,
-    hipY + localCrouch + press * 1.2,
-    (heavy ? 45 : 36) + press * 9,
-    (heavy ? 10.5 : 8.8) + press * 2.2,
-    -pivotDir * 0.018,
+    hipY + localCrouch + press * 1.2 + heel * 0.8,
+    (heavy ? 45 : 36) + press * 9 + twist * 4,
+    (heavy ? 10.5 : 8.8) + press * 2.2 + heel * 1.1,
+    -pivotDir * (0.018 + twist * 0.01),
     0,
     Math.PI * 2
   );
   ctx.ellipse(
     -counter * 0.2,
-    shoulderY + localCrouch + snap * 0.8,
-    (heavy ? 31 : 25) + snap * 4,
+    shoulderY + localCrouch + snap * 0.8 + movePresent.turnShoulderWhip * 0.6,
+    (heavy ? 31 : 25) + snap * 4 + movePresent.turnShoulderWhip * 3,
     (heavy ? 8.4 : 7.2) + press * 0.9,
     pivotDir * 0.014,
     0,
@@ -12630,10 +12658,10 @@ function drawUnifiedPivotMotionPolish(f, localCrouch, walking, stride) {
   ctx.fillStyle = `rgba(23, 12, 8, ${0.045 + press * 0.07})`;
   ctx.beginPath();
   ctx.ellipse(
-    pivotSide * (heavy ? 35 : 30) - pivotDir * press * 2.2,
-    footY + 5 + press * 0.8,
-    (heavy ? 23 : 19) + press * 10,
-    4.3 + press * 1.4,
+    pivotSide * (heavy ? 35 : 30) - pivotDir * (press * 2.2 + heel * 2.4),
+    footY + 5 + press * 0.8 + heel * 0.55,
+    (heavy ? 23 : 19) + press * 10 + heel * 5,
+    4.3 + press * 1.4 + heel * 0.8,
     -pivotDir * 0.04,
     0,
     Math.PI * 2
@@ -12643,10 +12671,10 @@ function drawUnifiedPivotMotionPolish(f, localCrouch, walking, stride) {
     ctx.fillStyle = `rgba(28, 15, 9, ${0.025 + snap * 0.045})`;
     ctx.beginPath();
     ctx.ellipse(
-      releaseSide * (heavy ? 31 : 27) + pivotDir * snap * 2.6,
-      footY + 3 - snap * 0.7,
-      (heavy ? 18 : 15) + snap * 8,
-      3.3 + snap * 0.8,
+      releaseSide * (heavy ? 31 : 27) + pivotDir * (snap * 2.6 + toe * 2.2),
+      footY + 3 - snap * 0.7 - toe * 0.35,
+      (heavy ? 18 : 15) + snap * 8 + toe * 4,
+      3.3 + snap * 0.8 + toe * 0.55,
       pivotDir * 0.055,
       0,
       Math.PI * 2
@@ -12660,25 +12688,25 @@ function drawUnifiedPivotMotionPolish(f, localCrouch, walking, stride) {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.strokeStyle = colorWithAlpha(trim, 0.042 + load * 0.065);
-  ctx.lineWidth = 0.85 + load * 0.55;
+  ctx.lineWidth = 0.85 + load * 0.55 + movePresent.turnShoulderWhip * 0.18;
   ctx.beginPath();
   ctx.moveTo(-28 - counter * 0.35, chestY + localCrouch + press * 0.6);
-  ctx.quadraticCurveTo(-11 - counter * 0.56, -96 + localCrouch - snap * 1.4, -4 + counter * 0.2, hipY + localCrouch + press * 1.2);
+  ctx.quadraticCurveTo(-11 - counter * 0.56, -96 + localCrouch - snap * 1.4 - movePresent.turnShoulderWhip * 1.3, -4 + counter * 0.2, hipY + localCrouch + press * 1.2 + heel * 0.6);
   ctx.moveTo(28 - counter * 0.35, chestY + localCrouch + snap * 0.5);
-  ctx.quadraticCurveTo(11 - counter * 0.48, -96 + localCrouch + press * 0.8, 4 + counter * 0.16, hipY + localCrouch + press * 0.8);
+  ctx.quadraticCurveTo(11 - counter * 0.48, -96 + localCrouch + press * 0.8 - movePresent.turnShoulderWhip * 0.8, 4 + counter * 0.16, hipY + localCrouch + press * 0.8 + heel * 0.4);
   ctx.stroke();
 
   ctx.strokeStyle = `rgba(255, 231, 158, ${0.038 + press * 0.055 + snap * 0.025})`;
-  ctx.lineWidth = 0.85 + press * 0.5;
+  ctx.lineWidth = 0.85 + press * 0.5 + heel * 0.28;
   ctx.beginPath();
-  ctx.ellipse(pivotSide * (heavy ? 35 : 30) - pivotDir * press * 1.5, footY + 2, 15 + press * 6, 3 + press * 0.7, -pivotDir * 0.04, 0, Math.PI * 1.82);
+  ctx.ellipse(pivotSide * (heavy ? 35 : 30) - pivotDir * (press * 1.5 + heel * 2), footY + 2 + heel * 0.35, 15 + press * 6 + heel * 4, 3 + press * 0.7 + heel * 0.55, -pivotDir * 0.04, 0, Math.PI * 1.82);
   ctx.stroke();
   if (snap > 0.05) {
     ctx.strokeStyle = colorWithAlpha(trim, 0.032 + snap * 0.052);
     ctx.lineWidth = 0.72 + snap * 0.45;
     ctx.beginPath();
-    ctx.moveTo(releaseSide * (heavy ? 31 : 27), footY - snap * 0.5);
-    ctx.quadraticCurveTo(releaseSide * (heavy ? 26 : 23) + pivotDir * snap * 8, footY - 4 - snap, releaseSide * (heavy ? 20 : 18) + pivotDir * snap * 14, footY + 2);
+    ctx.moveTo(releaseSide * (heavy ? 31 : 27), footY - snap * 0.5 - toe * 0.4);
+    ctx.quadraticCurveTo(releaseSide * (heavy ? 26 : 23) + pivotDir * (snap * 8 + toe * 4), footY - 4 - snap - toe, releaseSide * (heavy ? 20 : 18) + pivotDir * (snap * 14 + toe * 7), footY + 2);
     ctx.stroke();
   }
   ctx.restore();
@@ -14718,29 +14746,32 @@ function applyMovementExtremityPresence(hands, feet, f, frameName, stride = 0) {
   const pivot = clamp(move.pivotFootPress, 0, 1.2);
   const land = clamp(move.landingPress + move.landingSquash * 0.35, 0, 1.25);
   const crouch = clamp(move.crouchFootPress, 0, 1.12);
-  const press = Math.max(walk, pivot, land, crouch);
+  const heel = clamp(Math.max(move.walkHeelRoll, move.stopHeelCatch), 0, 1.35);
+  const toe = clamp(move.walkToePush, 0, 1.25);
+  const twist = clamp(move.pivotHipTwist + move.turnShoulderWhip * 0.38, 0, 1.45);
+  const press = Math.max(walk, pivot, land, crouch, heel);
 
   if (press > 0.035 && support) {
     support.press = Math.max(support.press ?? 0, press * 0.76);
-    support.plant = Math.max(support.plant ?? 0, 0.66 + press * 0.25);
-    support.w += press * 4.2 + land * 2.8;
-    support.h = Math.max(7, support.h - press * 0.88);
-    support.y += press * 0.95 + crouch * 0.45;
-    support.x -= move.moveLocal * (move.walkPush * 1.9 + move.pivotLoad * 1.2);
-    support.angle += supportIndex === 0 ? -press * 0.026 : press * 0.026;
-    support.toeFlex = Math.max(support.toeFlex ?? 0, press * 0.54 + move.walkPush * 0.22);
+    support.plant = Math.max(support.plant ?? 0, 0.66 + press * 0.25 + heel * 0.05);
+    support.w += press * 4.2 + land * 2.8 + heel * 2.2;
+    support.h = Math.max(7, support.h - press * 0.88 - heel * 0.32);
+    support.y += press * 0.95 + crouch * 0.45 + heel * 0.42;
+    support.x -= move.moveLocal * (move.walkPush * 1.9 + move.pivotLoad * 1.2 + toe * 0.8) + (supportIndex === 0 ? -1 : 1) * heel * 0.8;
+    support.angle += supportIndex === 0 ? -(press * 0.026 + heel * 0.012) : press * 0.026 + heel * 0.012;
+    support.toeFlex = Math.max(support.toeFlex ?? 0, press * 0.54 + move.walkPush * 0.22 + toe * 0.26);
   }
 
-  if (release && (lift > 0.035 || move.pivotSnap > 0.035 || move.landingRebound > 0.04)) {
-    const releaseLift = clamp(lift * 0.72 + move.pivotSnap * 0.42 + move.landingRebound * 0.24, 0, 1.1);
+  if (release && (lift > 0.035 || move.pivotSnap > 0.035 || move.landingRebound > 0.04 || toe > 0.04)) {
+    const releaseLift = clamp(lift * 0.72 + move.pivotSnap * 0.42 + move.landingRebound * 0.24 + toe * 0.18, 0, 1.1);
     release.plant = Math.max(0.12, (release.plant ?? 0.72) - releaseLift * 0.16);
-    release.y -= releaseLift * 1.25;
-    release.x += move.moveLocal * (releaseLift * 2.2 + move.walkReach * 0.8);
-    release.angle += releaseIndex === 0 ? releaseLift * 0.026 : -releaseLift * 0.026;
-    release.toeFlex = Math.max(release.toeFlex ?? 0, releaseLift * 0.5);
+    release.y -= releaseLift * 1.25 + toe * 0.6;
+    release.x += move.moveLocal * (releaseLift * 2.2 + move.walkReach * 0.8 + toe * 1.2);
+    release.angle += releaseIndex === 0 ? releaseLift * 0.026 + toe * 0.012 : -(releaseLift * 0.026 + toe * 0.012);
+    release.toeFlex = Math.max(release.toeFlex ?? 0, releaseLift * 0.5 + toe * 0.32);
   }
 
-  const handCounter = clamp(move.walkCounterLean * 0.55 + move.pivotLocal * move.pivotShoulderLag * 0.32 + move.airLocal * (move.preLand - move.airRise * 0.3), -1.25, 1.25);
+  const handCounter = clamp(move.walkCounterLean * 0.55 + move.walkShoulderCounter * 0.28 + move.pivotLocal * (move.pivotShoulderLag * 0.32 + twist * 0.22) + move.airLocal * (move.preLand - move.airRise * 0.3), -1.35, 1.35);
   if (Math.abs(handCounter) > 0.025) {
     hands[0].x -= handCounter * 2.2;
     hands[0].y += Math.abs(handCounter) * 0.9 + move.crouchSettle * 1.2;
@@ -15134,8 +15165,8 @@ function applyFacingTurnFootPressure(feet, f) {
   if (turn <= 0.03) return;
 
   const move = movementPresentationMotion(f, false, 0);
-  const press = clamp(Math.max(move.pivotPress, smoothStep01(turn) * move.pivot.style.brake), 0, 1.18);
-  const snap = clamp(Math.max(move.pivotSnap, Math.sin((1 - turn) * Math.PI) * move.pivot.style.snap), 0, 1.28);
+  const press = clamp(Math.max(move.pivotPress, move.stopHeelCatch * 0.8, smoothStep01(turn) * move.pivot.style.brake), 0, 1.18);
+  const snap = clamp(Math.max(move.pivotSnap, move.turnShoulderWhip * 0.72, Math.sin((1 - turn) * Math.PI) * move.pivot.style.snap), 0, 1.28);
   const pivotIndex = (f.facingTurnTo || f.dir || 1) === (f.dir || 1) ? 0 : 1;
   const releaseIndex = pivotIndex === 0 ? 1 : 0;
   const pivot = feet[pivotIndex];
@@ -15144,17 +15175,19 @@ function applyFacingTurnFootPressure(feet, f) {
 
   pivot.press = Math.max(pivot.press ?? 0, press);
   pivot.plant = Math.max(pivot.plant ?? 0, 0.72 + press * 0.24);
-  pivot.w += press * 5.8 + snap * 2.2;
-  pivot.h = Math.max(7.1, pivot.h - press * 1.2);
-  pivot.y += press * 1.3;
-  pivot.x -= turnDir * (press * 2.2 - snap * 1.4);
-  pivot.angle += pivotIndex === 0 ? -press * 0.05 + snap * 0.018 : press * 0.05 - snap * 0.018;
+  pivot.w += press * 5.8 + snap * 2.2 + move.stopHeelCatch * 2.4;
+  pivot.h = Math.max(7.1, pivot.h - press * 1.2 - move.stopHeelCatch * 0.35);
+  pivot.y += press * 1.3 + move.stopHeelCatch * 0.45;
+  pivot.x -= turnDir * (press * 2.2 + move.pivotHipTwist * 0.9 - snap * 1.4);
+  pivot.angle += pivotIndex === 0 ? -press * 0.05 - move.stopHeelCatch * 0.012 + snap * 0.018 : press * 0.05 + move.stopHeelCatch * 0.012 - snap * 0.018;
+  pivot.toeFlex = Math.max(pivot.toeFlex ?? 0, press * 0.42 + move.stopHeelCatch * 0.26);
 
   release.plant = Math.max(0.18, (release.plant ?? 0.72) - snap * 0.18);
   release.press = Math.max(release.press ?? 0, snap * 0.12);
-  release.y -= snap * 1.1;
-  release.x += turnDir * (snap * 2.7 + press * 0.8);
-  release.angle += releaseIndex === 0 ? snap * 0.04 : -snap * 0.04;
+  release.y -= snap * 1.1 + move.turnShoulderWhip * 0.45;
+  release.x += turnDir * (snap * 2.7 + press * 0.8 + move.turnShoulderWhip * 1.1);
+  release.angle += releaseIndex === 0 ? snap * 0.04 + move.turnShoulderWhip * 0.012 : -(snap * 0.04 + move.turnShoulderWhip * 0.012);
+  release.toeFlex = Math.max(release.toeFlex ?? 0, snap * 0.34 + move.turnShoulderWhip * 0.18);
 }
 
 function drawSpriteHandDetail(hand, skin, trim) {
@@ -18622,23 +18655,42 @@ function getPose(f, stride) {
     const frontLift = Math.max(0, -stride) * lift * (1 + backAnchor * 0.28);
     const backLift = Math.max(0, stride) * lift * (1 + frontAnchor * 0.28);
     const moveLocal = Math.sign(f.vx) === f.dir ? 1 : -1;
-    base.torsoTilt += moveLocal * stride * 0.018 * weight - moveLocal * push * 0.012 * motion.walkPush + (backAnchor - frontAnchor) * 0.008;
-    base.frontLeg.knee.x += moveLocal * frontLift * 4 * spec.stance;
-    base.frontLeg.knee.y -= frontLift * 5;
-    base.frontLeg.foot.x += moveLocal * frontLift * 6 * spec.stance;
-    base.frontLeg.foot.y -= frontLift * 8.5;
-    base.backLeg.knee.x -= moveLocal * backLift * 3.5 * spec.stance;
-    base.backLeg.knee.y -= backLift * 4.5;
-    base.backLeg.foot.x -= moveLocal * backLift * 5.5 * spec.stance;
-    base.backLeg.foot.y -= backLift * 7.5;
-    base.frontLeg.knee.y += frontAnchor * 3.4;
-    base.frontLeg.foot.y += frontAnchor * 1.2;
-    base.frontLeg.foot.x += moveLocal * frontAnchor * 3.2 * spec.stance;
-    base.backLeg.knee.y += backAnchor * 3.4;
-    base.backLeg.foot.y += backAnchor * 1.2;
-    base.backLeg.foot.x -= moveLocal * backAnchor * 3.2 * spec.stance;
-    base.frontLeg.plant = clamp(plant + Math.max(0, stride) * 0.3 + frontAnchor * 0.28, 0, 1);
-    base.backLeg.plant = clamp(plant + Math.max(0, -stride) * 0.3 + backAnchor * 0.28, 0, 1);
+    const heel = clamp(movePresent.walkHeelRoll, 0, 1.55);
+    const toe = clamp(movePresent.walkToePush, 0, 1.45);
+    const shoulderCounter = clamp(movePresent.walkShoulderCounter, -1.35, 1.35);
+    const frontHeel = anchorSide > 0 ? heel : 0;
+    const backHeel = anchorSide < 0 ? heel : 0;
+    const frontToe = stride < 0 ? toe : 0;
+    const backToe = stride > 0 ? toe : 0;
+
+    base.torsoTilt += moveLocal * stride * 0.018 * weight - moveLocal * push * 0.012 * motion.walkPush + shoulderCounter * 0.006 + (backAnchor - frontAnchor) * 0.008;
+    base.frontArm.shoulder.x -= shoulderCounter * 0.8 * spec.stance;
+    base.backArm.shoulder.x += shoulderCounter * 0.65 * spec.stance;
+    base.frontArm.hand.x -= shoulderCounter * 2.4 * spec.stance;
+    base.backArm.hand.x += shoulderCounter * 2.1 * spec.stance;
+    base.frontArm.hand.y += Math.abs(shoulderCounter) * 0.8;
+    base.backArm.hand.y -= Math.max(0, shoulderCounter) * 0.6;
+
+    base.frontLeg.knee.x += moveLocal * (frontLift * 4 + frontToe * 1.6 - frontHeel * 0.8) * spec.stance;
+    base.frontLeg.knee.y -= frontLift * 5 - frontToe * 1.2;
+    base.frontLeg.foot.x += moveLocal * (frontLift * 6 + frontToe * 3.2 - frontHeel * 1.5) * spec.stance;
+    base.frontLeg.foot.y -= frontLift * 8.5 + frontToe * 2.2;
+    base.backLeg.knee.x -= moveLocal * (backLift * 3.5 + backToe * 1.4 - backHeel * 0.7) * spec.stance;
+    base.backLeg.knee.y -= backLift * 4.5 - backToe * 1.1;
+    base.backLeg.foot.x -= moveLocal * (backLift * 5.5 + backToe * 2.9 - backHeel * 1.3) * spec.stance;
+    base.backLeg.foot.y -= backLift * 7.5 + backToe * 2;
+    base.frontLeg.knee.y += frontAnchor * 3.4 + frontHeel * 1.1;
+    base.frontLeg.foot.y += frontAnchor * 1.2 + frontHeel * 0.55;
+    base.frontLeg.foot.x += moveLocal * (frontAnchor * 3.2 + frontHeel * 1.1) * spec.stance;
+    base.backLeg.knee.y += backAnchor * 3.4 + backHeel * 1.1;
+    base.backLeg.foot.y += backAnchor * 1.2 + backHeel * 0.55;
+    base.backLeg.foot.x -= moveLocal * (backAnchor * 3.2 + backHeel * 1.1) * spec.stance;
+    base.frontLeg.plant = clamp(plant + Math.max(0, stride) * 0.3 + frontAnchor * 0.28 + frontHeel * 0.1, 0, 1);
+    base.backLeg.plant = clamp(plant + Math.max(0, -stride) * 0.3 + backAnchor * 0.28 + backHeel * 0.1, 0, 1);
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, frontToe * 0.44 + frontHeel * 0.16);
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, backToe * 0.44 + backHeel * 0.16);
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + moveLocal * (frontToe * 0.018 - frontHeel * 0.012);
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - moveLocal * (backToe * 0.018 - backHeel * 0.012);
     base.frontLeg.lift = frontLift;
     base.backLeg.lift = backLift;
   }
@@ -18647,33 +18699,34 @@ function getPose(f, stride) {
     const moveSide = movePresent.moveLocal;
     const pivotSide = movePresent.pivotLocal;
     const walkCounter = clamp(movePresent.walkCounterLean, -1.2, 1.2);
-    const floorLoad = clamp(Math.max(movePresent.walkLoad, movePresent.pivotFootPress, movePresent.landingPress, movePresent.crouchFootPress), 0, 1.45);
-    const release = clamp(Math.max(movePresent.walkLift, movePresent.pivotSnap, movePresent.landingRebound * 0.62), 0, 1.25);
+    const floorLoad = clamp(Math.max(movePresent.walkLoad, movePresent.walkHeelRoll, movePresent.stopHeelCatch, movePresent.pivotFootPress, movePresent.landingPress, movePresent.crouchFootPress), 0, 1.45);
+    const release = clamp(Math.max(movePresent.walkLift, movePresent.walkToePush * 0.72, movePresent.pivotSnap, movePresent.turnShoulderWhip * 0.36, movePresent.landingRebound * 0.62), 0, 1.25);
+    const shoulderCounter = clamp(movePresent.walkShoulderCounter + pivotSide * movePresent.turnShoulderWhip * 0.36, -1.45, 1.45);
 
-    base.torsoTilt += walkCounter * 0.007 - pivotSide * movePresent.pivotHipSet * 0.008 + movePresent.airLocal * (movePresent.airRise - movePresent.preLand) * 0.006;
-    base.frontArm.hand.x += (-walkCounter * 2.4 - pivotSide * movePresent.pivotShoulderLag * 1.3 + movePresent.airLocal * movePresent.airRise * 1.2) * spec.stance;
-    base.frontArm.hand.y += floorLoad * 0.9 - release * 1.4 + movePresent.crouchSettle * 1.6;
-    base.backArm.hand.x += (walkCounter * 2.1 - pivotSide * movePresent.pivotShoulderLag * 0.9 - movePresent.airLocal * movePresent.airRise * 0.9) * spec.stance;
-    base.backArm.hand.y += floorLoad * 1.2 - release * 0.9 + movePresent.crouchSettle * 1.3;
+    base.torsoTilt += walkCounter * 0.007 - pivotSide * (movePresent.pivotHipSet * 0.008 + movePresent.pivotHipTwist * 0.006) + shoulderCounter * 0.004 + movePresent.airLocal * (movePresent.airRise - movePresent.preLand) * 0.006;
+    base.frontArm.hand.x += (-walkCounter * 2.4 - shoulderCounter * 1.3 - pivotSide * (movePresent.pivotShoulderLag * 1.3 + movePresent.turnShoulderWhip * 1.2) + movePresent.airLocal * movePresent.airRise * 1.2) * spec.stance;
+    base.frontArm.hand.y += floorLoad * 0.9 - release * 1.4 + movePresent.crouchSettle * 1.6 + movePresent.stopHeelCatch * 0.8;
+    base.backArm.hand.x += (walkCounter * 2.1 + shoulderCounter * 1.1 - pivotSide * (movePresent.pivotShoulderLag * 0.9 + movePresent.turnShoulderWhip * 0.8) - movePresent.airLocal * movePresent.airRise * 0.9) * spec.stance;
+    base.backArm.hand.y += floorLoad * 1.2 - release * 0.9 + movePresent.crouchSettle * 1.3 + movePresent.pivotHipTwist * 0.5;
 
-    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + Math.abs(walkCounter) * 0.045 + movePresent.pivotLoad * 0.035 + movePresent.crouchSettle * 0.03, 0, 1);
-    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + Math.abs(walkCounter) * 0.036 + movePresent.pivotLoad * 0.028 + movePresent.crouchSettle * 0.025, 0, 1);
-    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, movePresent.walkReach * 0.18 + movePresent.pivotSnap * 0.22);
-    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, movePresent.walkReach * 0.14 + movePresent.pivotSnap * 0.18);
+    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + Math.abs(walkCounter) * 0.045 + Math.abs(shoulderCounter) * 0.025 + movePresent.pivotLoad * 0.035 + movePresent.crouchSettle * 0.03, 0, 1);
+    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + Math.abs(walkCounter) * 0.036 + Math.abs(shoulderCounter) * 0.022 + movePresent.pivotLoad * 0.028 + movePresent.crouchSettle * 0.025, 0, 1);
+    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, movePresent.walkReach * 0.18 + movePresent.walkToePush * 0.12 + movePresent.pivotSnap * 0.22);
+    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, movePresent.walkReach * 0.14 + movePresent.walkHeelRoll * 0.1 + movePresent.pivotSnap * 0.18);
 
     if (f.grounded && floorLoad > 0.025) {
       const supportKey = movePresent.pivotSide > 0 ? "frontLeg" : "backLeg";
       const releaseKey = supportKey === "frontLeg" ? "backLeg" : "frontLeg";
-      base[supportKey].plant = Math.max(base[supportKey].plant ?? 0, clamp(0.52 + floorLoad * 0.34, 0, 1));
-      base[supportKey].toeFlex = Math.max(base[supportKey].toeFlex ?? 0, floorLoad * 0.44 + movePresent.walkPush * 0.2);
-      base[supportKey].footAngle = (base[supportKey].footAngle ?? 0) + (supportKey === "frontLeg" ? 1 : -1) * floorLoad * 0.016;
-      base[supportKey].knee.y += floorLoad * 1.9 + movePresent.crouchSettle * 1.6;
-      base[supportKey].foot.y += floorLoad * 0.32;
+      base[supportKey].plant = Math.max(base[supportKey].plant ?? 0, clamp(0.52 + floorLoad * 0.34 + movePresent.stopHeelCatch * 0.06, 0, 1));
+      base[supportKey].toeFlex = Math.max(base[supportKey].toeFlex ?? 0, floorLoad * 0.44 + movePresent.walkPush * 0.2 + movePresent.walkToePush * 0.28);
+      base[supportKey].footAngle = (base[supportKey].footAngle ?? 0) + (supportKey === "frontLeg" ? 1 : -1) * (floorLoad * 0.016 + movePresent.stopHeelCatch * 0.012);
+      base[supportKey].knee.y += floorLoad * 1.9 + movePresent.stopHeelCatch * 1.1 + movePresent.crouchSettle * 1.6;
+      base[supportKey].foot.y += floorLoad * 0.32 + movePresent.stopHeelCatch * 0.55;
 
-      base[releaseKey].toeFlex = Math.max(base[releaseKey].toeFlex ?? 0, release * 0.36);
-      base[releaseKey].footAngle = (base[releaseKey].footAngle ?? 0) - (releaseKey === "frontLeg" ? 1 : -1) * release * 0.014;
-      base[releaseKey].foot.x += moveSide * release * 1.8 * spec.stance;
-      base[releaseKey].foot.y -= release * 1.25;
+      base[releaseKey].toeFlex = Math.max(base[releaseKey].toeFlex ?? 0, release * 0.36 + movePresent.walkToePush * 0.22);
+      base[releaseKey].footAngle = (base[releaseKey].footAngle ?? 0) - (releaseKey === "frontLeg" ? 1 : -1) * (release * 0.014 + movePresent.walkToePush * 0.012);
+      base[releaseKey].foot.x += moveSide * (release * 1.8 + movePresent.walkToePush * 1.4) * spec.stance;
+      base[releaseKey].foot.y -= release * 1.25 + movePresent.walkToePush * 0.8;
     }
   }
 
