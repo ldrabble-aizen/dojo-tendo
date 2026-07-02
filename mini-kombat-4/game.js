@@ -11603,6 +11603,204 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     ctx.stroke();
     ctx.restore();
   }
+
+  drawGroundContactMicroDust(f, baseX, {
+    walking,
+    stride,
+    plant,
+    landing,
+    landingWeight,
+    landingDustBloom,
+    movePresent,
+    guardPresent,
+    resultPresent,
+    defeatContact,
+    pivot,
+    facingPress,
+    facingSnap,
+    stopStrength,
+    attackPlant,
+    attackDrive,
+    attackCompression,
+    attackContact,
+    attackPresent,
+    attackAnatomy,
+    hitMass,
+    reactionFloor,
+    reactionSkid,
+    reactionAnatomySkid,
+    recoveryToeDrag,
+    footPlant,
+  });
+}
+
+function drawGroundContactMicroDust(f, baseX, contact) {
+  if (!f.grounded) return;
+
+  const movePresent = contact.movePresent;
+  const guardPresent = contact.guardPresent;
+  const resultPresent = contact.resultPresent;
+  const pivot = contact.pivot;
+  const defeatContact = contact.defeatContact;
+  const dir = f.dir || 1;
+  const trim = f.trim ?? "#fff1bd";
+  const motionDir = Math.sign(f.vx) || contact.hitMass?.worldDir || f.walkStopDir || f.landingDir || f.jumpDir || dir;
+  const timeFlicker = 0.82 + Math.sin(roundFrame * 0.38 + f.x * 0.017) * 0.18;
+  const sideHint = contact.hitMass && contact.reactionFloor > contact.attackPlant
+    ? (contact.hitMass.worldDir === dir ? -1 : 1)
+    : contact.attackPresent?.supportSide ?? contact.attackPresent?.freeSide ?? f.walkAnchorSide ?? f.footPlantSide ?? (contact.stride >= 0 ? 1 : -1);
+  const supportX = baseX + sideHint * (28 + Math.abs(contact.stride) * 8) * FIGHTER_SCALE * dir;
+  const trailDir = contact.hitMass ? contact.hitMass.worldDir : motionDir;
+  const walkContact = contact.walking
+    ? clamp(contact.plant * 0.44 + movePresent.walkLoad * 0.42 + movePresent.walkToePush * 0.24 + movePresent.walkHeelRoll * 0.2, 0, 1.35)
+    : 0;
+  const stopContact = clamp(contact.stopStrength + movePresent.stopHeelCatch * 0.5, 0, 1.55);
+  const pivotContact = clamp(pivot.press * 0.74 + pivot.snap * 0.32 + movePresent.pivotFootPress * 0.38 + movePresent.pivotHipTwist * 0.18, 0, 1.65);
+  const crouchContact = clamp(movePresent.crouchFootPress * 0.78, 0, 1.35);
+  const guardContact = clamp(guardPresent.footPress * 0.72 + guardPresent.impact * 0.38 + guardPresent.counterCoil * 0.24, 0, 1.55);
+  const attackContact = clamp(contact.attackPlant * 0.5 + contact.attackDrive * 0.18 + contact.attackCompression * 0.24 + contact.attackContact * 0.62, 0, 1.8);
+  const landingContact = clamp(contact.landingWeight * 0.78 + contact.landingDustBloom * 0.34 + contact.landing * 0.25, 0, 1.8);
+  const skidContact = clamp(contact.reactionSkid * 0.68 + contact.reactionAnatomySkid * 0.32 + contact.recoveryToeDrag * 0.44 + defeatContact.footDrag * 0.36, 0, 1.85);
+  const resultContact = clamp(resultPresent.heroFootDig * 0.38 + resultPresent.koFloorContact * 0.46 + resultPresent.koSlamEcho * 0.32, 0, 1.6);
+  const active = Math.max(walkContact, stopContact, pivotContact, crouchContact, guardContact, attackContact, landingContact, skidContact, resultContact, contact.footPlant * 0.8);
+  if (active <= 0.035) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.lineCap = "round";
+
+  const drawPuff = (x, y, strength, spread, biasDir = trailDir, lift = 0) => {
+    const puff = clamp(strength, 0, 1.9);
+    if (puff <= 0.035) return;
+    for (let i = 0; i < 3; i += 1) {
+      const lane = i - 1;
+      const laneLift = (i + 1) * (0.7 + lift * 0.5);
+      const fade = (1 - i * 0.2) * timeFlicker;
+      ctx.fillStyle = `rgba(70, 45, 25, ${(0.024 + puff * 0.032) * fade})`;
+      ctx.beginPath();
+      ctx.ellipse(
+        x - biasDir * (8 + i * 8 + spread * 0.12) + lane * 3,
+        y - laneLift + lane * 0.5,
+        (8 + spread * 0.22 + puff * 7) * (1 - i * 0.08),
+        2.1 + puff * 1.3 + i * 0.35,
+        -biasDir * (0.05 + puff * 0.015) + lane * 0.025,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
+  };
+
+  if (walkContact > 0.04) {
+    const stepX = supportX - motionDir * (11 + movePresent.walkToePush * 10) * FIGHTER_SCALE;
+    drawPuff(stepX, FLOOR + 8.2, walkContact, 18 + movePresent.walkReach * 8, motionDir, movePresent.walkToePush);
+  }
+
+  if (stopContact > 0.05) {
+    const stopDir = f.walkStopDir || motionDir;
+    const skidX = baseX - stopDir * (31 + stopContact * 18) * FIGHTER_SCALE;
+    drawPuff(skidX, FLOOR + 8.4, stopContact, 30 + stopContact * 18, stopDir, 0.35);
+    ctx.strokeStyle = `rgba(48, 30, 16, ${0.035 + stopContact * 0.035})`;
+    ctx.lineWidth = 0.7 + stopContact * 0.5;
+    for (let i = 0; i < 3; i += 1) {
+      const lane = (i - 1) * (2.4 + stopContact * 0.5);
+      ctx.beginPath();
+      ctx.moveTo(skidX + stopDir * (5 + i * 2), FLOOR + 8 + lane);
+      ctx.quadraticCurveTo(
+        skidX - stopDir * (16 + stopContact * 14),
+        FLOOR + 10 + lane * 0.4,
+        skidX - stopDir * (42 + stopContact * 22 + i * 4),
+        FLOOR + 8.5 + lane * 0.15
+      );
+      ctx.stroke();
+    }
+  }
+
+  if (pivotContact > 0.05) {
+    const pivotDir = pivot.faceRaw > 0.03 ? pivot.faceDir : pivot.stopRaw > 0.03 ? pivot.stopDir : pivot.moveDir || dir;
+    const pivotX = baseX + (pivot.pivotSide || sideHint) * (25 + pivot.press * 8) * FIGHTER_SCALE;
+    drawPuff(pivotX - pivotDir * 8 * FIGHTER_SCALE, FLOOR + 8.1, pivotContact, 22 + pivotContact * 12, pivotDir, pivot.snap);
+  }
+
+  if (crouchContact > 0.05 || guardContact > 0.05) {
+    const brace = Math.max(crouchContact, guardContact);
+    const spread = 34 + guardPresent.footSpread * 9 + crouchContact * 12;
+    for (const side of [-1, 1]) {
+      drawPuff(baseX + side * spread * FIGHTER_SCALE * dir, FLOOR + 8.3, brace * (0.52 + (side > 0 ? 0.08 : 0)), 14 + brace * 9, -side * dir, 0.18);
+    }
+  }
+
+  if (attackContact > 0.05) {
+    const specPresent = contact.attackPresent?.visualSpec;
+    const contactSide = specPresent?.kick || specPresent?.sweep ? contact.attackPresent.freeSide : sideHint;
+    const reach = specPresent?.sweep ? 47 : specPresent?.kick ? 39 : specPresent?.grab ? 30 : 33;
+    const attackX = baseX + contactSide * (reach + (contact.attackPresent?.reach ?? 0) * 12) * FIGHTER_SCALE * dir;
+    drawPuff(attackX - contactSide * dir * 9 * FIGHTER_SCALE, FLOOR + 8.2, attackContact, 24 + (contact.attackAnatomy?.extension ?? 0) * 14, contactSide * dir, 0.32);
+  }
+
+  if (landingContact > 0.05) {
+    drawPuff(baseX - motionDir * (16 + landingContact * 8) * FIGHTER_SCALE, FLOOR + 8.4, landingContact, 38 + landingContact * 20, motionDir, 0.55);
+    drawPuff(baseX + motionDir * (17 + landingContact * 5) * FIGHTER_SCALE, FLOOR + 8.1, landingContact * 0.76, 32 + landingContact * 14, -motionDir, 0.38);
+  }
+
+  if (skidContact > 0.05 || resultContact > 0.05) {
+    const drag = Math.max(skidContact, resultContact);
+    const dragDir = contact.hitMass?.worldDir || defeatContact.fallDir || motionDir;
+    const dragX = baseX - dragDir * (35 + drag * 22) * FIGHTER_SCALE;
+    drawPuff(dragX, FLOOR + 8.5, drag, 36 + drag * 24, dragDir, 0.2);
+    ctx.fillStyle = `rgba(42, 27, 15, ${0.028 + drag * 0.032})`;
+    ctx.beginPath();
+    ctx.ellipse(dragX - dragDir * (22 + drag * 13), FLOOR + 9, 28 + drag * 22, 3.5 + drag * 1.4, -dragDir * 0.035, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+
+  const drawArc = (x, strength, width, height, biasDir = motionDir, y = FLOOR + 6.4) => {
+    const arc = clamp(strength, 0, 1.9);
+    if (arc <= 0.035) return;
+    ctx.strokeStyle = colorWithAlpha(trim, (0.026 + arc * 0.042) * timeFlicker);
+    ctx.lineWidth = 0.7 + arc * 0.72;
+    ctx.beginPath();
+    ctx.ellipse(x, y, width + arc * 10, height + arc * 1.1, -biasDir * 0.045, Math.PI * 0.04, Math.PI * 1.74);
+    ctx.stroke();
+  };
+
+  drawArc(supportX, Math.max(walkContact, contact.footPlant * 0.62), 16 + Math.abs(contact.stride) * 5, 2.7, motionDir);
+  if (pivotContact > 0.04) drawArc(baseX + (pivot.pivotSide || sideHint) * 27 * FIGHTER_SCALE, pivotContact, 18 + pivot.press * 8, 3.2, pivot.faceDir || motionDir);
+  if (crouchContact > 0.04) drawArc(baseX, crouchContact, 41 + crouchContact * 12, 4.3, dir, FLOOR + 6.8);
+  if (guardContact > 0.04) drawArc(baseX, guardContact, 48 + guardPresent.footSpread * 8, 4.2, -dir, FLOOR + 6.7);
+  if (attackContact > 0.04) drawArc(baseX + sideHint * (32 + contact.attackDrive * 8) * FIGHTER_SCALE * dir, attackContact, 24 + attackContact * 8, 3.6, sideHint * dir);
+  if (landingContact > 0.04) {
+    ctx.strokeStyle = `rgba(255, 232, 166, ${(0.035 + landingContact * 0.045) * timeFlicker})`;
+    ctx.lineWidth = 0.9 + landingContact * 0.9;
+    ctx.beginPath();
+    ctx.ellipse(baseX, FLOOR + 6.8, 48 + landingContact * 32, 5.2 + landingContact * 2.4, 0, Math.PI * 0.04, Math.PI * 1.96);
+    ctx.stroke();
+  }
+  if (skidContact > 0.04) {
+    const skidDir = contact.hitMass?.worldDir || motionDir;
+    const skidX = baseX - skidDir * (28 + skidContact * 18) * FIGHTER_SCALE;
+    ctx.strokeStyle = `rgba(255, 240, 193, ${(0.022 + skidContact * 0.035) * timeFlicker})`;
+    ctx.lineWidth = 0.7 + skidContact * 0.52;
+    for (let i = 0; i < 2; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(skidX + skidDir * (5 + i * 4), FLOOR + 6.4 + i * 2.2);
+      ctx.quadraticCurveTo(
+        skidX - skidDir * (18 + skidContact * 9),
+        FLOOR + 10.2 + i,
+        skidX - skidDir * (42 + skidContact * 18),
+        FLOOR + 7.4 + i * 1.2
+      );
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
 }
 
 function drawMovementPoseFX(f, crouch, walking, stride) {
