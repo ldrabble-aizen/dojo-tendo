@@ -676,6 +676,12 @@ function guardPresentationMotion(f) {
   const shield = clamp((guard * 0.65 + impact * 1.18 + counter * 0.62) * guardProfile.shieldAlpha * absorption.shield, 0, 1.9);
   const crouchSettle = clamp((guard * 0.64 + entry * 0.32 + impact * 0.28) * guardProfile.crouch, 0, 1.55);
   const release = clamp(exit * (0.55 + guardProfile.handLift * 0.24), 0, 1.25);
+  const elbowSeal = clamp((handGuard * 0.44 + handImpact * 0.52 + brace * 0.18) * absorption.hand, 0, 1.4);
+  const wristLock = clamp((handGuard * 0.3 + impact * 0.65 + counterSnap * 0.18) * guardProfile.handLift * commitment.hand, 0, 1.35);
+  const backFootDig = clamp((footPress * 0.55 + impact * 0.34 + brace * 0.18) * absorption.foot, 0, 1.45);
+  const frontFootCheck = clamp((footSpread * 0.38 + counterCoil * 0.22 + release * 0.16) * commitment.foot, 0, 1.2);
+  const shoulderClamp = clamp((shoulderSink * 0.5 + impact * 0.34 + brace * 0.2) * absorption.shoulder, 0, 1.45);
+  const shieldLean = clamp(recoil * 0.42 + counterSnap * 0.25 - release * 0.18, -0.35, 1.25);
   const active = clamp(Math.max(guard, entry, impact, counter, counterSnap, footPress, shield, release * 0.62), 0, 1.95);
   const pulse = 0.5 + Math.sin(roundFrame * 0.34 + (f?.x ?? 0) * 0.015) * 0.5;
 
@@ -702,6 +708,12 @@ function guardPresentationMotion(f) {
     shield,
     crouchSettle,
     release,
+    elbowSeal,
+    wristLock,
+    backFootDig,
+    frontFootCheck,
+    shoulderClamp,
+    shieldLean,
     pulse,
     active,
   };
@@ -12725,28 +12737,32 @@ function drawUnifiedGuardCommitmentPolish(f, localCrouch) {
   const waistY = heavy ? -64 : -60;
   const footY = -4 + localCrouch;
   const brace = defense.brace;
+  const elbowSeal = clamp(defense.elbowSeal ?? 0, 0, 1.4);
+  const wristLock = clamp(defense.wristLock ?? 0, 0, 1.35);
+  const backFootDig = clamp(defense.backFootDig ?? 0, 0, 1.45);
+  const shoulderClamp = clamp(defense.shoulderClamp ?? 0, 0, 1.45);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
-  ctx.fillStyle = `rgba(18, 9, 7, ${0.045 + active * 0.09 + impact * 0.06 + defense.footPress * 0.012})`;
+  ctx.fillStyle = `rgba(18, 9, 7, ${0.045 + active * 0.09 + impact * 0.06 + defense.footPress * 0.012 + shoulderClamp * 0.012})`;
   ctx.beginPath();
-  ctx.ellipse(-30 - impact * 2, shoulderY + localCrouch + brace * 1.5, 22 + brace * 4, 9 + impact * 3, -0.32, 0, Math.PI * 2);
-  ctx.ellipse(31 + impact * 2, shoulderY + localCrouch + brace * 1.8, 23 + brace * 4, 9 + impact * 3, 0.32, 0, Math.PI * 2);
+  ctx.ellipse(-30 - impact * 2 - shoulderClamp * 0.9, shoulderY + localCrouch + brace * 1.5 + shoulderClamp * 0.8, 22 + brace * 4 + shoulderClamp * 1.6, 9 + impact * 3 + shoulderClamp * 0.7, -0.32, 0, Math.PI * 2);
+  ctx.ellipse(31 + impact * 2 + shoulderClamp * 0.8, shoulderY + localCrouch + brace * 1.8 + shoulderClamp * 0.95, 23 + brace * 4 + shoulderClamp * 1.4, 9 + impact * 3 + shoulderClamp * 0.75, 0.32, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = `rgba(18, 9, 7, ${0.08 + active * 0.11 + impact * 0.09})`;
-  ctx.lineWidth = 7.5 + active * 3.2;
+  ctx.strokeStyle = `rgba(18, 9, 7, ${0.08 + active * 0.11 + impact * 0.09 + elbowSeal * 0.012})`;
+  ctx.lineWidth = 7.5 + active * 3.2 + elbowSeal * 0.55;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(-40, -130 + localCrouch + guard * 3);
-  ctx.quadraticCurveTo(-22 - impact * 4, -118 + localCrouch + brace * 5, -8 - impact * 7 + snap * 4, chestY + localCrouch + 19 + brace * 2);
-  ctx.moveTo(40, -130 + localCrouch + guard * 3);
-  ctx.quadraticCurveTo(22 + impact * 4, -118 + localCrouch + brace * 5, 8 + impact * 7 - snap * 4, chestY + localCrouch + 19 + brace * 2);
+  ctx.moveTo(-40 - shoulderClamp * 0.8, -130 + localCrouch + guard * 3 + shoulderClamp * 0.7);
+  ctx.quadraticCurveTo(-22 - impact * 4 - elbowSeal * 1.4, -118 + localCrouch + brace * 5 + elbowSeal * 0.7, -8 - impact * 7 + snap * 4 - wristLock * 1.2, chestY + localCrouch + 19 + brace * 2 + wristLock * 0.55);
+  ctx.moveTo(40 + shoulderClamp * 0.8, -130 + localCrouch + guard * 3 + shoulderClamp * 0.85);
+  ctx.quadraticCurveTo(22 + impact * 4 + elbowSeal * 1.25, -118 + localCrouch + brace * 5 + elbowSeal * 0.65, 8 + impact * 7 - snap * 4 + wristLock * 1.1, chestY + localCrouch + 19 + brace * 2 + wristLock * 0.5);
   ctx.stroke();
 
-  ctx.fillStyle = `rgba(18, 9, 7, ${0.035 + active * 0.07})`;
+  ctx.fillStyle = `rgba(18, 9, 7, ${0.035 + active * 0.07 + backFootDig * 0.01})`;
   ctx.beginPath();
-  ctx.ellipse(0, waistY + localCrouch + brace * 2.4, (heavy ? 46 : 38) + defense.footSpread * 3, 11 + brace * 3, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, waistY + localCrouch + brace * 2.4 + backFootDig * 0.45, (heavy ? 46 : 38) + defense.footSpread * 3 + backFootDig * 2.4, 11 + brace * 3 + backFootDig * 0.7, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
@@ -12754,8 +12770,8 @@ function drawUnifiedGuardCommitmentPolish(f, localCrouch) {
   ctx.globalCompositeOperation = "screen";
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.strokeStyle = colorWithAlpha(guardColor, 0.08 + guard * 0.08 + impact * 0.12 + counter * 0.08 + defense.entry * 0.025);
-  ctx.lineWidth = 1.25 + active * 0.85;
+  ctx.strokeStyle = colorWithAlpha(guardColor, 0.08 + guard * 0.08 + impact * 0.12 + counter * 0.08 + defense.entry * 0.025 + wristLock * 0.012);
+  ctx.lineWidth = 1.25 + active * 0.85 + wristLock * 0.2;
   ctx.beginPath();
   ctx.moveTo(-34, shoulderY + localCrouch - 5);
   ctx.quadraticCurveTo(0, shoulderY + localCrouch - 15 - snap * 5, 35, shoulderY + localCrouch - 5);
@@ -12772,12 +12788,12 @@ function drawUnifiedGuardCommitmentPolish(f, localCrouch) {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = colorWithAlpha(trim, 0.045 + active * 0.075 + defense.footPress * 0.02);
-  ctx.lineWidth = 1 + active * 0.55 + defense.footPress * 0.25;
+  ctx.strokeStyle = colorWithAlpha(trim, 0.045 + active * 0.075 + defense.footPress * 0.02 + backFootDig * 0.018);
+  ctx.lineWidth = 1 + active * 0.55 + defense.footPress * 0.25 + backFootDig * 0.22;
   for (const side of [-1, 1]) {
     ctx.beginPath();
-    ctx.moveTo(side * (24 + brace * 1.8), footY);
-    ctx.quadraticCurveTo(side * (39 + brace * 6 + defense.footSpread * 4), footY + 4.5 + impact * 1.5 + defense.footPress * 0.5, side * (55 + brace * 9 + defense.footSpread * 5), footY + 3);
+    ctx.moveTo(side * (24 + brace * 1.8), footY + backFootDig * 0.35);
+    ctx.quadraticCurveTo(side * (39 + brace * 6 + defense.footSpread * 4 + backFootDig * 2.6), footY + 4.5 + impact * 1.5 + defense.footPress * 0.5 + backFootDig * 0.55, side * (55 + brace * 9 + defense.footSpread * 5 + backFootDig * 3.4), footY + 3 + backFootDig * 0.3);
     ctx.stroke();
   }
   ctx.restore();
@@ -14657,46 +14673,52 @@ function applyGuardExtremityPresence(hands, feet, f, frameName) {
   const defense = guardPresentationMotion(f);
   if (defense.active <= 0.035) return;
 
-  const seal = clamp(defense.handGuard + defense.handImpact * 0.45, 0, 1.28);
-  const snap = clamp(defense.counterSnap + defense.impact * 0.42, 0, 1.2);
-  const press = clamp(defense.footPress, 0, 1.25);
+  const elbowSeal = clamp(defense.elbowSeal ?? 0, 0, 1.4);
+  const wristLock = clamp(defense.wristLock ?? 0, 0, 1.35);
+  const backFootDig = clamp(defense.backFootDig ?? 0, 0, 1.45);
+  const frontFootCheck = clamp(defense.frontFootCheck ?? 0, 0, 1.2);
+  const shoulderClamp = clamp(defense.shoulderClamp ?? 0, 0, 1.45);
+  const seal = clamp(defense.handGuard + defense.handImpact * 0.45 + elbowSeal * 0.22, 0, 1.38);
+  const snap = clamp(defense.counterSnap + defense.impact * 0.42 + wristLock * 0.14, 0, 1.3);
+  const press = clamp(defense.footPress + backFootDig * 0.25, 0, 1.35);
 
-  hands[0].x += seal * 2.4 + snap * 1.4;
-  hands[0].y -= seal * 3.8 - defense.crouchSettle * 1.2;
-  hands[0].sx += seal * 0.035;
-  hands[0].sy -= seal * 0.018;
-  hands[0].angle += seal * 0.024 + snap * 0.018;
-  hands[0].curl = clamp((hands[0].curl ?? 0.7) + seal * 0.14 + snap * 0.04, 0, 1.14);
-  hands[0].shock = Math.max(hands[0].shock ?? 0, defense.impact * 0.66 + snap * 0.22);
+  hands[0].x += seal * 2.4 + snap * 1.4 - elbowSeal * 1.1;
+  hands[0].y -= seal * 3.8 - defense.crouchSettle * 1.2 + shoulderClamp * 0.9;
+  hands[0].sx += seal * 0.035 + wristLock * 0.012;
+  hands[0].sy -= seal * 0.018 + wristLock * 0.01;
+  hands[0].angle += seal * 0.024 + snap * 0.018 + wristLock * 0.026;
+  hands[0].curl = clamp((hands[0].curl ?? 0.7) + seal * 0.14 + snap * 0.04 + wristLock * 0.05, 0, 1.16);
+  hands[0].shock = Math.max(hands[0].shock ?? 0, defense.impact * 0.66 + snap * 0.22 + wristLock * 0.18);
 
-  hands[1].x -= seal * 1.6 - snap * 2.2;
-  hands[1].y -= seal * 4.6 + snap * 1.2 - defense.crouchSettle * 1.4;
-  hands[1].sx += seal * 0.04 + snap * 0.02;
-  hands[1].sy -= seal * 0.022;
-  hands[1].angle -= seal * 0.026 - snap * 0.012;
-  hands[1].curl = clamp((hands[1].curl ?? 0.72) + seal * 0.16 + snap * 0.05, 0, 1.16);
-  hands[1].shock = Math.max(hands[1].shock ?? 0, defense.impact * 0.72 + snap * 0.26);
+  hands[1].x -= seal * 1.6 - snap * 2.2 + elbowSeal * 1.25;
+  hands[1].y -= seal * 4.6 + snap * 1.2 - defense.crouchSettle * 1.4 + shoulderClamp * 1.15;
+  hands[1].sx += seal * 0.04 + snap * 0.02 + wristLock * 0.015;
+  hands[1].sy -= seal * 0.022 + wristLock * 0.012;
+  hands[1].angle -= seal * 0.026 - snap * 0.012 + wristLock * 0.03;
+  hands[1].curl = clamp((hands[1].curl ?? 0.72) + seal * 0.16 + snap * 0.05 + wristLock * 0.055, 0, 1.18);
+  hands[1].shock = Math.max(hands[1].shock ?? 0, defense.impact * 0.72 + snap * 0.26 + wristLock * 0.2);
 
   const supportIndex = defense.counterSnap > defense.brace * 0.45 ? 1 : 0;
   const releaseIndex = supportIndex === 0 ? 1 : 0;
   const support = feet[supportIndex];
   const release = feet[releaseIndex];
 
-  support.press = Math.max(support.press ?? 0, press * 0.82);
-  support.plant = Math.max(support.plant ?? 0, 0.7 + press * 0.24);
-  support.w += press * 5.2 + defense.counterCoil * 1.4;
-  support.h = Math.max(7.1, support.h - press * 1.05);
-  support.y += press * 1.15 + defense.crouchSettle * 0.35;
-  support.x -= (supportIndex === 0 ? 1 : -1) * (press * 1.2 + defense.impact * 1.4);
-  support.angle += supportIndex === 0 ? -press * 0.032 : press * 0.032;
-  support.toeFlex = Math.max(support.toeFlex ?? 0, press * 0.58 + defense.impact * 0.28);
+  support.press = Math.max(support.press ?? 0, press * 0.82 + backFootDig * 0.16);
+  support.plant = Math.max(support.plant ?? 0, 0.7 + press * 0.24 + backFootDig * 0.07);
+  support.w += press * 5.2 + defense.counterCoil * 1.4 + backFootDig * 2.1;
+  support.h = Math.max(7.1, support.h - press * 1.05 - backFootDig * 0.32);
+  support.y += press * 1.15 + defense.crouchSettle * 0.35 + backFootDig * 0.42;
+  support.x -= (supportIndex === 0 ? 1 : -1) * (press * 1.2 + defense.impact * 1.4 + backFootDig * 1.2);
+  support.angle += supportIndex === 0 ? -(press * 0.032 + backFootDig * 0.012) : press * 0.032 + backFootDig * 0.012;
+  support.toeFlex = Math.max(support.toeFlex ?? 0, press * 0.58 + defense.impact * 0.28 + backFootDig * 0.2);
 
   if (release) {
-    const lift = clamp(snap * 0.36 + defense.release * 0.24, 0, 0.8);
-    release.plant = Math.max(0.18, (release.plant ?? 0.74) - lift * 0.1);
-    release.y -= lift * 0.7;
-    release.x += (releaseIndex === 0 ? -1 : 1) * (lift * 1.4 + defense.footSpread * 0.6);
-    release.toeFlex = Math.max(release.toeFlex ?? 0, press * 0.28 + lift * 0.35);
+    const lift = clamp(snap * 0.36 + defense.release * 0.24 + frontFootCheck * 0.22, 0, 0.9);
+    release.plant = Math.max(0.18, (release.plant ?? 0.74) - lift * 0.1 - frontFootCheck * 0.04);
+    release.y -= lift * 0.7 - frontFootCheck * 0.18;
+    release.x += (releaseIndex === 0 ? -1 : 1) * (lift * 1.4 + defense.footSpread * 0.6 + frontFootCheck * 1.1);
+    release.angle += releaseIndex === 0 ? frontFootCheck * 0.014 : -frontFootCheck * 0.014;
+    release.toeFlex = Math.max(release.toeFlex ?? 0, press * 0.28 + lift * 0.35 + frontFootCheck * 0.18);
   }
 }
 
@@ -15178,37 +15200,41 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
   const counterPulse = counter * guardProfile.counter * (0.7 + Math.sin(roundFrame * 0.32) * 0.3) + defense.counterSnap * 0.18;
   const heavyGuard = f.profileId === "p1";
   const technicalGuard = f.profileId === "p2";
+  const elbowSeal = clamp(defense.elbowSeal ?? 0, 0, 1.4);
+  const wristLock = clamp(defense.wristLock ?? 0, 0, 1.35);
+  const backFootDig = clamp(defense.backFootDig ?? 0, 0, 1.45);
+  const shoulderClamp = clamp(defense.shoulderClamp ?? 0, 0, 1.45);
 
   const frontShoulder = heavyGuard
-    ? { x: 28 - recoil * 2, y: -153 + localCrouch + guard * 2 + defense.shoulderSink * 0.6 }
+    ? { x: 28 - recoil * 2 - shoulderClamp * 0.9, y: -153 + localCrouch + guard * 2 + defense.shoulderSink * 0.6 + shoulderClamp * 0.8 }
     : technicalGuard
-      ? { x: 36 - recoil * 2, y: -158 + localCrouch - guard + defense.shoulderSink * 0.35 }
-      : { x: 34 - recoil * 3, y: -154 + localCrouch + guard * 2 + defense.shoulderSink * 0.5 };
+      ? { x: 36 - recoil * 2 - shoulderClamp * 0.7, y: -158 + localCrouch - guard + defense.shoulderSink * 0.35 + shoulderClamp * 0.55 }
+      : { x: 34 - recoil * 3 - shoulderClamp * 0.8, y: -154 + localCrouch + guard * 2 + defense.shoulderSink * 0.5 + shoulderClamp * 0.7 };
   const frontElbow = heavyGuard
-    ? { x: 40 + recoil * 3 + defense.handGuard * 0.8, y: -136 + localCrouch + guard * 5 + breath * 0.55 + defense.brace * 1.1 }
+    ? { x: 40 + recoil * 3 + defense.handGuard * 0.8 - elbowSeal * 1.6, y: -136 + localCrouch + guard * 5 + breath * 0.55 + defense.brace * 1.1 + elbowSeal * 0.55 }
     : technicalGuard
-      ? { x: 58 + recoil * 6 + defense.counterSnap * 2.2, y: -139 + localCrouch + guard * 2 + breath * 1.15 - defense.counterSnap * 1.5 }
-      : { x: 52 + recoil * 4 + defense.handGuard * 1.1, y: -132 + localCrouch + guard * 7 + breath + defense.brace };
+      ? { x: 58 + recoil * 6 + defense.counterSnap * 2.2 - elbowSeal * 1.15, y: -139 + localCrouch + guard * 2 + breath * 1.15 - defense.counterSnap * 1.5 + elbowSeal * 0.4 }
+      : { x: 52 + recoil * 4 + defense.handGuard * 1.1 - elbowSeal * 1.35, y: -132 + localCrouch + guard * 7 + breath + defense.brace + elbowSeal * 0.5 };
   const frontHand = heavyGuard
-    ? { x: 31 + recoil * 5 + counter * 3 + defense.handImpact * 1.8, y: -113 + localCrouch + guard * 4 + impact * 2 - defense.handGuard * 1.4 }
+    ? { x: 31 + recoil * 5 + counter * 3 + defense.handImpact * 1.8 - wristLock * 1.8, y: -113 + localCrouch + guard * 4 + impact * 2 - defense.handGuard * 1.4 + wristLock * 0.65 }
     : technicalGuard
-      ? { x: 50 + recoil * 12 + counter * 8 + defense.counterSnap * 4, y: -119 + localCrouch + guard * 2 + impact * 5 - defense.counterSnap * 3 }
-      : { x: 36 + recoil * 9 + counter * 5 + defense.handImpact * 2.4, y: -111 + localCrouch + guard * 6 + impact * 4 - defense.handGuard * 1.2 };
+      ? { x: 50 + recoil * 12 + counter * 8 + defense.counterSnap * 4 - wristLock * 1.2, y: -119 + localCrouch + guard * 2 + impact * 5 - defense.counterSnap * 3 + wristLock * 0.55 }
+      : { x: 36 + recoil * 9 + counter * 5 + defense.handImpact * 2.4 - wristLock * 1.5, y: -111 + localCrouch + guard * 6 + impact * 4 - defense.handGuard * 1.2 + wristLock * 0.6 };
   const backShoulder = heavyGuard
     ? { x: -28, y: -148 + localCrouch + guard * 5 }
     : technicalGuard
       ? { x: -30, y: -151 + localCrouch + guard * 3 }
       : { x: -31, y: -150 + localCrouch + guard * 4 };
   const backElbow = heavyGuard
-    ? { x: 4 + recoil * 3, y: -131 + localCrouch + guard * 8 - breath * 0.35 }
+    ? { x: 4 + recoil * 3 + elbowSeal * 1.2, y: -131 + localCrouch + guard * 8 - breath * 0.35 + elbowSeal * 0.45 }
     : technicalGuard
-      ? { x: 12 + recoil * 6, y: -128 + localCrouch + guard * 6 - breath * 0.9 }
-      : { x: 9 + recoil * 5, y: -134 + localCrouch + guard * 9 - breath * 0.6 };
+      ? { x: 12 + recoil * 6 + elbowSeal * 1.1, y: -128 + localCrouch + guard * 6 - breath * 0.9 + elbowSeal * 0.35 }
+      : { x: 9 + recoil * 5 + elbowSeal * 1.15, y: -134 + localCrouch + guard * 9 - breath * 0.6 + elbowSeal * 0.42 };
   const backHand = heavyGuard
-    ? { x: 9 + recoil * 4, y: -106 + localCrouch + guard * 6 + impact * 2 }
+    ? { x: 9 + recoil * 4 + wristLock * 1.25, y: -106 + localCrouch + guard * 6 + impact * 2 + wristLock * 0.55 }
     : technicalGuard
-      ? { x: 3 + recoil * 9, y: -96 + localCrouch + guard * 6 + impact * 4 }
-      : { x: 13 + recoil * 7, y: -107 + localCrouch + guard * 8 + impact * 3 };
+      ? { x: 3 + recoil * 9 + wristLock * 1.1, y: -96 + localCrouch + guard * 6 + impact * 4 + wristLock * 0.48 }
+      : { x: 13 + recoil * 7 + wristLock * 1.18, y: -107 + localCrouch + guard * 8 + impact * 3 + wristLock * 0.52 };
 
   ctx.save();
   ctx.lineCap = "round";
@@ -15220,7 +15246,7 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
 
   ctx.globalCompositeOperation = "source-over";
   ctx.strokeStyle = darken(sleeve, 18);
-  ctx.lineWidth = 17 * guardProfile.shieldWidth + guard * 2 * guardProfile.brace + impact * 4 * guardProfile.recoil + defense.brace * 1.2;
+  ctx.lineWidth = 17 * guardProfile.shieldWidth + guard * 2 * guardProfile.brace + impact * 4 * guardProfile.recoil + defense.brace * 1.2 + shoulderClamp * 0.6;
   ctx.beginPath();
   ctx.moveTo(backShoulder.x, backShoulder.y);
   ctx.quadraticCurveTo(backElbow.x - 12, backElbow.y - 3, backHand.x, backHand.y);
@@ -15229,7 +15255,7 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
   ctx.stroke();
 
   ctx.strokeStyle = colorWithAlpha(sleeve, 0.96);
-  ctx.lineWidth = 11 * guardProfile.shieldWidth + guard * 2.2 * guardProfile.brace + impact * 2.4 * guardProfile.recoil + defense.handGuard * 0.85;
+  ctx.lineWidth = 11 * guardProfile.shieldWidth + guard * 2.2 * guardProfile.brace + impact * 2.4 * guardProfile.recoil + defense.handGuard * 0.85 + elbowSeal * 0.35;
   ctx.beginPath();
   ctx.moveTo(backShoulder.x + 3, backShoulder.y + 1);
   ctx.quadraticCurveTo(backElbow.x - 5, backElbow.y - 1, backHand.x + 2, backHand.y);
@@ -15238,7 +15264,7 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
   ctx.stroke();
 
   ctx.strokeStyle = colorWithAlpha(skin, 0.92);
-  ctx.lineWidth = 8.4 + impact * 1.4 * guardProfile.recoil;
+  ctx.lineWidth = 8.4 + impact * 1.4 * guardProfile.recoil + wristLock * 0.28;
   ctx.beginPath();
   ctx.moveTo(backHand.x - 5, backHand.y + 1);
   ctx.lineTo(backHand.x + 10, backHand.y + 2);
@@ -15256,7 +15282,7 @@ function drawSpriteGuardPoseOverlay(f, crouch, frameName) {
   ctx.globalCompositeOperation = "multiply";
   ctx.globalAlpha = clamp(0.08 + active * 0.12, 0.06, 0.22);
   ctx.strokeStyle = "rgba(19, 10, 8, 0.9)";
-  ctx.lineWidth = 4 + guard * 2 * guardProfile.brace + defense.crouchSettle * 0.8;
+  ctx.lineWidth = 4 + guard * 2 * guardProfile.brace + defense.crouchSettle * 0.8 + backFootDig * 0.25;
   ctx.beginPath();
   ctx.moveTo(-38, -73 + localCrouch + guard * 5);
   ctx.quadraticCurveTo(-15, -57 + localCrouch + guard * 8, 4, -40 + localCrouch + guard * 7);
@@ -18775,25 +18801,30 @@ function getPose(f, stride) {
     const crouchPress = guardProfile.crouch;
     const absorption = guardPresent.absorption;
     const impactAbsorb = guardImpact * absorption.shield;
+    const elbowSeal = clamp(guardPresent.elbowSeal ?? 0, 0, 1.4);
+    const wristLock = clamp(guardPresent.wristLock ?? 0, 0, 1.35);
+    const backFootDig = clamp(guardPresent.backFootDig ?? 0, 0, 1.45);
+    const frontFootCheck = clamp(guardPresent.frontFootCheck ?? 0, 0, 1.2);
+    const shoulderClamp = clamp(guardPresent.shoulderClamp ?? 0, 0, 1.45);
 
-    base.torsoTilt -= (0.012 * guardHold + 0.026 * guardSnap) * brace;
-    base.torsoTilt -= (impactAbsorb * 0.018 + guardSnap * 0.006) * absorption.twist;
-    base.frontArm.shoulder.x -= impactAbsorb * 2.2 * spec.stance * absorption.shoulder;
-    base.frontArm.shoulder.y += impactAbsorb * 1.9 * absorption.shoulder;
-    base.backArm.shoulder.x += impactAbsorb * 1.8 * spec.stance * absorption.shoulder;
-    base.backArm.shoulder.y += impactAbsorb * 1.6 * absorption.shoulder;
-    base.frontArm.elbow.x += (guardBreath * 1.6 - guardSnap * 2.4) * spec.stance * brace;
-    base.frontArm.elbow.y -= (guardHold * 2.8 + guardSnap * 4.8) * handLift;
-    base.frontArm.hand.x += (guardBreath * 2.2 - guardSnap * 3.4) * spec.stance * brace;
-    base.frontArm.hand.y -= (guardHold * 4.2 + guardSnap * 6.6) * handLift;
-    base.backArm.elbow.x += (guardBreath * 1.1 + guardSnap * 2.8) * spec.stance * brace;
-    base.backArm.elbow.y -= (guardHold * 2.1 + guardSnap * 3.8) * handLift;
-    base.backArm.hand.x += (guardBreath * 1.6 + guardSnap * 4.2) * spec.stance * brace;
-    base.backArm.hand.y -= (guardHold * 3.2 + guardSnap * 5.2) * handLift;
+    base.torsoTilt -= (0.012 * guardHold + 0.026 * guardSnap + shoulderClamp * 0.006) * brace;
+    base.torsoTilt -= (impactAbsorb * 0.018 + guardSnap * 0.006 + backFootDig * 0.004) * absorption.twist;
+    base.frontArm.shoulder.x -= (impactAbsorb * 2.2 + shoulderClamp * 1.2) * spec.stance * absorption.shoulder;
+    base.frontArm.shoulder.y += (impactAbsorb * 1.9 + shoulderClamp * 1.3) * absorption.shoulder;
+    base.backArm.shoulder.x += (impactAbsorb * 1.8 + shoulderClamp * 0.9) * spec.stance * absorption.shoulder;
+    base.backArm.shoulder.y += (impactAbsorb * 1.6 + shoulderClamp * 1.6) * absorption.shoulder;
+    base.frontArm.elbow.x += (guardBreath * 1.6 - guardSnap * 2.4 - elbowSeal * 1.8) * spec.stance * brace;
+    base.frontArm.elbow.y -= (guardHold * 2.8 + guardSnap * 4.8 - elbowSeal * 0.7) * handLift;
+    base.frontArm.hand.x += (guardBreath * 2.2 - guardSnap * 3.4 - wristLock * 1.8) * spec.stance * brace;
+    base.frontArm.hand.y -= (guardHold * 4.2 + guardSnap * 6.6 - wristLock * 1.2) * handLift;
+    base.backArm.elbow.x += (guardBreath * 1.1 + guardSnap * 2.8 + elbowSeal * 1.5) * spec.stance * brace;
+    base.backArm.elbow.y -= (guardHold * 2.1 + guardSnap * 3.8 - elbowSeal * 0.55) * handLift;
+    base.backArm.hand.x += (guardBreath * 1.6 + guardSnap * 4.2 + wristLock * 1.55) * spec.stance * brace;
+    base.backArm.hand.y -= (guardHold * 3.2 + guardSnap * 5.2 - wristLock * 1.0) * handLift;
     base.frontLeg.knee.y += (guardHold * 2.4 + guardSnap * 4.8) * crouchPress;
     base.backLeg.knee.y += (guardHold * 3.2 + guardSnap * 6.2) * crouchPress;
-    base.frontLeg.foot.x += (guardHold * 2.6 + guardSnap * 5.6) * spec.stance * brace;
-    base.backLeg.foot.x -= (guardHold * 4.2 + guardSnap * 8.2) * spec.stance * brace;
+    base.frontLeg.foot.x += (guardHold * 2.6 + guardSnap * 5.6 + frontFootCheck * 2.2) * spec.stance * brace;
+    base.backLeg.foot.x -= (guardHold * 4.2 + guardSnap * 8.2 + backFootDig * 3.2) * spec.stance * brace;
     base.frontLeg.hip.x -= impactAbsorb * 1.6 * spec.stance * absorption.hip;
     base.frontLeg.hip.y += impactAbsorb * 1.8 * absorption.hip;
     base.backLeg.hip.x += impactAbsorb * 2.4 * spec.stance * absorption.hip;
@@ -18810,10 +18841,10 @@ function getPose(f, stride) {
     base.backLeg.foot.x -= impactAbsorb * 8.6 * spec.stance * absorption.foot;
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.52 + guardHold * 0.26 + guardSnap * 0.22 + guardPresent.footPress * 0.08, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.62 + guardHold * 0.28 + guardSnap * 0.28 + guardPresent.footPress * 0.1, 0, 1));
-    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + impactAbsorb * 0.026 * absorption.foot;
-    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - impactAbsorb * 0.038 * absorption.foot;
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + (impactAbsorb * 0.026 + frontFootCheck * 0.018) * absorption.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - (impactAbsorb * 0.038 + backFootDig * 0.016) * absorption.foot;
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.66 + impactAbsorb * 0.24, 0, 1));
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.78 + impactAbsorb * 0.22, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.78 + impactAbsorb * 0.22 + backFootDig * 0.1, 0, 1));
 
     const guardLowStyle = {
       p1: { sink: 1.12, shoulder: 0.86, foot: 1.2, arm: 0.86, angle: 0.72 },
@@ -18861,23 +18892,27 @@ function getPose(f, stride) {
     const absorb = guardImpactBody * commitment.absorb;
     const coil = Math.max(guardEntryBody * 0.64, counterBody * commitment.counter);
     const snap = guardPresent.counterSnap * commitment.snap;
-    const handGuard = Math.max((guardHoldBody * 0.42 + absorb * 0.88 + coil * 0.56) * commitment.hand, guardPresent.handGuard * 0.48);
-    const footBrace = Math.max((guardHoldBody * 0.34 + absorb * 1.05 + coil * 0.44) * commitment.foot, guardPresent.footPress * 0.54);
+    const elbowSeal = clamp(guardPresent.elbowSeal ?? 0, 0, 1.4);
+    const wristLock = clamp(guardPresent.wristLock ?? 0, 0, 1.35);
+    const backFootDig = clamp(guardPresent.backFootDig ?? 0, 0, 1.45);
+    const shoulderClamp = clamp(guardPresent.shoulderClamp ?? 0, 0, 1.45);
+    const handGuard = Math.max((guardHoldBody * 0.42 + absorb * 0.88 + coil * 0.56) * commitment.hand, guardPresent.handGuard * 0.48, elbowSeal * 0.55);
+    const footBrace = Math.max((guardHoldBody * 0.34 + absorb * 1.05 + coil * 0.44) * commitment.foot, guardPresent.footPress * 0.54, backFootDig * 0.58);
 
-    base.torsoTilt -= absorb * 0.024 + guardEntryBody * 0.011 * commitment.absorb;
+    base.torsoTilt -= absorb * 0.024 + guardEntryBody * 0.011 * commitment.absorb + shoulderClamp * 0.008;
     base.torsoTilt += snap * 0.018 * commitment.snap + pulse * 0.004;
-    base.frontArm.shoulder.y += absorb * 2.2 * commitment.shoulder - snap * 0.9;
-    base.backArm.shoulder.y += absorb * 2.6 * commitment.shoulder - snap * 0.7;
-    base.frontArm.shoulder.x -= (absorb * 1.8 - snap * 0.8) * spec.stance * commitment.shoulder;
-    base.backArm.shoulder.x += (absorb * 1.5 - snap * 0.6) * spec.stance * commitment.shoulder;
-    base.frontArm.elbow.x -= (handGuard * 4.2 - snap * 4.8 + pulse * 0.8) * spec.stance;
-    base.frontArm.elbow.y += absorb * 3.2 - coil * 1.2 - snap * 2.4;
-    base.frontArm.hand.x -= (handGuard * 7.8 - snap * 9.4 + pulse * 1.2) * spec.stance;
-    base.frontArm.hand.y += absorb * 4.4 - coil * 2.2 - snap * 5.6;
-    base.backArm.elbow.x += (handGuard * 3.6 + snap * 3.8 - pulse * 0.6) * spec.stance;
-    base.backArm.elbow.y += absorb * 2.8 - coil * 0.8 - snap * 1.8;
-    base.backArm.hand.x += (handGuard * 6.4 + snap * 7.2 - pulse * 0.9) * spec.stance;
-    base.backArm.hand.y += absorb * 3.6 - coil * 1.8 - snap * 4.2;
+    base.frontArm.shoulder.y += absorb * 2.2 * commitment.shoulder - snap * 0.9 + shoulderClamp * 1.1;
+    base.backArm.shoulder.y += absorb * 2.6 * commitment.shoulder - snap * 0.7 + shoulderClamp * 1.3;
+    base.frontArm.shoulder.x -= (absorb * 1.8 - snap * 0.8 + shoulderClamp * 0.8) * spec.stance * commitment.shoulder;
+    base.backArm.shoulder.x += (absorb * 1.5 - snap * 0.6 + shoulderClamp * 0.7) * spec.stance * commitment.shoulder;
+    base.frontArm.elbow.x -= (handGuard * 4.2 - snap * 4.8 + pulse * 0.8 + elbowSeal * 1.6) * spec.stance;
+    base.frontArm.elbow.y += absorb * 3.2 - coil * 1.2 - snap * 2.4 + wristLock * 0.8;
+    base.frontArm.hand.x -= (handGuard * 7.8 - snap * 9.4 + pulse * 1.2 + wristLock * 2.2) * spec.stance;
+    base.frontArm.hand.y += absorb * 4.4 - coil * 2.2 - snap * 5.6 + wristLock * 1.1;
+    base.backArm.elbow.x += (handGuard * 3.6 + snap * 3.8 - pulse * 0.6 + elbowSeal * 1.2) * spec.stance;
+    base.backArm.elbow.y += absorb * 2.8 - coil * 0.8 - snap * 1.8 + wristLock * 0.65;
+    base.backArm.hand.x += (handGuard * 6.4 + snap * 7.2 - pulse * 0.9 + wristLock * 1.8) * spec.stance;
+    base.backArm.hand.y += absorb * 3.6 - coil * 1.8 - snap * 4.2 + wristLock * 0.9;
     base.frontLeg.hip.y += absorb * 1.4 + footBrace * 0.7;
     base.backLeg.hip.y += absorb * 2.1 + footBrace * 0.9;
     base.frontLeg.knee.x += (footBrace * 3.8 + snap * 2.4) * spec.stance;
@@ -18886,8 +18921,8 @@ function getPose(f, stride) {
     base.frontLeg.foot.y += absorb * 0.8;
     base.backLeg.knee.x -= (footBrace * 5.2 + absorb * 3.4) * spec.stance;
     base.backLeg.knee.y += footBrace * 6.2 + absorb * 3.2 - snap * 0.8;
-    base.backLeg.foot.x -= (footBrace * 10.6 + absorb * 4.8 - snap * 1.6) * spec.stance;
-    base.backLeg.foot.y += absorb * 1.1;
+    base.backLeg.foot.x -= (footBrace * 10.6 + absorb * 4.8 - snap * 1.6 + backFootDig * 2.8) * spec.stance;
+    base.backLeg.foot.y += absorb * 1.1 + backFootDig * 0.55;
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.62 + footBrace * 0.32 + snap * 0.12, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.78 + footBrace * 0.22 + absorb * 0.16, 0, 1));
     base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + (absorb * 0.024 + snap * 0.018) * commitment.foot;
@@ -20533,14 +20568,25 @@ function applyKineticAnatomyPose(base, f, spec, context = {}) {
 
   if (guard > 0.025) {
     const brace = smoothStep01(guard) * style.guard;
-    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + brace * 0.08, 0, 1);
-    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + brace * 0.1, 0, 1);
-    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, brace * 0.2);
-    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, brace * 0.24);
-    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.62 + brace * 0.2, 0, 1));
-    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.72 + brace * 0.22, 0, 1));
-    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, brace * 0.2);
-    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, brace * 0.26);
+    const guardPresent = context.guardPresent ?? guardPresentationMotion(f);
+    const elbowSeal = clamp(guardPresent.elbowSeal ?? 0, 0, 1.4);
+    const wristLock = clamp(guardPresent.wristLock ?? 0, 0, 1.35);
+    const backFootDig = clamp(guardPresent.backFootDig ?? 0, 0, 1.45);
+    const frontFootCheck = clamp(guardPresent.frontFootCheck ?? 0, 0, 1.2);
+    const shoulderClamp = clamp(guardPresent.shoulderClamp ?? 0, 0, 1.45);
+    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + brace * 0.08 + wristLock * 0.045, 0, 1);
+    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + brace * 0.1 + wristLock * 0.052, 0, 1);
+    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, brace * 0.2 + wristLock * 0.18);
+    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, brace * 0.24 + wristLock * 0.2);
+    base.frontArm.shoulder.y += shoulderClamp * 0.9;
+    base.backArm.shoulder.y += shoulderClamp * 1.15;
+    base.frontArm.elbow.x -= dir * elbowSeal * 1.2 * spec.stance;
+    base.backArm.elbow.x += dir * elbowSeal * 1.05 * spec.stance;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.62 + brace * 0.2 + frontFootCheck * 0.08, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.72 + brace * 0.22 + backFootDig * 0.1, 0, 1));
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, brace * 0.2 + frontFootCheck * 0.18);
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, brace * 0.26 + backFootDig * 0.22);
+    base.backLeg.foot.y += backFootDig * 0.35;
   }
 
   if (hurt > 0.025) {
@@ -22283,34 +22329,39 @@ function drawGuard(color, crouch, f) {
   const impact = defense.impact;
   const counter = defense.counter;
   const pulse = 0.5 + Math.sin(roundFrame * 0.32) * 0.5;
-  const centerX = 22 + impact * 5 * guardProfile.recoil + defense.counterSnap * 2.5 + (f?.profileId === "p2" ? 4 : f?.profileId === "p1" ? -2 : 0);
-  const centerY = -106 + crouch + impact * 2 * guardProfile.recoil + defense.crouchSettle * 2.4 - defense.counterSnap * 2 + (f?.profileId === "p2" ? -4 : f?.profileId === "p1" ? 1 : 0);
-  const radius = (30 + guard * 5 * guardProfile.brace + impact * 12 * guardProfile.recoil + defense.shield * 3.2) * guardProfile.shieldScale;
-  const arcStart = -1.35 * guardProfile.arc;
-  const arcEnd = 1.38 * guardProfile.arc;
+  const elbowSeal = clamp(defense.elbowSeal ?? 0, 0, 1.4);
+  const wristLock = clamp(defense.wristLock ?? 0, 0, 1.35);
+  const backFootDig = clamp(defense.backFootDig ?? 0, 0, 1.45);
+  const shoulderClamp = clamp(defense.shoulderClamp ?? 0, 0, 1.45);
+  const shieldLean = clamp(defense.shieldLean ?? 0, -0.35, 1.25);
+  const centerX = 22 + impact * 5 * guardProfile.recoil + defense.counterSnap * 2.5 + elbowSeal * 1.3 + wristLock * 1.8 + (f?.profileId === "p2" ? 4 : f?.profileId === "p1" ? -2 : 0);
+  const centerY = -106 + crouch + impact * 2 * guardProfile.recoil + defense.crouchSettle * 2.4 - defense.counterSnap * 2 + shoulderClamp * 1.15 + (f?.profileId === "p2" ? -4 : f?.profileId === "p1" ? 1 : 0);
+  const radius = (30 + guard * 5 * guardProfile.brace + impact * 12 * guardProfile.recoil + defense.shield * 3.2 + wristLock * 1.6 + backFootDig * 0.8) * guardProfile.shieldScale;
+  const arcStart = (-1.35 - shieldLean * 0.045) * guardProfile.arc;
+  const arcEnd = (1.38 + elbowSeal * 0.025) * guardProfile.arc;
   const guardColor = guardProfile.color ?? color;
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
 
   const glow = ctx.createRadialGradient(centerX, centerY, 4, centerX, centerY, radius + 36);
-  glow.addColorStop(0, colorWithAlpha(color, (0.18 + impact * 0.2 + counter * 0.14 + defense.entry * 0.04) * guardProfile.shieldAlpha));
-  glow.addColorStop(0.42, colorWithAlpha(counter > 0.05 ? "#fff1bd" : guardColor, (0.08 + counter * 0.04 + defense.shield * 0.018) * guardProfile.shieldAlpha));
+  glow.addColorStop(0, colorWithAlpha(color, (0.18 + impact * 0.2 + counter * 0.14 + defense.entry * 0.04 + wristLock * 0.018) * guardProfile.shieldAlpha));
+  glow.addColorStop(0.42, colorWithAlpha(counter > 0.05 ? "#fff1bd" : guardColor, (0.08 + counter * 0.04 + defense.shield * 0.018 + backFootDig * 0.01) * guardProfile.shieldAlpha));
   glow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
   ctx.ellipse(centerX, centerY, radius + 24 * guardProfile.shieldWidth, radius + 38, -0.08, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = colorWithAlpha(color, (0.5 + guard * 0.22 + impact * 0.3 + counter * 0.08 + defense.brace * 0.035) * guardProfile.shieldAlpha);
-  ctx.lineWidth = (4.4 + impact * 3.8 * guardProfile.recoil + counter * 0.7 + defense.brace * 0.45) * guardProfile.shieldWidth;
+  ctx.strokeStyle = colorWithAlpha(color, (0.5 + guard * 0.22 + impact * 0.3 + counter * 0.08 + defense.brace * 0.035 + backFootDig * 0.015) * guardProfile.shieldAlpha);
+  ctx.lineWidth = (4.4 + impact * 3.8 * guardProfile.recoil + counter * 0.7 + defense.brace * 0.45 + shoulderClamp * 0.35) * guardProfile.shieldWidth;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.arc(centerX, centerY, radius, arcStart, arcEnd);
   ctx.stroke();
 
   ctx.strokeStyle = `rgba(255,255,255,${(0.38 + impact * 0.36 + counter * 0.26) * guardProfile.shieldAlpha})`;
-  ctx.lineWidth = 1.9 + impact * 2.2 * guardProfile.recoil + counter * 0.6;
+  ctx.lineWidth = 1.9 + impact * 2.2 * guardProfile.recoil + counter * 0.6 + wristLock * 0.25;
   ctx.beginPath();
   ctx.arc(centerX + 2, centerY, radius + 9 + impact * 3, -1.12 * guardProfile.arc, 1.13 * guardProfile.arc);
   ctx.stroke();
