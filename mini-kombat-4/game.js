@@ -10670,6 +10670,9 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const attackDrive = attackMass ? clamp(Math.max(attackMass.drive + attackMass.snap * 0.35, attackWeight?.drive ?? 0), 0, 1.75) : 0;
   const attackLoad = attackMass ? clamp(Math.max(attackMass.load, attackWeight?.load ?? 0), 0, 1.55) : 0;
   const attackCompression = attackWeight ? clamp(attackWeight.compression + attackWeight.brace * 0.18, 0, 1.75) : 0;
+  const attackPresent = f.attack ? attackPresentationProfile(f) : null;
+  const attackAnatomy = attackPresent ? attackAnatomyPolishProfile(f, attackPresent) : null;
+  const attackContact = attackAnatomy ? clamp(attackAnatomy.contact * 0.68 + attackAnatomy.supportPlant * 0.28, 0, 1.25) : 0;
   const hitMass = f.hurt > 0 || (f.reactionPulse ?? 0) > 0 ? hitReactionMassProfile(f) : null;
   const reactionFloor = hitMass ? clamp(hitMass.floor, 0, 1.7) : 0;
   const reactionSkid = hitMass ? clamp(hitMass.skid, 0, 1.85) : 0;
@@ -10704,6 +10707,36 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   ctx.arc(0, 0, 1, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+
+  if (f.grounded && attackContact > 0.04 && attackPresent) {
+    const specPresent = attackPresent.visualSpec;
+    const contactSide = specPresent.kick || specPresent.sweep ? attackPresent.freeSide : 1;
+    const contactReach = specPresent.sweep ? 44 : specPresent.kick ? 37 : specPresent.grab ? 30 : specPresent.special ? 34 : 32;
+    const contactX = baseX + contactSide * (contactReach + attackPresent.reach * 14) * FIGHTER_SCALE * (f.dir || 1);
+    const smearX = (specPresent.sweep ? 30 : specPresent.kick ? 24 : 18) + attackAnatomy.extension * 10;
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = `rgba(35, 20, 11, ${0.055 + attackContact * 0.055})`;
+    ctx.beginPath();
+    ctx.ellipse(contactX, FLOOR + 7.5, smearX, 3.4 + attackContact * 1.4, -contactSide * (f.dir || 1) * 0.045, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = colorWithAlpha(f.trim ?? "#fff1bd", 0.045 + attackContact * 0.065);
+    ctx.lineWidth = 0.85 + attackContact * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(contactX - contactSide * (f.dir || 1) * (8 + attackContact * 3), FLOOR + 5.5);
+    ctx.quadraticCurveTo(
+      contactX - contactSide * (f.dir || 1) * (18 + attackAnatomy.extension * 10),
+      FLOOR + 9,
+      contactX - contactSide * (f.dir || 1) * (34 + attackAnatomy.extension * 16),
+      FLOOR + 6.5
+    );
+    ctx.stroke();
+    ctx.restore();
+  }
 
   if (landing > 0.04) {
     ctx.save();
@@ -10868,7 +10901,7 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     ctx.restore();
   }
 
-  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.75, stop * 0.68, landingWeight * 0.72, facingPress * 0.78, pivot.press * 0.7, pivot.snap * 0.36, movePresent.walkLoad * 0.62, movePresent.pivotFootPress * 0.58, movePresent.crouchFootPress * 0.42, guardPresent.footPress * 0.7, guardPresent.counterCoil * 0.38, startPresence.footPress * 0.72, attackPlant * 0.46, attackCompression * 0.36, reactionFloor * 0.34);
+  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.75, stop * 0.68, landingWeight * 0.72, facingPress * 0.78, pivot.press * 0.7, pivot.snap * 0.36, movePresent.walkLoad * 0.62, movePresent.pivotFootPress * 0.58, movePresent.crouchFootPress * 0.42, guardPresent.footPress * 0.7, guardPresent.counterCoil * 0.38, startPresence.footPress * 0.72, attackPlant * 0.46, attackCompression * 0.36, attackContact * 0.42, reactionFloor * 0.34);
   if (f.grounded && footPlant > 0.04) {
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
@@ -14852,6 +14885,7 @@ function applyAttackExtremityPresence(hands, feet, f, frameName) {
 
   const spec = attack.visualSpec;
   const anticipation = attackAnticipationAnatomyProfile(f, attack);
+  const anatomy = attackAnatomyPolishProfile(f, attack);
   const handGrip = clamp(attack.handTension, 0, 1.12);
   const finger = clamp(attack.fingerTension, 0, 1.08);
   const toe = clamp(attack.toeDig, 0, 1.16);
@@ -14869,14 +14903,17 @@ function applyAttackExtremityPresence(hands, feet, f, frameName) {
     }
     frontHand.x += reachDir * attack.reach * (spec.grab ? 5.2 : spec.special ? 4.6 : 6.2);
     frontHand.y -= attack.reach * (spec.special ? 2.8 : 1.6) + attack.drive * 1.2;
+    frontHand.x += anatomy.handArc * (spec.grab ? 5.8 : spec.special ? 4.8 : 6.6) - anatomy.coil * 1.8 - anatomy.follow * 1.6;
+    frontHand.y -= anatomy.handArc * (spec.special ? 2.8 : 3.4) - anatomy.follow * 2.2;
     frontHand.sx += handGrip * 0.045;
     frontHand.sy -= handGrip * 0.025;
-    frontHand.angle -= attack.reach * (spec.special ? 0.035 : 0.052);
+    frontHand.angle -= attack.reach * (spec.special ? 0.035 : 0.052) + anatomy.handArc * 0.035 - anatomy.follow * 0.018;
     frontHand.curl = clamp((frontHand.curl ?? 0.76) + handGrip * (spec.grab ? 0.18 : 0.12), 0, 1.16);
-    frontHand.shock = Math.max(frontHand.shock ?? 0, finger * 0.72);
+    frontHand.shock = Math.max(frontHand.shock ?? 0, finger * 0.72 + anatomy.contact * 0.18);
 
-    backHand.x -= attack.load * 2.2 + attack.follow * 1.4;
-    backHand.y -= attack.load * 1.8 - attack.recover * 1.1;
+    backHand.x -= attack.load * 2.2 + attack.follow * 1.4 + anatomy.coil * 1.7 - anatomy.follow * 1.1;
+    backHand.y -= attack.load * 1.8 - attack.recover * 1.1 - anatomy.follow * 1.2;
+    backHand.angle += attack.supportSide * (anatomy.coil * 0.026 - anatomy.follow * 0.014);
     backHand.curl = clamp((backHand.curl ?? 0.72) + handGrip * 0.08, 0, 1.08);
     backHand.shock = Math.max(backHand.shock ?? 0, finger * 0.42);
   } else {
@@ -14888,13 +14925,17 @@ function applyAttackExtremityPresence(hands, feet, f, frameName) {
     }
     frontHand.x -= attack.reach * (spec.sweep ? 2.2 : 3.2);
     frontHand.y += attack.drive * (spec.sweep ? 2.8 : 1.8);
-    frontHand.angle -= attack.drive * 0.035;
+    frontHand.x -= anatomy.footArc * (spec.sweep ? 1.2 : 2.2) + anatomy.follow * 0.8;
+    frontHand.y += anatomy.footArc * (spec.sweep ? 1.9 : 1.2) + anatomy.follow * 1.4;
+    frontHand.angle -= attack.drive * 0.035 + anatomy.footArc * 0.018;
     frontHand.curl = clamp((frontHand.curl ?? 0.72) + handGrip * 0.08, 0, 1.08);
     frontHand.shock = Math.max(frontHand.shock ?? 0, finger * 0.35);
 
     backHand.x -= attack.reach * (spec.sweep ? 3.4 : 4.4);
     backHand.y += attack.drive * (spec.sweep ? 2.4 : 1.3);
-    backHand.angle += attack.drive * 0.04;
+    backHand.x -= anatomy.footArc * (spec.sweep ? 1.8 : 2.8) - anatomy.follow * 1.1;
+    backHand.y += anatomy.footArc * (spec.sweep ? 2.2 : 1.6) + anatomy.follow * 1.5;
+    backHand.angle += attack.drive * 0.04 - anatomy.footArc * 0.02 + anatomy.follow * 0.012;
     backHand.curl = clamp((backHand.curl ?? 0.72) + handGrip * 0.07, 0, 1.05);
     backHand.shock = Math.max(backHand.shock ?? 0, finger * 0.32);
   }
@@ -14910,18 +14951,20 @@ function applyAttackExtremityPresence(hands, feet, f, frameName) {
   support.plant = Math.max(support.plant ?? 0, 0.68 + press * 0.26 + anticipation.toeGrip * 0.08);
   support.w += press * 3.6 + attack.load * 1.2 + anticipation.supportPress * 2.6;
   support.h = Math.max(7.1, support.h - press * 0.82 - anticipation.supportPress * 0.36);
-  support.y += press * 0.95 + anticipation.supportPress * 0.42;
-  support.x -= attack.supportSide * (press * 1.6 + attack.drive * 0.9 + anticipation.hipSet * 1.1);
-  support.angle += supportIndex === 0 ? -(press * 0.032 + anticipation.toeGrip * 0.018) : press * 0.032 + anticipation.toeGrip * 0.018;
+  support.w += anatomy.supportPlant * 2.8;
+  support.h = Math.max(7, support.h - anatomy.supportPlant * 0.38);
+  support.y += press * 0.95 + anticipation.supportPress * 0.42 + anatomy.supportPlant * 0.42;
+  support.x -= attack.supportSide * (press * 1.6 + attack.drive * 0.9 + anticipation.hipSet * 1.1 + anatomy.supportDrag * 1.4);
+  support.angle += supportIndex === 0 ? -(press * 0.032 + anticipation.toeGrip * 0.018 + anatomy.supportPlant * 0.014) : press * 0.032 + anticipation.toeGrip * 0.018 + anatomy.supportPlant * 0.014;
   support.toeFlex = Math.max(support.toeFlex ?? 0, Math.max(toe, anticipation.toeGrip * 0.78));
 
   if (free) {
     const freeLift = spec.kick || spec.sweep ? attack.reach * 1.7 : attack.drive * 0.5;
     free.plant = Math.max(0.12, (free.plant ?? 0.7) - attack.drive * 0.08);
-    free.y -= spec.kick ? freeLift + anticipation.freeChamber * 1.2 : spec.sweep ? -anticipation.freeChamber * 0.5 : freeLift * 0.45;
-    free.x += attack.freeSide * (attack.reach * (spec.kick || spec.sweep ? 2.6 : 1.2) + attack.follow * 0.9 + anticipation.freeChamber * 1.9);
-    free.angle += freeIndex === 0 ? attack.reach * 0.026 + anticipation.freeChamber * 0.018 : -attack.reach * 0.026 - anticipation.freeChamber * 0.018;
-    free.toeFlex = Math.max(free.toeFlex ?? 0, toe * (spec.kick || spec.sweep ? 0.58 : 0.32) + anticipation.freeChamber * 0.16);
+    free.y -= spec.kick ? freeLift + anticipation.freeChamber * 1.2 + anatomy.footArc * 1.6 : spec.sweep ? -anticipation.freeChamber * 0.5 - anatomy.footArc * 0.4 : freeLift * 0.45;
+    free.x += attack.freeSide * (attack.reach * (spec.kick || spec.sweep ? 2.6 : 1.2) + attack.follow * 0.9 + anticipation.freeChamber * 1.9 + anatomy.footArc * 1.8);
+    free.angle += freeIndex === 0 ? attack.reach * 0.026 + anticipation.freeChamber * 0.018 + anatomy.footArc * 0.022 : -attack.reach * 0.026 - anticipation.freeChamber * 0.018 - anatomy.footArc * 0.022;
+    free.toeFlex = Math.max(free.toeFlex ?? 0, toe * (spec.kick || spec.sweep ? 0.58 : 0.32) + anticipation.freeChamber * 0.16 + anatomy.contact * 0.12);
   }
 }
 
@@ -18220,6 +18263,78 @@ function attackAnticipationAnatomyProfile(f, attack = attackPresentationProfile(
   };
 }
 
+function attackAnatomyPolishProfile(f, attack = attackPresentationProfile(f)) {
+  const attackPresent = attack ?? attackPresentationProfile(f);
+  const attackState = f?.attack;
+  const spec = attackPresent.visualSpec ?? attackVisualSpec(attackState?.type);
+  const phase = attackPhase(attackState);
+  const body = attackBodyWeightProfile(f);
+  const anticipation = attackAnticipationAnatomyProfile(f, attackPresent);
+  const style = attackPresent.style ?? { reach: 1, hand: 1, foot: 1, snap: 1 };
+  const active = attackState && attackPresent.active > 0.025 && (f?.hurt ?? 0) <= 0 && !winner ? attackPresent.active : 0;
+  if (active <= 0.025) {
+    return {
+      active: 0,
+      coil: 0,
+      extension: 0,
+      follow: 0,
+      contact: 0,
+      supportPlant: 0,
+      supportDrag: 0,
+      shoulderOpposition: 0,
+      hipOpposition: 0,
+      handArc: 0,
+      footArc: 0,
+      reachArc: 0,
+    };
+  }
+
+  const leg = spec.kick || spec.sweep;
+  const hand = spec.punch || spec.special || spec.grab;
+  const heavy = spec.special || spec.grab || spec.sweep;
+  const coil = clamp(
+    (attackPresent.load * 0.42 + anticipation.coil * 0.48 + phase.anticipation * 0.24) *
+      (heavy ? 1.08 : 0.94),
+    0,
+    1.42
+  );
+  const extension = clamp(
+    (attackPresent.drive * 0.56 + attackPresent.reach * 0.48 + phase.snap * 0.34) *
+      (leg ? 1.08 : hand ? 1.02 : 0.96),
+    0,
+    1.55
+  );
+  const follow = clamp(attackPresent.follow * 0.64 + attackPresent.recover * 0.28 + phase.followThrough * 0.36, 0, 1.35);
+  const contact = clamp(Math.max(phase.snap, phase.strike * 0.72) * (heavy ? 1.08 : 1), 0, 1.25);
+  const supportPlant = clamp(
+    (body.plant * 0.44 + body.brace * 0.24 + coil * 0.22 + extension * 0.18) *
+      (f?.grounded ? 1 : 0.38),
+    0,
+    1.35
+  );
+  const supportDrag = clamp(supportPlant * 0.58 + body.compression * 0.26 + follow * 0.18, 0, 1.28);
+  const shoulderOpposition = clamp((coil * 0.46 - extension * 0.28 + follow * 0.18) * style.hand, -1.1, 1.1);
+  const hipOpposition = clamp((coil * 0.34 + supportPlant * 0.36 - extension * 0.18) * style.foot, -1.05, 1.25);
+  const reachArc = Math.sin(clamp(phase.strikeT, 0, 1) * Math.PI) * extension;
+  const handArc = clamp((hand ? reachArc * 0.72 + contact * 0.2 : reachArc * 0.22) * style.hand, 0, 1.28);
+  const footArc = clamp((leg ? reachArc * 0.76 + contact * 0.18 : reachArc * 0.18) * style.foot, 0, 1.28);
+
+  return {
+    active,
+    coil,
+    extension,
+    follow,
+    contact,
+    supportPlant,
+    supportDrag,
+    shoulderOpposition,
+    hipOpposition,
+    handArc,
+    footArc,
+    reachArc,
+  };
+}
+
 function attackChainProfile(f, currentType = "") {
   const max = Math.max(1, f?.attackChainMax ?? 1);
   const raw = clamp((f?.attackChainPulse ?? 0) / max, 0, 1);
@@ -19607,13 +19722,14 @@ function getPose(f, stride) {
     const supportKey = attackPresent.supportSide < 0 ? "backLeg" : "frontLeg";
     const freeKey = supportKey === "backLeg" ? "frontLeg" : "backLeg";
     const anticipation = attackAnticipationAnatomyProfile(f, attackPresent);
+    const anatomy = attackAnatomyPolishProfile(f, attackPresent);
     const handTension = clamp(attackPresent.handTension, 0, 0.9);
     const finger = clamp(attackPresent.fingerTension, 0, 0.72);
     const toe = clamp(attackPresent.toeDig, 0, 0.58);
+    const supportSide = attackPresent.supportSide;
+    const freeSide = attackPresent.freeSide;
 
     if (anticipation.active > 0.035) {
-      const supportSide = attackPresent.supportSide;
-      const freeSide = attackPresent.freeSide;
       base.torsoTilt += supportSide * (anticipation.coil * 0.014 - anticipation.releaseHint * 0.006);
       base.frontArm.shoulder.x -= supportSide * anticipation.shoulderCoil * 2.3 * spec.stance;
       base.frontArm.shoulder.y += anticipation.shoulderCoil * 0.9;
@@ -19638,6 +19754,54 @@ function getPose(f, stride) {
         base.frontArm.hand.y -= anticipation.handLoad * (specPresent.special ? 2.8 : 1.6);
         base.backArm.hand.x -= supportSide * anticipation.shoulderCoil * 2.6 * spec.stance;
         base.backArm.hand.y -= anticipation.shoulderCoil * 1.2;
+      }
+    }
+
+    if (anatomy.active > 0.035) {
+      const legAttack = specPresent.kick || specPresent.sweep;
+      const handAttack = specPresent.punch || specPresent.special || specPresent.grab;
+      const lowArc = specPresent.sweep ? 1 : 0;
+      const heavyReach = specPresent.special || specPresent.grab ? 1.12 : 1;
+      const shoulderTwist = anatomy.shoulderOpposition;
+      const hipTwist = anatomy.hipOpposition;
+      const contactDrop = anatomy.contact * (legAttack ? 1.2 : 0.82);
+
+      base.torsoTilt += supportSide * (-anatomy.coil * 0.012 + anatomy.extension * (legAttack ? 0.014 : 0.018) - anatomy.follow * 0.01);
+      base.frontArm.shoulder.x += supportSide * (-shoulderTwist * 2.1 + anatomy.extension * (handAttack ? 0.9 : -0.5)) * spec.stance;
+      base.frontArm.shoulder.y += anatomy.coil * 0.6 - anatomy.contact * 0.55 + anatomy.follow * 0.7;
+      base.backArm.shoulder.x -= supportSide * (shoulderTwist * 1.65 + anatomy.extension * 0.45) * spec.stance;
+      base.backArm.shoulder.y += anatomy.coil * 0.72 + anatomy.follow * 0.92;
+      base.frontLeg.hip.x += supportSide * (hipTwist * 1.8 - anatomy.extension * (legAttack ? 0.65 : 0.28)) * spec.stance;
+      base.backLeg.hip.x -= supportSide * (hipTwist * 2.1 + anatomy.coil * 0.42) * spec.stance;
+      base[supportKey].knee.x -= supportSide * (anatomy.supportDrag * 3.4 + anatomy.coil * 1.4) * spec.stance;
+      base[supportKey].knee.y += anatomy.supportPlant * 3.4 + contactDrop * 0.8;
+      base[supportKey].foot.x -= supportSide * (anatomy.supportDrag * 5.8 + anatomy.extension * 1.2) * spec.stance;
+      base[supportKey].foot.y += anatomy.supportPlant * 0.72 + contactDrop * 0.32;
+      base[supportKey].plant = Math.max(base[supportKey].plant ?? 0, clamp(0.62 + anatomy.supportPlant * 0.3, 0, 1));
+      base[supportKey].toeFlex = Math.max(base[supportKey].toeFlex ?? 0, clamp(toe + anatomy.supportPlant * 0.22, 0, 1));
+      base[supportKey].footAngle = (base[supportKey].footAngle ?? 0) - supportSide * anatomy.supportPlant * 0.024;
+
+      if (handAttack) {
+        const pull = anatomy.coil * (specPresent.grab ? 3.1 : 2.2);
+        const reach = anatomy.handArc * (specPresent.special ? 7.5 : specPresent.grab ? 8.6 : 9.4) * heavyReach;
+        base.frontArm.elbow.x += (reach * 0.45 - pull + anatomy.follow * 2.1) * spec.stance;
+        base.frontArm.elbow.y += -anatomy.handArc * (specPresent.special ? 1.8 : 2.8) + anatomy.follow * 2.4;
+        base.frontArm.hand.x += (reach - pull * 1.35 - anatomy.follow * (specPresent.grab ? 3.4 : 2.2)) * spec.stance;
+        base.frontArm.hand.y += -anatomy.handArc * (specPresent.special ? 3.6 : 4.2) + anatomy.follow * (specPresent.grab ? 3.8 : 2.8);
+        base.backArm.elbow.x -= supportSide * (anatomy.coil * 3.4 + anatomy.extension * 1.5) * spec.stance;
+        base.backArm.hand.x -= supportSide * (anatomy.coil * 5.2 + anatomy.extension * 2.4 - anatomy.follow * 1.8) * spec.stance;
+        base.backArm.hand.y += anatomy.coil * 1.8 + anatomy.follow * 1.6;
+      } else {
+        const sweepReach = specPresent.sweep ? 1.32 : 1;
+        base[freeKey].knee.x += freeSide * (anatomy.footArc * 6.8 + anatomy.extension * 2.8) * spec.stance;
+        base[freeKey].knee.y += lowArc ? anatomy.footArc * 2.8 : -anatomy.footArc * 4.2 + anatomy.follow * 2.2;
+        base[freeKey].foot.x += freeSide * (anatomy.footArc * 13.5 * sweepReach + anatomy.extension * 3.5 - anatomy.follow * 2.6) * spec.stance;
+        base[freeKey].foot.y += lowArc ? anatomy.footArc * 1.3 + anatomy.follow * 1.8 : -anatomy.footArc * 7.2 + anatomy.follow * 3.2;
+        base[freeKey].footAngle = (base[freeKey].footAngle ?? 0) + freeSide * (anatomy.footArc * (lowArc ? 0.038 : 0.052) - anatomy.follow * 0.022);
+        base.frontArm.hand.x -= supportSide * (anatomy.extension * 3.8 + anatomy.follow * 1.8) * spec.stance;
+        base.backArm.hand.x -= supportSide * (anatomy.extension * 4.8 - anatomy.follow * 1.2) * spec.stance;
+        base.frontArm.hand.y += anatomy.extension * 1.7 + anatomy.follow * 1.9;
+        base.backArm.hand.y += anatomy.extension * 2.2 + anatomy.follow * 2.3;
       }
     }
 
