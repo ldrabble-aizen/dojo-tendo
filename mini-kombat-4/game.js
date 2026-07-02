@@ -11953,6 +11953,7 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
   ctx.stroke();
   ctx.restore();
 
+  drawUnifiedBodyLandmarkPolish(f, localCrouch, frameName, motion, phase, walking, stride);
   drawUnifiedRoundStartPresence(f, localCrouch, frameName);
   drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting);
   drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase);
@@ -11963,6 +11964,122 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
   drawUnifiedGuardCommitmentPolish(f, localCrouch);
   drawUnifiedWhiffRecoveryPolish(f, localCrouch);
   drawUnifiedHeadAccessoryPolish(f, localCrouch, motion, acting);
+}
+
+function drawUnifiedBodyLandmarkPolish(f, localCrouch, frameName, motion, phase, walking, stride) {
+  if (f.profileId !== "p1" && f.profileId !== "p2") return;
+
+  const heavy = f.profileId === "p1";
+  const trim = f.trim ?? "#fff1bd";
+  const attack = f.attack ? clamp(phase.anticipation * 0.32 + phase.strike * 0.68 + phase.snap * 0.5 + phase.followThrough * 0.24, 0, 1.55) : 0;
+  const hurt = clamp((f.hurt ?? 0) / 24 + (f.reactionPulse ?? 0) / 22, 0, 1.45);
+  const guard = frameName === "block" || f.blocking ? clamp(0.28 + (f.guardImpact ?? 0) / 18, 0, 1.15) : 0;
+  const walk = walking ? clamp(Math.abs(stride ?? 0) * 0.58 + Math.abs(f.vx ?? 0) / 7.2, 0, 1.2) : 0;
+  const idle = !walking && !f.attack && f.hurt <= 0 && !f.blocking && !winner ? idleVisualMotion(f) : null;
+  const idleLife = idle ? clamp(idle.active * (0.72 + Math.abs(idle.breath) * 0.18), 0, 1.1) : 0;
+  const action = clamp(Math.max(attack, hurt * 0.92, guard * 0.82, walk * 0.62, idleLife * 0.48), 0, 1.55);
+  if (action <= 0.035) return;
+
+  const phaseOffset = (f.profileId?.charCodeAt(1) ?? 0) * 0.21;
+  const breath = idle ? idle.breath * idle.style.breath : Math.sin(roundFrame * 0.055 + phaseOffset) * (0.18 + action * 0.12);
+  const sway = (idle?.sway ?? 0) + (motion?.x ?? 0) * 0.026 + (walking ? (stride ?? 0) * 0.34 : 0);
+  const compression = clamp(hurt * 0.52 + guard * 0.36 + attack * 0.28 + walk * 0.18, 0, 1.2);
+  const shoulderY = heavy ? -145 : -150;
+  const chestY = heavy ? -119 : -122;
+  const hipY = heavy ? -62 : -58;
+  const footY = -3 + localCrouch;
+  const shoulderSpread = heavy ? 34 : 29;
+  const hipSpread = heavy ? 38 : 32;
+  const footSpread = heavy ? 35 : 30;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-72, -158 + localCrouch, 144, 166);
+  ctx.clip();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.fillStyle = `rgba(18, 9, 7, ${clamp(0.024 + action * 0.034 + compression * 0.018, 0.022, 0.088)})`;
+  ctx.beginPath();
+  ctx.ellipse(
+    sway * 1.2,
+    shoulderY + localCrouch + compression * 1.2 - Math.max(0, breath) * 0.8,
+    shoulderSpread + action * (heavy ? 5 : 4),
+    (heavy ? 8.8 : 7.3) + compression * 1.8,
+    sway * 0.012,
+    0,
+    Math.PI * 2
+  );
+  ctx.ellipse(
+    -sway * 1.4,
+    hipY + localCrouch + compression * 2 + Math.max(0, -breath) * 1.2,
+    hipSpread + compression * 7,
+    (heavy ? 10.8 : 9.2) + compression * 2.1,
+    -sway * 0.01,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(18, 9, 7, ${clamp(0.022 + action * 0.03 + hurt * 0.014, 0.018, 0.078)})`;
+  for (const side of [-1, 1]) {
+    const shoulderX = side * shoulderSpread + sway * 0.8;
+    const hipX = side * hipSpread - sway * 0.9;
+    ctx.beginPath();
+    ctx.ellipse(shoulderX, shoulderY + localCrouch + compression * 0.7, 8.5 + action * 2.4, 3.6 + compression * 0.7, side * 0.18, 0, Math.PI * 2);
+    ctx.ellipse(hipX, hipY + localCrouch + compression * 1.1, 9.5 + compression * 2.2, 4.2 + compression * 0.9, -side * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = `rgba(20, 10, 7, ${clamp(0.026 + compression * 0.052 + walk * 0.028, 0.022, 0.095)})`;
+  for (const side of [-1, 1]) {
+    const press = idle ? (side > 0 ? idle.frontPress : idle.backPress) : 0.35 + walk * 0.28 + guard * 0.22;
+    ctx.beginPath();
+    ctx.ellipse(
+      side * footSpread - sway * 1.2 + walk * side * 2,
+      footY + 5 + compression * 0.8 + press * 0.5,
+      (heavy ? 22 : 18) + press * 7 + compression * 4,
+      4.2 + press * 1.1,
+      side * 0.035,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-72, -158 + localCrouch, 144, 166);
+  ctx.clip();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = colorWithAlpha(trim, clamp(0.034 + action * 0.052 + attack * 0.024, 0.03, 0.118));
+  ctx.lineWidth = 0.82 + action * 0.55;
+  ctx.beginPath();
+  ctx.moveTo(-shoulderSpread + sway * 0.8, chestY + localCrouch - 11 - Math.max(0, breath) * 1.2);
+  ctx.quadraticCurveTo(0, chestY + localCrouch - 1 + breath * 0.8, shoulderSpread + sway * 0.8, chestY + localCrouch - 11 + Math.max(0, -breath) * 0.6);
+  ctx.moveTo(-hipSpread * 0.78 - sway * 0.4, hipY + localCrouch - 8 + compression);
+  ctx.quadraticCurveTo(0, hipY + localCrouch + 2 + compression * 1.8, hipSpread * 0.78 - sway * 0.4, hipY + localCrouch - 8 + compression * 0.7);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(255, 236, 176, ${clamp(0.028 + action * 0.045 + walk * 0.018, 0.025, 0.105)})`;
+  ctx.lineWidth = 0.65 + action * 0.28;
+  for (const side of [-1, 1]) {
+    const wristX = side * (heavy ? 47 : 42) + sway * 1.1 + attack * side * 2.2;
+    const wristY = (frameName === "block" ? -125 : frameName === "punch" || frameName === "special" ? -111 : -106) + localCrouch - attack * 1.8 + guard * 1.4;
+    ctx.beginPath();
+    ctx.moveTo(wristX - side * 3.2, wristY - action * 0.4);
+    ctx.quadraticCurveTo(wristX, wristY - 1.6 - action * 0.7, wristX + side * (3.8 + action * 0.9), wristY - 0.4);
+    ctx.stroke();
+
+    const ankleX = side * footSpread - sway * 1.2 + walk * side * 2;
+    ctx.beginPath();
+    ctx.ellipse(ankleX, footY + 2, 7.5 + action * 1.9, 2.1 + compression * 0.35, side * 0.035, 0.08, Math.PI * 1.72);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawUnifiedRoundStartPresence(f, localCrouch, frameName) {
