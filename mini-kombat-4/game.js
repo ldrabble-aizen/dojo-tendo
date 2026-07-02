@@ -19273,6 +19273,106 @@ function applyGrabClaspActingPose(base, f, spec) {
   free.lift = Math.max(free.lift ?? 0, clamp(grab.free * 0.18 + recover * 0.12, 0, 0.72));
 }
 
+function crouchStanceActingProfile(f, movePresent = movementPresentationMotion(f, false, 0), context = {}) {
+  const grounded = !!f?.grounded;
+  if (!grounded || winner || (f?.hurt ?? 0) > 0 || f?.attack) return { active: 0 };
+
+  const guardPresent = context.guardPresent ?? (f?.blocking ? guardPresentationMotion(f) : null);
+  const style = {
+    p1: { sink: 1.16, arm: 0.88, foot: 1.18, rebound: 0.88 },
+    p2: { sink: 0.86, arm: 1.16, foot: 0.86, rebound: 1.16 },
+    p3: { sink: 1.28, arm: 0.78, foot: 1.28, rebound: 0.78 },
+    p4: { sink: 0.88, arm: 1.14, foot: 0.9, rebound: 1.14 },
+    p5: { sink: 0.82, arm: 1.2, foot: 0.82, rebound: 1.18 },
+    p6: { sink: 1.04, arm: 0.98, foot: 1.04, rebound: 1 },
+  }[f?.profileId] ?? { sink: 1, arm: 1, foot: 1, rebound: 1 };
+
+  const rawCrouch = smoothStep01(clamp(f?.crouch ?? 0, 0, 1));
+  const moveCrouch = clamp((movePresent?.crouchEase ?? 0) * 0.66 + (movePresent?.crouchSettle ?? 0) * 0.42, 0, 1.25);
+  const guardCrouch = clamp((guardPresent?.crouchSettle ?? 0) * 0.74 + (f?.blocking ? rawCrouch * 0.34 : 0), 0, 1.35);
+  const low = clamp(Math.max(rawCrouch, moveCrouch, guardCrouch), 0, 1.4);
+  if (low <= 0.035) return { active: 0 };
+
+  const clock = (roundFrame ?? 0) + (f?.profileId?.charCodeAt(1) ?? 0) * 17;
+  const pulse = Math.sin(clock * 0.16) * 0.5 + 0.5;
+  const guard = f?.blocking ? clamp((guardPresent?.guard ?? 0.35) + (guardPresent?.entry ?? 0) * 0.42, 0, 1.35) : 0;
+  const settle = clamp(low * (0.78 + guard * 0.22) * style.sink, 0, 1.65);
+  const compression = clamp((movePresent?.crouchSettle ?? 0) * 0.52 + settle * 0.58 + guard * 0.18, 0, 1.55);
+  const footPress = clamp((movePresent?.crouchFootPress ?? 0) * 0.62 + settle * 0.5 + guard * 0.18, 0, 1.6) * style.foot;
+  const kneeOpen = clamp((settle * 0.72 + footPress * 0.22) * style.foot, 0, 1.55);
+  const handShield = clamp((settle * 0.52 + guard * 0.68 + pulse * low * 0.08) * style.arm, 0, 1.55);
+  const toeGrip = clamp((footPress * 0.52 + settle * 0.28 + guard * 0.16) * style.foot, 0, 1.3);
+  const exitRebound = clamp((1 - rawCrouch) * (movePresent?.crouchSettle ?? 0) * 0.32 * style.rebound, 0, 0.45);
+  const supportSide = ((movePresent?.pivotSide ?? f?.footPlantSide ?? 1) >= 0 ? 1 : -1);
+
+  return {
+    active: clamp(Math.max(settle, compression, footPress, kneeOpen, handShield, toeGrip), 0, 1.7),
+    settle,
+    compression,
+    footPress,
+    kneeOpen,
+    handShield,
+    toeGrip,
+    exitRebound,
+    supportSide,
+  };
+}
+
+function applyCrouchStanceActingPose(base, f, spec, context = {}) {
+  if (!base || !f || !spec || f.attack || winner || (f.hurt ?? 0) > 0 || !f.grounded) return;
+
+  const crouch = crouchStanceActingProfile(f, context.movePresent, context);
+  if (crouch.active <= 0.035) return;
+
+  const stance = spec.stance ?? 1;
+  const dirScale = (f.dir || 1) * stance;
+  const frontSupport = crouch.supportSide >= 0;
+  const support = frontSupport ? base.frontLeg : base.backLeg;
+  const free = frontSupport ? base.backLeg : base.frontLeg;
+  const supportSign = frontSupport ? 1 : -1;
+  const freeSign = -supportSign;
+  const sink = crouch.settle;
+  const compression = crouch.compression;
+  const footPress = crouch.footPress;
+  const hand = crouch.handShield;
+  const knee = crouch.kneeOpen;
+  const toe = crouch.toeGrip;
+  const rebound = crouch.exitRebound;
+
+  base.torsoTilt -= compression * 0.018 - rebound * 0.01;
+  base.frontArm.shoulder.y += sink * 1.1 - rebound * 0.35;
+  base.backArm.shoulder.y += sink * 1.45 - rebound * 0.3;
+  base.frontArm.elbow.x += dirScale * (hand * 2.6 + knee * 0.7);
+  base.frontArm.elbow.y += sink * 1.6 - hand * 1.2;
+  base.frontArm.hand.x += dirScale * (hand * 5.2 + knee * 1.1);
+  base.frontArm.hand.y += sink * 2.2 - hand * 2.8 + rebound * 1.2;
+  base.backArm.elbow.x -= dirScale * (hand * 1.8 + knee * 0.5);
+  base.backArm.elbow.y += sink * 1.8 - hand * 0.9;
+  base.backArm.hand.x -= dirScale * (hand * 3.9 + knee * 0.9);
+  base.backArm.hand.y += sink * 2.6 - hand * 2.1 + rebound * 0.9;
+  base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + hand * 0.05 + toe * 0.03, 0.04, 1);
+  base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.48) + hand * 0.042 + toe * 0.026, 0.04, 1);
+  base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(hand * 0.24 + rebound * 0.12, 0, 0.7));
+  base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(hand * 0.2 + rebound * 0.1, 0, 0.62));
+
+  base.frontLeg.hip.y += compression * 1.05;
+  base.backLeg.hip.y += compression * 1.24;
+  support.knee.x += dirScale * supportSign * (knee * 3.8 + footPress * 1.2);
+  support.knee.y += sink * 5.2 + footPress * 2.1 - rebound * 1.1;
+  support.foot.x += dirScale * supportSign * (knee * 5.6 + toe * 2.4);
+  support.foot.y += footPress * 0.62;
+  support.plant = Math.max(support.plant ?? 0, clamp(0.68 + footPress * 0.2 + toe * 0.12, 0, 1));
+  support.toeFlex = Math.max(support.toeFlex ?? 0, clamp(toe * 0.62 + hand * 0.08, 0, 0.92));
+  support.footAngle = (support.footAngle ?? 0) + supportSign * (toe * 0.024 + knee * 0.012);
+  free.knee.x += dirScale * freeSign * (knee * 2.8 + rebound * 1.2);
+  free.knee.y += sink * 4.4 + footPress * 1.2 - rebound * 1.4;
+  free.foot.x += dirScale * freeSign * (knee * 4.2 + toe * 1.6 - rebound * 1.3);
+  free.foot.y += footPress * 0.42 - rebound * 0.28;
+  free.plant = Math.max(free.plant ?? 0, clamp(0.54 + footPress * 0.16, 0, 1));
+  free.toeFlex = Math.max(free.toeFlex ?? 0, clamp(toe * 0.42, 0, 0.72));
+  free.lift = Math.max(free.lift ?? 0, clamp(rebound * 0.18, 0, 0.42));
+}
+
 function whiffActingPolishProfile(f, whiff = whiffRecoveryMotion(f), anatomy = null, silhouette = null) {
   if (!whiff) return { active: 0 };
 
@@ -22205,6 +22305,11 @@ function getPose(f, stride) {
   });
 
   applyGrabClaspActingPose(base, f, spec);
+
+  applyCrouchStanceActingPose(base, f, spec, {
+    movePresent,
+    guardPresent,
+  });
 
   applyLimbMicroActingPose(base, f, spec, {
     movePresent,
