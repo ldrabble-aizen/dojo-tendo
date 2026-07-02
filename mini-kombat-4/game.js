@@ -660,6 +660,21 @@ function roundStartReadinessProfile(f) {
   }[f?.profileId] ?? { brace: 1, breath: 1, guard: 1, foot: 1, snap: 1, shoulder: 1, hip: 1, torso: 1, handLift: 1, kneeSink: 1, stanceWide: 1, twitch: 1 };
 }
 
+function fatigueBodyProfile(f) {
+  return {
+    p1: { sink: 1.18, breath: 0.82, shoulders: 0.9, hands: 0.86, knees: 1.18, feet: 1.16, tremor: 0.72, guardDrop: 0.88 },
+    p2: { sink: 0.82, breath: 1.18, shoulders: 1.12, hands: 1.22, knees: 0.86, feet: 0.84, tremor: 1.18, guardDrop: 1.18 },
+    p3: { sink: 1.3, breath: 0.72, shoulders: 0.78, hands: 0.76, knees: 1.32, feet: 1.28, tremor: 0.58, guardDrop: 0.72 },
+    p4: { sink: 0.86, breath: 1.16, shoulders: 1.16, hands: 1.16, knees: 0.88, feet: 0.86, tremor: 1.16, guardDrop: 1.14 },
+    p5: { sink: 0.78, breath: 1.24, shoulders: 1.24, hands: 1.28, knees: 0.82, feet: 0.78, tremor: 1.26, guardDrop: 1.22 },
+    p6: { sink: 1.06, breath: 0.92, shoulders: 0.96, hands: 0.92, knees: 1.08, feet: 1.06, tremor: 0.86, guardDrop: 0.96 },
+  }[f?.profileId] ?? { sink: 1, breath: 1, shoulders: 1, hands: 1, knees: 1, feet: 1, tremor: 1, guardDrop: 1 };
+}
+
+function fighterFatigueAmount(f) {
+  return smoothStep01(clamp((38 - (f?.health ?? 100)) / 38, 0, 1));
+}
+
 function movementPivotProfile(f) {
   return {
     p1: { brake: 1.2, snap: 0.74, shoulder: 0.82, hip: 1.16, foot: 1.18, sway: 0.72 },
@@ -10094,7 +10109,12 @@ function drawFighter(f) {
   const baseY = f.y + bob - impactRise - idlePulse * 0.8 + transition.y;
   const pose = getPose(f, stride);
   const attackStretch = f.attack ? attackProgress(f.attack) * 0.012 : 0;
-  const breathing = f.grounded && effectiveHurt <= 0 ? Math.sin(t * 2.7 + f.x * 0.02) * 0.012 + idlePulse * 0.006 : 0;
+  const fatigueActive = f.grounded && effectiveHurt <= 0 && !f.attack && !winner ? fighterFatigueAmount(f) : 0;
+  const fatigueStyle = fatigueBodyProfile(f);
+  const fatigueBreath = fatigueActive > 0.02
+    ? Math.sin(t * 1.42 + f.x * 0.014) * 0.01 * fatigueActive * fatigueStyle.breath
+    : 0;
+  const breathing = f.grounded && effectiveHurt <= 0 ? Math.sin(t * 2.7 + f.x * 0.02) * 0.012 + idlePulse * 0.006 + fatigueBreath : 0;
   const hurtSquash = effectiveHurt > 0 ? Math.sin((effectiveHurt + resultFrame) * 0.7) * 0.012 + impactEase * 0.014 : impactEase * 0.005;
   const visualScaleX = f.profileId === "p5" ? 0.82 : 1;
   const visualScaleY = f.profileId === "p5" ? 1.38 : 1;
@@ -11077,7 +11097,74 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
 
   drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting);
   drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase);
+  drawUnifiedFatiguePolish(f, localCrouch);
   drawUnifiedHeadAccessoryPolish(f, localCrouch, motion, acting);
+}
+
+function drawUnifiedFatiguePolish(f, localCrouch) {
+  const fatigue = !winner && f.grounded && f.hurt <= 0 && !f.attack ? fighterFatigueAmount(f) : 0;
+  if (fatigue <= 0.035) return;
+
+  const style = fatigueBodyProfile(f);
+  const trim = f.trim ?? "#fff1bd";
+  const clock = roundFrame + (f.profileId?.charCodeAt(1) ?? 0) * 19 + f.x * 0.04;
+  const breath = Math.sin(clock * 0.071) * fatigue * style.breath;
+  const tremor = Math.sin(clock * 0.43) * fatigue * style.tremor;
+  const heavy = f.profileId === "p1";
+  const chestY = heavy ? -116 : -119;
+  const shoulderY = heavy ? -145 : -148;
+  const hipY = heavy ? -61 : -57;
+  const footY = -4 + localCrouch;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(24, 12, 9, ${0.045 + fatigue * 0.11 * style.sink})`;
+  ctx.beginPath();
+  ctx.ellipse(tremor * 1.4, chestY + localCrouch + breath * 2.2, heavy ? 42 : 36, 24 + fatigue * 8, 0.03 * (f.dir || 1), 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(18, 9, 7, ${0.04 + fatigue * 0.095})`;
+  ctx.beginPath();
+  ctx.ellipse(-28 + tremor, shoulderY + localCrouch + fatigue * 2.2, 20 + fatigue * 6, 7.5, -0.2, 0, Math.PI * 2);
+  ctx.ellipse(30 + tremor * 0.6, shoulderY + localCrouch + fatigue * 2.6, 21 + fatigue * 6, 8, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(18, 9, 7, ${0.035 + fatigue * 0.075})`;
+  ctx.beginPath();
+  ctx.ellipse(0, hipY + localCrouch + fatigue * 3.2, heavy ? 43 : 36, 10 + fatigue * 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(trim, 0.045 + fatigue * 0.095);
+  ctx.lineWidth = 1.05 + fatigue * 0.7;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-26 + tremor * 0.5, chestY + localCrouch - 10 + breath * 1.3);
+  ctx.quadraticCurveTo(0, chestY + localCrouch - 3 + fatigue * 2, 28 + tremor * 0.35, chestY + localCrouch - 9 + breath * 1.1);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha("#fff1bd", 0.035 + fatigue * 0.055);
+  ctx.lineWidth = 1 + fatigue * 0.5;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * (22 + fatigue * 2), footY);
+    ctx.quadraticCurveTo(side * (35 + fatigue * 7), footY + 5 + fatigue * 1.4, side * (51 + fatigue * 9), footY + 3);
+    ctx.stroke();
+  }
+
+  if (fatigue > 0.55) {
+    ctx.strokeStyle = colorWithAlpha(trim, 0.04 + fatigue * 0.04);
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-18 + tremor, -76 + localCrouch);
+    ctx.lineTo(-5 + tremor * 0.6, -68 + localCrouch + fatigue * 2);
+    ctx.moveTo(18 + tremor * 0.4, -82 + localCrouch);
+    ctx.lineTo(5 + tremor * 0.5, -72 + localCrouch + fatigue * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting) {
@@ -15701,6 +15788,42 @@ function getPose(f, stride) {
     }
   }
 
+  const fatiguePose = !winner && f.grounded && f.hurt <= 0 && !f.attack ? fighterFatigueAmount(f) : 0;
+  if (fatiguePose > 0.025) {
+    const fatigueStyle = fatigueBodyProfile(f);
+    const clock = roundFrame + (f.profileId?.charCodeAt(1) ?? 0) * 13 + f.x * 0.035;
+    const breath = Math.sin(clock * 0.071) * fatiguePose * fatigueStyle.breath;
+    const tremor = Math.sin(clock * 0.43 + 0.6) * fatiguePose * fatigueStyle.tremor;
+    const moving = Math.min(1, Math.abs(f.vx ?? 0) / 3.2);
+    const sink = fatiguePose * fatigueStyle.sink * (1 - moving * 0.35);
+    const handDrop = fatiguePose * fatigueStyle.hands * (1 + Math.max(0, -breath) * 0.45);
+    const footBrace = fatiguePose * fatigueStyle.feet * (0.78 + moving * 0.18);
+
+    base.torsoTilt += (0.012 + sink * 0.024) * fatigueStyle.sink + tremor * 0.004;
+    base.frontArm.shoulder.y += sink * 2.4 * fatigueStyle.shoulders;
+    base.backArm.shoulder.y += sink * 2.9 * fatigueStyle.shoulders;
+    base.frontArm.elbow.x -= (fatiguePose * 2.4 + tremor * 1.4) * spec.stance * fatigueStyle.guardDrop;
+    base.frontArm.elbow.y += handDrop * 4.8;
+    base.frontArm.hand.x -= (fatiguePose * 4.8 + tremor * 2.1) * spec.stance * fatigueStyle.guardDrop;
+    base.frontArm.hand.y += handDrop * 7.2 + Math.max(0, breath) * 1.5;
+    base.backArm.elbow.x += (fatiguePose * 1.8 - tremor * 0.9) * spec.stance;
+    base.backArm.elbow.y += handDrop * 3.8;
+    base.backArm.hand.x += (fatiguePose * 3.4 - tremor * 1.5) * spec.stance;
+    base.backArm.hand.y += handDrop * 6.2 + Math.max(0, breath) * 1.2;
+    base.frontLeg.hip.y += sink * 1.5;
+    base.backLeg.hip.y += sink * 1.9;
+    base.frontLeg.knee.y += sink * (5.2 + fatigueStyle.knees * 2.4);
+    base.backLeg.knee.y += sink * (6.3 + fatigueStyle.knees * 2.8);
+    base.frontLeg.foot.x += footBrace * 5.4 * spec.stance;
+    base.backLeg.foot.x -= footBrace * 6.4 * spec.stance;
+    base.frontLeg.foot.y += sink * 0.55;
+    base.backLeg.foot.y += sink * 0.65;
+    base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.56 + footBrace * 0.34, 0, 1));
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.66 + footBrace * 0.3, 0, 1));
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + fatiguePose * 0.012 * fatigueStyle.feet;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - fatiguePose * 0.016 * fatigueStyle.feet;
+  }
+
   const walkingPose = f.grounded && f.hurt <= 0 && !f.attack && Math.abs(f.vx) > 0.45;
   if (walkingPose) {
     const weight = clamp((f.walkWeight ?? 0) * motion.walkWeight, 0, 1.35);
@@ -18799,23 +18922,26 @@ function drawVectorFootAnatomy(spec, outfit, plant, lift, extension = 0) {
 function drawVectorHandAnatomy(f, arm, spec, front) {
   const attack = f.attack ? attackProgress(f.attack) : 0;
   const punch = front && (f.attack?.type === "punch" || f.attack?.type === "airPunch" || f.attack?.type === "special");
-  const curl = punch ? 1 : 0.62 + attack * 0.18;
+  const fatigue = !winner && f.grounded && f.hurt <= 0 && !f.attack ? fighterFatigueAmount(f) : 0;
+  const fatigueStyle = fatigueBodyProfile(f);
+  const tremor = fatigue > 0.025 ? Math.sin(roundFrame * 0.51 + (front ? 0.8 : 1.9)) * fatigue * fatigueStyle.tremor : 0;
+  const curl = punch ? 1 : 0.62 + attack * 0.18 + fatigue * 0.18 * fatigueStyle.hands;
   const skin = f.skin ?? "#f5c7a9";
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
-  ctx.strokeStyle = `rgba(45, 23, 17, ${front ? 0.34 : 0.24})`;
-  ctx.lineWidth = punch ? 1.7 : 1.3;
+  ctx.strokeStyle = `rgba(45, 23, 17, ${front ? 0.34 + fatigue * 0.08 : 0.24 + fatigue * 0.06})`;
+  ctx.lineWidth = (punch ? 1.7 : 1.3) + fatigue * 0.24;
   ctx.lineCap = "round";
   for (let i = -1; i <= 1; i += 1) {
-    const x = arm.hand.x + i * 4.5 * spec.hand;
+    const x = arm.hand.x + i * 4.5 * spec.hand + tremor * (0.45 + Math.abs(i) * 0.28);
     ctx.beginPath();
     ctx.moveTo(x - 1.2 * spec.hand, arm.hand.y - 6.2 * spec.hand);
     ctx.quadraticCurveTo(
       x + curl * 1.1 * spec.hand,
-      arm.hand.y - 1.4 * spec.hand,
+      arm.hand.y - 1.4 * spec.hand + fatigue * 1.2,
       x + 1.2 * spec.hand,
-      arm.hand.y + 4.4 * spec.hand
+      arm.hand.y + 4.4 * spec.hand + fatigue * 1.8
     );
     ctx.stroke();
   }
@@ -18830,11 +18956,11 @@ function drawVectorHandAnatomy(f, arm, spec, front) {
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  ctx.strokeStyle = colorWithAlpha(lighten(skin, 28), punch ? 0.22 : 0.15);
+  ctx.strokeStyle = colorWithAlpha(lighten(skin, 28), punch ? 0.22 : 0.15 + fatigue * 0.04);
   ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(arm.hand.x - 7 * spec.hand, arm.hand.y - 5.5 * spec.hand);
-  ctx.quadraticCurveTo(arm.hand.x - 1 * spec.hand, arm.hand.y - 10 * spec.hand, arm.hand.x + 8 * spec.hand, arm.hand.y - 4.8 * spec.hand);
+  ctx.moveTo(arm.hand.x - 7 * spec.hand + tremor * 0.5, arm.hand.y - 5.5 * spec.hand + fatigue * 0.8);
+  ctx.quadraticCurveTo(arm.hand.x - 1 * spec.hand + tremor * 0.35, arm.hand.y - 10 * spec.hand + fatigue * 0.6, arm.hand.x + 8 * spec.hand + tremor * 0.2, arm.hand.y - 4.8 * spec.hand + fatigue * 0.9);
   ctx.stroke();
   ctx.restore();
 }
