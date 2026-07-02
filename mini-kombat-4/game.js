@@ -11624,6 +11624,7 @@ function drawAttackAnticipationCue(f, crouch) {
   const spec = attackVisualSpec(f.attack.type);
   const mass = attackMassProfile(f);
   const read = attackReadabilityProfile(f);
+  const anatomy = attackAnticipationAnatomyProfile(f);
   const signature = spec.special ? fighterSignatureStyle(f) : null;
   const color = signature?.trail ?? spec.color;
   const core = signature?.core ?? spec.core;
@@ -11637,6 +11638,8 @@ function drawAttackAnticipationCue(f, crouch) {
   const anchorY = spec.sweep ? -35 : spec.kick ? -78 : spec.special ? -118 : -121;
   const loadX = anchorX - (spec.kick ? 25 : spec.sweep ? 36 : spec.special ? 18 : 30) * prep;
   const loadY = anchorY + localCrouch + (spec.sweep ? 18 * prep : spec.kick ? -8 * prep : spec.special ? -5 * prep : -4 * prep);
+  const supportX = -mass.footSide * (31 + anatomy.supportPress * 4) - f.dir * release * 5;
+  const chamberX = (spec.kick || spec.sweep ? anatomy.freeChamber : anatomy.handLoad) * (spec.sweep ? 24 : spec.kick ? 18 : 14);
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
@@ -11647,15 +11650,36 @@ function drawAttackAnticipationCue(f, crouch) {
   ctx.fillStyle = colorWithAlpha(color, floorAlpha);
   ctx.beginPath();
   ctx.ellipse(
-    -mass.footSide * 31 - f.dir * release * 5,
+    supportX,
     4 + localCrouch + mass.crush * 0.8,
-    31 + prep * (heavy ? 28 : 19),
-    4.5 + prep * 3.5,
+    31 + prep * (heavy ? 28 : 19) + anatomy.toeGrip * 8,
+    4.5 + prep * 3.5 + anatomy.supportPress * 0.8,
     -f.dir * release * 0.05,
     0,
     Math.PI * 2
   );
   ctx.fill();
+
+  if (anatomy.active > 0.035) {
+    ctx.strokeStyle = colorWithAlpha("#ffffff", 0.035 + anatomy.coil * 0.055 + anatomy.releaseHint * 0.025);
+    ctx.lineWidth = 0.75 + anatomy.coil * 0.42;
+    ctx.beginPath();
+    ctx.moveTo(-26 - anatomy.hipSet * 6, -63 + localCrouch + anatomy.supportPress * 2.2);
+    ctx.quadraticCurveTo(
+      -8 + anatomy.releaseHint * 4,
+      -102 + localCrouch - anatomy.shoulderCoil * 7,
+      28 + chamberX * 0.32,
+      -125 + localCrouch - anatomy.handLoad * 4
+    );
+    ctx.moveTo(24 + anatomy.hipSet * 5, -61 + localCrouch + anatomy.supportPress * 1.6);
+    ctx.quadraticCurveTo(
+      8 - anatomy.releaseHint * 3,
+      -94 + localCrouch - anatomy.shoulderCoil * 4,
+      -22 - chamberX * 0.2,
+      -113 + localCrouch + anatomy.freeChamber * 3
+    );
+    ctx.stroke();
+  }
 
   ctx.strokeStyle = colorWithAlpha(core, 0.14 + prep * 0.2 + charge * 0.12);
   ctx.lineWidth = 1.5 + prep * (heavy ? 2.3 : 1.6) + charge * 0.7;
@@ -14667,6 +14691,7 @@ function applyAttackExtremityPresence(hands, feet, f, frameName) {
   if (attack.active <= 0.035) return;
 
   const spec = attack.visualSpec;
+  const anticipation = attackAnticipationAnatomyProfile(f, attack);
   const handGrip = clamp(attack.handTension, 0, 1.12);
   const finger = clamp(attack.fingerTension, 0, 1.08);
   const toe = clamp(attack.toeDig, 0, 1.16);
@@ -14675,6 +14700,13 @@ function applyAttackExtremityPresence(hands, feet, f, frameName) {
   const backHand = hands[0];
 
   if (spec.punch || spec.special || spec.grab) {
+    if (anticipation.active > 0.035) {
+      frontHand.x -= attack.supportSide * anticipation.handLoad * (spec.grab ? 3.8 : spec.special ? 3.2 : 4.4);
+      frontHand.y -= anticipation.shoulderCoil * (spec.special ? 2.6 : 1.4);
+      frontHand.angle += attack.supportSide * anticipation.coil * 0.026;
+      backHand.x -= attack.supportSide * anticipation.shoulderCoil * 2.2;
+      backHand.y -= anticipation.handLoad * 1.4;
+    }
     frontHand.x += reachDir * attack.reach * (spec.grab ? 5.2 : spec.special ? 4.6 : 6.2);
     frontHand.y -= attack.reach * (spec.special ? 2.8 : 1.6) + attack.drive * 1.2;
     frontHand.sx += handGrip * 0.045;
@@ -14688,6 +14720,12 @@ function applyAttackExtremityPresence(hands, feet, f, frameName) {
     backHand.curl = clamp((backHand.curl ?? 0.72) + handGrip * 0.08, 0, 1.08);
     backHand.shock = Math.max(backHand.shock ?? 0, finger * 0.42);
   } else {
+    if (anticipation.active > 0.035) {
+      frontHand.x -= attack.supportSide * anticipation.shoulderCoil * 2.8;
+      frontHand.y += anticipation.freeChamber * (spec.sweep ? 1.8 : 0.9);
+      backHand.x -= attack.supportSide * anticipation.handLoad * 2.4;
+      backHand.y += anticipation.shoulderCoil * 1.1;
+    }
     frontHand.x -= attack.reach * (spec.sweep ? 2.2 : 3.2);
     frontHand.y += attack.drive * (spec.sweep ? 2.8 : 1.8);
     frontHand.angle -= attack.drive * 0.035;
@@ -14706,23 +14744,24 @@ function applyAttackExtremityPresence(hands, feet, f, frameName) {
   const support = feet[supportIndex];
   const free = feet[freeIndex];
   const press = clamp(attack.plantShadow * 0.62 + toe * 0.24, 0, 1.08);
+  const anticipatoryPress = anticipation.supportPress;
 
-  support.press = Math.max(support.press ?? 0, press);
-  support.plant = Math.max(support.plant ?? 0, 0.68 + press * 0.26);
-  support.w += press * 3.6 + attack.load * 1.2;
-  support.h = Math.max(7.1, support.h - press * 0.82);
-  support.y += press * 0.95;
-  support.x -= attack.supportSide * (press * 1.6 + attack.drive * 0.9);
-  support.angle += supportIndex === 0 ? -press * 0.032 : press * 0.032;
-  support.toeFlex = Math.max(support.toeFlex ?? 0, toe);
+  support.press = Math.max(support.press ?? 0, clamp(press + anticipatoryPress * 0.28, 0, 1.2));
+  support.plant = Math.max(support.plant ?? 0, 0.68 + press * 0.26 + anticipation.toeGrip * 0.08);
+  support.w += press * 3.6 + attack.load * 1.2 + anticipation.supportPress * 2.6;
+  support.h = Math.max(7.1, support.h - press * 0.82 - anticipation.supportPress * 0.36);
+  support.y += press * 0.95 + anticipation.supportPress * 0.42;
+  support.x -= attack.supportSide * (press * 1.6 + attack.drive * 0.9 + anticipation.hipSet * 1.1);
+  support.angle += supportIndex === 0 ? -(press * 0.032 + anticipation.toeGrip * 0.018) : press * 0.032 + anticipation.toeGrip * 0.018;
+  support.toeFlex = Math.max(support.toeFlex ?? 0, Math.max(toe, anticipation.toeGrip * 0.78));
 
   if (free) {
     const freeLift = spec.kick || spec.sweep ? attack.reach * 1.7 : attack.drive * 0.5;
     free.plant = Math.max(0.12, (free.plant ?? 0.7) - attack.drive * 0.08);
-    free.y -= spec.kick ? freeLift : spec.sweep ? 0 : freeLift * 0.45;
-    free.x += attack.freeSide * (attack.reach * (spec.kick || spec.sweep ? 2.6 : 1.2) + attack.follow * 0.9);
-    free.angle += freeIndex === 0 ? attack.reach * 0.026 : -attack.reach * 0.026;
-    free.toeFlex = Math.max(free.toeFlex ?? 0, toe * (spec.kick || spec.sweep ? 0.58 : 0.32));
+    free.y -= spec.kick ? freeLift + anticipation.freeChamber * 1.2 : spec.sweep ? -anticipation.freeChamber * 0.5 : freeLift * 0.45;
+    free.x += attack.freeSide * (attack.reach * (spec.kick || spec.sweep ? 2.6 : 1.2) + attack.follow * 0.9 + anticipation.freeChamber * 1.9);
+    free.angle += freeIndex === 0 ? attack.reach * 0.026 + anticipation.freeChamber * 0.018 : -attack.reach * 0.026 - anticipation.freeChamber * 0.018;
+    free.toeFlex = Math.max(free.toeFlex ?? 0, toe * (spec.kick || spec.sweep ? 0.58 : 0.32) + anticipation.freeChamber * 0.16);
   }
 }
 
@@ -17955,6 +17994,56 @@ function attackPresentationProfile(f) {
   };
 }
 
+function attackAnticipationAnatomyProfile(f, attack = attackPresentationProfile(f)) {
+  const attackState = f?.attack;
+  if (!attackState || attackState.frame >= attackState.activeStart || (f?.hurt ?? 0) > 0 || winner) {
+    return {
+      active: 0,
+      coil: 0,
+      supportPress: 0,
+      freeChamber: 0,
+      handLoad: 0,
+      shoulderCoil: 0,
+      hipSet: 0,
+      toeGrip: 0,
+      releaseHint: 0,
+    };
+  }
+
+  const phase = attackPhase(attackState);
+  const spec = attack.visualSpec ?? attackVisualSpec(attackState.type);
+  const read = attackReadabilityProfile(f);
+  const body = attackBodyWeightProfile(f);
+  const wind = clamp(read.wind, 0, 1);
+  const charge = smoothStep01(clamp((phase.windupT - 0.08) / 0.82, 0, 1));
+  const peak = Math.sin(clamp(phase.windupT, 0, 1) * Math.PI);
+  const late = smoothStep01(clamp((phase.windupT - 0.56) / 0.44, 0, 1));
+  const profile = f.profileId === "p1" || f.profileId === "p3" ? 1.12 : f.profileId === "p2" || f.profileId === "p5" ? 0.92 : 1;
+  const leg = spec.kick || spec.sweep;
+  const heavy = spec.heavy || spec.grab;
+  const coil = clamp((wind * 0.62 + peak * 0.28 + charge * 0.18) * (heavy ? 1.08 : 0.94) * profile, 0, 1.35);
+  const supportPress = clamp((body.brace * 0.42 + body.plant * 0.32 + coil * 0.34) * attack.style.foot, 0, 1.35);
+  const freeChamber = clamp((leg ? coil * 0.84 + late * 0.24 : coil * 0.22) * (spec.sweep ? 0.82 : 1), 0, 1.28);
+  const handLoad = clamp((spec.punch || spec.special || spec.grab ? coil * 0.9 + charge * 0.22 : coil * 0.34) * attack.style.hand, 0, 1.35);
+  const shoulderCoil = clamp((coil * 0.72 + body.load * 0.2) * (leg ? 0.78 : 1.06), 0, 1.35);
+  const hipSet = clamp((coil * 0.58 + supportPress * 0.32) * (leg ? 1.12 : 0.88), 0, 1.35);
+  const toeGrip = clamp((supportPress * 0.68 + late * 0.22) * attack.style.foot, 0, 1.35);
+  const releaseHint = clamp(late * wind * read.clarity, 0, 1.15);
+  const active = clamp(Math.max(coil, supportPress, freeChamber, handLoad) * wind, 0, 1.45);
+
+  return {
+    active,
+    coil,
+    supportPress,
+    freeChamber,
+    handLoad,
+    shoulderCoil,
+    hipSet,
+    toeGrip,
+    releaseHint,
+  };
+}
+
 function attackChainProfile(f, currentType = "") {
   const max = Math.max(1, f?.attackChainMax ?? 1);
   const raw = clamp((f?.attackChainPulse ?? 0) / max, 0, 1);
@@ -19307,9 +19396,40 @@ function getPose(f, stride) {
     const specPresent = attackPresent.visualSpec;
     const supportKey = attackPresent.supportSide < 0 ? "backLeg" : "frontLeg";
     const freeKey = supportKey === "backLeg" ? "frontLeg" : "backLeg";
+    const anticipation = attackAnticipationAnatomyProfile(f, attackPresent);
     const handTension = clamp(attackPresent.handTension, 0, 0.9);
     const finger = clamp(attackPresent.fingerTension, 0, 0.72);
     const toe = clamp(attackPresent.toeDig, 0, 0.58);
+
+    if (anticipation.active > 0.035) {
+      const supportSide = attackPresent.supportSide;
+      const freeSide = attackPresent.freeSide;
+      base.torsoTilt += supportSide * (anticipation.coil * 0.014 - anticipation.releaseHint * 0.006);
+      base.frontArm.shoulder.x -= supportSide * anticipation.shoulderCoil * 2.3 * spec.stance;
+      base.frontArm.shoulder.y += anticipation.shoulderCoil * 0.9;
+      base.backArm.shoulder.x -= supportSide * anticipation.shoulderCoil * 1.5 * spec.stance;
+      base.backArm.shoulder.y += anticipation.shoulderCoil * 0.7;
+      base.frontLeg.hip.x -= supportSide * anticipation.hipSet * 1.5 * spec.stance;
+      base.backLeg.hip.x += supportSide * anticipation.hipSet * 1.2 * spec.stance;
+      base[supportKey].knee.y += anticipation.supportPress * 2.6;
+      base[supportKey].foot.y += anticipation.supportPress * 0.65;
+      base[supportKey].foot.x -= supportSide * anticipation.hipSet * 2.2 * spec.stance;
+      base[supportKey].plant = Math.max(base[supportKey].plant ?? 0, clamp(0.62 + anticipation.supportPress * 0.28, 0, 1));
+      base[supportKey].toeFlex = Math.max(base[supportKey].toeFlex ?? 0, anticipation.toeGrip * 0.78);
+      if (specPresent.kick || specPresent.sweep) {
+        base[freeKey].knee.x += freeSide * anticipation.freeChamber * (specPresent.sweep ? 6.2 : 4.8) * spec.stance;
+        base[freeKey].knee.y += specPresent.sweep ? anticipation.freeChamber * 2.4 : -anticipation.freeChamber * 3.4;
+        base[freeKey].foot.x += freeSide * anticipation.freeChamber * (specPresent.sweep ? 8.8 : 6.6) * spec.stance;
+        base[freeKey].foot.y += specPresent.sweep ? anticipation.freeChamber * 0.9 : -anticipation.freeChamber * 4.8;
+        base[freeKey].footAngle = (base[freeKey].footAngle ?? 0) + freeSide * anticipation.freeChamber * 0.026;
+      } else {
+        base.frontArm.elbow.x -= supportSide * anticipation.handLoad * 4.2 * spec.stance;
+        base.frontArm.hand.x -= supportSide * anticipation.handLoad * (specPresent.grab ? 6.2 : 5.1) * spec.stance;
+        base.frontArm.hand.y -= anticipation.handLoad * (specPresent.special ? 2.8 : 1.6);
+        base.backArm.hand.x -= supportSide * anticipation.shoulderCoil * 2.6 * spec.stance;
+        base.backArm.hand.y -= anticipation.shoulderCoil * 1.2;
+      }
+    }
 
     if (specPresent.punch || specPresent.special || specPresent.grab) {
       base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + handTension * (specPresent.grab ? 0.2 : 0.13), 0, 1);
