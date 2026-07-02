@@ -1620,6 +1620,7 @@ canvas {
 
 .fighter-showcase-portrait {
   position: relative;
+  overflow: hidden;
   display: grid;
   place-items: center;
   width: 134px;
@@ -1646,14 +1647,279 @@ canvas {
 }
 
 .fighter-showcase-portrait img {
+  position: relative;
+  z-index: 2;
   width: 112px;
   height: 112px;
   object-fit: contain;
   filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.62));
+  transform: translate(18px, -5px) scale(0.84);
+  transform-origin: 56% 42%;
+}
+
+.fighter-showcase-stance {
+  --stance-scale: 1;
+  --stance-lean: -4deg;
+  --stance-shoulder: 27px;
+  --stance-hip: 20px;
+  --stance-body-h: 45px;
+  --stance-head-x: -1px;
+  --stance-front-arm: -38deg;
+  --stance-back-arm: 32deg;
+  --stance-front-leg: -11deg;
+  --stance-back-leg: 17deg;
+  --stance-arm-reach: 0px;
+  --stance-foot-spread: 0px;
+  --stance-head-tilt: 2deg;
+  --stance-torso-tilt: -1deg;
+  --stance-belt-tilt: 0deg;
+  position: absolute;
+  left: 18px;
+  bottom: 5px;
+  z-index: 1;
+  width: 70px;
+  height: 122px;
+  opacity: 0.9;
+  pointer-events: none;
+  transform: translateX(-10px) scale(var(--stance-scale));
+  transform-origin: 50% 100%;
+  filter:
+    drop-shadow(0 12px 9px rgba(0, 0, 0, 0.46))
+    drop-shadow(0 0 10px color-mix(in srgb, var(--fighter-trim) 18%, transparent));
+}
+
+.fighter-showcase-stance span {
+  position: absolute;
+  left: 50%;
+  display: block;
+  box-sizing: border-box;
+}
+
+.fighter-showcase-stance .shadow {
+  bottom: 2px;
+  width: calc(66px + var(--stance-foot-spread));
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.5), transparent 68%);
+  transform: translateX(-50%);
+}
+
+.fighter-showcase-stance .head {
+  bottom: calc(var(--stance-body-h) + 50px);
+  width: 18px;
+  height: 20px;
+  border: 1px solid rgba(42, 22, 15, 0.42);
+  border-radius: 48% 48% 44% 44%;
+  background:
+    radial-gradient(circle at 38% 28%, rgba(255,255,255,0.22), transparent 24%),
+    linear-gradient(180deg, color-mix(in srgb, var(--fighter-accent) 20%, #f0c09d), #bd7959);
+  transform:
+    translateX(calc(-50% + var(--stance-head-x)))
+    rotate(var(--stance-head-tilt));
+}
+
+.fighter-showcase-stance .torso {
+  bottom: 40px;
+  width: var(--stance-shoulder);
+  height: var(--stance-body-h);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px 10px 7px 7px;
+  background:
+    linear-gradient(110deg, rgba(255,255,255,0.18), transparent 34%),
+    linear-gradient(180deg, var(--fighter-color), color-mix(in srgb, var(--fighter-color) 58%, #08090c));
+  clip-path: polygon(7% 8%, 93% 0, 78% 100%, 22% 100%);
+  transform:
+    translateX(-50%)
+    skewX(var(--stance-lean))
+    rotate(var(--stance-torso-tilt));
+}
+
+.fighter-showcase-stance .belt {
+  bottom: 43px;
+  width: calc(var(--stance-hip) + 12px);
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--fighter-trim) 52%, #111), var(--fighter-trim));
+  transform: translateX(-50%) rotate(var(--stance-belt-tilt));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.18);
+}
+
+.fighter-showcase-stance .front-arm,
+.fighter-showcase-stance .back-arm {
+  bottom: 50px;
+  width: 11px;
+  height: 47px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,0.18), transparent 36%),
+    linear-gradient(180deg, var(--fighter-trim), color-mix(in srgb, var(--fighter-trim) 42%, #111));
+  transform-origin: 50% 9%;
+}
+
+.fighter-showcase-stance .front-arm {
+  margin-left: 10px;
+  height: calc(47px + var(--stance-arm-reach));
+  transform: rotate(var(--stance-front-arm));
+}
+
+.fighter-showcase-stance .back-arm {
+  margin-left: -20px;
+  opacity: 0.82;
+  transform: rotate(var(--stance-back-arm));
+}
+
+.fighter-showcase-stance .front-arm::after,
+.fighter-showcase-stance .back-arm::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 14px;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fighter-accent) 24%, #f0bd94);
+  transform: translateX(-50%);
+  box-shadow: inset 0 -2px 0 rgba(54, 24, 14, 0.28);
+}
+
+.fighter-showcase-stance .front-leg,
+.fighter-showcase-stance .back-leg {
+  bottom: 9px;
+  width: 13px;
+  height: 43px;
+  border-radius: 999px 999px 6px 6px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.12), transparent 36%),
+    linear-gradient(180deg, color-mix(in srgb, var(--fighter-color) 72%, #07080b), color-mix(in srgb, var(--fighter-color) 34%, #07080b));
+  transform-origin: 50% 8%;
+}
+
+.fighter-showcase-stance .front-leg {
+  margin-left: 6px;
+  transform: rotate(var(--stance-front-leg));
+}
+
+.fighter-showcase-stance .back-leg {
+  margin-left: -16px;
+  opacity: 0.86;
+  transform: rotate(var(--stance-back-leg));
+}
+
+.fighter-showcase-stance .front-leg::after,
+.fighter-showcase-stance .back-leg::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 25px;
+  height: 10px;
+  border-radius: 999px 999px 5px 5px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--fighter-trim) 42%, #08090c), #08090c);
+  transform: translateX(-46%);
+}
+
+.fighter-showcase[data-fighter="p1"] {
+  --stance-scale: 1.04;
+  --stance-lean: 2deg;
+  --stance-shoulder: 32px;
+  --stance-hip: 27px;
+  --stance-body-h: 48px;
+  --stance-front-arm: -28deg;
+  --stance-back-arm: 24deg;
+  --stance-front-leg: -7deg;
+  --stance-back-leg: 13deg;
+  --stance-foot-spread: 8px;
+  --stance-head-tilt: -1deg;
+  --stance-torso-tilt: 1deg;
+  --stance-belt-tilt: 1deg;
+}
+
+.fighter-showcase[data-fighter="p2"] {
+  --stance-scale: 0.92;
+  --stance-lean: -8deg;
+  --stance-shoulder: 24px;
+  --stance-hip: 17px;
+  --stance-body-h: 44px;
+  --stance-head-x: 2px;
+  --stance-front-arm: -46deg;
+  --stance-back-arm: 38deg;
+  --stance-front-leg: -15deg;
+  --stance-back-leg: 21deg;
+  --stance-arm-reach: 4px;
+  --stance-head-tilt: 3deg;
+  --stance-torso-tilt: -2deg;
+  --stance-belt-tilt: -1deg;
+}
+
+.fighter-showcase[data-fighter="p3"] {
+  --stance-scale: 1.1;
+  --stance-lean: 1deg;
+  --stance-shoulder: 34px;
+  --stance-hip: 29px;
+  --stance-body-h: 50px;
+  --stance-front-arm: -24deg;
+  --stance-back-arm: 20deg;
+  --stance-front-leg: -5deg;
+  --stance-back-leg: 10deg;
+  --stance-foot-spread: 12px;
+  --stance-head-tilt: -1deg;
+  --stance-torso-tilt: 1deg;
+  --stance-belt-tilt: 1deg;
+}
+
+.fighter-showcase[data-fighter="p4"] {
+  --stance-scale: 0.95;
+  --stance-lean: -10deg;
+  --stance-shoulder: 24px;
+  --stance-hip: 18px;
+  --stance-body-h: 45px;
+  --stance-front-arm: -52deg;
+  --stance-back-arm: 42deg;
+  --stance-front-leg: -17deg;
+  --stance-back-leg: 23deg;
+  --stance-arm-reach: 5px;
+  --stance-head-tilt: 4deg;
+  --stance-torso-tilt: -2deg;
+  --stance-belt-tilt: -1deg;
+}
+
+.fighter-showcase[data-fighter="p5"] {
+  --stance-scale: 1.08;
+  --stance-lean: -12deg;
+  --stance-shoulder: 25px;
+  --stance-hip: 17px;
+  --stance-body-h: 56px;
+  --stance-head-x: 3px;
+  --stance-front-arm: -56deg;
+  --stance-back-arm: 46deg;
+  --stance-front-leg: -18deg;
+  --stance-back-leg: 22deg;
+  --stance-arm-reach: 8px;
+  --stance-foot-spread: 6px;
+  --stance-head-tilt: 4deg;
+  --stance-torso-tilt: -3deg;
+  --stance-belt-tilt: -2deg;
+}
+
+.fighter-showcase[data-fighter="p6"] {
+  --stance-scale: 0.96;
+  --stance-lean: 3deg;
+  --stance-shoulder: 28px;
+  --stance-hip: 22px;
+  --stance-body-h: 44px;
+  --stance-front-arm: -34deg;
+  --stance-back-arm: 30deg;
+  --stance-front-leg: -9deg;
+  --stance-back-leg: 16deg;
+  --stance-foot-spread: 4px;
+  --stance-head-tilt: -1deg;
+  --stance-torso-tilt: 1deg;
+  --stance-belt-tilt: 1deg;
 }
 
 .fighter-showcase-mark {
   position: absolute;
+  z-index: 3;
   right: 6px;
   bottom: 6px;
   display: grid;
@@ -3273,11 +3539,27 @@ canvas {
   .fighter-showcase-portrait img {
     width: 54px;
     height: 54px;
+    transform: translate(9px, -2px) scale(0.72);
   }
 
   .overlay[data-screen="home"] .fighter-showcase-portrait img {
     width: 62px;
     height: 62px;
+    transform: translate(10px, -2px) scale(0.74);
+  }
+
+  .fighter-showcase-stance {
+    left: 9px;
+    bottom: 1px;
+    transform: translateX(-22px) scale(0.56);
+    opacity: 0.76;
+  }
+
+  .overlay[data-screen="home"] .fighter-showcase-stance {
+    left: 12px;
+    bottom: 2px;
+    transform: translateX(-18px) scale(0.62);
+    opacity: 0.82;
   }
 
   .fighter-showcase-mark {
@@ -3715,6 +3997,7 @@ canvas {
   .fighter-showcase-portrait img {
     width: 38px;
     height: 38px;
+    transform: translate(0, -1px) scale(0.82);
   }
 
   .fighter-showcase-mark {
@@ -3758,12 +4041,19 @@ canvas {
   .overlay[data-screen="home"] .fighter-showcase-portrait img {
     width: 60px;
     height: 60px;
+    transform: translate(0, -1px) scale(0.86);
+  }
+
+  .fighter-showcase-stance {
+    display: none;
+  }
+
+  .overlay[data-screen="home"] .fighter-showcase-stance {
+    display: none;
   }
 
   .overlay[data-screen="home"] .fighter-showcase-mark {
-    width: 17px;
-    height: 17px;
-    font-size: 8px;
+    display: none;
   }
 
   .overlay[data-screen="home"] .fighter-showcase-info strong {

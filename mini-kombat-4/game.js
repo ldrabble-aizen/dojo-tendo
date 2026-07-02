@@ -23395,6 +23395,7 @@ function makeSelectColumn(side, title, selectedId) {
 
   const portraitWrap = document.createElement("div");
   portraitWrap.className = "fighter-showcase-portrait";
+  portraitWrap.append(makeFighterStancePreview(selectedProfile));
   const portrait = document.createElement("img");
   portrait.src = selectedProfile.face.src;
   portrait.alt = selectedProfile.name;
@@ -23450,6 +23451,19 @@ function makeSelectColumn(side, title, selectedId) {
   }
   column.append(grid);
   return column;
+}
+
+function makeFighterStancePreview(profile) {
+  const stance = document.createElement("div");
+  stance.className = "fighter-showcase-stance";
+  stance.dataset.fighter = profile?.profileId ?? profile?.id ?? "";
+  stance.setAttribute("aria-hidden", "true");
+  for (const part of ["shadow", "back-arm", "back-leg", "torso", "head", "front-leg", "front-arm", "belt"]) {
+    const node = document.createElement("span");
+    node.className = part;
+    stance.append(node);
+  }
+  return stance;
 }
 
 function fighterTrait(profile) {
