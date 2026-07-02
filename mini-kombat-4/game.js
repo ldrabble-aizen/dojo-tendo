@@ -1873,6 +1873,15 @@ const SOUND_PRESETS = {
     ],
     cooldown: 0.05,
   },
+  hitCrack: {
+    duration: 0.11,
+    volume: 0.058,
+    type: "square",
+    freq: [880, 260],
+    noise: { volume: 0.048, type: "highpass", frequency: 1850, duration: 0.055 },
+    layers: [{ type: "triangle", freq: [1320, 520], volume: 0.12, delay: 0.012, duration: 0.07 }],
+    cooldown: 0.055,
+  },
   projectileHit: {
     duration: 0.28,
     volume: 0.15,
@@ -1903,6 +1912,15 @@ const SOUND_PRESETS = {
     layers: [{ type: "triangle", freq: [1280, 740], volume: 0.12, delay: 0.02, duration: 0.16 }],
     cooldown: 0.08,
   },
+  guardClang: {
+    duration: 0.14,
+    volume: 0.068,
+    type: "square",
+    freq: [1180, 560, 820],
+    noise: { volume: 0.032, type: "highpass", frequency: 2200, duration: 0.06 },
+    layers: [{ type: "triangle", freq: [1760, 960], volume: 0.1, delay: 0.018, duration: 0.08 }],
+    cooldown: 0.07,
+  },
   specialTail: {
     duration: 0.54,
     volume: 0.07,
@@ -1926,6 +1944,18 @@ const SOUND_PRESETS = {
       { type: "triangle", freq: [108, 54], volume: 0.16, delay: 0.04, duration: 0.36 },
     ],
     cooldown: 0.28,
+  },
+  finishCrack: {
+    duration: 0.18,
+    volume: 0.096,
+    type: "square",
+    freq: [520, 96],
+    noise: { volume: 0.072, type: "highpass", frequency: 1500, duration: 0.085 },
+    layers: [
+      { type: "sine", freq: [82, 34], volume: 0.36, duration: 0.16 },
+      { type: "triangle", freq: [1040, 390], volume: 0.12, delay: 0.028, duration: 0.09 },
+    ],
+    cooldown: 0.16,
   },
   counter: {
     duration: 0.23,
@@ -5171,12 +5201,14 @@ function sweetenImpactAudio({ target, blocked, heavyImpact, projectile, counter,
   const strength = clamp((impactStrength ?? 1) + zoneBoost, 0.42, 1.75);
 
   if (blocked) {
+    playSound("guardClang", { x, intensity: clamp(0.62 + strength * 0.2, 0.64, 1.16), key: `${target.id}:${hitZone}:clang` });
     playSound("guardTail", { x, intensity: clamp(0.68 + strength * 0.22, 0.68, 1.2), key: `${target.id}:${hitZone}` });
     duckMusicForImpact(0.42 + strength * 0.28, 0.055, 0.18);
     return;
   }
 
   if (finishingHit) {
+    playSound("finishCrack", { x, intensity: clamp(0.86 + strength * 0.22, 0.92, 1.42), key: `${target.id}:${hitZone}:finish:${roundNumber}` });
     playSound("finishRumble", { x, intensity: clamp(0.9 + strength * 0.3, 0.95, 1.55), key: `${target.id}:${roundNumber}` });
     playSound("impactTail", { x, intensity: clamp(0.98 + strength * 0.24, 1, 1.65), key: `${target.id}:finish:${roundNumber}` });
     playDojoReaction("finishImpact", { x, intensity: clamp(0.78 + strength * 0.1, 0.84, 1.02), key: `${target.id}:finish-impact:${roundNumber}` });
@@ -5185,6 +5217,7 @@ function sweetenImpactAudio({ target, blocked, heavyImpact, projectile, counter,
   }
 
   if (projectile || counter) {
+    playSound("hitCrack", { x, intensity: clamp(0.66 + strength * 0.18, 0.68, 1.15), key: `${target.id}:${hitZone}:${projectile ? "projectile" : "counter"}:crack` });
     playSound("specialTail", { x, intensity: clamp(0.82 + strength * 0.28, 0.86, 1.52), key: `${target.id}:${projectile ? "projectile" : "counter"}` });
     playSound("impactTail", { x, intensity: clamp(0.74 + strength * 0.22, 0.78, 1.35), key: `${target.id}:${hitZone}:tail` });
     duckMusicForImpact(0.92 + strength * 0.22, 0.13, 0.38);
@@ -5192,6 +5225,7 @@ function sweetenImpactAudio({ target, blocked, heavyImpact, projectile, counter,
   }
 
   if (heavyImpact || hitZone === "head" || hitZone === "legs") {
+    playSound("hitCrack", { x, intensity: clamp(0.56 + strength * 0.2, 0.58, 1.08), key: `${target.id}:${hitZone}:crack` });
     playSound("impactTail", { x, intensity: clamp(0.62 + strength * 0.24, 0.66, 1.25), key: `${target.id}:${hitZone}:tail` });
     duckMusicForImpact(0.58 + strength * 0.2, 0.075, 0.24);
   }
@@ -5366,7 +5400,7 @@ function landHit(attacker, target, damage, projectile = false, projectileInfo = 
     heavyImpact,
   );
   impactGlints(impactX, impactY, impactColor, blocked, heavyImpact);
-  contactFlashBurst(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
+  contactFlashBurst(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter, finishingHit, hitZone);
   cinematicImpact(impactX, impactY, impactColor, impactDir, blocked, heavyImpact, counter);
   premiumImpactFX(impactX, impactY, target, impactColor, impactDir, blocked, heavyImpact, counter, projectile);
   if (blocked) guardClashFX(impactX, impactY, target, impactColor, impactDir, heavyImpact, projectile);
@@ -5425,17 +5459,22 @@ function triggerScreenTear(dir, color, strength = 1, pulse = 10) {
   screenTearStrength = strength;
 }
 
-function contactFlashBurst(x, y, color, dir, blocked, heavyImpact, counter) {
-  const strength = blocked ? 0.48 : counter ? 1.35 : heavyImpact ? 1.08 : 0.82;
+function contactFlashBurst(x, y, color, dir, blocked, heavyImpact, counter, finishingHit = false, hitZone = "torso") {
+  const zoneAccent = hitZone === "head" ? 0.16 : hitZone === "legs" ? 0.12 : 0;
+  const finishAccent = finishingHit ? 0.34 : 0;
+  const accent = blocked ? 0 : zoneAccent + finishAccent;
+  const strength = blocked ? 0.48 : counter ? 1.35 + accent : heavyImpact ? 1.08 + accent : 0.82 + accent;
+  const flashLife = blocked ? 8 : finishingHit ? 16 : counter ? 13 : heavyImpact ? 12 : 10;
+  const flashSize = blocked ? 22 : finishingHit ? 52 : counter ? 42 : heavyImpact ? 36 + zoneAccent * 16 : 30 + zoneAccent * 14;
   particles.push({
     x,
     y,
     vx: 0,
     vy: 0,
     angle: dir > 0 ? 0 : Math.PI,
-    life: blocked ? 8 : counter ? 13 : heavyImpact ? 12 : 10,
-    maxLife: blocked ? 8 : counter ? 13 : heavyImpact ? 12 : 10,
-    size: blocked ? 22 : counter ? 42 : heavyImpact ? 36 : 30,
+    life: flashLife,
+    maxLife: flashLife,
+    size: flashSize,
     color,
     strength,
     kind: "contactFlash",
@@ -5448,31 +5487,31 @@ function contactFlashBurst(x, y, color, dir, blocked, heavyImpact, counter) {
       vx: dir * 0.8,
       vy: 0,
       angle: dir > 0 ? -0.08 : Math.PI + 0.08,
-      life: heavyImpact ? 15 : 12,
-      maxLife: heavyImpact ? 15 : 12,
-      size: heavyImpact ? 74 : 54,
+      life: finishingHit ? 18 : heavyImpact ? 15 : 12,
+      maxLife: finishingHit ? 18 : heavyImpact ? 15 : 12,
+      size: finishingHit ? 88 : heavyImpact ? 74 : hitZone === "head" || hitZone === "legs" ? 62 : 54,
       color,
       strength,
       kind: "recoilArc",
     });
   }
 
-  const shardCount = fxCount(blocked ? 4 : heavyImpact ? 10 : 7, blocked ? 2 : 3);
-  const spread = blocked ? 0.78 : heavyImpact ? 1.18 : 0.98;
+  const shardCount = fxCount(blocked ? 4 : finishingHit ? 13 : heavyImpact ? 10 : hitZone === "head" || hitZone === "legs" ? 9 : 7, blocked ? 2 : finishingHit ? 4 : 3);
+  const spread = blocked ? 0.78 : finishingHit ? 1.32 : heavyImpact ? 1.18 : hitZone === "head" || hitZone === "legs" ? 1.08 : 0.98;
   const base = dir > 0 ? 0 : Math.PI;
   for (let i = 0; i < shardCount; i += 1) {
     const lane = shardCount === 1 ? 0 : i / (shardCount - 1) - 0.5;
     const angle = base + lane * spread + (Math.random() - 0.5) * 0.16;
-    const speed = blocked ? 1.1 : heavyImpact ? 3.2 : 2.45;
+    const speed = blocked ? 1.1 : finishingHit ? 3.85 : heavyImpact ? 3.2 : hitZone === "head" || hitZone === "legs" ? 2.85 : 2.45;
     particles.push({
       x,
       y: y + lane * 18,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed * 0.42 - (blocked ? 0.2 : 0.45),
       angle,
-      life: blocked ? 10 + Math.random() * 5 : 13 + Math.random() * 7,
-      maxLife: blocked ? 12 : 17,
-      size: blocked ? 8 : heavyImpact ? 14 : 11,
+      life: blocked ? 10 + Math.random() * 5 : finishingHit ? 15 + Math.random() * 8 : 13 + Math.random() * 7,
+      maxLife: blocked ? 12 : finishingHit ? 20 : 17,
+      size: blocked ? 8 : finishingHit ? 16 : heavyImpact ? 14 : hitZone === "head" || hitZone === "legs" ? 12.5 : 11,
       color,
       strength,
       kind: "hitShard",
