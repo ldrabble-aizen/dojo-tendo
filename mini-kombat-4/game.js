@@ -18978,6 +18978,248 @@ function attackSilhouetteAnatomyProfile(f, attack = attackPresentationProfile(f)
   };
 }
 
+function attackActingPolishProfile(f, attack = attackPresentationProfile(f), anatomy = null, silhouette = null) {
+  const attackState = f?.attack;
+  const spec = attack?.visualSpec ?? attackVisualSpec(attackState?.type);
+  const phase = attackPhase(attackState);
+  const body = attackBodyWeightProfile(f);
+  const anticipation = attackAnticipationAnatomyProfile(f, attack);
+  const anatomyRead = anatomy ?? attackAnatomyPolishProfile(f, attack);
+  const silhouetteRead = silhouette ?? attackSilhouetteAnatomyProfile(f, attack);
+  const style = {
+    p1: { shoulder: 0.86, hip: 1.18, hand: 0.84, foot: 1.16, snap: 0.86, carry: 1.14 },
+    p2: { shoulder: 1.2, hip: 0.86, hand: 1.22, foot: 0.86, snap: 1.2, carry: 0.86 },
+    p3: { shoulder: 0.74, hip: 1.28, hand: 0.74, foot: 1.28, snap: 0.72, carry: 1.24 },
+    p4: { shoulder: 1.16, hip: 0.9, hand: 1.18, foot: 0.9, snap: 1.16, carry: 0.9 },
+    p5: { shoulder: 1.26, hip: 0.82, hand: 1.28, foot: 0.82, snap: 1.24, carry: 0.82 },
+    p6: { shoulder: 0.94, hip: 1.06, hand: 0.96, foot: 1.04, snap: 0.94, carry: 1.04 },
+  }[f?.profileId] ?? { shoulder: 1, hip: 1, hand: 1, foot: 1, snap: 1, carry: 1 };
+
+  if (!attackState || (f?.hurt ?? 0) > 0 || winner || (attack?.active ?? 0) <= 0.025) {
+    return {
+      active: 0,
+      anticipation: 0,
+      actionLine: 0,
+      snap: 0,
+      follow: 0,
+      recover: 0,
+      supportPress: 0,
+      freeLoad: 0,
+      wristBreak: 0,
+      ankleWhip: 0,
+      fingerSplay: 0,
+      toeGrip: 0,
+      shoulderCounter: 0,
+      hipCounter: 0,
+      passThrough: 0,
+      settle: 0,
+      side: attack?.supportSide ?? 1,
+      freeSide: attack?.freeSide ?? -1,
+      spec,
+      style,
+    };
+  }
+
+  const leg = spec.kick || spec.sweep;
+  const hand = spec.punch || spec.special || spec.grab;
+  const heavy = spec.heavy || spec.special || spec.grab;
+  const low = spec.sweep ? 1 : 0;
+  const supportSide = attack.supportSide ?? (body.footSide < 0 ? -1 : 1);
+  const freeSide = attack.freeSide ?? -supportSide;
+  const anticipationT = clamp((anticipation.active * 0.76 + phase.anticipation * 0.52) * (heavy ? 1.08 : 0.94), 0, 1.45);
+  const actionLine = clamp(
+    ((silhouetteRead?.attackLine ?? 0) * 0.54 + (anatomyRead?.extension ?? 0) * 0.44 + phase.strike * 0.3) *
+      (leg ? 1.08 : hand ? 1.02 : 0.96),
+    0,
+    1.7
+  );
+  const snap = clamp((phase.snap * 0.7 + (anatomyRead?.contact ?? 0) * 0.42 + (silhouetteRead?.wristSnap ?? 0) * 0.28) * style.snap, 0, 1.55);
+  const follow = clamp((phase.followThrough * 0.62 + (anatomyRead?.follow ?? 0) * 0.54 + (silhouetteRead?.recoveryLine ?? 0) * 0.2) * style.carry, 0, 1.55);
+  const recover = clamp((phase.recovery * 0.74 + (attack?.recover ?? 0) * 0.28 + follow * 0.16) * style.carry, 0, 1.5);
+  const supportPress = clamp((anticipation.supportPress * 0.42 + body.plant * 0.36 + actionLine * 0.18 + recover * 0.12) * style.foot, 0, 1.55);
+  const freeLoad = clamp((anticipation.freeChamber * 0.58 + actionLine * 0.36 + follow * 0.16) * (leg ? 1.12 : 0.72), 0, 1.5);
+  const wristBreak = clamp((hand ? actionLine * 0.46 + snap * 0.52 + follow * 0.26 : actionLine * 0.14 + follow * 0.18) * style.hand, 0, 1.5);
+  const ankleWhip = clamp((leg ? actionLine * 0.5 + snap * 0.3 + follow * 0.28 : supportPress * 0.22) * style.foot, 0, 1.5);
+  const fingerSplay = clamp((snap * 0.38 + follow * 0.22 + recover * 0.12 + anticipation.handLoad * 0.12) * style.hand, 0, 1);
+  const toeGrip = clamp((supportPress * 0.54 + snap * (leg ? 0.12 : 0.04) + recover * 0.2) * style.foot, 0, 1);
+  const shoulderCounter = clamp((anticipationT * 0.4 - actionLine * 0.2 + follow * 0.22 + snap * 0.12) * style.shoulder, -0.85, 1.35);
+  const hipCounter = clamp((supportPress * 0.44 + anticipationT * 0.3 - actionLine * 0.22 + follow * 0.18) * style.hip, -0.75, 1.35);
+  const passThrough = clamp((actionLine * 0.34 + follow * 0.58 - recover * 0.12) * (heavy ? 1.08 : 0.96), 0, 1.5);
+  const settle = clamp(recover * 0.72 + follow * 0.18 + supportPress * 0.12, 0, 1.35);
+  const active = clamp(Math.max(anticipationT * 0.86, actionLine, snap * 0.78, follow * 0.72, recover * 0.52), 0, 1.8);
+
+  return {
+    active,
+    anticipation: anticipationT,
+    actionLine,
+    snap,
+    follow,
+    recover,
+    supportPress,
+    freeLoad,
+    wristBreak,
+    ankleWhip,
+    fingerSplay,
+    toeGrip,
+    shoulderCounter,
+    hipCounter,
+    passThrough,
+    settle,
+    side: supportSide,
+    freeSide,
+    spec,
+    style,
+    leg,
+    hand,
+    low,
+  };
+}
+
+function whiffActingPolishProfile(f, whiff = whiffRecoveryMotion(f), anatomy = null, silhouette = null) {
+  if (!whiff) return { active: 0 };
+
+  const anatomyRead = anatomy ?? whiffAnatomyProfile(f, whiff);
+  const silhouetteRead = silhouette ?? attackSilhouetteAnatomyProfile(f, null, whiff);
+  const { spec, style, strength, localSide, over, stumble, replant, settle } = whiff;
+  const leg = spec.kick || spec.sweep;
+  const low = spec.sweep ? 1 : 0;
+  const loose = clamp((over * 0.56 + stumble * 0.5 + (anatomyRead?.handLoose ?? 0) * 0.24) * strength * style.arm, 0, 1.35);
+  const overextend = clamp((over * 0.72 + (silhouetteRead?.overextension ?? 0) * 0.34 + stumble * 0.22) * strength * style.freeLimb, 0, 1.6);
+  const replantT = clamp((replant * 0.72 + (anatomyRead?.replantWeight ?? 0) * 0.26 + settle * 0.16) * strength * style.plant, 0, 1.55);
+  const shoulderDrop = clamp((anatomyRead?.shoulderDrop ?? 0) * 0.56 + stumble * 0.42 + loose * 0.14, 0, 1.4);
+  const hipCatch = clamp((anatomyRead?.hipCatch ?? 0) * 0.56 + replantT * 0.28 + stumble * 0.18, 0, 1.45);
+  const wristLoose = clamp((loose * 0.62 + overextend * 0.24 + (silhouetteRead?.wristFollow ?? 0) * 0.16) * (leg ? 0.72 : 1), 0, 1.2);
+  const ankleLoose = clamp((overextend * (leg ? 0.62 : 0.22) + replantT * 0.34 + (silhouetteRead?.toePoint ?? 0) * 0.18) * style.foot, 0, 1.2);
+  const active = clamp(Math.max(overextend, replantT * 0.78, loose * 0.76, shoulderDrop * 0.62), 0, 1.7);
+
+  return {
+    active,
+    side: localSide,
+    spec,
+    leg,
+    low,
+    overextend,
+    replant: replantT,
+    shoulderDrop,
+    hipCatch,
+    wristLoose,
+    ankleLoose,
+    loose,
+    settle,
+  };
+}
+
+function applyAttackActingPolishPose(base, f, spec, context = {}) {
+  if (!base || !f || !spec || winner) return;
+
+  const stance = spec.stance ?? 1;
+  const attack = context.attackActing ?? null;
+  if (attack?.active > 0.025) {
+    const supportKey = attack.side < 0 ? "backLeg" : "frontLeg";
+    const freeKey = supportKey === "backLeg" ? "frontLeg" : "backLeg";
+    const support = base[supportKey];
+    const free = base[freeKey];
+    const side = attack.side;
+    const freeSide = attack.freeSide;
+    const line = attack.actionLine;
+    const snap = attack.snap;
+    const follow = attack.follow;
+    const recover = attack.recover;
+    const anticipate = attack.anticipation;
+    const low = attack.low ? 1 : 0;
+
+    base.torsoTilt += side * (-anticipate * 0.01 + line * (attack.leg ? 0.012 : 0.016) + attack.passThrough * 0.01 - recover * 0.012);
+    base.frontArm.shoulder.x += side * (attack.shoulderCounter * 1.8 + line * (attack.hand ? 0.65 : -0.28)) * stance;
+    base.frontArm.shoulder.y += anticipate * 0.6 - snap * 0.8 + recover * 0.58;
+    base.backArm.shoulder.x -= side * (attack.shoulderCounter * 1.5 + attack.hipCounter * 0.62) * stance;
+    base.backArm.shoulder.y += attack.hipCounter * 0.62 + follow * 0.72;
+    base.frontLeg.hip.x += side * (attack.hipCounter * 1.4 - line * (attack.leg ? 0.44 : 0.18)) * stance;
+    base.backLeg.hip.x -= side * (attack.hipCounter * 1.7 + anticipate * 0.44) * stance;
+    support.knee.x -= side * (attack.supportPress * 2.8 + attack.settle * 0.9) * stance;
+    support.knee.y += attack.supportPress * 3.1 + attack.settle * 1.2;
+    support.foot.x -= side * (attack.supportPress * 4.8 + attack.settle * 2.6) * stance;
+    support.foot.y += attack.supportPress * 0.54 + attack.settle * 0.38;
+    support.plant = Math.max(support.plant ?? 0, clamp(0.62 + attack.supportPress * 0.28 + attack.settle * 0.08, 0, 1));
+    support.toeFlex = Math.max(support.toeFlex ?? 0, clamp(attack.toeGrip * 0.9 + snap * 0.08, 0, 1));
+    support.footAngle = (support.footAngle ?? 0) - side * (attack.toeGrip * 0.022 + attack.supportPress * 0.014);
+
+    if (attack.leg) {
+      const sweepReach = low ? 1.36 : 1;
+      free.knee.x += freeSide * (attack.freeLoad * 4.2 + line * 4.8 + snap * 2.2 - recover * 1.3) * stance;
+      free.knee.y += low ? attack.freeLoad * 2.6 + line * 1.6 : -attack.freeLoad * 3.2 - line * 4.2 + recover * 2.1;
+      free.foot.x += freeSide * (attack.freeLoad * 6.8 + line * 9.2 * sweepReach + snap * 4.1 - recover * 2.7) * stance;
+      free.foot.y += low ? line * 1.8 + follow * 1.4 : -line * 6.8 - snap * 2.2 + recover * 3.4;
+      free.footAngle = (free.footAngle ?? 0) + freeSide * (attack.ankleWhip * (low ? 0.045 : 0.06) - recover * 0.02);
+      free.extension = Math.max(free.extension ?? 0, clamp(line * 0.32 + attack.ankleWhip * 0.16, 0, 0.92));
+      free.lift = Math.max(free.lift ?? 0, clamp(line * 0.34 + snap * 0.16, 0, 1));
+      free.toeFlex = Math.max(free.toeFlex ?? 0, clamp(attack.ankleWhip * 0.68 + snap * 0.12, 0, 1));
+      base.frontArm.hand.x -= side * (attack.wristBreak * 3.8 + follow * 1.6) * stance;
+      base.backArm.hand.x -= side * (attack.wristBreak * 4.8 + follow * 2.1) * stance;
+      base.frontArm.hand.y += attack.wristBreak * 1.9 + recover * 1.2;
+      base.backArm.hand.y += attack.wristBreak * 2.3 + recover * 1.5;
+    } else {
+      const grabBias = attack.spec.grab ? 1.2 : 1;
+      const liftBias = attack.spec.special ? 1.16 : 1;
+      base.frontArm.elbow.x += side * (attack.wristBreak * 4.8 + snap * 2.1 + line * 2.6 - recover * 1.3) * stance * grabBias;
+      base.frontArm.elbow.y -= (attack.wristBreak * 1.7 + snap * 2.2) * liftBias - follow * 1.2 - recover * 1.4;
+      base.frontArm.hand.x += side * (attack.wristBreak * 9.8 + snap * 5.4 + line * 4.6 - recover * 2.4) * stance * grabBias;
+      base.frontArm.hand.y -= (attack.wristBreak * 2.5 + snap * 3.4) * liftBias - follow * 1.9 - recover * 2.2;
+      base.backArm.elbow.x -= side * (anticipate * 2.8 + snap * 0.9 - follow * 1.1) * stance;
+      base.backArm.hand.x -= side * (anticipate * 4.4 + snap * 1.6 + recover * 1.8 - follow * 1.4) * stance;
+      base.backArm.hand.y += anticipate * 1.1 + follow * 1.6 + recover * 1.7 - snap * 0.8;
+      base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + snap * 0.08 + attack.wristBreak * 0.05 - follow * 0.025, 0, 1);
+    }
+
+    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(attack.fingerSplay * 0.7 + snap * 0.12 + recover * 0.08, 0, 0.92));
+    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(attack.fingerSplay * 0.44 + follow * 0.1, 0, 0.72));
+  }
+
+  const whiff = context.whiffActing ?? null;
+  if (whiff?.active > 0.025) {
+    const side = whiff.side;
+    const over = whiff.overextend;
+    const replant = whiff.replant;
+    const loose = whiff.loose;
+    const leg = whiff.leg;
+    const low = whiff.low ? 1 : 0;
+
+    base.torsoTilt += side * (over * (leg ? 0.014 : 0.011) - replant * 0.012) + whiff.shoulderDrop * 0.004;
+    base.frontArm.shoulder.x += side * (over * 1.4 + whiff.shoulderDrop * 0.9) * stance;
+    base.frontArm.shoulder.y += whiff.shoulderDrop * 1.1 + loose * 0.5;
+    base.backArm.shoulder.x -= side * (whiff.hipCatch * 1.2 + replant * 0.7) * stance;
+    base.backArm.shoulder.y += whiff.shoulderDrop * 0.86 + replant * 0.48;
+    base.frontLeg.hip.x += side * whiff.hipCatch * 1.2 * stance;
+    base.backLeg.hip.x -= side * (whiff.hipCatch * 1.6 + replant * 0.8) * stance;
+    base.backLeg.knee.y += replant * 2.6 + whiff.hipCatch * 1.4;
+    base.backLeg.foot.x -= side * (replant * 5.8 + whiff.hipCatch * 2.4) * stance;
+    base.backLeg.foot.y += replant * 0.56;
+    base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.58 + replant * 0.26, 0, 1));
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, clamp(whiff.ankleLoose * 0.52 + replant * 0.22, 0, 1));
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - side * (whiff.ankleLoose * 0.024 + replant * 0.014);
+
+    if (leg) {
+      base.frontLeg.knee.x += side * over * (low ? 8.6 : 5.8) * stance;
+      base.frontLeg.knee.y += low ? over * 2.8 : -over * 3.2 + replant * 2.2;
+      base.frontLeg.foot.x += side * over * (low ? 17.2 : 9.8) * stance - side * replant * 2.5 * stance;
+      base.frontLeg.foot.y += low ? over * 1.4 : -over * 5.2 + replant * 3.1;
+      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - side * (whiff.ankleLoose * (low ? 0.034 : 0.046) - replant * 0.016);
+      base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, clamp(whiff.ankleLoose * 0.5 + replant * 0.12, 0, 0.9));
+    } else {
+      base.frontArm.elbow.x += side * (over * 4.8 + whiff.wristLoose * 4.2 - replant * 1.6) * stance;
+      base.frontArm.elbow.y += loose * 1.6 + whiff.shoulderDrop * 0.8 - replant * 0.9;
+      base.frontArm.hand.x += side * (over * 8.8 + whiff.wristLoose * 7.2 - replant * 2.8) * stance;
+      base.frontArm.hand.y += loose * 2.4 + whiff.shoulderDrop * 1.1 - replant * 1.2;
+      base.backArm.hand.x += side * (loose * 3.4 - replant * 1.5) * stance;
+      base.backArm.hand.y += loose * 1.8 + whiff.shoulderDrop * 0.72;
+    }
+
+    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + whiff.wristLoose * 0.08 - replant * 0.025, 0, 1);
+    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + loose * 0.045, 0, 1);
+    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(loose * 0.52 + whiff.wristLoose * 0.18, 0, 0.88));
+    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(loose * 0.38 + replant * 0.08, 0, 0.66));
+  }
+}
+
 function attackChainProfile(f, currentType = "") {
   const max = Math.max(1, f?.attackChainMax ?? 1);
   const raw = clamp((f?.attackChainPulse ?? 0) / max, 0, 1);
@@ -20444,6 +20686,10 @@ function getPose(f, stride) {
       base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(wristTrail * 0.34 + line * 0.16, 0, 0.78));
       base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(wristTrail * 0.26 + catchLine * 0.12, 0, 0.66));
     }
+
+    applyAttackActingPolishPose(base, f, spec, {
+      whiffActing: whiffActingPolishProfile(f, whiffPose, anatomy, silhouette),
+    });
   }
 
   const attackPresent = attackPresentationProfile(f);
@@ -20613,6 +20859,10 @@ function getPose(f, stride) {
     base[supportKey].toeFlex = Math.max(base[supportKey].toeFlex ?? 0, toe);
     base[supportKey].footAngle = (base[supportKey].footAngle ?? 0) - attackPresent.supportSide * toe * 0.026;
     base[freeKey].toeFlex = Math.max(base[freeKey].toeFlex ?? 0, toe * (specPresent.kick || specPresent.sweep ? 0.48 : 0.24));
+
+    applyAttackActingPolishPose(base, f, spec, {
+      attackActing: attackActingPolishProfile(f, attackPresent, anatomy, silhouette),
+    });
   }
 
   if (bodyWeight && bodyWeight.active > 0.03 && f.grounded) {
