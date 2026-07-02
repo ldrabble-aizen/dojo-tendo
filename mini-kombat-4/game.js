@@ -818,6 +818,100 @@ function specialTechniqueProfile(f) {
   }[f?.profileId] ?? { coil: 1, release: 1, hands: 1, lift: 1, foot: 1, arc: 1, focus: 1 };
 }
 
+function specialPresentationMotion(f) {
+  const attack = f?.attack;
+  const technique = specialTechniqueProfile(f);
+  const style = fighterSignatureStyle(f);
+  if (!attack || attack.type !== "special" || (f?.hurt ?? 0) > 0 || winner) {
+    return {
+      technique,
+      style,
+      active: 0,
+      charge: 0,
+      release: 0,
+      focus: 0,
+      palm: 0,
+      handPull: 0,
+      handPush: 0,
+      footBrace: 0,
+      shoulderLift: 0,
+      torsoArc: 0,
+      auraScale: 1,
+      handX: 0,
+      handY: -112,
+      pulse: 0,
+      orbit: 0,
+      wake: 0,
+    };
+  }
+
+  const phase = attackPhase(attack);
+  const mass = attackMassProfile(f);
+  const progress = phase.power;
+  const charge = clamp(phase.anticipation * 0.92 + mass.load * 0.24, 0, 1.38) * technique.coil;
+  const release = clamp(phase.strike * 0.9 + phase.snap * 0.5 + phase.followThrough * 0.32, 0, 1.48) * technique.release;
+  const focus = clamp((Math.max(charge, release) * 0.74 + progress * 0.42) * technique.focus, 0, 1.95);
+  const pulse = Math.sin(roundFrame * (0.22 + technique.arc * 0.025) + (f?.profileId?.charCodeAt(1) ?? 0)) * focus;
+  const palm = clamp((charge * 0.72 + release * 1.04 + phase.snap * 0.34) * technique.hands, 0, 1.95);
+  const handPull = charge * technique.hands;
+  const handPush = release * technique.hands;
+  const footBrace = clamp(charge * 0.88 + release * 0.44 + mass.plant * 0.18, 0, 1.72) * technique.foot;
+  const shoulderLift = clamp(release * 0.72 + charge * 0.24, 0, 1.5) * technique.lift;
+  const torsoArc = clamp(release * 0.82 - charge * 0.32 + pulse * 0.12, -0.6, 1.6) * technique.arc;
+  const auraScale = clamp(0.82 + focus * 0.24 + release * 0.12, 0.82, 1.45);
+  const handY = (f.profileId === "p2" || f.profileId === "p4" || f.profileId === "p5" ? -126 : -112) - release * 7 * technique.lift + charge * 2;
+  const handX = (f.profileId === "p2" || f.profileId === "p4" || f.profileId === "p5" ? 58 : 46) + phase.strike * (14 + technique.hands * 6) + release * 7 * technique.hands - charge * 4;
+
+  return {
+    technique,
+    style,
+    active: clamp(Math.max(charge * 0.72, release, focus * 0.68, palm * 0.58), 0, 1.95),
+    charge,
+    release,
+    focus,
+    palm,
+    handPull,
+    handPush,
+    footBrace,
+    shoulderLift,
+    torsoArc,
+    auraScale,
+    handX,
+    handY,
+    pulse,
+    orbit: clamp(charge * 0.6 + release * 0.84 + progress * 0.36, 0, 1.8),
+    wake: clamp(release * 0.72 + phase.followThrough * 0.46 + phase.recovery * 0.2, 0, 1.6),
+  };
+}
+
+function specialProjectilePresentation(p) {
+  const profile = specialProjectileProfile(p?.profileId);
+  const age = p?.age ?? 0;
+  const life = p?.life ?? 0;
+  const dir = p?.dir || ((p?.vx ?? 0) > 0 ? 1 : -1);
+  const warm = smoothStep01(clamp(age / 10, 0, 1));
+  const fade = smoothStep01(clamp(life / 18, 0, 1));
+  const pulse = 0.5 + Math.sin(age * (0.28 + (profile.spinRate || 0.08)) + (p?.x ?? 0) * 0.01) * 0.5;
+  const wake = clamp((warm * 0.74 + fade * 0.28) * (0.88 + pulse * 0.2), 0, 1.45);
+  const stretch = clamp(1 + Math.abs(p?.vx ?? 0) * 0.018 + wake * 0.14, 1, 1.45);
+  const compression = clamp(1 - wake * 0.06, 0.82, 1);
+
+  return {
+    profile,
+    age,
+    life,
+    dir,
+    warm,
+    fade,
+    pulse,
+    wake,
+    stretch,
+    compression,
+    halo: clamp(0.18 + wake * 0.38 + pulse * 0.08, 0.18, 0.72),
+    orbit: clamp(wake * 0.82 + pulse * 0.18, 0, 1.35),
+  };
+}
+
 function hitReactionAnatomyProfile(f) {
   return {
     p1: { shoulder: 0.86, hip: 1.14, armLag: 0.78, footLag: 0.9, settle: 1.18, twist: 0.82, handWhip: 0.78, kneeWhip: 0.92, spine: 0.82, fingerShock: 0.82, toeClaw: 1.16, crease: 0.9, shadowWeight: 1.18 },
@@ -15793,14 +15887,15 @@ function drawAttackBodyGlow(f, crouch) {
   const presentation = attackPresentationProfile(f);
   const progress = phase.power;
   const style = f.attack.type === "special" ? fighterSignatureStyle(f) : null;
-  const technique = f.attack.type === "special" ? specialTechniqueProfile(f) : null;
+  const specialPresent = f.attack.type === "special" ? specialPresentationMotion(f) : null;
+  const technique = specialPresent?.technique ?? null;
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.strokeStyle = style ? style.rim : colorWithAlpha(f.trim, 0.55);
-  ctx.globalAlpha = 0.04 + phase.anticipation * 0.045 + phase.strike * 0.095 + phase.recovery * 0.03 + mass.drive * 0.03;
-  ctx.lineWidth = f.attack.type === "special" ? 3.2 + mass.drive * 0.8 : 1.6 + phase.strike * 0.75 + mass.plant * 0.45;
+  ctx.globalAlpha = 0.04 + phase.anticipation * 0.045 + phase.strike * 0.095 + phase.recovery * 0.03 + mass.drive * 0.03 + (specialPresent?.focus ?? 0) * 0.018;
+  ctx.lineWidth = f.attack.type === "special" ? 3.2 + mass.drive * 0.8 + (specialPresent?.palm ?? 0) * 0.45 : 1.6 + phase.strike * 0.75 + mass.plant * 0.45;
   ctx.beginPath();
-  ctx.ellipse(-mass.load * 4 + mass.drive * 7, -94 + crouch + mass.crush * 2, 58 + progress * 18 + mass.drive * 10, 106 + progress * 12 - mass.crush * 4, f.dir * (mass.drive - mass.load) * 0.035, 0, Math.PI * 2);
+  ctx.ellipse(-mass.load * 4 + mass.drive * 7 + (specialPresent?.pulse ?? 0) * 2, -94 + crouch + mass.crush * 2 - (specialPresent?.shoulderLift ?? 0) * 3, 58 + progress * 18 + mass.drive * 10 + (specialPresent?.focus ?? 0) * 10, 106 + progress * 12 - mass.crush * 4 + (specialPresent?.auraScale ?? 0) * 4, f.dir * (mass.drive - mass.load) * 0.035, 0, Math.PI * 2);
   ctx.stroke();
   if (mass.plant > 0.04) {
     const footSide = mass.footSide * 32;
@@ -15811,39 +15906,39 @@ function drawAttackBodyGlow(f, crouch) {
     ctx.quadraticCurveTo(footSide - f.dir * (28 + mass.drive * 18), 3 + crouch * 0.18, footSide - f.dir * (52 + mass.drive * 24), 0 + crouch * 0.18);
     ctx.stroke();
   }
-  if (f.attack.type === "special") {
+  if (f.attack.type === "special" && specialPresent.active > 0) {
     ctx.strokeStyle = style.core;
     ctx.lineWidth = 2;
-    const charge = clamp(phase.anticipation * 0.86 + mass.load * 0.18, 0, 1.3) * technique.coil;
-    const release = clamp(phase.strike + phase.snap * 0.5 + phase.followThrough * 0.3, 0, 1.4) * technique.release;
-    const focusScale = technique.focus * (0.86 + progress * 0.18);
-    for (let i = 0; i < 3; i += 1) {
-      const a = roundFrame * (0.07 + technique.arc * 0.015) + i * 2.1;
+    const charge = specialPresent.charge;
+    const release = specialPresent.release;
+    const focusScale = technique.focus * (0.86 + progress * 0.18 + specialPresent.focus * 0.08);
+    for (let i = 0; i < 4; i += 1) {
+      const a = roundFrame * (0.07 + technique.arc * 0.015) + i * 1.57 + specialPresent.pulse * 0.06;
       ctx.beginPath();
-      ctx.arc(Math.cos(a) * (18 + release * 6), -108 + crouch + Math.sin(a) * (14 + charge * 5), (18 + progress * 10) * focusScale, 0.2, Math.PI * (1.44 + technique.arc * 0.12));
+      ctx.arc(Math.cos(a) * (18 + release * 6 + specialPresent.orbit * 3), -108 + crouch + Math.sin(a) * (14 + charge * 5), (18 + progress * 10 + specialPresent.focus * 3) * focusScale, 0.2, Math.PI * (1.44 + technique.arc * 0.12));
       ctx.stroke();
     }
 
-    const handY = (f.profileId === "p2" ? -126 : -112) + crouch - release * 7 * technique.lift + charge * 2;
-    const handX = (f.profileId === "p2" ? 58 : 46) + phase.strike * (14 + technique.hands * 6) + release * 7 * technique.hands - charge * 4;
-    const aura = ctx.createRadialGradient(handX, handY, 2, handX, handY, (54 + progress * 36) * focusScale);
-    aura.addColorStop(0, `rgba(255,255,255,${0.2 + progress * 0.26})`);
-    aura.addColorStop(0.35, colorWithAlpha(style.rim, 0.13 + progress * 0.18));
+    const handY = specialPresent.handY + crouch;
+    const handX = specialPresent.handX;
+    const aura = ctx.createRadialGradient(handX, handY, 2, handX, handY, (54 + progress * 36 + specialPresent.palm * 8) * focusScale);
+    aura.addColorStop(0, `rgba(255,255,255,${0.2 + progress * 0.26 + specialPresent.release * 0.05})`);
+    aura.addColorStop(0.35, colorWithAlpha(style.rim, 0.13 + progress * 0.18 + specialPresent.focus * 0.035));
     aura.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = aura;
     ctx.beginPath();
-    ctx.ellipse(handX, handY, (46 + progress * 28) * technique.focus, (34 + progress * 24) * (0.88 + technique.lift * 0.12), -0.12 * technique.arc, 0, Math.PI * 2);
+    ctx.ellipse(handX + specialPresent.pulse * 2.2, handY - specialPresent.release * 2, (46 + progress * 28 + specialPresent.palm * 8) * technique.focus, (34 + progress * 24 + specialPresent.focus * 5) * (0.88 + technique.lift * 0.12), -0.12 * technique.arc, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = colorWithAlpha(style.trail, 0.08 + progress * 0.16);
-    ctx.lineWidth = 1.2 + progress * 1.1;
+    ctx.strokeStyle = colorWithAlpha(style.trail, 0.08 + progress * 0.16 + specialPresent.wake * 0.04);
+    ctx.lineWidth = 1.2 + progress * 1.1 + specialPresent.release * 0.45;
     ctx.beginPath();
     if (f.profileId === "p2") {
       ctx.moveTo(-34, -96 + crouch);
-      ctx.bezierCurveTo(2, -154 + crouch, 50 + progress * 16, -154 + crouch, 78 + progress * 28, -115 + crouch);
+      ctx.bezierCurveTo(2, -154 + crouch - charge * 4, 50 + progress * 16, -154 + crouch - specialPresent.focus * 3, 78 + progress * 28 + release * 6, -115 + crouch - release * 3);
     } else {
       ctx.moveTo(-28, -78 + crouch);
-      ctx.bezierCurveTo(10, -137 + crouch, 46 + progress * 14, -148 + crouch, 78 + progress * 26, -105 + crouch);
+      ctx.bezierCurveTo(10, -137 + crouch - charge * 3, 46 + progress * 14, -148 + crouch - specialPresent.focus * 2.6, 78 + progress * 26 + release * 6, -105 + crouch - release * 2);
     }
     ctx.stroke();
   }
@@ -15859,6 +15954,8 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
   const spec = attackVisualSpec(f.attack.type);
   const motion = characterMotion(f);
   const signature = spec.special ? fighterSignatureStyle(f) : null;
+  const specialPresent = spec.special ? specialPresentationMotion(f) : null;
+  const specialActive = (specialPresent?.active ?? 0) > 0;
   const trailColor = signature?.trail ?? spec.color;
   const coreColor = signature?.core ?? spec.core;
   const rimColor = signature?.rim ?? spec.color;
@@ -15919,13 +16016,14 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
       ctx.stroke();
     }
 
-    if (spec.special && prep > 0.04) {
-      ctx.strokeStyle = colorWithAlpha(rimColor, 0.045 + prep * 0.12);
-      ctx.lineWidth = 1.1 + prep * 1.2;
-      for (let i = 0; i < 2; i += 1) {
-        const radius = 27 + i * 13 + prep * 16;
+    if (spec.special && specialActive && prep > 0.04) {
+      const charge = specialPresent?.charge ?? prep;
+      ctx.strokeStyle = colorWithAlpha(rimColor, 0.045 + prep * 0.12 + charge * 0.035);
+      ctx.lineWidth = 1.1 + prep * 1.2 + charge * 0.42;
+      for (let i = 0; i < 3; i += 1) {
+        const radius = 27 + i * 11 + prep * 16 + charge * 5;
         ctx.beginPath();
-        ctx.arc(28 + prep * 9, -112 + yOffset, radius, -0.45 + i * 0.18, Math.PI * 1.25 + prep * 0.55);
+        ctx.arc(28 + prep * 9 + (specialPresent?.pulse ?? 0) * 1.2, -112 + yOffset - charge * 2, radius, -0.45 + i * 0.18, Math.PI * (1.25 + prep * 0.18 + (specialPresent?.orbit ?? 0) * 0.06));
         ctx.stroke();
       }
     }
@@ -16017,18 +16115,21 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
     );
     ctx.stroke();
 
-    if (spec.special) {
-      ctx.strokeStyle = colorWithAlpha(rimColor, 0.1 + strike * 0.24);
-      ctx.lineWidth = 2 + phase.snap * 1.2;
-      for (let i = 0; i < 2; i += 1) {
+    if (spec.special && specialActive) {
+      const release = specialPresent?.release ?? strike;
+      const focus = specialPresent?.focus ?? strike;
+      ctx.strokeStyle = colorWithAlpha(rimColor, 0.1 + strike * 0.24 + focus * 0.04);
+      ctx.lineWidth = 2 + phase.snap * 1.2 + release * 0.7;
+      for (let i = 0; i < 3; i += 1) {
         const lane = i === 0 ? -0.55 : 0.55;
+        const laneOffset = i === 2 ? 0 : lane;
         ctx.beginPath();
         if (f.profileId === "p2") {
-          ctx.moveTo(12 + lane * 5, baseY - height * (0.35 + lane * 0.08));
-          ctx.bezierCurveTo(reach * 0.32, baseY - height * (1.35 + lane * 0.18), reach * 0.72, baseY - height * (0.18 - lane * 0.08), reach * (1.08 + lane * 0.05), baseY + height * (0.12 + lane * 0.08));
+          ctx.moveTo(12 + laneOffset * 5, baseY - height * (0.35 + laneOffset * 0.08) - focus * 2);
+          ctx.bezierCurveTo(reach * 0.32, baseY - height * (1.35 + laneOffset * 0.18) - release * 4, reach * 0.72, baseY - height * (0.18 - laneOffset * 0.08), reach * (1.08 + laneOffset * 0.05 + release * 0.04), baseY + height * (0.12 + laneOffset * 0.08) - release * 2);
         } else {
-          ctx.moveTo(8 + lane * 6, baseY + height * (0.2 + lane * 0.12));
-          ctx.bezierCurveTo(reach * 0.28, baseY - height * (1.02 + lane * 0.15), reach * 0.66, baseY - height * (0.86 - lane * 0.05), reach * (1.02 + lane * 0.04), baseY - height * (0.08 - lane * 0.1));
+          ctx.moveTo(8 + laneOffset * 6, baseY + height * (0.2 + laneOffset * 0.12));
+          ctx.bezierCurveTo(reach * 0.28, baseY - height * (1.02 + laneOffset * 0.15) - release * 3, reach * 0.66, baseY - height * (0.86 - laneOffset * 0.05), reach * (1.02 + laneOffset * 0.04 + release * 0.04), baseY - height * (0.08 - laneOffset * 0.1) - release * 2);
         }
         ctx.stroke();
       }
@@ -16067,7 +16168,7 @@ function drawAttackKineticFX(f, crouch, layer = "front") {
       }
     }
 
-    if (spec.special) {
+    if (spec.special && specialActive) {
       ctx.strokeStyle = colorWithAlpha(rimColor, 0.1 + strike * 0.2);
       ctx.lineWidth = 1.3 + strike * 1.2;
       for (let i = 0; i < 2; i += 1) {
@@ -18611,27 +18712,28 @@ function getPose(f, stride) {
       base.frontLeg.foot.x += 7 * activePulse - 3 * windup;
       base.backLeg.foot.x -= 7 * activePulse + 3 * windup;
     }
-    const technique = specialTechniqueProfile(f);
-    const charge = clamp(windup * 0.9 + load * 0.22, 0, 1.35) * technique.coil;
-    const release = clamp(activePulse * 0.92 + mass.snap * 0.34 + phase.followThrough * 0.28, 0, 1.45) * technique.release;
-    const focusPulse = Math.sin(roundFrame * 0.22 + (f.profileId?.charCodeAt(1) ?? 0)) * clamp(Math.max(charge, release), 0, 1.2);
-    const handPull = charge * technique.hands;
-    const handPush = release * technique.hands;
-    const footBrace = clamp(charge * 0.86 + release * 0.42, 0, 1.6) * technique.foot;
+    const specialPresent = specialPresentationMotion(f);
+    const technique = specialPresent.technique;
+    const charge = specialPresent.charge;
+    const release = specialPresent.release;
+    const focusPulse = specialPresent.pulse;
+    const handPull = specialPresent.handPull;
+    const handPush = specialPresent.handPush;
+    const footBrace = specialPresent.footBrace;
 
-    base.torsoTilt += -charge * 0.018 * technique.coil + release * 0.034 * technique.arc;
+    base.torsoTilt += -charge * 0.018 * technique.coil + release * 0.034 * technique.arc + specialPresent.torsoArc * 0.012;
     base.frontArm.shoulder.x -= handPull * 2.2 * spec.stance;
-    base.frontArm.shoulder.y -= release * 2.2 * technique.lift - charge * 1.2;
+    base.frontArm.shoulder.y -= release * 2.2 * technique.lift - charge * 1.2 + specialPresent.shoulderLift * 1.4;
     base.backArm.shoulder.x += handPull * 1.6 * spec.stance;
     base.backArm.shoulder.y += charge * 1.4;
-    base.frontArm.elbow.x += (-handPull * 5.6 + handPush * 8.8 + focusPulse * 1.4) * spec.stance;
-    base.frontArm.elbow.y += charge * 3.4 - release * 6.2 * technique.lift;
-    base.frontArm.hand.x += (-handPull * 8.8 + handPush * 15.5 + focusPulse * 2.4) * spec.stance;
-    base.frontArm.hand.y += charge * 4.8 - release * 9.4 * technique.lift;
-    base.backArm.elbow.x += (-handPull * 3.8 + handPush * 6.4 - focusPulse * 1.2) * spec.stance;
-    base.backArm.elbow.y += charge * 2.8 - release * 5.2 * technique.lift;
-    base.backArm.hand.x += (-handPull * 5.8 + handPush * 11.2 - focusPulse * 1.8) * spec.stance;
-    base.backArm.hand.y += charge * 3.8 - release * 8.2 * technique.lift;
+    base.frontArm.elbow.x += (-handPull * 5.6 + handPush * 8.8 + focusPulse * 1.4 + specialPresent.palm * 1.2) * spec.stance;
+    base.frontArm.elbow.y += charge * 3.4 - release * 6.2 * technique.lift - specialPresent.focus * 1.6;
+    base.frontArm.hand.x += (-handPull * 8.8 + handPush * 15.5 + focusPulse * 2.4 + specialPresent.palm * 2.4) * spec.stance;
+    base.frontArm.hand.y += charge * 4.8 - release * 9.4 * technique.lift - specialPresent.focus * 2.4;
+    base.backArm.elbow.x += (-handPull * 3.8 + handPush * 6.4 - focusPulse * 1.2 - specialPresent.palm * 0.8) * spec.stance;
+    base.backArm.elbow.y += charge * 2.8 - release * 5.2 * technique.lift - specialPresent.focus * 1.1;
+    base.backArm.hand.x += (-handPull * 5.8 + handPush * 11.2 - focusPulse * 1.8 - specialPresent.palm * 1.5) * spec.stance;
+    base.backArm.hand.y += charge * 3.8 - release * 8.2 * technique.lift - specialPresent.focus * 1.8;
     base.frontLeg.knee.y += footBrace * 4.8;
     base.frontLeg.foot.x += (release * 4.2 - charge * 2.8) * spec.stance * technique.foot;
     base.frontLeg.foot.y += footBrace * 0.55 - release * 1.6 * technique.lift;
@@ -18640,6 +18742,12 @@ function getPose(f, stride) {
     base.backLeg.foot.y += footBrace * 0.75;
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.42 + release * 0.26 + footBrace * 0.22, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.72 + charge * 0.22 + footBrace * 0.2, 0, 1));
+    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + specialPresent.palm * 0.16, 0, 1);
+    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + specialPresent.charge * 0.12 + release * 0.08, 0, 1);
+    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, clamp(specialPresent.focus * 0.28, 0, 0.72));
+    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, clamp(specialPresent.charge * 0.22, 0, 0.58));
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, clamp(release * 0.22, 0, 0.54));
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, clamp(footBrace * 0.2, 0, 0.58));
     base.torsoTilt += -load * 0.03 + drive * 0.04;
     base.frontLeg.foot.x += drive * 8 * spec.stance;
     base.backLeg.foot.x -= load * 8 * spec.stance + drive * 8 * spec.stance;
@@ -21475,27 +21583,45 @@ function drawCounterReadyFX(color, crouch, f) {
 function drawProjectiles() {
   for (const p of projectiles) {
     const style = p.style ?? SPECIAL_STYLES.p1;
-    const profile = specialProjectileProfile(p.profileId);
+    const present = specialProjectilePresentation(p);
+    const profile = present.profile;
     for (let i = 0; i < p.trail.length; i += 1) {
       const point = p.trail[i];
       const alpha = (i + 1) / p.trail.length;
-      const trailAlpha = 0.035 + alpha * (p.profileId === "p3" || p.profileId === "p6" ? 0.22 : 0.16);
+      const trailAlpha = 0.035 + alpha * (p.profileId === "p3" || p.profileId === "p6" ? 0.22 : 0.16) + present.wake * alpha * 0.025;
       ctx.fillStyle = colorWithAlpha(style.trail, trailAlpha);
       ctx.beginPath();
-      ctx.ellipse(point.x, point.y, p.r * alpha * (profile.radius >= 18 ? 1.65 : 1.35), p.r * alpha * (p.profileId === "p2" || p.profileId === "p4" ? 0.52 : 0.78), p.vx > 0 ? 0 : Math.PI, 0, Math.PI * 2);
+      ctx.ellipse(point.x, point.y, p.r * alpha * (profile.radius >= 18 ? 1.65 : 1.35) * present.stretch, p.r * alpha * (p.profileId === "p2" || p.profileId === "p4" ? 0.52 : 0.78) * present.compression, p.vx > 0 ? 0 : Math.PI, 0, Math.PI * 2);
       ctx.fill();
     }
 
     const pulse = Math.sin(p.life * 0.45) * 3;
-    const glowSize = (profile.radius >= 18 ? 38 : 31) + pulse;
+    const glowSize = (profile.radius >= 18 ? 38 : 31) + pulse + present.wake * 8;
     const glow = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, glowSize);
     glow.addColorStop(0, style.core);
     glow.addColorStop(0.35, style.rim);
     glow.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, glowSize, 0, Math.PI * 2);
+    ctx.ellipse(p.x + present.dir * present.wake * 2.5, p.y, glowSize * present.stretch, glowSize * present.compression, present.dir * 0.02, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = colorWithAlpha(style.core, 0.12 + present.halo * 0.16);
+    ctx.lineWidth = 1.2 + present.wake * 1.1;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(p.x - present.dir * (p.r * 2.2 + present.wake * 10), p.y - p.r * 0.32);
+    ctx.quadraticCurveTo(p.x - present.dir * p.r * 0.2, p.y - p.r * (1.05 + present.wake * 0.2), p.x + present.dir * (p.r * 1.45 + present.wake * 7), p.y - p.r * 0.12);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${0.1 + present.halo * 0.12})`;
+    ctx.lineWidth = 0.8 + present.wake * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(p.x - present.dir * p.r * 1.25, p.y + p.r * 0.28);
+    ctx.lineTo(p.x + present.dir * (p.r * 1.55 + present.wake * 4), p.y + p.r * 0.04);
+    ctx.stroke();
+    ctx.restore();
 
     drawSpecialSatellites(p, style, pulse);
     drawSpecialCore(p, style, pulse);
@@ -21503,25 +21629,27 @@ function drawProjectiles() {
 }
 
 function drawSpecialSatellites(p, style, pulse) {
-  const profile = specialProjectileProfile(p.profileId);
-  const age = p.age ?? 0;
-  const dir = p.dir || (p.vx > 0 ? 1 : -1);
+  const present = specialProjectilePresentation(p);
+  const profile = present.profile;
+  const age = present.age;
+  const dir = present.dir;
   const count = p.profileId === "p2" || p.profileId === "p4" ? 3 : p.profileId === "p6" ? 5 : 4;
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   for (let i = 0; i < count; i += 1) {
     const phase = age * (profile.spinRate || 0.08) + i * (Math.PI * 2 / count);
-    const radius = p.r * (p.profileId === "p5" ? 1.55 : p.profileId === "p3" ? 1.32 : 1.18);
-    const sx = p.x - dir * p.r * 0.22 + Math.cos(phase) * radius * 0.82;
+    const radius = p.r * (p.profileId === "p5" ? 1.55 : p.profileId === "p3" ? 1.32 : 1.18) * (1 + present.orbit * 0.08);
+    const sx = p.x - dir * p.r * 0.22 + Math.cos(phase) * radius * (0.82 + present.wake * 0.05);
     const sy = p.y + Math.sin(phase) * radius * (p.profileId === "p2" || p.profileId === "p4" ? 0.42 : 0.62);
-    ctx.fillStyle = i % 2 ? colorWithAlpha(style.core, 0.68) : colorWithAlpha(style.trail, 0.58);
+    ctx.fillStyle = i % 2 ? colorWithAlpha(style.core, 0.68 + present.halo * 0.06) : colorWithAlpha(style.trail, 0.58 + present.halo * 0.05);
     ctx.beginPath();
     if (p.profileId === "p5") {
-      ctx.ellipse(sx, sy, 3.8 + pulse * 0.18, 8.5, phase, 0, Math.PI * 2);
+      ctx.ellipse(sx, sy, 3.8 + pulse * 0.18 + present.orbit * 0.8, 8.5 + present.orbit * 1.5, phase, 0, Math.PI * 2);
     } else if (p.profileId === "p6") {
-      ctx.roundRect(sx - 4, sy - 4, 8, 8, 2);
+      const size = 8 + present.orbit * 1.4;
+      ctx.roundRect(sx - size / 2, sy - size / 2, size, size, 2);
     } else {
-      ctx.arc(sx, sy, 3.5 + Math.max(0, pulse) * 0.12, 0, Math.PI * 2);
+      ctx.arc(sx, sy, 3.5 + Math.max(0, pulse) * 0.12 + present.orbit * 0.55, 0, Math.PI * 2);
     }
     ctx.fill();
   }
@@ -21529,13 +21657,15 @@ function drawSpecialSatellites(p, style, pulse) {
 }
 
 function drawSpecialCore(p, style, pulse) {
+  const present = specialProjectilePresentation(p);
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate((p.age ?? p.life) * (p.spinRate ?? 0.08) * (p.vx > 0 ? 1 : -1));
+  ctx.scale(present.stretch, present.compression);
   ctx.globalCompositeOperation = "screen";
   ctx.fillStyle = style.core;
   ctx.strokeStyle = style.rim;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 3 + present.wake * 0.7;
 
   if (style.shape === "petal") {
     for (let i = 0; i < 5; i += 1) {
