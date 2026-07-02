@@ -1244,6 +1244,43 @@ function roundStartReadinessProfile(f) {
   }[f?.profileId] ?? { brace: 1, breath: 1, guard: 1, foot: 1, snap: 1, shoulder: 1, hip: 1, torso: 1, handLift: 1, kneeSink: 1, stanceWide: 1, twitch: 1, armPresence: 1, legPresence: 1, handSize: 1, footWeight: 1, snapReach: 1 };
 }
 
+function roundStartCinematicProfile(f, side = f?.id === "left" ? "left" : "right") {
+  const entrance = f ? fighterEntranceCue(f) : null;
+  const readiness = entrance?.readiness ?? roundStartReadinessProfile(f);
+  const presentation = f ? fighterPresentation(f) : fighterPresentation({});
+  const stats = f ? menuStatValues(f) : [75, 75, 75];
+  const clock = Math.max(0, 180 - (countdownFrames ?? 0));
+  const roundSeed = (roundNumber ?? 1) * 0.37 + (side === "left" ? 0.16 : 0.71);
+  const introWindow = smoothStep01(clamp((180 - (countdownFrames ?? 0)) / 22, 0, 1)) * smoothStep01(clamp(((countdownFrames ?? 0) - 44) / 36, 0, 1));
+  const clashWindow = smoothStep01(clamp((132 - (countdownFrames ?? 0)) / 22, 0, 1)) * smoothStep01(clamp(((countdownFrames ?? 0) - 34) / 30, 0, 1));
+  const fightSnap = (countdownFrames ?? 0) <= 48 ? smoothStep01(clamp((48 - (countdownFrames ?? 0)) / 36, 0, 1)) : 0;
+  const cue = entrance ? clamp(entrance.ease * 0.72 + entrance.step * 0.28, 0, 1) : introWindow * 0.42;
+  const pulse = 0.5 + Math.sin(clock * 0.155 + roundSeed) * 0.5;
+  const micro = 0.5 + Math.sin((roundFrame ?? 0) * 0.11 + roundSeed * 4.2) * 0.5;
+  const statTempo = clamp((stats[1] * 0.52 + stats[2] * 0.26 + stats[0] * 0.22) / 100, 0.4, 1.12);
+  const disciplineWeight = clamp((String(presentation.discipline ?? "").length + String(presentation.signature ?? "").length) / 42, 0.5, 1.25);
+  const pressure = clamp((stats[0] * 0.48 + stats[2] * 0.34 + stats[1] * 0.18) / 100 * readiness.brace, 0.45, 1.35);
+  const active = clamp(Math.max(introWindow, clashWindow, fightSnap, cue), 0, 1);
+
+  return {
+    active,
+    intro: introWindow,
+    clash: clashWindow,
+    fightSnap,
+    tempo: clamp(statTempo * (0.9 + pulse * 0.18), 0.35, 1.32),
+    pressure,
+    cardGlow: clamp((introWindow * 0.55 + cue * 0.34 + fightSnap * 0.2) * (0.78 + pulse * 0.42) * disciplineWeight, 0, 1.45),
+    nameShear: clamp((cue * 0.52 + fightSnap * 0.48) * readiness.snap * (side === "left" ? 1 : -1), -1.25, 1.25),
+    stanceBloom: clamp((cue * 0.55 + introWindow * 0.28 + fightSnap * 0.32) * readiness.guard * (0.84 + micro * 0.26), 0, 1.55),
+    footHeat: clamp((cue * 0.44 + fightSnap * 0.4 + clashWindow * 0.16) * readiness.footWeight * pressure, 0, 1.6),
+    shoulderRise: clamp((cue * 0.46 + fightSnap * 0.5 + pulse * 0.08) * readiness.shoulder, 0, 1.45),
+    handReady: clamp((cue * 0.38 + fightSnap * 0.54 + micro * 0.08) * readiness.handSize * readiness.snap, 0, 1.5),
+    screenCut: clamp((clashWindow * 0.42 + fightSnap * 0.62) * (0.82 + pressure * 0.24), 0, 1.4),
+    countdownPulse: clamp((fightSnap * 0.68 + pulse * 0.22 + introWindow * 0.1) * statTempo, 0, 1.45),
+    tapeBias: clamp(((stats[0] - stats[1]) / 100) * 0.6 + (side === "left" ? -0.12 : 0.12), -0.75, 0.75),
+  };
+}
+
 function fatigueBodyProfile(f) {
   return {
     p1: { sink: 1.18, breath: 0.82, shoulders: 0.9, hands: 0.86, knees: 1.18, feet: 1.16, tremor: 0.72, guardDrop: 0.88 },
@@ -7342,15 +7379,18 @@ function drawRoundIntroCards() {
   const y = mobile ? 92 : 108;
   const slide = (1 - intro) * (mobile ? 58 : 86);
   const pulse = 0.5 + Math.sin((180 - countdownFrames) * 0.12) * 0.5;
+  const leftCinema = roundStartCinematicProfile(fighters[0], "left");
+  const rightCinema = roundStartCinematicProfile(fighters[1], "right");
+  const sharedCut = clamp((leftCinema.screenCut + rightCinema.screenCut) * 0.5, 0, 1.35);
 
   ctx.save();
   ctx.globalAlpha = alpha;
-  drawRoundIntroCard(fighters[0], "left", 42 - slide, y, cardW, cardH, pulse);
-  drawRoundIntroCard(fighters[1], "right", W - 42 - cardW + slide, y, cardW, cardH, pulse);
+  drawRoundIntroCard(fighters[0], "left", 42 - slide, y, cardW, cardH, pulse, leftCinema);
+  drawRoundIntroCard(fighters[1], "right", W - 42 - cardW + slide, y, cardW, cardH, pulse, rightCinema);
   if (countdownFrames > 132) {
     ctx.save();
     ctx.globalAlpha *= smoothStep01(clamp((countdownFrames - 132) / 18, 0, 1));
-    drawRoundIntroTape(fighters[0], fighters[1], W / 2, y + cardH / 2, mobile, pulse);
+    drawRoundIntroTape(fighters[0], fighters[1], W / 2, y + cardH / 2, mobile, pulse, leftCinema, rightCinema);
     ctx.restore();
   }
 
@@ -7365,10 +7405,19 @@ function drawRoundIntroCards() {
   ctx.moveTo(W * 0.2, y + cardH + 13);
   ctx.lineTo(W * 0.8, y + cardH + 13);
   ctx.stroke();
+  ctx.strokeStyle = `rgba(126, 240, 207, ${0.08 + sharedCut * 0.09})`;
+  ctx.lineWidth = mobile ? 1.2 : 1.6;
+  for (let i = 0; i < 3; i += 1) {
+    const offset = (i - 1) * (mobile ? 28 : 42);
+    ctx.beginPath();
+    ctx.moveTo(W * 0.5 + offset - 88, y + cardH + 24 + i * 2);
+    ctx.lineTo(W * 0.5 + offset + 82, y + cardH + 8 - i * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
-function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
+function drawRoundIntroCard(fighter, side, x, y, width, height, pulse, cinematic = roundStartCinematicProfile(fighter, side)) {
   const reverse = side === "right";
   const trim = fighter.trim || "#fff1bd";
   const presentation = fighterPresentation(fighter);
@@ -7379,10 +7428,12 @@ function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
   const textW = width - portraitSize - 45;
   const textAnchor = reverse ? textX + textW : textX;
   const fontScale = height <= 100 ? 0.88 : 1;
+  const edgeGlow = clamp(cinematic.cardGlow ?? 0, 0, 1.5);
+  const shear = (cinematic.nameShear ?? 0) * (reverse ? -1 : 1);
 
   ctx.save();
   ctx.translate(x + width / 2, y + height / 2);
-  ctx.rotate(reverse ? 0.018 : -0.018);
+  ctx.rotate((reverse ? 0.018 : -0.018) + shear * 0.004);
   ctx.translate(-(x + width / 2), -(y + height / 2));
 
   const panel = ctx.createLinearGradient(x, y, x + width, y + height);
@@ -7394,17 +7445,42 @@ function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
   ctx.roundRect(x, y, width, height, 8);
   ctx.fill();
 
-  ctx.strokeStyle = colorWithAlpha(trim, 0.42 + pulse * 0.14);
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = colorWithAlpha(trim, 0.42 + pulse * 0.14 + edgeGlow * 0.12);
+  ctx.lineWidth = 2 + edgeGlow * 0.7;
   ctx.stroke();
+
+  ctx.globalCompositeOperation = "screen";
+  const edge = ctx.createLinearGradient(reverse ? x + width : x, y, reverse ? x : x + width, y + height);
+  edge.addColorStop(0, colorWithAlpha(trim, 0.13 + edgeGlow * 0.12));
+  edge.addColorStop(0.34, "rgba(255,255,255,0)");
+  edge.addColorStop(0.72, colorWithAlpha(fighter.color || trim, 0.04 + edgeGlow * 0.05));
+  edge.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = edge;
+  ctx.beginPath();
+  ctx.moveTo(x + (reverse ? width - 10 : 10), y + 6);
+  ctx.lineTo(x + (reverse ? width * 0.2 : width * 0.8), y + 6);
+  ctx.lineTo(x + (reverse ? width * 0.38 : width * 0.62), y + height - 6);
+  ctx.lineTo(x + (reverse ? width - 4 : 4), y + height - 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = colorWithAlpha("#ffffff", 0.045 + edgeGlow * 0.045);
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 2; i += 1) {
+    const dy = 14 + i * 38;
+    ctx.beginPath();
+    ctx.moveTo(reverse ? x + width - 18 : x + 18, y + dy);
+    ctx.lineTo(reverse ? x + width * 0.62 : x + width * 0.38, y + dy - 13 - pulse * 4);
+    ctx.stroke();
+  }
+  ctx.globalCompositeOperation = "source-over";
 
   const stanceX = reverse ? x + 56 : x + width - 56;
   const stanceFeetY = y + height - 15;
-  drawRoundIntroStanceGlyph(fighter, stanceX, stanceFeetY, reverse, pulse, fontScale);
+  drawRoundIntroStanceGlyph(fighter, stanceX, stanceFeetY, reverse, pulse, fontScale, cinematic);
 
   ctx.globalCompositeOperation = "screen";
   const glow = ctx.createRadialGradient(portraitX + portraitSize / 2, portraitY + portraitSize / 2, 8, portraitX + portraitSize / 2, portraitY + portraitSize / 2, portraitSize * 1.12);
-  glow.addColorStop(0, colorWithAlpha(trim, 0.22 + pulse * 0.08));
+  glow.addColorStop(0, colorWithAlpha(trim, 0.22 + pulse * 0.08 + edgeGlow * 0.08));
   glow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
@@ -7438,13 +7514,17 @@ function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
   ctx.font = `900 ${Math.round(9 * fontScale)}px system-ui, sans-serif`;
   ctx.fillText(reverse ? "JUGADOR 2" : cpuEnabled ? "CPU" : "JUGADOR 1", textAnchor, y + 23);
 
+  ctx.save();
+  ctx.translate(textAnchor, y + 52);
+  ctx.transform(1, 0, shear * 0.025, 1, 0, 0);
   ctx.fillStyle = "#fff3c4";
   ctx.font = `900 ${Math.round(28 * fontScale)}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
   ctx.lineWidth = 4;
   ctx.strokeStyle = "rgba(28, 10, 8, 0.88)";
   const name = compactIntroText(fighter.name, 16).toUpperCase();
-  ctx.strokeText(name, textAnchor, y + 52);
-  ctx.fillText(name, textAnchor, y + 52);
+  ctx.strokeText(name, 0, 0);
+  ctx.fillText(name, 0, 0);
+  ctx.restore();
 
   ctx.fillStyle = colorWithAlpha(trim, 0.94);
   ctx.font = `900 ${Math.round(10 * fontScale)}px system-ui, sans-serif`;
@@ -7457,29 +7537,33 @@ function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
   ctx.restore();
 }
 
-function drawRoundIntroStanceGlyph(fighter, cx, feetY, reverse, pulse, scale = 1) {
+function drawRoundIntroStanceGlyph(fighter, cx, feetY, reverse, pulse, scale = 1, cinematic = roundStartCinematicProfile(fighter, reverse ? "right" : "left")) {
   const profileId = fighter?.profileId ?? fighter?.id ?? "";
   const trim = fighter?.trim || "#fff1bd";
   const base = fighter?.color || trim;
   const ready = roundStartReadinessProfile(fighter);
+  const bloom = clamp(cinematic.stanceBloom ?? 0, 0, 1.6);
+  const shoulderRise = clamp(cinematic.shoulderRise ?? 0, 0, 1.5);
+  const handReady = clamp(cinematic.handReady ?? 0, 0, 1.5);
+  const footHeat = clamp(cinematic.footHeat ?? 0, 0, 1.6);
   const heavy = profileId === "p1" || profileId === "p3" || profileId === "p6";
   const agile = profileId === "p2" || profileId === "p4" || profileId === "p5";
   const facing = reverse ? -1 : 1;
   const bodyScale = scale * (heavy ? 1.04 : agile ? 0.94 : 1);
   const breath = Math.sin((180 - countdownFrames) * 0.11 + (profileId.charCodeAt(1) || 0)) * ready.breath;
-  const guard = 0.66 + pulse * 0.22;
+  const guard = 0.66 + pulse * 0.22 + handReady * 0.05;
   const shoulderW = (heavy ? 24 : 20) * bodyScale * ready.shoulder;
   const hipW = (heavy ? 19 : 15) * bodyScale * ready.hip;
   const headR = (heavy ? 8.2 : 7.2) * bodyScale;
-  const headY = feetY - (heavy ? 74 : 78) * bodyScale + breath * 0.6;
-  const chestY = feetY - (heavy ? 55 : 58) * bodyScale + breath * 0.9;
+  const headY = feetY - (heavy ? 74 : 78) * bodyScale + breath * 0.6 - shoulderRise * 1.1 * bodyScale;
+  const chestY = feetY - (heavy ? 55 : 58) * bodyScale + breath * 0.9 - shoulderRise * 1.4 * bodyScale;
   const hipY = feetY - (heavy ? 31 : 30) * bodyScale;
   const frontFoot = {
-    x: cx + facing * (20 + ready.stanceWide * 3.2) * bodyScale,
+    x: cx + facing * (20 + ready.stanceWide * 3.2 + footHeat * 1.2) * bodyScale,
     y: feetY,
   };
   const backFoot = {
-    x: cx - facing * (18 + ready.stanceWide * 2.6) * bodyScale,
+    x: cx - facing * (18 + ready.stanceWide * 2.6 + footHeat * 0.8) * bodyScale,
     y: feetY - 1.5 * bodyScale,
   };
   const frontKnee = {
@@ -7491,12 +7575,12 @@ function drawRoundIntroStanceGlyph(fighter, cx, feetY, reverse, pulse, scale = 1
     y: feetY - (20 + ready.kneeSink * 2.2) * bodyScale,
   };
   const frontHand = {
-    x: cx + facing * (29 + ready.snapReach * 2.6) * bodyScale,
-    y: chestY - (11 + ready.handLift * 2.4) * bodyScale,
+    x: cx + facing * (29 + ready.snapReach * 2.6 + handReady * 2.4) * bodyScale,
+    y: chestY - (11 + ready.handLift * 2.4 + handReady * 2.2) * bodyScale,
   };
   const backHand = {
-    x: cx - facing * (18 - guard * 2) * bodyScale,
-    y: chestY - (7 + ready.handLift * 1.6) * bodyScale,
+    x: cx - facing * (18 - guard * 2 + handReady * 0.8) * bodyScale,
+    y: chestY - (7 + ready.handLift * 1.6 + handReady * 1.4) * bodyScale,
   };
   const frontElbow = {
     x: cx + facing * 18 * bodyScale,
@@ -7510,26 +7594,26 @@ function drawRoundIntroStanceGlyph(fighter, cx, feetY, reverse, pulse, scale = 1
   ctx.save();
   ctx.globalAlpha *= 0.74;
   ctx.globalCompositeOperation = "multiply";
-  ctx.fillStyle = "rgba(16, 8, 6, 0.18)";
+  ctx.fillStyle = `rgba(16, 8, 6, ${0.18 + footHeat * 0.025})`;
   ctx.beginPath();
-  ctx.ellipse(cx + facing * 1.5, feetY + 2.5, 43 * bodyScale, 5.8 * bodyScale, -facing * 0.03, 0, Math.PI * 2);
+  ctx.ellipse(cx + facing * 1.5, feetY + 2.5, (43 + footHeat * 4) * bodyScale, (5.8 + footHeat * 0.8) * bodyScale, -facing * 0.03, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.globalCompositeOperation = "screen";
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.strokeStyle = colorWithAlpha(trim, 0.2 + pulse * 0.08);
-  ctx.lineWidth = 1.2 * bodyScale;
+  ctx.strokeStyle = colorWithAlpha(trim, 0.2 + pulse * 0.08 + bloom * 0.08);
+  ctx.lineWidth = (1.2 + bloom * 0.32) * bodyScale;
   ctx.beginPath();
-  ctx.ellipse(cx + facing * 2, feetY + 1.5, 33 * bodyScale, 4.2 * bodyScale, 0, 0.05, Math.PI * 1.9);
+  ctx.ellipse(cx + facing * 2, feetY + 1.5, (33 + footHeat * 4) * bodyScale, (4.2 + footHeat * 0.7) * bodyScale, 0, 0.05, Math.PI * 1.9);
   ctx.stroke();
 
   const bodyGrad = ctx.createLinearGradient(cx - shoulderW, headY, cx + shoulderW, feetY);
-  bodyGrad.addColorStop(0, colorWithAlpha(trim, 0.34 + pulse * 0.07));
-  bodyGrad.addColorStop(0.48, colorWithAlpha(base, 0.2 + pulse * 0.06));
+  bodyGrad.addColorStop(0, colorWithAlpha(trim, 0.34 + pulse * 0.07 + bloom * 0.06));
+  bodyGrad.addColorStop(0.48, colorWithAlpha(base, 0.2 + pulse * 0.06 + bloom * 0.035));
   bodyGrad.addColorStop(1, colorWithAlpha(trim, 0.16));
   ctx.strokeStyle = bodyGrad;
-  ctx.lineWidth = 4.6 * bodyScale;
+  ctx.lineWidth = (4.6 + shoulderRise * 0.45) * bodyScale;
   ctx.beginPath();
   ctx.moveTo(cx - shoulderW * 0.72, chestY - 1);
   ctx.quadraticCurveTo(cx + facing * ready.torso * 2.4, chestY + 8 * bodyScale, cx - hipW * 0.42, hipY);
@@ -7537,8 +7621,8 @@ function drawRoundIntroStanceGlyph(fighter, cx, feetY, reverse, pulse, scale = 1
   ctx.quadraticCurveTo(cx + facing * ready.torso * 4.2, chestY + 9 * bodyScale, cx + hipW * 0.42, hipY);
   ctx.stroke();
 
-  ctx.strokeStyle = colorWithAlpha(trim, 0.24 + guard * 0.09);
-  ctx.lineWidth = 3.1 * bodyScale;
+  ctx.strokeStyle = colorWithAlpha(trim, 0.24 + guard * 0.09 + handReady * 0.055);
+  ctx.lineWidth = (3.1 + handReady * 0.28) * bodyScale;
   ctx.beginPath();
   ctx.moveTo(cx + shoulderW * 0.74, chestY - 1);
   ctx.quadraticCurveTo(frontElbow.x, frontElbow.y, frontHand.x, frontHand.y);
@@ -7550,11 +7634,20 @@ function drawRoundIntroStanceGlyph(fighter, cx, feetY, reverse, pulse, scale = 1
   ctx.quadraticCurveTo(backKnee.x, backKnee.y, backFoot.x, backFoot.y);
   ctx.stroke();
 
-  ctx.fillStyle = colorWithAlpha("#fff7d6", 0.2 + pulse * 0.08);
+  ctx.fillStyle = colorWithAlpha("#fff7d6", 0.2 + pulse * 0.08 + bloom * 0.04);
   for (const point of [frontHand, backHand, frontFoot, backFoot]) {
     ctx.beginPath();
     ctx.ellipse(point.x, point.y, 3.6 * bodyScale, 2.5 * bodyScale, facing * 0.16, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  if (bloom > 0.05) {
+    ctx.strokeStyle = colorWithAlpha(trim, 0.06 + bloom * 0.06);
+    ctx.lineWidth = 0.9 * bodyScale;
+    ctx.beginPath();
+    ctx.moveTo(backFoot.x - facing * 5 * bodyScale, backFoot.y + 1 * bodyScale);
+    ctx.quadraticCurveTo(cx, feetY - (18 + bloom * 5) * bodyScale, frontHand.x + facing * 5 * bodyScale, frontHand.y - handReady * 4 * bodyScale);
+    ctx.stroke();
   }
 
   ctx.fillStyle = colorWithAlpha(trim, 0.23 + pulse * 0.08);
@@ -7603,7 +7696,7 @@ function drawRoundIntroStats(fighter, x, y, width, reverse, pulse) {
   ctx.restore();
 }
 
-function drawRoundIntroTape(left, right, centerX, centerY, mobile, pulse) {
+function drawRoundIntroTape(left, right, centerX, centerY, mobile, pulse, leftCinema = roundStartCinematicProfile(left, "left"), rightCinema = roundStartCinematicProfile(right, "right")) {
   const scout = matchupScout(left, right);
   const width = mobile ? 224 : 204;
   const height = mobile ? 70 : 78;
@@ -7614,6 +7707,8 @@ function drawRoundIntroTape(left, right, centerX, centerY, mobile, pulse) {
   const leftRating = Math.round(leftStats[0] * 0.42 + leftStats[1] * 0.35 + leftStats[2] * 0.23);
   const rightRating = Math.round(rightStats[0] * 0.42 + rightStats[1] * 0.35 + rightStats[2] * 0.23);
   const split = clamp(leftRating / Math.max(1, leftRating + rightRating), 0.18, 0.82);
+  const pressure = clamp((leftCinema.pressure + rightCinema.pressure) * 0.5, 0.35, 1.4);
+  const bias = clamp((leftCinema.tapeBias - rightCinema.tapeBias) * 0.5, -0.5, 0.5);
 
   ctx.save();
   const panel = ctx.createLinearGradient(x, y, x + width, y + height);
@@ -7625,14 +7720,24 @@ function drawRoundIntroTape(left, right, centerX, centerY, mobile, pulse) {
   ctx.roundRect(x, y, width, height, 8);
   ctx.fill();
   ctx.strokeStyle = `rgba(255, 241, 189, ${0.28 + pulse * 0.14})`;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1.5 + pressure * 0.35;
   ctx.stroke();
 
   ctx.globalCompositeOperation = "screen";
-  ctx.fillStyle = colorWithAlpha(left.trim || "#fff1bd", 0.18);
-  ctx.fillRect(x + 10, y + height - 14, (width - 20) * split, 6);
-  ctx.fillStyle = colorWithAlpha(right.trim || "#75f0cb", 0.18);
-  ctx.fillRect(x + 10 + (width - 20) * split, y + height - 14, (width - 20) * (1 - split), 6);
+  const splitX = clamp(split + bias * 0.08, 0.16, 0.84);
+  ctx.fillStyle = colorWithAlpha(left.trim || "#fff1bd", 0.16 + leftCinema.cardGlow * 0.035);
+  ctx.fillRect(x + 10, y + height - 14, (width - 20) * splitX, 6);
+  ctx.fillStyle = colorWithAlpha(right.trim || "#75f0cb", 0.16 + rightCinema.cardGlow * 0.035);
+  ctx.fillRect(x + 10 + (width - 20) * splitX, y + height - 14, (width - 20) * (1 - splitX), 6);
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.06 + pressure * 0.045})`;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i += 1) {
+    const sx = x + 18 + i * (width - 36) / 2;
+    ctx.beginPath();
+    ctx.moveTo(sx - 12, y + 21 + i * 2);
+    ctx.lineTo(sx + 18, y + 15 - i);
+    ctx.stroke();
+  }
   ctx.globalCompositeOperation = "source-over";
 
   ctx.textAlign = "center";
@@ -7668,11 +7773,14 @@ function drawRoundClashSlate() {
   const leftX = W / 2 - panelW - gap - slide;
   const rightX = W / 2 + gap + slide;
   const pulse = 0.5 + Math.sin((132 - countdownFrames) * 0.15) * 0.5;
+  const leftCinema = roundStartCinematicProfile(fighters[0], "left");
+  const rightCinema = roundStartCinematicProfile(fighters[1], "right");
+  const screenCut = clamp((leftCinema.screenCut + rightCinema.screenCut) * 0.5, 0, 1.4);
 
   ctx.save();
   ctx.globalAlpha = alpha;
-  drawClashFighterPlate(fighters[0], leftX, y, panelW, panelH, false, pulse, mobile);
-  drawClashFighterPlate(fighters[1], rightX, y, panelW, panelH, true, pulse, mobile);
+  drawClashFighterPlate(fighters[0], leftX, y, panelW, panelH, false, pulse, mobile, leftCinema);
+  drawClashFighterPlate(fighters[1], rightX, y, panelW, panelH, true, pulse, mobile, rightCinema);
 
   const centerW = mobile ? 66 : 82;
   const centerH = mobile ? 52 : 62;
@@ -7687,15 +7795,23 @@ function drawRoundClashSlate() {
   ctx.roundRect(centerX, centerY, centerW, centerH, 7);
   ctx.fill();
   ctx.strokeStyle = `rgba(255, 241, 189, ${0.34 + pulse * 0.2})`;
-  ctx.lineWidth = 1.6;
+  ctx.lineWidth = 1.6 + screenCut * 0.4;
   ctx.stroke();
 
   ctx.globalCompositeOperation = "screen";
-  ctx.strokeStyle = `rgba(255, 212, 77, ${0.22 + pulse * 0.18})`;
-  ctx.lineWidth = mobile ? 2 : 3;
+  ctx.strokeStyle = `rgba(255, 212, 77, ${0.22 + pulse * 0.18 + screenCut * 0.08})`;
+  ctx.lineWidth = (mobile ? 2 : 3) + screenCut * 0.8;
   ctx.beginPath();
   ctx.moveTo(centerX + 8, centerY + centerH / 2);
   ctx.lineTo(centerX + centerW - 8, centerY + centerH / 2);
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(126, 240, 207, ${0.08 + screenCut * 0.08})`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(centerX - 28, centerY + centerH - 8);
+  ctx.lineTo(centerX + centerW + 28, centerY + 8);
+  ctx.moveTo(centerX - 18, centerY + 8);
+  ctx.lineTo(centerX + centerW + 18, centerY + centerH - 8);
   ctx.stroke();
   ctx.globalCompositeOperation = "source-over";
 
@@ -7713,7 +7829,7 @@ function drawRoundClashSlate() {
   ctx.restore();
 }
 
-function drawClashFighterPlate(fighter, x, y, width, height, reverse, pulse, mobile) {
+function drawClashFighterPlate(fighter, x, y, width, height, reverse, pulse, mobile, cinematic = roundStartCinematicProfile(fighter, reverse ? "right" : "left")) {
   if (!fighter) return;
   const presentation = fighterPresentation(fighter);
   const trim = fighter.trim || "#fff1bd";
@@ -7723,6 +7839,8 @@ function drawClashFighterPlate(fighter, x, y, width, height, reverse, pulse, mob
   const tag = compactIntroText(presentation.archetype || fighterTrait(fighter), mobile ? 13 : 16).toUpperCase();
   const signature = compactIntroText(presentation.signature, mobile ? 20 : 27).toUpperCase();
   const edge = compactIntroText(presentation.edge || presentation.callout, mobile ? 24 : 36).toUpperCase();
+  const pressure = clamp(cinematic.pressure ?? 1, 0.35, 1.45);
+  const glow = clamp(cinematic.cardGlow ?? 0, 0, 1.5);
 
   const panel = ctx.createLinearGradient(x, y, x + width, y + height);
   panel.addColorStop(0, colorWithAlpha(reverse ? "#090a0d" : color, 0.76));
@@ -7732,13 +7850,13 @@ function drawClashFighterPlate(fighter, x, y, width, height, reverse, pulse, mob
   ctx.beginPath();
   ctx.roundRect(x, y, width, height, 8);
   ctx.fill();
-  ctx.strokeStyle = colorWithAlpha(trim, 0.38 + pulse * 0.16);
-  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = colorWithAlpha(trim, 0.38 + pulse * 0.16 + glow * 0.09);
+  ctx.lineWidth = 1.6 + pressure * 0.22;
   ctx.stroke();
 
   ctx.globalCompositeOperation = "screen";
   const beam = ctx.createLinearGradient(reverse ? x + width : x, y, reverse ? x : x + width, y + height);
-  beam.addColorStop(0, colorWithAlpha(trim, 0.16 + pulse * 0.08));
+  beam.addColorStop(0, colorWithAlpha(trim, 0.16 + pulse * 0.08 + glow * 0.08));
   beam.addColorStop(0.42, "rgba(255,255,255,0)");
   beam.addColorStop(1, colorWithAlpha(color, 0.06));
   ctx.fillStyle = beam;
@@ -7756,6 +7874,12 @@ function drawClashFighterPlate(fighter, x, y, width, height, reverse, pulse, mob
   }
   ctx.closePath();
   ctx.fill();
+  ctx.strokeStyle = `rgba(255,255,255,${0.035 + glow * 0.035})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(reverse ? x + width - 22 : x + 22, y + height - 10);
+  ctx.lineTo(reverse ? x + width * 0.62 : x + width * 0.38, y + 12);
+  ctx.stroke();
   ctx.globalCompositeOperation = "source-over";
 
   ctx.textAlign = align;
@@ -7795,11 +7919,14 @@ function countdownRead() {
   };
 }
 
-function drawCountdownNamePlate(fighter, x, y, width, reverse, alpha) {
+function drawCountdownNamePlate(fighter, x, y, width, reverse, alpha, cinematic = roundStartCinematicProfile(fighter, reverse ? "right" : "left")) {
   if (!fighter) return;
   const trim = fighter.trim || "#fff1bd";
   const height = 42;
-  const skew = reverse ? -14 : 14;
+  const pulse = clamp(cinematic.countdownPulse ?? 0, 0, 1.5);
+  const shear = clamp(cinematic.nameShear ?? 0, -1.25, 1.25);
+  const edgeAlpha = alpha * (0.34 + pulse * 0.08);
+  const skew = (reverse ? -14 : 14) + shear * 3.5;
   const grad = ctx.createLinearGradient(x, y, x + width, y + height);
   grad.addColorStop(0, colorWithAlpha(reverse ? "#09090c" : fighter.color, 0.62 * alpha));
   grad.addColorStop(0.5, `rgba(14, 10, 10, ${0.68 * alpha})`);
@@ -7814,13 +7941,19 @@ function drawCountdownNamePlate(fighter, x, y, width, reverse, alpha) {
   ctx.lineTo(x + (reverse ? 0 : -skew), y + height);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = colorWithAlpha(trim, 0.34 * alpha);
-  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = colorWithAlpha(trim, edgeAlpha);
+  ctx.lineWidth = 1.4 + pulse * 0.32;
   ctx.stroke();
 
   ctx.globalCompositeOperation = "screen";
-  ctx.fillStyle = colorWithAlpha(trim, 0.08 * alpha);
+  ctx.fillStyle = colorWithAlpha(trim, (0.08 + pulse * 0.045) * alpha);
   ctx.fillRect(x + 8, y + 5, width - 16, 4);
+  ctx.strokeStyle = `rgba(255,255,255,${0.04 * alpha + pulse * 0.035})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(reverse ? x + width - 12 : x + 12, y + height - 8);
+  ctx.lineTo(reverse ? x + width * 0.62 : x + width * 0.38, y + 8);
+  ctx.stroke();
   ctx.globalCompositeOperation = "source-over";
 
   ctx.textAlign = reverse ? "right" : "left";
@@ -7830,7 +7963,11 @@ function drawCountdownNamePlate(fighter, x, y, width, reverse, alpha) {
   ctx.fillStyle = "#fff1bd";
   ctx.font = "900 18px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif";
   const textX = reverse ? x + width - 14 : x + 14;
-  ctx.fillText(fighter.name.toUpperCase(), textX, y + 23);
+  ctx.save();
+  ctx.translate(textX, y + 23);
+  ctx.transform(1, 0, shear * 0.015, 1, 0, 0);
+  ctx.fillText(fighter.name.toUpperCase(), 0, 0);
+  ctx.restore();
   ctx.fillStyle = colorWithAlpha(trim, 0.82 * alpha);
   ctx.font = "900 8px system-ui, sans-serif";
   ctx.fillText(fighterPresentation(fighter).signature.toUpperCase(), textX, y + 36);
@@ -7848,6 +7985,10 @@ function drawCountdown() {
   const plateW = mobile ? 220 : 276;
   const plateY = centerY + (mobile ? 50 : 64);
   const snapShift = read.snap * (mobile ? 34 : 54);
+  const leftCinema = roundStartCinematicProfile(fighters[0], "left");
+  const rightCinema = roundStartCinematicProfile(fighters[1], "right");
+  const countdownPulse = clamp((leftCinema.countdownPulse + rightCinema.countdownPulse) * 0.5, 0, 1.5);
+  const screenCut = clamp((leftCinema.screenCut + rightCinema.screenCut) * 0.5, 0, 1.45);
 
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -7876,9 +8017,9 @@ function drawCountdown() {
   ctx.fill();
 
   ctx.globalCompositeOperation = "screen";
-  const slashAlpha = read.fight ? 0.34 : 0.22;
+  const slashAlpha = (read.fight ? 0.34 : 0.22) + screenCut * 0.05;
   ctx.strokeStyle = colorWithAlpha(read.color, slashAlpha);
-  ctx.lineWidth = read.fight ? 7 : 5;
+  ctx.lineWidth = (read.fight ? 7 : 5) + screenCut * 1.2;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(96 - snapShift, bandY + bandH - 18);
@@ -7895,17 +8036,24 @@ function drawCountdown() {
   ctx.moveTo(34, bandY + bandH + 4);
   ctx.lineTo(W - 34, bandY + bandH - 8);
   ctx.stroke();
+  if (read.fight) {
+    ctx.strokeStyle = colorWithAlpha(read.color, 0.09 + countdownPulse * 0.08);
+    ctx.lineWidth = mobile ? 2 : 3;
+    ctx.beginPath();
+    ctx.ellipse(W / 2, centerY, (mobile ? 126 : 166) + countdownPulse * 14, (mobile ? 46 : 58) + countdownPulse * 6, -0.04, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.globalCompositeOperation = "source-over";
 
-  drawCountdownNamePlate(fighters[0], mobile ? 72 : 76 - snapShift * 0.35, plateY, plateW, false, 0.84);
-  drawCountdownNamePlate(fighters[1], W - (mobile ? 72 : 76) - plateW + snapShift * 0.35, plateY, plateW, true, 0.84);
+  drawCountdownNamePlate(fighters[0], mobile ? 72 : 76 - snapShift * 0.35, plateY, plateW, false, 0.84, leftCinema);
+  drawCountdownNamePlate(fighters[1], W - (mobile ? 72 : 76) - plateW + snapShift * 0.35, plateY, plateW, true, 0.84, rightCinema);
 
   ctx.translate(W / 2, centerY);
-  ctx.scale(read.pulse, read.pulse);
+  ctx.scale(read.pulse + countdownPulse * (read.fight ? 0.035 : 0.018), read.pulse + countdownPulse * (read.fight ? 0.028 : 0.014));
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.shadowColor = colorWithAlpha(read.color, read.fight ? 0.54 : 0.32);
-  ctx.shadowBlur = read.fight ? 24 : 14;
+  ctx.shadowBlur = (read.fight ? 24 : 14) + countdownPulse * 8;
   ctx.font = read.fight
     ? `900 ${mobile ? 76 : 96}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`
     : `900 ${mobile ? 112 : 132}px Impact, Haettenschweiler, 'Arial Black', system-ui, sans-serif`;
@@ -7918,6 +8066,19 @@ function drawCountdown() {
   ctx.fillStyle = textFill;
   ctx.strokeText(read.label, 0, 0);
   ctx.fillText(read.label, 0, 0);
+
+  if (read.fight) {
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = colorWithAlpha("#ffffff", 0.07 + countdownPulse * 0.06);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(-(mobile ? 130 : 178), -22 - screenCut * 5);
+    ctx.lineTo(-(mobile ? 64 : 84), -42);
+    ctx.moveTo(mobile ? 130 : 178, 23 + screenCut * 5);
+    ctx.lineTo(mobile ? 64 : 84, 44);
+    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+  }
 
   ctx.shadowBlur = 6;
   ctx.font = `900 ${mobile ? 11 : 14}px system-ui, sans-serif`;
@@ -18021,29 +18182,35 @@ function drawEntrancePoseEffect(f, crouch) {
   if (!entrance || entrance.snapOnly) return;
   const clock = 180 - countdownFrames;
   const profile = entrance.profile ?? entrancePoseProfile(f);
-  const alpha = clamp((entrance.ease * 0.22 + entrance.step * 0.08) * profile.aura, 0.04, 0.3);
+  const cinematic = roundStartCinematicProfile(f);
+  const alpha = clamp((entrance.ease * 0.22 + entrance.step * 0.08 + cinematic.stanceBloom * 0.04) * profile.aura, 0.04, 0.34);
   const trim = f.trim ?? "#fff1bd";
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.strokeStyle = colorWithAlpha(trim, alpha);
-  ctx.lineWidth = 2.2;
+  ctx.lineWidth = 2.2 + cinematic.footHeat * 0.42;
   ctx.beginPath();
-  ctx.ellipse(0, -3 + crouch, (42 + entrance.reveal * 28) * profile.foot, 8 + entrance.reveal * 4, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -3 + crouch, (42 + entrance.reveal * 28 + cinematic.footHeat * 6) * profile.foot, 8 + entrance.reveal * 4 + cinematic.footHeat * 1.4, 0, 0, Math.PI * 2);
   ctx.stroke();
+
+  ctx.fillStyle = colorWithAlpha(trim, alpha * 0.16);
+  ctx.beginPath();
+  ctx.ellipse(entrance.side * (4 + cinematic.tapeBias * 6), -1 + crouch, (30 + cinematic.screenCut * 8) * profile.foot, 3.5 + cinematic.footHeat * 1.2, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   const trailSide = -entrance.side;
   const trailCount = isMobileFightView() ? 2 : 3;
   for (let i = 0; i < trailCount; i += 1) {
-    const offset = trailSide * (34 + i * 18 + entrance.ease * 18);
+    const offset = trailSide * (34 + i * 18 + entrance.ease * 18 + cinematic.handReady * 3);
     const height = (f.profileId === "p2" || f.profileId === "p4" || f.profileId === "p5") ? 128 : 150;
     const drift = Math.sin(clock * 0.1 + i) * 4;
     const grad = ctx.createLinearGradient(offset, -36 + crouch, offset + trailSide * 12, -height + crouch);
-    grad.addColorStop(0, colorWithAlpha(trim, alpha * 0.7));
-    grad.addColorStop(0.62, colorWithAlpha(trim, alpha * 0.18));
+    grad.addColorStop(0, colorWithAlpha(trim, alpha * (0.7 + cinematic.stanceBloom * 0.12)));
+    grad.addColorStop(0.62, colorWithAlpha(trim, alpha * (0.18 + cinematic.handReady * 0.035)));
     grad.addColorStop(1, colorWithAlpha(trim, 0));
     ctx.strokeStyle = grad;
-    ctx.lineWidth = 1.4 + i * 0.45;
+    ctx.lineWidth = 1.4 + i * 0.45 + cinematic.screenCut * 0.24;
     ctx.beginPath();
     ctx.moveTo(offset, -34 + crouch);
     ctx.quadraticCurveTo(offset + trailSide * 11 + drift, -86 + crouch, offset + trailSide * 2, -height + crouch);
