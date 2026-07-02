@@ -660,6 +660,17 @@ function grabTechniqueProfile(f) {
   }[f?.profileId] ?? { clasp: 1, shoulder: 1, hip: 1, pull: 1, foot: 1, aura: 1 };
 }
 
+function aerialBodyProfile(f) {
+  return {
+    p1: { launch: 0.82, tuck: 0.84, arm: 0.74, land: 1.22, foot: 1.18, rebound: 0.72 },
+    p2: { launch: 1.18, tuck: 1.16, arm: 1.2, land: 0.82, foot: 0.84, rebound: 1.22 },
+    p3: { launch: 0.72, tuck: 0.76, arm: 0.64, land: 1.34, foot: 1.3, rebound: 0.62 },
+    p4: { launch: 1.22, tuck: 1.24, arm: 1.24, land: 0.86, foot: 0.88, rebound: 1.18 },
+    p5: { launch: 1.12, tuck: 1.08, arm: 1.1, land: 0.78, foot: 0.82, rebound: 1.3 },
+    p6: { launch: 0.9, tuck: 0.94, arm: 0.88, land: 1.04, foot: 1.06, rebound: 0.86 },
+  }[f?.profileId] ?? { launch: 1, tuck: 1, arm: 1, land: 1, foot: 1, rebound: 1 };
+}
+
 const BODY_SPECS = {
   athletic: {
     shoulder: 41,
@@ -15506,6 +15517,7 @@ function getPose(f, stride) {
   const attackType = f.attack?.type;
   const attackMass = f.attack ? attackMassProfile(f) : null;
   const bodyWeight = f.attack ? attackBodyWeightProfile(f) : null;
+  const aerialBody = aerialBodyProfile(f);
   const activePulse = phase.strike;
   const windup = phase.anticipation;
   const recovery = phase.recovery;
@@ -15672,6 +15684,36 @@ function getPose(f, stride) {
     base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - side * close * 0.028;
   }
 
+  const jumpLaunchPose = airborne && f.hurt <= 0 && !winner
+    ? smoothStep01(clamp((f.jumpPulse ?? 0) / 12, 0, 1))
+    : 0;
+  if (jumpLaunchPose > 0.03) {
+    const jumpDir = (f.jumpDir || Math.sign(f.vx) || f.dir || 1) === (f.dir || 1) ? 1 : -1;
+    const strength = clamp(f.jumpStrength ?? 1, 0.65, 1.42);
+    const launch = jumpLaunchPose * strength * aerialBody.launch;
+    const trail = Math.sin((1 - jumpLaunchPose) * Math.PI) * strength * aerialBody.tuck;
+
+    base.torsoTilt += jumpDir * (-launch * 0.03 + trail * 0.018);
+    base.frontArm.elbow.x -= jumpDir * (launch * 5.6 + trail * 2.2) * spec.stance * aerialBody.arm;
+    base.frontArm.elbow.y -= launch * 10.2 * aerialBody.arm - trail * 2.4;
+    base.frontArm.hand.x -= jumpDir * (launch * 9.8 + trail * 3.8) * spec.stance * aerialBody.arm;
+    base.frontArm.hand.y -= launch * 17.4 * aerialBody.arm - trail * 3.8;
+    base.backArm.elbow.x += jumpDir * (launch * 4.8 + trail * 1.8) * spec.stance * aerialBody.arm;
+    base.backArm.elbow.y -= launch * 7.6 * aerialBody.arm - trail * 1.6;
+    base.backArm.hand.x += jumpDir * (launch * 8.4 + trail * 3.2) * spec.stance * aerialBody.arm;
+    base.backArm.hand.y -= launch * 13.2 * aerialBody.arm - trail * 2.8;
+    base.frontLeg.knee.x -= jumpDir * trail * 7.8 * spec.stance * aerialBody.foot;
+    base.frontLeg.knee.y += trail * 7.4 - launch * 4.6;
+    base.frontLeg.foot.x -= jumpDir * trail * 13.6 * spec.stance * aerialBody.foot;
+    base.frontLeg.foot.y += trail * 12.8 - launch * 8.2;
+    base.backLeg.knee.x += jumpDir * trail * 5.6 * spec.stance * aerialBody.foot;
+    base.backLeg.knee.y += trail * 5.2 - launch * 3.4;
+    base.backLeg.foot.x += jumpDir * trail * 9.4 * spec.stance * aerialBody.foot;
+    base.backLeg.foot.y += trail * 9.8 - launch * 5.8;
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) - jumpDir * trail * 0.036 * aerialBody.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) + jumpDir * trail * 0.03 * aerialBody.foot;
+  }
+
   const landingPose = f.grounded && f.hurt <= 0 && !f.attack && !winner
     ? smoothStep01(clamp((f.landingPulse ?? 0) / 16, 0, 1))
     : 0;
@@ -15685,12 +15727,16 @@ function getPose(f, stride) {
       p6: { absorb: 1.04, rebound: 0.86, arm: 0.92, spread: 1.04 },
     }[f.profileId] ?? { absorb: 1, rebound: 1, arm: 1, spread: 1 };
     const strength = clamp(f.landingStrength ?? 1, 0.38, 1.65);
-    const press = landingPose * strength * landingStyle.absorb;
-    const rebound = Math.sin((1 - landingPose) * Math.PI) * landingStyle.rebound * strength;
+    const press = landingPose * strength * landingStyle.absorb * aerialBody.land;
+    const rebound = Math.sin((1 - landingPose) * Math.PI) * landingStyle.rebound * strength * aerialBody.rebound;
     const landingDir = (f.landingDir || f.jumpDir || f.dir || 1) === (f.dir || 1) ? 1 : -1;
-    const footSpread = press * landingStyle.spread;
+    const footSpread = press * landingStyle.spread * aerialBody.foot;
 
-    base.torsoTilt += landingDir * (press * 0.032 - rebound * 0.012);
+    base.torsoTilt += landingDir * (press * 0.032 - rebound * 0.012) - press * 0.008;
+    base.frontArm.shoulder.y += press * 1.8 - rebound * 0.8;
+    base.backArm.shoulder.y += press * 1.4 - rebound * 0.6;
+    base.frontLeg.hip.y += press * 1.6;
+    base.backLeg.hip.y += press * 1.9;
     base.frontLeg.knee.x += landingDir * (footSpread * 4.5 + rebound * 1.8) * spec.stance;
     base.frontLeg.knee.y += press * 10.5 - rebound * 2.4;
     base.frontLeg.foot.x += landingDir * (footSpread * 10 + rebound * 2.2) * spec.stance;
@@ -15709,11 +15755,13 @@ function getPose(f, stride) {
     base.backArm.hand.y += press * 6.8 * landingStyle.arm - rebound * 3.8;
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(press * 0.86, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(press * 0.96, 0, 1));
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + landingDir * (press * 0.028 - rebound * 0.012) * aerialBody.foot;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - landingDir * (press * 0.036 - rebound * 0.01) * aerialBody.foot;
   }
 
   const airKickLandingPose = f.grounded ? smoothStep01(clamp((f.airKickLandingPulse ?? 0) / 16, 0, 1)) : 0;
   if (airKickLandingPose > 0.03 && f.hurt <= 0 && !f.attack && !winner) {
-    const press = airKickLandingPose * (f.profileId === "p1" ? 1.12 : f.profileId === "p2" ? 0.84 : 1);
+    const press = airKickLandingPose * (f.profileId === "p1" ? 1.12 : f.profileId === "p2" ? 0.84 : 1) * aerialBody.land;
     const landingDir = (f.airKickDir || f.landingDir || f.dir || 1) === (f.dir || 1) ? 1 : -1;
     base.torsoTilt += landingDir * press * 0.028;
     base.frontLeg.knee.y += press * 6.5;
