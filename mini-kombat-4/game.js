@@ -707,6 +707,95 @@ function guardPresentationMotion(f) {
   };
 }
 
+function resultPresentationProfile(f) {
+  return {
+    p1: { chest: 0.9, swagger: 0.72, stance: 1.16, glow: 0.92, breath: 0.78, settle: 1.16, fall: 0.86, sprawl: 0.82, limp: 0.78, knee: 1.16, twist: 0.82, dust: 1.12 },
+    p2: { chest: 1.08, swagger: 1.12, stance: 0.86, glow: 1.18, breath: 1.16, settle: 0.86, fall: 1.2, sprawl: 1.18, limp: 1.28, knee: 0.86, twist: 1.24, dust: 0.86 },
+    p3: { chest: 0.68, swagger: 0.58, stance: 1.28, glow: 0.78, breath: 0.68, settle: 1.3, fall: 0.74, sprawl: 0.76, limp: 0.72, knee: 1.28, twist: 0.72, dust: 1.28 },
+    p4: { chest: 1.16, swagger: 1.22, stance: 0.88, glow: 1.14, breath: 1.18, settle: 0.9, fall: 1.16, sprawl: 1.16, limp: 1.2, knee: 0.9, twist: 1.18, dust: 0.88 },
+    p5: { chest: 1.24, swagger: 1.3, stance: 0.78, glow: 1.2, breath: 1.22, settle: 0.82, fall: 1.24, sprawl: 1.32, limp: 1.14, knee: 0.84, twist: 1.28, dust: 0.82 },
+    p6: { chest: 0.82, swagger: 0.82, stance: 1.04, glow: 0.96, breath: 0.9, settle: 1.06, fall: 0.94, sprawl: 0.92, limp: 0.86, knee: 1.08, twist: 0.94, dust: 1.04 },
+  }[f?.profileId] ?? { chest: 1, swagger: 1, stance: 1, glow: 1, breath: 1, settle: 1, fall: 1, sprawl: 1, limp: 1, knee: 1, twist: 1, dust: 1 };
+}
+
+function resultPresentationMotion(f) {
+  const profile = resultPresentationProfile(f);
+  if (!winner) {
+    return {
+      profile,
+      active: 0,
+      winner: false,
+      loser: false,
+      victory: 0,
+      cheer: 0,
+      cheerLift: 0,
+      victoryLift: 0,
+      sway: 0,
+      floorPulse: 0,
+      fall: 0,
+      limp: 0,
+      collapse: 0,
+      slam: 0,
+      sprawl: 0,
+      armDrop: 0,
+      kneeDrop: 0,
+      loose: 0,
+      fallDir: 0,
+      dust: 0,
+      glow: 0,
+      breath: 0,
+    };
+  }
+
+  const clock = roundFrame + resultFrame;
+  const isWinner = f?.id === roundWinnerId;
+  const victoryRaw = clamp(Math.max(0, (f?.victoryPulse ?? 60) - resultFrame * 0.9) / 60, 0, 1);
+  const victory = isWinner ? smoothStep01(victoryRaw) : 0;
+  const entrance = 1 - smoothStep01(clamp(resultFrame / 58, 0, 1));
+  const cheer = isWinner ? Math.sin(Math.min(resultFrame, 72) * 0.17) * clamp(resultFrame / 48, 0, 1) : 0;
+  const sway = isWinner ? Math.sin(resultFrame * 0.075 + (f?.profileId?.charCodeAt(1) ?? 0)) * clamp(resultFrame / 72, 0, 1) * profile.swagger : 0;
+  const fall = !isWinner ? smoothStep01(clamp(resultFrame / 46, 0, 1)) : 0;
+  const limp = !isWinner ? smoothStep01(clamp((resultFrame - 10) / 54, 0, 1)) : 0;
+  const collapse = !isWinner ? smoothStep01(clamp((resultFrame - 18) / 76, 0, 1)) : 0;
+  const slam = !isWinner ? 1 - smoothStep01(clamp((resultFrame - 4) / 36, 0, 1)) : 0;
+  const fallDir = !isWinner ? ((f?.koFallDir || f?.impactDir || -f?.dir || -1) === (f?.dir || 1) ? 1 : -1) : 0;
+  const breath = Math.sin(clock * 0.065 + (f?.profileId?.charCodeAt(1) ?? 0)) * profile.breath;
+  const settle = 0.5 + Math.sin(clock * 0.08) * 0.5;
+  const sprawl = collapse * profile.sprawl;
+  const armDrop = (fall * 0.75 + limp * 0.55) * profile.limp;
+  const kneeDrop = (fall * 0.7 + collapse * 0.65) * profile.knee;
+  const loose = clamp(armDrop * 0.5 + collapse * 0.44 + Math.max(0, breath) * 0.05, 0, 1.65);
+  const glow = clamp((victory * 0.7 + Math.max(0, cheer) * 0.44 + entrance * 0.35) * profile.glow, 0, 1.65);
+  const dust = clamp((fall * 0.55 + slam * 0.78 + collapse * 0.42) * profile.dust, 0, 1.85);
+
+  return {
+    profile,
+    active: 1,
+    winner: isWinner,
+    loser: !isWinner,
+    victory,
+    entrance,
+    cheer,
+    cheerLift: Math.max(0, cheer) * profile.swagger,
+    victoryLift: victory * profile.chest,
+    sway,
+    floorPulse: 0.5 + Math.sin(clock * 0.08) * 0.18 + entrance * 0.22,
+    fall,
+    limp,
+    collapse,
+    slam,
+    sprawl,
+    armDrop,
+    kneeDrop,
+    loose,
+    fallDir,
+    settle,
+    dust,
+    glow,
+    breath,
+  };
+}
+
 function rangePressureProfile(f) {
   return {
     p1: { weight: 1.18, guard: 0.86, reach: 0.9, foot: 1.2, sway: 0.72, lift: 0.82, floor: 1.16 },
@@ -10096,37 +10185,38 @@ function fighterTransitionMotion(f, walking) {
   }
 
   if (winner) {
-    const settle = 0.5 + Math.sin((roundFrame + resultFrame) * 0.08) * 0.5;
+    const resultPresent = resultPresentationMotion(f);
+    const settle = resultPresent.settle;
     if (f.id === roundWinnerId) {
-      const victory = clamp(Math.max(0, (f.victoryPulse ?? 60) - resultFrame * 0.9) / 60, 0, 1);
+      const victory = resultPresent.victory;
       const hero = f.profileId === "p1";
       const agile = f.profileId === "p2";
-      const cheer = Math.sin(Math.min(resultFrame, 72) * 0.17) * clamp(resultFrame / 48, 0, 1);
-      motion.y -= settle * (agile ? 0.55 : 0.72) + victory * (hero ? 1.25 : 1.7) + Math.max(0, cheer) * (agile ? 1.1 : 0.45);
-      motion.rotation += dir * (settle * (hero ? 0.004 : 0.007) - victory * (hero ? 0.008 : 0.013) + cheer * (agile ? 0.008 : 0.003));
-      motion.scaleX *= 1 + victory * (hero ? 0.018 : 0.011) + Math.max(0, cheer) * 0.004;
-      motion.scaleY *= 1 - victory * (hero ? 0.01 : 0.006) - Math.max(0, cheer) * 0.003;
+      const cheer = resultPresent.cheer;
+      motion.y -= settle * (agile ? 0.55 : 0.72) + victory * (hero ? 1.25 : 1.7) + resultPresent.cheerLift * (agile ? 1.1 : 0.45);
+      motion.rotation += dir * (settle * (hero ? 0.004 : 0.007) - victory * (hero ? 0.008 : 0.013) + cheer * (agile ? 0.008 : 0.003) + resultPresent.sway * 0.002);
+      motion.scaleX *= 1 + victory * (hero ? 0.018 : 0.011) + resultPresent.cheerLift * 0.004 + resultPresent.glow * 0.003;
+      motion.scaleY *= 1 - victory * (hero ? 0.01 : 0.006) - resultPresent.cheerLift * 0.003;
     } else {
-      const fall = smoothStep01(clamp(resultFrame / 46, 0, 1));
+      const fall = resultPresent.fall;
       const bounce = Math.max(0, Math.sin(clamp((resultFrame - 16) / 28, 0, 1) * Math.PI));
       const impact = Math.max(0, 1 - resultFrame / 34);
       const fallDir = f.koFallDir || f.impactDir || -dir;
       const heavy = f.profileId === "p1";
       const agile = f.profileId === "p2";
       if (usesUnifiedSprite(f)) {
-        motion.x += fallDir * (fall * (heavy ? 5.2 : 6.2) + impact * (agile ? 2.6 : 2.2));
-        motion.y += 0.45 + fall * (heavy ? 8.5 : 9.5) - bounce * (heavy ? 1.7 : 2.1);
-        motion.rotation += fallDir * (0.01 + fall * (agile ? 0.045 : 0.04) + impact * 0.01);
-        motion.scaleX *= 1 + impact * 0.006 + fall * 0.006;
-        motion.scaleY *= 1 - impact * 0.004 - fall * 0.005;
-        motion.afterimage = Math.max(motion.afterimage, impact * 0.012);
+        motion.x += fallDir * (fall * (heavy ? 5.2 : 6.2) + impact * (agile ? 2.6 : 2.2) + resultPresent.sprawl * 1.4);
+        motion.y += 0.45 + fall * (heavy ? 8.5 : 9.5) - bounce * (heavy ? 1.7 : 2.1) + resultPresent.collapse * 1.2;
+        motion.rotation += fallDir * (0.01 + fall * (agile ? 0.045 : 0.04) + impact * 0.01 + resultPresent.loose * 0.006);
+        motion.scaleX *= 1 + impact * 0.006 + fall * 0.006 + resultPresent.dust * 0.002;
+        motion.scaleY *= 1 - impact * 0.004 - fall * 0.005 - resultPresent.collapse * 0.002;
+        motion.afterimage = Math.max(motion.afterimage, impact * 0.012 + resultPresent.slam * 0.006);
       } else {
-        motion.x += fallDir * (fall * (heavy ? 10 : 13) + impact * (agile ? 5.6 : 4.4));
-        motion.y += 0.8 + fall * (heavy ? 19 : 22) - bounce * (heavy ? 3.5 : 5.2);
-        motion.rotation += fallDir * (0.036 + fall * (agile ? 0.18 : 0.13) + impact * 0.028);
-        motion.scaleX *= 1 + impact * 0.016 + fall * (heavy ? 0.018 : 0.026);
-        motion.scaleY *= 1 - impact * 0.01 - fall * (heavy ? 0.014 : 0.02);
-        motion.afterimage = Math.max(motion.afterimage, impact * 0.032);
+        motion.x += fallDir * (fall * (heavy ? 10 : 13) + impact * (agile ? 5.6 : 4.4) + resultPresent.sprawl * 2.6);
+        motion.y += 0.8 + fall * (heavy ? 19 : 22) - bounce * (heavy ? 3.5 : 5.2) + resultPresent.collapse * 2.4;
+        motion.rotation += fallDir * (0.036 + fall * (agile ? 0.18 : 0.13) + impact * 0.028 + resultPresent.loose * 0.012);
+        motion.scaleX *= 1 + impact * 0.016 + fall * (heavy ? 0.018 : 0.026) + resultPresent.dust * 0.004;
+        motion.scaleY *= 1 - impact * 0.01 - fall * (heavy ? 0.014 : 0.02) - resultPresent.collapse * 0.004;
+        motion.afterimage = Math.max(motion.afterimage, impact * 0.032 + resultPresent.slam * 0.012);
       }
     }
   }
@@ -10140,6 +10230,7 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const spec = bodySpec(f);
   const movePresent = movementPresentationMotion(f, walking, stride);
   const guardPresent = guardPresentationMotion(f);
+  const resultPresent = resultPresentationMotion(f);
   const air = clamp((FLOOR - f.y) / 132, 0, 1);
   const plant = walking ? clamp(f.walkPlant ?? 0, 0, 1) : 0;
   const walkSpread = walking ? Math.abs(stride) * 10 : 0;
@@ -10186,9 +10277,9 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     movePresent.pivotLocal * movePresent.pivotLoad * 2.4 +
     movePresent.airLocal * movePresent.preLand * 3.2
   ) * FIGHTER_SCALE;
-  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + preLandShadow * 18 + facingPress * 34 + facingSnap * 16 + pivot.press * 18 + pivot.snap * 9 + startPresence.floorWeight * 30 + startPresence.snapReach * 10 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + movePresent.walkLoad * 14 + movePresent.walkReach * 8 + movePresent.pivotFootPress * 13 + movePresent.landingSquash * 16 + movePresent.crouchFootPress * 14 + guardPresent.footPress * 23 + guardPresent.footSpread * 16 + guardPresent.impact * 12 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
-  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + preLandShadow * 2.2 + facingPress * 4.8 + facingSnap * 1.7 + pivot.press * 2.2 + startPresence.floorWeight * 3.4 + startPresence.footPress * 1.2 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + movePresent.walkLoad * 1.4 + movePresent.pivotFootPress * 1.6 + movePresent.landingPress * 2.2 + movePresent.crouchFootPress * 1.9 + guardPresent.footPress * 2.7 + guardPresent.brace * 1.1 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
-  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + preLandShadow * 0.035 + facingPress * 0.085 + facingSnap * 0.035 + pivot.press * 0.042 + pivot.snap * 0.02 + startPresence.floorWeight * 0.065 + startPresence.fightSnap * 0.035 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + movePresent.walkLoad * 0.032 + movePresent.pivotFootPress * 0.03 + movePresent.landingSquash * 0.04 + movePresent.crouchFootPress * 0.026 + guardPresent.footPress * 0.048 + guardPresent.impact * 0.055 + guardPresent.counter * 0.032 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.6);
+  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + preLandShadow * 18 + facingPress * 34 + facingSnap * 16 + pivot.press * 18 + pivot.snap * 9 + startPresence.floorWeight * 30 + startPresence.snapReach * 10 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + movePresent.walkLoad * 14 + movePresent.walkReach * 8 + movePresent.pivotFootPress * 13 + movePresent.landingSquash * 16 + movePresent.crouchFootPress * 14 + guardPresent.footPress * 23 + guardPresent.footSpread * 16 + guardPresent.impact * 12 + resultPresent.victoryLift * 12 + resultPresent.cheerLift * 9 + resultPresent.sprawl * 36 + resultPresent.dust * 22 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
+  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + preLandShadow * 2.2 + facingPress * 4.8 + facingSnap * 1.7 + pivot.press * 2.2 + startPresence.floorWeight * 3.4 + startPresence.footPress * 1.2 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + movePresent.walkLoad * 1.4 + movePresent.pivotFootPress * 1.6 + movePresent.landingPress * 2.2 + movePresent.crouchFootPress * 1.9 + guardPresent.footPress * 2.7 + guardPresent.brace * 1.1 + resultPresent.victory * 0.8 + resultPresent.collapse * 3.2 + resultPresent.slam * 2.4 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
+  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + preLandShadow * 0.035 + facingPress * 0.085 + facingSnap * 0.035 + pivot.press * 0.042 + pivot.snap * 0.02 + startPresence.floorWeight * 0.065 + startPresence.fightSnap * 0.035 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + movePresent.walkLoad * 0.032 + movePresent.pivotFootPress * 0.03 + movePresent.landingSquash * 0.04 + movePresent.crouchFootPress * 0.026 + guardPresent.footPress * 0.048 + guardPresent.impact * 0.055 + guardPresent.counter * 0.032 + resultPresent.glow * 0.032 + resultPresent.dust * 0.06 + resultPresent.collapse * 0.042 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.64);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -16455,16 +16546,23 @@ function drawHitFlash(f, crouch) {
 
 function drawResultPoseEffect(f, crouch) {
   const clock = roundFrame + resultFrame;
+  const resultPresent = resultPresentationMotion(f);
   ctx.save();
   if (f.id === roundWinnerId) {
     ctx.globalCompositeOperation = "screen";
-    const entrance = 1 - smoothStep01(clamp(resultFrame / 58, 0, 1));
-    const floorPulse = 0.5 + Math.sin(clock * 0.08) * 0.18 + entrance * 0.22;
-    ctx.strokeStyle = colorWithAlpha(f.trim, 0.28 + floorPulse * 0.16);
-    ctx.lineWidth = 3 + entrance * 2;
+    const entrance = resultPresent.entrance;
+    const floorPulse = resultPresent.floorPulse;
+    const heroGlow = clamp(resultPresent.glow + resultPresent.cheerLift * 0.34, 0, 1.8);
+    ctx.strokeStyle = colorWithAlpha(f.trim, 0.28 + floorPulse * 0.16 + heroGlow * 0.035);
+    ctx.lineWidth = 3 + entrance * 2 + heroGlow * 0.6;
     ctx.beginPath();
-    ctx.ellipse(0, -4 + crouch, 62 + floorPulse * 18, 13 + floorPulse * 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -4 + crouch, 62 + floorPulse * 18 + resultPresent.victoryLift * 8, 13 + floorPulse * 5 + resultPresent.cheerLift * 2, 0, 0, Math.PI * 2);
     ctx.stroke();
+
+    ctx.fillStyle = colorWithAlpha(f.trim, 0.045 + heroGlow * 0.035);
+    ctx.beginPath();
+    ctx.ellipse(0, -9 + crouch, 44 + heroGlow * 22, 8 + heroGlow * 3.5, resultPresent.sway * 0.03, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.lineWidth = 2;
     const rayCount = isMobileFightView() ? 4 : 5;
@@ -16474,7 +16572,7 @@ function drawResultPoseEffect(f, crouch) {
       const bottom = -36 + crouch;
       const ray = ctx.createLinearGradient(x, top, x + 12, bottom);
       ray.addColorStop(0, colorWithAlpha(f.trim, 0));
-      ray.addColorStop(0.44, colorWithAlpha(f.trim, 0.16 + entrance * 0.08));
+      ray.addColorStop(0.44, colorWithAlpha(f.trim, 0.16 + entrance * 0.08 + heroGlow * 0.035));
       ray.addColorStop(1, "rgba(255,255,255,0)");
       ctx.strokeStyle = ray;
       ctx.beginPath();
@@ -16483,14 +16581,27 @@ function drawResultPoseEffect(f, crouch) {
       ctx.stroke();
     }
 
-    const spotlight = ctx.createRadialGradient(0, -142 + crouch, 12, 0, -96 + crouch, 126);
-    spotlight.addColorStop(0, colorWithAlpha(f.trim, 0.22 + entrance * 0.12));
-    spotlight.addColorStop(0.45, `rgba(255, 241, 189, ${0.08 + entrance * 0.08})`);
+    const spotlight = ctx.createRadialGradient(0, -142 + crouch, 12, resultPresent.sway * 4, -96 + crouch, 126 + heroGlow * 16);
+    spotlight.addColorStop(0, colorWithAlpha(f.trim, 0.22 + entrance * 0.12 + heroGlow * 0.04));
+    spotlight.addColorStop(0.45, `rgba(255, 241, 189, ${0.08 + entrance * 0.08 + heroGlow * 0.028})`);
     spotlight.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = spotlight;
     ctx.beginPath();
-    ctx.ellipse(0, -96 + crouch, 78, 130, 0, 0, Math.PI * 2);
+    ctx.ellipse(resultPresent.sway * 2.5, -96 + crouch - resultPresent.victoryLift * 3, 78 + heroGlow * 12, 130 + heroGlow * 18, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    if (heroGlow > 0.08) {
+      ctx.lineCap = "round";
+      ctx.strokeStyle = `rgba(255, 247, 214, ${0.12 + heroGlow * 0.08})`;
+      ctx.lineWidth = 1.1 + heroGlow * 0.8;
+      for (let i = 0; i < 3; i += 1) {
+        const side = i - 1;
+        ctx.beginPath();
+        ctx.moveTo(side * (18 + heroGlow * 5), -33 + crouch);
+        ctx.quadraticCurveTo(side * (28 + heroGlow * 9), -84 + crouch - resultPresent.victoryLift * 4, side * (16 + resultPresent.sway * 5), -160 + crouch - heroGlow * 7);
+        ctx.stroke();
+      }
+    }
 
     if (f.profileId === "p2") {
       ctx.strokeStyle = "rgba(95, 240, 199, 0.22)";
@@ -16550,18 +16661,18 @@ function drawResultPoseEffect(f, crouch) {
     }
   } else {
     ctx.globalCompositeOperation = "source-over";
-    const fall = smoothStep01(clamp(resultFrame / 56, 0, 1));
-    const collapse = smoothStep01(clamp((resultFrame - 18) / 76, 0, 1));
-    const slam = 1 - smoothStep01(clamp((resultFrame - 4) / 36, 0, 1));
+    const fall = smoothStep01(clamp(resultPresent.fall + resultPresent.collapse * 0.24, 0, 1));
+    const collapse = resultPresent.collapse;
+    const slam = resultPresent.slam;
     const breath = 0.5 + Math.sin(clock * 0.06) * 0.5;
-    const fallDir = (f.koFallDir || f.impactDir || -f.dir || -1) === (f.dir || 1) ? 1 : -1;
-    ctx.fillStyle = `rgba(12, 8, 7, ${0.3 + fall * 0.16 + slam * 0.12})`;
+    const fallDir = resultPresent.fallDir || ((f.koFallDir || f.impactDir || -f.dir || -1) === (f.dir || 1) ? 1 : -1);
+    ctx.fillStyle = `rgba(12, 8, 7, ${0.3 + fall * 0.16 + slam * 0.12 + resultPresent.dust * 0.035})`;
     ctx.beginPath();
-    ctx.ellipse(fallDir * collapse * 24, -2 + crouch + collapse * 3, 58 + fall * 24 + slam * 18 + collapse * 22, 10 + fall * 4 + slam * 4, fallDir * 0.06, 0, Math.PI * 2);
+    ctx.ellipse(fallDir * collapse * 24, -2 + crouch + collapse * 3, 58 + fall * 24 + slam * 18 + collapse * 22 + resultPresent.sprawl * 14, 10 + fall * 4 + slam * 4 + resultPresent.dust * 2.2, fallDir * 0.06, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.globalCompositeOperation = "screen";
-    const shockAlpha = (0.18 + slam * 0.2) * (1 - collapse * 0.38);
+    const shockAlpha = (0.18 + slam * 0.2 + resultPresent.dust * 0.05) * (1 - collapse * 0.38);
     if (shockAlpha > 0.03) {
       ctx.globalAlpha = shockAlpha;
       ctx.strokeStyle = colorWithAlpha(f.trim, 0.44);
@@ -16579,6 +16690,25 @@ function drawResultPoseEffect(f, crouch) {
           Math.PI * 2
         );
         ctx.stroke();
+      }
+    }
+
+    if (resultPresent.dust > 0.04) {
+      ctx.globalAlpha = clamp(0.1 + resultPresent.dust * 0.12, 0, 0.32);
+      ctx.fillStyle = colorWithAlpha(f.trim, 0.22);
+      for (let i = 0; i < 5; i += 1) {
+        const lane = i - 2;
+        ctx.beginPath();
+        ctx.ellipse(
+          fallDir * (18 + collapse * 28 + lane * 6),
+          -3 + crouch + Math.sin(clock * 0.09 + i) * 2,
+          9 + resultPresent.dust * 9 + Math.abs(lane) * 2,
+          2.4 + resultPresent.dust * 1.4,
+          fallDir * 0.12,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
       }
     }
 
@@ -19408,6 +19538,7 @@ function getPose(f, stride) {
   }
 
   if (winner) {
+    const resultPresent = resultPresentationMotion(f);
     if (f.id === roundWinnerId) {
       const victory = clamp(Math.max(0, (f.victoryPulse ?? 60) - resultFrame * 0.9) / 60, 0, 1);
       const cheer = Math.sin(Math.min(resultFrame, 72) * 0.17) * clamp(resultFrame / 48, 0, 1);
@@ -19478,24 +19609,30 @@ function getPose(f, stride) {
       const cheerLift = Math.max(0, cheer) * victoryStyle.swagger;
       const victoryLift = victory * victoryStyle.chest;
       const sway = Math.sin(resultFrame * 0.075 + (f.profileId?.charCodeAt(1) ?? 0)) * clamp(resultFrame / 72, 0, 1);
+      const breath = resultPresent.breath * clamp(resultFrame / 54, 0, 1);
+      const heroLift = resultPresent.victoryLift;
 
-      base.torsoTilt = victoryStyle.torso - victoryLift * 0.026 + cheer * 0.012 * victoryStyle.swagger + sway * 0.006;
+      base.torsoTilt = victoryStyle.torso - victoryLift * 0.026 + cheer * 0.012 * victoryStyle.swagger + sway * 0.006 - heroLift * 0.006 + breath * 0.004;
       base.frontArm = {
-        shoulder: { x: shoulderX, y: shoulderY - victoryLift * 1.2 },
-        elbow: { x: victoryStyle.front.elbow[0] * spec.stance + sway * 2.4 * spec.stance, y: victoryStyle.front.elbow[1] + crouch - victoryLift * 6 - cheerLift * 2.6 },
-        hand: { x: victoryStyle.front.hand[0] * spec.stance + sway * 4.2 * spec.stance, y: victoryStyle.front.hand[1] + crouch - victoryLift * 9 - cheerLift * 5.6 },
+        shoulder: { x: shoulderX + resultPresent.sway * 0.8 * spec.stance, y: shoulderY - victoryLift * 1.2 - heroLift * 0.8 },
+        elbow: { x: victoryStyle.front.elbow[0] * spec.stance + sway * 2.4 * spec.stance + resultPresent.sway * 1.6 * spec.stance, y: victoryStyle.front.elbow[1] + crouch - victoryLift * 6 - cheerLift * 2.6 - heroLift * 2.4 + breath * 1.3 },
+        hand: { x: victoryStyle.front.hand[0] * spec.stance + sway * 4.2 * spec.stance + resultPresent.sway * 2.6 * spec.stance, y: victoryStyle.front.hand[1] + crouch - victoryLift * 9 - cheerLift * 5.6 - heroLift * 3.2 + breath * 1.7 },
       };
       base.backArm = {
-        shoulder: { x: -shoulderX, y: shoulderY + 4 - victoryLift * 0.8 },
-        elbow: { x: victoryStyle.back.elbow[0] * spec.stance - sway * 1.8 * spec.stance, y: victoryStyle.back.elbow[1] + crouch - victoryLift * 4 + cheer * 2.2 },
-        hand: { x: victoryStyle.back.hand[0] * spec.stance - sway * 3.4 * spec.stance, y: victoryStyle.back.hand[1] + crouch - victoryLift * 5 + cheer * 3.2 },
+        shoulder: { x: -shoulderX - resultPresent.sway * 0.6 * spec.stance, y: shoulderY + 4 - victoryLift * 0.8 - heroLift * 0.5 },
+        elbow: { x: victoryStyle.back.elbow[0] * spec.stance - sway * 1.8 * spec.stance - resultPresent.sway * 1.2 * spec.stance, y: victoryStyle.back.elbow[1] + crouch - victoryLift * 4 + cheer * 2.2 - heroLift * 1.8 + breath },
+        hand: { x: victoryStyle.back.hand[0] * spec.stance - sway * 3.4 * spec.stance - resultPresent.sway * 2 * spec.stance, y: victoryStyle.back.hand[1] + crouch - victoryLift * 5 + cheer * 3.2 - heroLift * 2.3 + breath * 1.2 },
       };
-      base.frontLeg.foot.x += (victoryStyle.foot + cheerLift * 1.8) * spec.stance;
-      base.backLeg.foot.x -= (victoryStyle.foot + victoryLift * 2.4) * spec.stance;
-      base.frontLeg.knee.y += victoryStyle.knee + cheerLift * 1.8;
-      base.backLeg.knee.y += victoryStyle.knee + victoryLift * 2.2;
-      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, 0.72 + victoryLift * 0.2);
-      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, 0.82 + victoryLift * 0.18);
+      base.frontLeg.foot.x += (victoryStyle.foot + cheerLift * 1.8 + resultPresent.profile.stance * 1.2) * spec.stance;
+      base.backLeg.foot.x -= (victoryStyle.foot + victoryLift * 2.4 + resultPresent.profile.stance * 1.5) * spec.stance;
+      base.frontLeg.knee.y += victoryStyle.knee + cheerLift * 1.8 + resultPresent.cheerLift * 0.7;
+      base.backLeg.knee.y += victoryStyle.knee + victoryLift * 2.2 + heroLift * 0.9;
+      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, 0.72 + victoryLift * 0.2 + resultPresent.cheerLift * 0.04);
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, 0.82 + victoryLift * 0.18 + heroLift * 0.04);
+      base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.48) + heroLift * 0.12, 0, 1);
+      base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.48) + resultPresent.cheerLift * 0.1, 0, 1);
+      base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, resultPresent.cheerLift * 0.16);
+      base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, heroLift * 0.18);
     } else {
       const fall = smoothStep01(clamp(resultFrame / 46, 0, 1));
       const limp = smoothStep01(clamp((resultFrame - 10) / 54, 0, 1));
@@ -19548,6 +19685,17 @@ function getPose(f, stride) {
       base.backLeg.extension = Math.max(base.backLeg.extension ?? 0, sprawl * 0.42);
       base.frontLeg.footAngle = fallDir * (0.04 + sprawl * 0.1);
       base.backLeg.footAngle = -fallDir * (0.05 + sprawl * 0.08);
+      base.torsoTilt += fallDir * resultPresent.loose * 0.024;
+      base.frontArm.hand.y += resultPresent.loose * 7.5;
+      base.backArm.hand.y += resultPresent.loose * 6.2;
+      base.frontArm.hand.x += fallDir * resultPresent.sprawl * 6.4 * spec.stance;
+      base.backArm.hand.x -= fallDir * resultPresent.sprawl * 4.8 * spec.stance;
+      base.frontLeg.foot.x += fallDir * resultPresent.sprawl * 5.6 * spec.stance;
+      base.backLeg.foot.x -= fallDir * resultPresent.sprawl * 5.2 * spec.stance;
+      base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.45) - resultPresent.loose * 0.16, 0.05, 1);
+      base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.45) - resultPresent.loose * 0.12, 0.05, 1);
+      base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, resultPresent.slam * 0.2);
+      base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, resultPresent.collapse * 0.16);
     }
   }
 
