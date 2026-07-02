@@ -18250,6 +18250,190 @@ function drawHitFlash(f, crouch) {
   ctx.restore();
 }
 
+function drawResultActingOverlay(f, crouch, resultPresent, clock) {
+  if (!winner || !resultPresent?.active) return;
+
+  const trim = f.trim || f.color || "#fff1bd";
+  const profileSeed = f.profileId?.charCodeAt(1) ?? 1;
+  const breath = 0.5 + Math.sin(clock * 0.055 + profileSeed) * 0.5;
+  const isResultWinner = f.id === roundWinnerId;
+
+  ctx.save();
+  ctx.globalAlpha = 1;
+  if (isResultWinner) {
+    const presence = clamp(
+      resultPresent.glow * 0.5 +
+        resultPresent.heroChest * 0.34 +
+        resultPresent.heroArmOpen * 0.22 +
+        resultPresent.victory * 0.2 +
+        resultPresent.entrance * 0.16,
+      0,
+      1.8
+    );
+    if (presence < 0.04) {
+      ctx.restore();
+      return;
+    }
+
+    const heroicSettle = smoothStep01(clamp(resultFrame / 54, 0, 1));
+    const shoulderY = -132 + crouch - resultPresent.heroShoulderSet * 6 - breath * 2.5;
+    const chestY = -103 + crouch - resultPresent.heroChest * 7;
+    const headY = -164 + crouch - resultPresent.victoryLift * 5 - breath * 3;
+    const handReach = 44 + resultPresent.heroArmOpen * 18 + resultPresent.heroReach * 8;
+    const open = clamp(resultPresent.heroArmOpen + resultPresent.cheerLift * 0.28, 0, 1.55);
+
+    ctx.globalCompositeOperation = "screen";
+    const halo = ctx.createRadialGradient(
+      resultPresent.sway * 2,
+      headY + 8,
+      9,
+      resultPresent.sway * 3,
+      chestY - 22,
+      88 + presence * 22
+    );
+    halo.addColorStop(0, colorWithAlpha(trim, 0.09 + presence * 0.075));
+    halo.addColorStop(0.5, `rgba(255, 247, 214, ${0.035 + presence * 0.028})`);
+    halo.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.ellipse(resultPresent.sway * 3, chestY - 24, 48 + presence * 20, 82 + presence * 18, resultPresent.sway * 0.015, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.lineCap = "round";
+    ctx.strokeStyle = colorWithAlpha(trim, 0.11 + presence * 0.08);
+    ctx.lineWidth = 1.1 + presence * 0.65;
+    for (let i = 0; i < 4; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const lane = Math.floor(i / 2);
+      const lift = Math.sin(clock * 0.05 + i * 1.7) * (3 + presence * 2);
+      const shoulderX = side * (24 + lane * 10 + open * 8);
+      const handX = side * (handReach + lane * 9);
+      const handY = -112 + crouch - open * 28 - lane * 10 + lift;
+      ctx.beginPath();
+      ctx.moveTo(side * (10 + resultPresent.heroChest * 3), chestY + lane * 3);
+      ctx.quadraticCurveTo(shoulderX, shoulderY + lift, handX, handY);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = `rgba(255, 247, 214, ${0.08 + presence * 0.045})`;
+    ctx.lineWidth = 0.9 + presence * 0.3;
+    for (let i = 0; i < 3; i += 1) {
+      const side = i === 1 ? 0 : i === 0 ? -1 : 1;
+      const y = -72 + crouch - i * 31 - breath * 5;
+      ctx.beginPath();
+      ctx.moveTo(side * (16 + i * 8) - 8, y + 7);
+      ctx.quadraticCurveTo(side * (28 + open * 10), y - 12 - resultPresent.heroChest * 6, side * (36 + open * 13) + 8, y + 1);
+      ctx.stroke();
+    }
+
+    const sparkleCount = isMobileFightView() ? 3 : 5;
+    ctx.fillStyle = "rgba(255, 247, 214, 0.78)";
+    ctx.strokeStyle = colorWithAlpha(trim, 0.24);
+    ctx.lineWidth = 0.9;
+    for (let i = 0; i < sparkleCount; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const phase = clock * 0.072 + i * 1.38 + profileSeed;
+      const x = side * (34 + (i % 3) * 13 + Math.sin(phase) * 7);
+      const y = -136 + crouch - Math.cos(phase * 0.8) * 18 - i * 5;
+      const alpha = clamp((0.18 + presence * 0.18) * heroicSettle * (0.72 + Math.sin(phase) * 0.28), 0, 0.42);
+      if (alpha <= 0.04) continue;
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.moveTo(x, y - 5);
+      ctx.lineTo(x + 2.5, y - 1.5);
+      ctx.lineTo(x + 6, y);
+      ctx.lineTo(x + 2.5, y + 1.5);
+      ctx.lineTo(x, y + 5);
+      ctx.lineTo(x - 2.5, y + 1.5);
+      ctx.lineTo(x - 6, y);
+      ctx.lineTo(x - 2.5, y - 1.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    const floorContact = defeatFloorContactProfile(f, resultPresent);
+    const weight = clamp(
+      resultPresent.collapse * 0.38 +
+        resultPresent.floorDrag * 0.28 +
+        resultPresent.koFloorContact * 0.32 +
+        floorContact.shadowWeight * 0.28 +
+        resultPresent.dust * 0.12,
+      0,
+      1.85
+    );
+    if (weight < 0.035) {
+      ctx.restore();
+      return;
+    }
+
+    const fallDir = resultPresent.fallDir || floorContact.fallDir || ((f.koFallDir || f.impactDir || -f.dir || -1) === (f.dir || 1) ? 1 : -1);
+    const lateFade = 1 - smoothStep01(clamp((resultFrame - 210) / 70, 0, 1));
+    const tremble = Math.sin(clock * 0.12 + profileSeed) * (1 - floorContact.finalSettle * 0.5);
+    const bodyX = fallDir * (20 + resultPresent.sprawlReach * 18 + floorContact.shadowAlign * 5);
+    const floorY = -2 + crouch + floorContact.floorCompression * 2;
+
+    ctx.globalCompositeOperation = "source-over";
+    const pool = ctx.createRadialGradient(bodyX, floorY, 8, bodyX + fallDir * 8, floorY + 1, 102 + weight * 36);
+    pool.addColorStop(0, `rgba(9, 7, 8, ${0.22 + weight * 0.15})`);
+    pool.addColorStop(0.56, `rgba(9, 7, 8, ${0.1 + weight * 0.07})`);
+    pool.addColorStop(1, "rgba(9, 7, 8, 0)");
+    ctx.fillStyle = pool;
+    ctx.beginPath();
+    ctx.ellipse(bodyX, floorY, 76 + weight * 34 + resultPresent.sprawl * 14, 14 + weight * 4, fallDir * 0.055, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalCompositeOperation = "screen";
+    ctx.lineCap = "round";
+    ctx.strokeStyle = colorWithAlpha(trim, (0.08 + resultPresent.dust * 0.035 + resultPresent.koSlamEcho * 0.04) * lateFade);
+    ctx.lineWidth = 1.1 + resultPresent.koFloorContact * 0.55;
+    for (let i = 0; i < 4; i += 1) {
+      const lane = i - 1.5;
+      const startX = bodyX - fallDir * (18 + i * 7);
+      const y = floorY - 7 + lane * 3 + Math.sin(clock * 0.07 + i) * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(startX, y);
+      ctx.quadraticCurveTo(
+        bodyX + fallDir * (16 + resultPresent.floorDrag * 13),
+        y - 5 - resultPresent.koSlamEcho * 4,
+        bodyX + fallDir * (54 + resultPresent.sprawlReach * 16),
+        y + 1.5
+      );
+      ctx.stroke();
+    }
+
+    const weakPulse = clamp((0.18 + Math.max(0, resultPresent.breath) * 0.08 + floorContact.finalSettle * 0.05) * lateFade, 0, 0.26);
+    ctx.strokeStyle = `rgba(255, 238, 208, ${weakPulse})`;
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 3; i += 1) {
+      const x = bodyX - fallDir * (28 - i * 19) + tremble * (1 + i * 0.4);
+      const y = -36 + crouch + floorContact.shoulderCollapse * 7 + i * 5;
+      ctx.beginPath();
+      ctx.moveTo(x - fallDir * 9, y + 2);
+      ctx.quadraticCurveTo(x + fallDir * 3, y - 4 - breath * 2, x + fallDir * 15, y + 1);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = colorWithAlpha(trim, 0.08 * lateFade + resultPresent.koFloorContact * 0.025);
+    for (let i = 0; i < 4; i += 1) {
+      const drift = Math.sin(clock * 0.05 + i * 1.1) * 4;
+      ctx.beginPath();
+      ctx.ellipse(
+        bodyX + fallDir * (24 + i * 11) + drift,
+        floorY - 4 - i * 1.6,
+        8 + resultPresent.dust * 5 + i * 1.2,
+        2 + resultPresent.koFloorContact * 0.6,
+        fallDir * 0.08,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 function drawResultPoseEffect(f, crouch) {
   const clock = roundFrame + resultFrame;
   const resultPresent = resultPresentationMotion(f);
@@ -18492,6 +18676,7 @@ function drawResultPoseEffect(f, crouch) {
       ctx.globalAlpha = 1;
     }
   }
+  drawResultActingOverlay(f, crouch, resultPresent, clock);
   ctx.restore();
 }
 
