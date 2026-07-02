@@ -16179,13 +16179,15 @@ function drawSpriteHandDetail(hand, skin, trim) {
 
 function drawSpriteFootDetail(foot, shoe, trim) {
   const press = clamp(foot.press ?? 0, 0, 1);
+  const plant = clamp(foot.plant ?? 0, 0, 1.25);
+  const lift = clamp(foot.lift ?? 0, 0, 1);
   const toeFlex = clamp(foot.toeFlex ?? 0, 0, 1.2);
-  if (foot.plant > 0.24 && foot.y > -16) {
+  if (plant > 0.24 && foot.y > -16) {
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
-    ctx.fillStyle = `rgba(20, 12, 8, ${0.08 + foot.plant * 0.12 + press * 0.05 + toeFlex * 0.035})`;
+    ctx.fillStyle = `rgba(20, 12, 8, ${0.08 + plant * 0.12 + press * 0.05 + toeFlex * 0.035})`;
     ctx.beginPath();
-    ctx.ellipse(foot.x, foot.y + 8 + press * 0.8 + toeFlex * 0.3, foot.w * (0.54 + foot.plant * 0.16 + press * 0.08 + toeFlex * 0.025), 4.6 + press * 0.8, foot.angle, 0, Math.PI * 2);
+    ctx.ellipse(foot.x, foot.y + 8 + press * 0.8 + toeFlex * 0.3, foot.w * (0.54 + plant * 0.16 + press * 0.08 + toeFlex * 0.025), 4.6 + press * 0.8, foot.angle, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -16202,6 +16204,21 @@ function drawSpriteFootDetail(foot, shoe, trim) {
   ctx.quadraticCurveTo(-foot.w * 0.04, foot.h * (0.62 + foot.sole * 0.1 + press * 0.08 + toeFlex * 0.06), foot.w * 0.48, foot.h * (0.16 + press * 0.08 - toeFlex * 0.03));
   ctx.stroke();
 
+  const toeCap = clamp(toeFlex * 0.58 + press * 0.32 + plant * 0.2, 0, 1.15);
+  if (toeCap > 0.06) {
+    ctx.fillStyle = `rgba(24, 13, 9, ${0.08 + toeCap * 0.08})`;
+    ctx.beginPath();
+    ctx.ellipse(foot.w * 0.34, foot.h * (0.02 - toeFlex * 0.02), foot.w * (0.15 + toeCap * 0.025), foot.h * (0.22 + press * 0.02), -0.12 - toeFlex * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(20, 11, 8, ${0.15 + toeCap * 0.12})`;
+    ctx.lineWidth = 0.9 + toeCap * 0.16;
+    ctx.beginPath();
+    ctx.moveTo(-foot.w * 0.22, foot.h * (0.44 + press * 0.04));
+    ctx.quadraticCurveTo(foot.w * 0.08, foot.h * (0.58 + press * 0.08), foot.w * 0.43, foot.h * (0.3 - toeFlex * 0.02));
+    ctx.stroke();
+  }
+
   ctx.strokeStyle = `rgba(22, 13, 10, ${0.28 + toeFlex * 0.08})`;
   ctx.lineWidth = 1.15 + toeFlex * 0.12;
   for (let i = 0; i < 3; i += 1) {
@@ -16217,14 +16234,22 @@ function drawSpriteFootDetail(foot, shoe, trim) {
   ctx.translate(foot.x, foot.y);
   ctx.rotate(foot.angle);
   ctx.globalCompositeOperation = "screen";
-  ctx.strokeStyle = colorWithAlpha(lighten(shoe, 28), 0.16 + press * 0.04 + toeFlex * 0.04);
+  ctx.strokeStyle = colorWithAlpha(lighten(shoe, 28), 0.16 + press * 0.04 + toeFlex * 0.04 + lift * 0.04);
   ctx.lineWidth = 1.35;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(-foot.w * 0.35, -foot.h * (0.35 - press * 0.03));
-  ctx.quadraticCurveTo(foot.w * 0.08, -foot.h * (0.62 - press * 0.05 + toeFlex * 0.04), foot.w * 0.36, -foot.h * (0.25 - press * 0.03 + toeFlex * 0.02));
+  ctx.moveTo(-foot.w * 0.35, -foot.h * (0.35 - press * 0.03 + lift * 0.02));
+  ctx.quadraticCurveTo(foot.w * 0.08, -foot.h * (0.62 - press * 0.05 + toeFlex * 0.04 + lift * 0.06), foot.w * 0.36, -foot.h * (0.25 - press * 0.03 + toeFlex * 0.02 + lift * 0.05));
   ctx.stroke();
-  ctx.strokeStyle = colorWithAlpha(trim, foot.plant > 0.5 ? 0.1 : 0.16);
+  if (lift > 0.18 || toeFlex > 0.18) {
+    ctx.strokeStyle = colorWithAlpha(lighten(trim, 20), 0.07 + lift * 0.08 + toeFlex * 0.035);
+    ctx.lineWidth = 0.85;
+    ctx.beginPath();
+    ctx.moveTo(foot.w * 0.04, -foot.h * (0.18 + lift * 0.05));
+    ctx.quadraticCurveTo(foot.w * 0.24, -foot.h * (0.34 + lift * 0.07), foot.w * 0.45, -foot.h * (0.1 + toeFlex * 0.04));
+    ctx.stroke();
+  }
+  ctx.strokeStyle = colorWithAlpha(trim, plant > 0.5 ? 0.1 : 0.16);
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.moveTo(-foot.w * 0.34, foot.h * 0.34);
@@ -24462,6 +24487,21 @@ function drawVectorFootAnatomy(spec, outfit, plant, lift, extension = 0, toeFlex
   ctx.quadraticCurveTo(2 * spec.foot + extension * 2, 8 + plant * 1.4 + toeFlex * 1.1, 25 * spec.foot + extension * 5, 3.8 - toeFlex * 1.4);
   ctx.stroke();
 
+  const compression = clamp(plant * 0.7 + toeFlex * 0.5 - lift * 0.24, 0, 1.25);
+  if (compression > 0.05) {
+    ctx.fillStyle = `rgba(24, 13, 9, ${0.055 + compression * 0.055})`;
+    ctx.beginPath();
+    ctx.ellipse(20 * spec.foot + extension * 4.1, 1.4 + plant * 0.9 - toeFlex * 0.4, 8.6 * spec.foot + compression * 1.4, 4.1 + compression * 0.8, -0.16 - toeFlex * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(19, 10, 7, ${0.16 + compression * 0.13})`;
+    ctx.lineWidth = 0.85 + compression * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(-7, 6 + compression * 0.3);
+    ctx.quadraticCurveTo(8 * spec.foot + extension * 1.6, 10.1 + compression * 0.9, 29 * spec.foot + extension * 5.2, 4.9 - toeFlex * 1.25);
+    ctx.stroke();
+  }
+
   ctx.strokeStyle = "rgba(20, 12, 9, 0.22)";
   ctx.lineWidth = 1.1;
   for (let i = 0; i < 4; i += 1) {
@@ -24470,6 +24510,12 @@ function drawVectorFootAnatomy(spec, outfit, plant, lift, extension = 0, toeFlex
     ctx.moveTo(x, -5.8 + lift * 1.2 - toeFlex * 0.6);
     ctx.quadraticCurveTo(x + 1.2 + toeFlex * 0.5, -0.4 + toeFlex * 0.8, x + 2.4 + toeFlex * 0.9, 4.6 - toeFlex * 0.4);
     ctx.stroke();
+
+    if (toeFlex > 0.12 || plant > 0.28) {
+      ctx.beginPath();
+      ctx.arc(x + 2.5 + toeFlex * 0.7, 4.2 - toeFlex * 0.65, 1.25 + toeFlex * 0.28, Math.PI * 1.05, Math.PI * 1.95);
+      ctx.stroke();
+    }
   }
 
   const soleBite = clamp(plant * 0.62 + toeFlex * 0.46 - lift * 0.22, 0, 1.2);
@@ -24489,17 +24535,33 @@ function drawVectorFootAnatomy(spec, outfit, plant, lift, extension = 0, toeFlex
       ctx.lineTo(x + 2.6 + toeFlex * 0.7, 2.4 - toeFlex * 0.8);
       ctx.stroke();
     }
+
+    ctx.strokeStyle = `rgba(18, 10, 8, ${0.1 + soleBite * 0.11})`;
+    ctx.lineWidth = 0.8 + soleBite * 0.12;
+    ctx.beginPath();
+    ctx.moveTo(-5, 3.2 + soleBite * 0.25);
+    ctx.quadraticCurveTo(8 * spec.foot + extension * 1.2, 5.8 + soleBite * 0.45, 24 * spec.foot + extension * 4.6, 1.7 - toeFlex * 1.1);
+    ctx.stroke();
   }
   ctx.restore();
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  ctx.strokeStyle = colorWithAlpha(lighten(outfit.shoe, 28), 0.16 + clamp(toeFlex + plant * 0.5, 0, 1.2) * 0.045);
+  ctx.strokeStyle = colorWithAlpha(lighten(outfit.shoe, 28), 0.16 + clamp(toeFlex + plant * 0.5 + lift * 0.65, 0, 1.35) * 0.045);
   ctx.lineWidth = 1.25 + toeFlex * 0.18;
   ctx.beginPath();
   ctx.moveTo(-9, -7.2);
   ctx.quadraticCurveTo(4 * spec.foot + extension * 2, -11 - extension * 0.8 - toeFlex * 0.8, 23 * spec.foot + extension * 5, -5.5 - toeFlex * 0.35);
   ctx.stroke();
+
+  if (lift > 0.12 || toeFlex > 0.1) {
+    ctx.strokeStyle = colorWithAlpha(lighten(outfit.shoe, 46), 0.055 + lift * 0.075 + toeFlex * 0.035);
+    ctx.lineWidth = 0.85;
+    ctx.beginPath();
+    ctx.moveTo(1 * spec.foot + extension * 0.7, -4.8 - lift * 0.65);
+    ctx.quadraticCurveTo(12 * spec.foot + extension * 2.5, -8.4 - lift * 1.15, 28 * spec.foot + extension * 5.8, -3.7 - toeFlex * 0.7);
+    ctx.stroke();
+  }
 
   if (toeFlex > 0.08 || plant > 0.35) {
     ctx.strokeStyle = colorWithAlpha(lighten(outfit.shoe, 42), 0.08 + clamp(toeFlex * 0.1 + plant * 0.045, 0, 0.16));
@@ -24521,6 +24583,8 @@ function drawVectorHandAnatomy(f, arm, spec, front) {
   const idleCurl = clamp(arm.handCurl ?? 0, 0, 1);
   const fingerFidget = clamp(arm.fingerFidget ?? 0, 0, 0.75);
   const curl = punch ? 1 : 0.62 + attack * 0.18 + fatigue * 0.18 * fatigueStyle.hands + idleCurl * 0.18;
+  const fistMass = clamp((punch ? 0.78 : 0.12) + attack * 0.24 + idleCurl * 0.18 + fatigue * 0.08, 0, 1.18);
+  const relaxed = clamp((1 - fistMass) * 0.7 + fingerFidget * 0.32 + fatigue * 0.24, 0, 1);
   const skin = f.skin ?? "#f5c7a9";
 
   ctx.save();
@@ -24546,6 +24610,23 @@ function drawVectorHandAnatomy(f, arm, spec, front) {
     ctx.moveTo(x - 2.1 * spec.hand, arm.hand.y - 5.4 * spec.hand + knuckleLift * 0.2);
     ctx.quadraticCurveTo(x + fingerWave * 0.25, arm.hand.y - 7.4 * spec.hand - knuckleLift * 0.28, x + 2.3 * spec.hand, arm.hand.y - 5.2 * spec.hand + knuckleLift * 0.18);
     ctx.stroke();
+
+    const knuckleAlpha = 0.1 + fistMass * 0.13 + fingerFidget * 0.04;
+    ctx.fillStyle = `rgba(30, 14, 10, ${knuckleAlpha})`;
+    ctx.beginPath();
+    ctx.ellipse(x + 0.45 * spec.hand, arm.hand.y - 5.7 * spec.hand + knuckleLift * 0.06, (1.55 + fistMass * 0.45) * spec.hand, (0.9 + fistMass * 0.2) * spec.hand, -0.08 + i * 0.03, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (relaxed > 0.08) {
+      ctx.strokeStyle = `rgba(42, 22, 16, ${0.1 + relaxed * 0.08})`;
+      ctx.lineWidth = 0.75 + relaxed * 0.12;
+      ctx.beginPath();
+      ctx.moveTo(x - 0.5 * spec.hand, arm.hand.y + 3.5 * spec.hand + fatigue * 1.1);
+      ctx.quadraticCurveTo(x + 1.7 * spec.hand + fingerWave * 0.55, arm.hand.y + (5.8 + relaxed * 1.2) * spec.hand, x + 4.1 * spec.hand, arm.hand.y + 3.6 * spec.hand);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(45, 23, 17, ${front ? 0.34 + fatigue * 0.08 : 0.24 + fatigue * 0.06})`;
+      ctx.lineWidth = (punch ? 1.7 : 1.3) + fatigue * 0.24;
+    }
   }
 
   ctx.strokeStyle = "rgba(34, 17, 12, 0.38)";
@@ -24554,6 +24635,20 @@ function drawVectorHandAnatomy(f, arm, spec, front) {
   ctx.moveTo(arm.hand.x - 8 * spec.hand, arm.hand.y - 2.4 * spec.hand);
   ctx.quadraticCurveTo(arm.hand.x, arm.hand.y - 8.8 * spec.hand, arm.hand.x + 8.5 * spec.hand, arm.hand.y - 2.5 * spec.hand);
   ctx.stroke();
+
+  ctx.fillStyle = `rgba(43, 20, 14, ${0.055 + curl * 0.055 + fatigue * 0.035})`;
+  ctx.beginPath();
+  ctx.ellipse(arm.hand.x + (front ? -2.4 : 2.4) * spec.hand, arm.hand.y + 0.6 * spec.hand + fatigue * 0.8, (5.8 + fistMass * 1.4) * spec.hand, (3.7 + relaxed * 1.1) * spec.hand, front ? -0.22 : 0.22, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (punch) {
+    ctx.strokeStyle = `rgba(24, 11, 8, ${0.24 + attack * 0.12})`;
+    ctx.lineWidth = 1.05 + attack * 0.2;
+    ctx.beginPath();
+    ctx.moveTo(arm.hand.x - 8.8 * spec.hand, arm.hand.y - 1.2 * spec.hand);
+    ctx.quadraticCurveTo(arm.hand.x - 1.2 * spec.hand, arm.hand.y + 3.2 * spec.hand + attack * 0.8, arm.hand.x + 8.2 * spec.hand, arm.hand.y - 0.9 * spec.hand);
+    ctx.stroke();
+  }
 
   ctx.strokeStyle = `rgba(34, 17, 12, ${0.2 + curl * 0.08 + fingerFidget * 0.08})`;
   ctx.lineWidth = 1.15;
@@ -24584,6 +24679,21 @@ function drawVectorHandAnatomy(f, arm, spec, front) {
     ctx.beginPath();
     ctx.moveTo(arm.hand.x - 4.8 * spec.hand + tremor * 0.3, arm.hand.y - 1.2 * spec.hand);
     ctx.quadraticCurveTo(arm.hand.x + 0.4 * spec.hand, arm.hand.y - 3.4 * spec.hand - fingerFidget * 0.8, arm.hand.x + 6.8 * spec.hand, arm.hand.y - 0.6 * spec.hand);
+    ctx.stroke();
+  }
+
+  if (relaxed > 0.12 || punch) {
+    ctx.strokeStyle = colorWithAlpha(lighten(skin, 48), 0.055 + relaxed * 0.055 + (punch ? 0.045 : 0));
+    ctx.lineWidth = 0.72 + relaxed * 0.08;
+    const thumbSide = front ? -1 : 1;
+    ctx.beginPath();
+    ctx.moveTo(arm.hand.x + thumbSide * 3.8 * spec.hand, arm.hand.y + 1.9 * spec.hand + fatigue * 0.5);
+    ctx.quadraticCurveTo(
+      arm.hand.x + thumbSide * (7.5 + relaxed * 1.5) * spec.hand,
+      arm.hand.y + (3.1 + relaxed * 0.9) * spec.hand,
+      arm.hand.x + thumbSide * (10.2 + fistMass * 0.9) * spec.hand,
+      arm.hand.y + 0.2 * spec.hand
+    );
     ctx.stroke();
   }
   ctx.restore();
