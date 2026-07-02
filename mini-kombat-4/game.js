@@ -728,6 +728,89 @@ function guardPresentationMotion(f) {
   };
 }
 
+function defensiveGuardAnatomyProfile(f, defense = guardPresentationMotion(f)) {
+  const style = {
+    p1: { shoulder: 0.86, elbow: 0.9, wrist: 0.84, forearm: 0.9, torso: 1.14, hip: 1.18, knee: 1.16, backFoot: 1.2, frontFoot: 1.08, toe: 1.12, shield: 0.92 },
+    p2: { shoulder: 1.18, elbow: 1.16, wrist: 1.22, forearm: 1.18, torso: 0.86, hip: 0.84, knee: 0.86, backFoot: 0.84, frontFoot: 1.14, toe: 0.9, shield: 1.16 },
+    p3: { shoulder: 0.74, elbow: 0.78, wrist: 0.74, forearm: 0.8, torso: 1.28, hip: 1.3, knee: 1.28, backFoot: 1.3, frontFoot: 1.12, toe: 1.26, shield: 0.88 },
+    p4: { shoulder: 1.16, elbow: 1.14, wrist: 1.16, forearm: 1.16, torso: 0.88, hip: 0.88, knee: 0.88, backFoot: 0.86, frontFoot: 1.16, toe: 0.92, shield: 1.14 },
+    p5: { shoulder: 1.24, elbow: 1.22, wrist: 1.28, forearm: 1.24, torso: 0.82, hip: 0.8, knee: 0.8, backFoot: 0.8, frontFoot: 1.2, toe: 0.88, shield: 1.2 },
+    p6: { shoulder: 0.94, elbow: 0.96, wrist: 0.94, forearm: 0.96, torso: 1.04, hip: 1.06, knee: 1.06, backFoot: 1.08, frontFoot: 1.04, toe: 1.04, shield: 1.02 },
+  }[f?.profileId] ?? { shoulder: 1, elbow: 1, wrist: 1, forearm: 1, torso: 1, hip: 1, knee: 1, backFoot: 1, frontFoot: 1, toe: 1, shield: 1 };
+
+  const available = !!f?.grounded && !winner && (f?.hurt ?? 0) <= 0 && !f?.attack;
+  const hold = available ? clamp(defense.guard ?? 0, 0, 1.45) : 0;
+  const entry = available ? clamp(defense.entry ?? 0, 0, 1.2) : 0;
+  const impact = available ? clamp(defense.impact ?? 0, 0, 1.35) : 0;
+  const counter = available ? clamp(defense.counter ?? 0, 0, 1.25) : 0;
+  const counterSnap = available ? clamp(defense.counterSnap ?? 0, 0, 1.35) : 0;
+  const release = available ? clamp(defense.release ?? 0, 0, 1.1) : 0;
+  const active = clamp(Math.max(hold, entry, impact, counter, counterSnap * 0.76, release * 0.42), 0, 1.65);
+
+  if (active <= 0.018) {
+    return {
+      active: 0,
+      style,
+      shoulderClamp: 0,
+      elbowSeal: 0,
+      wristLock: 0,
+      forearmCompression: 0,
+      torsoBrace: 0,
+      hipCounterSet: 0,
+      kneeSink: 0,
+      backFootDig: 0,
+      frontFootCheck: 0,
+      toeFlex: 0,
+      footAngle: 0,
+      shieldAlignX: 0,
+      shieldAlignY: 0,
+      shieldCompress: 0,
+      bodyAlign: 0,
+      counterReady: 0,
+    };
+  }
+
+  const absorption = defense.absorption ?? guardAbsorptionProfile(f);
+  const commitment = defense.commitment ?? guardCommitmentProfile(f);
+  const impactWave = Math.sin(clamp(impact, 0, 1) * Math.PI);
+  const counterReady = clamp(counter * 0.74 + counterSnap * 0.42, 0, 1.35);
+  const brace = clamp((hold * 0.46 + entry * 0.28 + impact * 0.92 + counterReady * 0.24) * commitment.absorb, 0, 1.75);
+  const shoulderClamp = clamp((defense.shoulderClamp * 0.72 + brace * 0.2 + impactWave * 0.16) * style.shoulder, 0, 1.55);
+  const elbowSeal = clamp((defense.elbowSeal * 0.76 + brace * 0.18 + counterReady * 0.14) * style.elbow, 0, 1.5);
+  const wristLock = clamp((defense.wristLock * 0.82 + impact * 0.24 + counterReady * 0.18) * style.wrist, 0, 1.48);
+  const forearmCompression = clamp((elbowSeal * 0.44 + wristLock * 0.38 + impact * 0.42) * style.forearm, 0, 1.55);
+  const torsoBrace = clamp((brace * 0.58 + impact * 0.44 + shoulderClamp * 0.28) * style.torso, 0, 1.7);
+  const hipCounterSet = clamp((defense.hipSet * 0.42 + torsoBrace * 0.28 + counterReady * 0.22) * style.hip * absorption.hip, 0, 1.55);
+  const kneeSink = clamp((defense.crouchSettle * 0.44 + torsoBrace * 0.34 + impact * 0.36) * style.knee, 0, 1.55);
+  const backFootDig = clamp((defense.backFootDig * 0.74 + kneeSink * 0.24 + impactWave * 0.18) * style.backFoot, 0, 1.62);
+  const frontFootCheck = clamp((defense.frontFootCheck * 0.78 + counterReady * 0.22 + release * 0.12) * style.frontFoot, 0, 1.42);
+  const toeFlex = clamp((backFootDig * 0.34 + frontFootCheck * 0.24 + kneeSink * 0.18) * style.toe, 0, 1.12);
+  const footAngle = clamp((backFootDig * 0.038 + frontFootCheck * 0.024 + impact * 0.018) * absorption.foot, 0, 0.12);
+  const bodyAlign = clamp(torsoBrace * 0.36 + hipCounterSet * 0.24 + counterReady * 0.2, 0, 1.3);
+  const shieldCompress = clamp((forearmCompression * 0.38 + impact * 0.54 + counterReady * 0.18) * style.shield, 0, 1.45);
+
+  return {
+    active,
+    style,
+    shoulderClamp,
+    elbowSeal,
+    wristLock,
+    forearmCompression,
+    torsoBrace,
+    hipCounterSet,
+    kneeSink,
+    backFootDig,
+    frontFootCheck,
+    toeFlex,
+    footAngle,
+    shieldAlignX: clamp((wristLock * 1.8 + elbowSeal * 1.2 + counterReady * 1.4 - release * 0.7) * style.shield, -0.9, 8.2),
+    shieldAlignY: clamp((shoulderClamp * 1.2 + kneeSink * 0.56 - counterReady * 1.8 + impact * 1.5) * style.shield, -4.8, 5.8),
+    shieldCompress,
+    bodyAlign,
+    counterReady,
+  };
+}
+
 function resultPresentationProfile(f) {
   return {
     p1: { chest: 0.9, swagger: 0.72, stance: 1.16, glow: 0.92, breath: 0.78, settle: 1.16, fall: 0.86, sprawl: 0.82, limp: 0.78, knee: 1.16, twist: 0.82, dust: 1.12 },
@@ -19160,6 +19243,7 @@ function getPose(f, stride) {
   const facingTurnT = clamp((f.facingTurnPulse ?? 0) / 14, 0, 1);
   const counterReadyT = clamp((f.counterWindow ?? 0) / COUNTER_WINDOW_FRAMES, 0, 1);
   const guardPresent = guardPresentationMotion(f);
+  const guardAnatomy = defensiveGuardAnatomyProfile(f, guardPresent);
 
   if (f.blocking) {
     if (f.profileId === "p1") {
@@ -19246,43 +19330,56 @@ function getPose(f, stride) {
     const backFootDig = clamp(guardPresent.backFootDig ?? 0, 0, 1.45);
     const frontFootCheck = clamp(guardPresent.frontFootCheck ?? 0, 0, 1.2);
     const shoulderClamp = clamp(guardPresent.shoulderClamp ?? 0, 0, 1.45);
+    const defensiveShoulderClamp = clamp(guardAnatomy.shoulderClamp ?? 0, 0, 1.55);
+    const forearmCompression = clamp(guardAnatomy.forearmCompression ?? 0, 0, 1.55);
+    const torsoBrace = clamp(guardAnatomy.torsoBrace ?? 0, 0, 1.7);
+    const hipCounterSet = clamp(guardAnatomy.hipCounterSet ?? 0, 0, 1.55);
+    const kneeSink = clamp(guardAnatomy.kneeSink ?? 0, 0, 1.55);
+    const toeFlex = clamp(guardAnatomy.toeFlex ?? 0, 0, 1.12);
+    const footAngle = clamp(guardAnatomy.footAngle ?? 0, 0, 0.12);
+    const bodyAlign = clamp(guardAnatomy.bodyAlign ?? 0, 0, 1.3);
 
     base.torsoTilt -= (0.012 * guardHold + 0.026 * guardSnap + shoulderClamp * 0.006) * brace;
     base.torsoTilt -= (impactAbsorb * 0.018 + guardSnap * 0.006 + backFootDig * 0.004) * absorption.twist;
+    base.torsoTilt -= (torsoBrace * 0.012 + bodyAlign * 0.006) * brace;
     base.frontArm.shoulder.x -= (impactAbsorb * 2.2 + shoulderClamp * 1.2) * spec.stance * absorption.shoulder;
-    base.frontArm.shoulder.y += (impactAbsorb * 1.9 + shoulderClamp * 1.3) * absorption.shoulder;
+    base.frontArm.shoulder.y += (impactAbsorb * 1.9 + shoulderClamp * 1.3 + defensiveShoulderClamp * 0.85) * absorption.shoulder;
     base.backArm.shoulder.x += (impactAbsorb * 1.8 + shoulderClamp * 0.9) * spec.stance * absorption.shoulder;
-    base.backArm.shoulder.y += (impactAbsorb * 1.6 + shoulderClamp * 1.6) * absorption.shoulder;
-    base.frontArm.elbow.x += (guardBreath * 1.6 - guardSnap * 2.4 - elbowSeal * 1.8) * spec.stance * brace;
-    base.frontArm.elbow.y -= (guardHold * 2.8 + guardSnap * 4.8 - elbowSeal * 0.7) * handLift;
-    base.frontArm.hand.x += (guardBreath * 2.2 - guardSnap * 3.4 - wristLock * 1.8) * spec.stance * brace;
-    base.frontArm.hand.y -= (guardHold * 4.2 + guardSnap * 6.6 - wristLock * 1.2) * handLift;
-    base.backArm.elbow.x += (guardBreath * 1.1 + guardSnap * 2.8 + elbowSeal * 1.5) * spec.stance * brace;
-    base.backArm.elbow.y -= (guardHold * 2.1 + guardSnap * 3.8 - elbowSeal * 0.55) * handLift;
-    base.backArm.hand.x += (guardBreath * 1.6 + guardSnap * 4.2 + wristLock * 1.55) * spec.stance * brace;
-    base.backArm.hand.y -= (guardHold * 3.2 + guardSnap * 5.2 - wristLock * 1.0) * handLift;
-    base.frontLeg.knee.y += (guardHold * 2.4 + guardSnap * 4.8) * crouchPress;
-    base.backLeg.knee.y += (guardHold * 3.2 + guardSnap * 6.2) * crouchPress;
-    base.frontLeg.foot.x += (guardHold * 2.6 + guardSnap * 5.6 + frontFootCheck * 2.2) * spec.stance * brace;
-    base.backLeg.foot.x -= (guardHold * 4.2 + guardSnap * 8.2 + backFootDig * 3.2) * spec.stance * brace;
-    base.frontLeg.hip.x -= impactAbsorb * 1.6 * spec.stance * absorption.hip;
-    base.frontLeg.hip.y += impactAbsorb * 1.8 * absorption.hip;
-    base.backLeg.hip.x += impactAbsorb * 2.4 * spec.stance * absorption.hip;
-    base.backLeg.hip.y += impactAbsorb * 2.4 * absorption.hip;
-    base.frontArm.elbow.x -= impactAbsorb * 2.8 * spec.stance * absorption.hand;
-    base.frontArm.hand.x -= impactAbsorb * 5.6 * spec.stance * absorption.hand;
-    base.frontArm.hand.y += impactAbsorb * 2.4 * absorption.hand;
-    base.backArm.elbow.x += impactAbsorb * 2.2 * spec.stance * absorption.hand;
-    base.backArm.hand.x += impactAbsorb * 4.4 * spec.stance * absorption.hand;
-    base.backArm.hand.y += impactAbsorb * 1.8 * absorption.hand;
-    base.frontLeg.knee.x += impactAbsorb * 4.2 * spec.stance * absorption.foot;
-    base.backLeg.knee.x -= impactAbsorb * 5.4 * spec.stance * absorption.foot;
-    base.frontLeg.foot.x += impactAbsorb * 6.8 * spec.stance * absorption.foot;
-    base.backLeg.foot.x -= impactAbsorb * 8.6 * spec.stance * absorption.foot;
+    base.backArm.shoulder.y += (impactAbsorb * 1.6 + shoulderClamp * 1.6 + defensiveShoulderClamp * 1.05) * absorption.shoulder;
+    base.frontArm.elbow.x += (guardBreath * 1.6 - guardSnap * 2.4 - elbowSeal * 1.8 - forearmCompression * 1.9) * spec.stance * brace;
+    base.frontArm.elbow.y -= (guardHold * 2.8 + guardSnap * 4.8 - elbowSeal * 0.7 - forearmCompression * 0.8) * handLift;
+    base.frontArm.hand.x += (guardBreath * 2.2 - guardSnap * 3.4 - wristLock * 1.8 - forearmCompression * 2.4) * spec.stance * brace;
+    base.frontArm.hand.y -= (guardHold * 4.2 + guardSnap * 6.6 - wristLock * 1.2 - forearmCompression * 1.1) * handLift;
+    base.backArm.elbow.x += (guardBreath * 1.1 + guardSnap * 2.8 + elbowSeal * 1.5 + forearmCompression * 1.7) * spec.stance * brace;
+    base.backArm.elbow.y -= (guardHold * 2.1 + guardSnap * 3.8 - elbowSeal * 0.55 - forearmCompression * 0.65) * handLift;
+    base.backArm.hand.x += (guardBreath * 1.6 + guardSnap * 4.2 + wristLock * 1.55 + forearmCompression * 2.2) * spec.stance * brace;
+    base.backArm.hand.y -= (guardHold * 3.2 + guardSnap * 5.2 - wristLock * 1.0 - forearmCompression * 0.9) * handLift;
+    base.frontLeg.knee.y += (guardHold * 2.4 + guardSnap * 4.8 + kneeSink * 2.1) * crouchPress;
+    base.backLeg.knee.y += (guardHold * 3.2 + guardSnap * 6.2 + kneeSink * 2.8) * crouchPress;
+    base.frontLeg.foot.x += (guardHold * 2.6 + guardSnap * 5.6 + frontFootCheck * 2.2 + guardAnatomy.frontFootCheck * 1.8) * spec.stance * brace;
+    base.backLeg.foot.x -= (guardHold * 4.2 + guardSnap * 8.2 + backFootDig * 3.2 + guardAnatomy.backFootDig * 2.4) * spec.stance * brace;
+    base.frontLeg.hip.x -= (impactAbsorb * 1.6 + hipCounterSet * 1.2) * spec.stance * absorption.hip;
+    base.frontLeg.hip.y += (impactAbsorb * 1.8 + hipCounterSet * 0.8) * absorption.hip;
+    base.backLeg.hip.x += (impactAbsorb * 2.4 + hipCounterSet * 1.8) * spec.stance * absorption.hip;
+    base.backLeg.hip.y += (impactAbsorb * 2.4 + hipCounterSet) * absorption.hip;
+    base.frontArm.elbow.x -= (impactAbsorb * 2.8 + forearmCompression * 1.3) * spec.stance * absorption.hand;
+    base.frontArm.hand.x -= (impactAbsorb * 5.6 + forearmCompression * 2.1) * spec.stance * absorption.hand;
+    base.frontArm.hand.y += (impactAbsorb * 2.4 + forearmCompression * 0.9) * absorption.hand;
+    base.backArm.elbow.x += (impactAbsorb * 2.2 + forearmCompression * 1.1) * spec.stance * absorption.hand;
+    base.backArm.hand.x += (impactAbsorb * 4.4 + forearmCompression * 1.8) * spec.stance * absorption.hand;
+    base.backArm.hand.y += (impactAbsorb * 1.8 + forearmCompression * 0.7) * absorption.hand;
+    base.frontLeg.knee.x += (impactAbsorb * 4.2 + guardAnatomy.frontFootCheck * 1.8) * spec.stance * absorption.foot;
+    base.backLeg.knee.x -= (impactAbsorb * 5.4 + guardAnatomy.backFootDig * 2.2) * spec.stance * absorption.foot;
+    base.frontLeg.foot.x += (impactAbsorb * 6.8 + guardAnatomy.frontFootCheck * 3.2) * spec.stance * absorption.foot;
+    base.backLeg.foot.x -= (impactAbsorb * 8.6 + guardAnatomy.backFootDig * 4.1) * spec.stance * absorption.foot;
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.52 + guardHold * 0.26 + guardSnap * 0.22 + guardPresent.footPress * 0.08, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.62 + guardHold * 0.28 + guardSnap * 0.28 + guardPresent.footPress * 0.1, 0, 1));
     base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + (impactAbsorb * 0.026 + frontFootCheck * 0.018) * absorption.foot;
     base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - (impactAbsorb * 0.038 + backFootDig * 0.016) * absorption.foot;
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + footAngle * 0.72;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - footAngle;
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, toeFlex * 0.72 + guardAnatomy.frontFootCheck * 0.12);
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, toeFlex + guardAnatomy.backFootDig * 0.16);
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.66 + impactAbsorb * 0.24, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.78 + impactAbsorb * 0.22 + backFootDig * 0.1, 0, 1));
 
@@ -19336,37 +19433,43 @@ function getPose(f, stride) {
     const wristLock = clamp(guardPresent.wristLock ?? 0, 0, 1.35);
     const backFootDig = clamp(guardPresent.backFootDig ?? 0, 0, 1.45);
     const shoulderClamp = clamp(guardPresent.shoulderClamp ?? 0, 0, 1.45);
-    const handGuard = Math.max((guardHoldBody * 0.42 + absorb * 0.88 + coil * 0.56) * commitment.hand, guardPresent.handGuard * 0.48, elbowSeal * 0.55);
-    const footBrace = Math.max((guardHoldBody * 0.34 + absorb * 1.05 + coil * 0.44) * commitment.foot, guardPresent.footPress * 0.54, backFootDig * 0.58);
+    const forearmCompression = clamp(guardAnatomy.forearmCompression ?? 0, 0, 1.55);
+    const torsoBrace = clamp(guardAnatomy.torsoBrace ?? 0, 0, 1.7);
+    const hipCounterSet = clamp(guardAnatomy.hipCounterSet ?? 0, 0, 1.55);
+    const kneeSink = clamp(guardAnatomy.kneeSink ?? 0, 0, 1.55);
+    const handGuard = Math.max((guardHoldBody * 0.42 + absorb * 0.88 + coil * 0.56) * commitment.hand, guardPresent.handGuard * 0.48, elbowSeal * 0.55, forearmCompression * 0.42);
+    const footBrace = Math.max((guardHoldBody * 0.34 + absorb * 1.05 + coil * 0.44) * commitment.foot, guardPresent.footPress * 0.54, backFootDig * 0.58, kneeSink * 0.34);
 
-    base.torsoTilt -= absorb * 0.024 + guardEntryBody * 0.011 * commitment.absorb + shoulderClamp * 0.008;
+    base.torsoTilt -= absorb * 0.024 + guardEntryBody * 0.011 * commitment.absorb + shoulderClamp * 0.008 + torsoBrace * 0.01;
     base.torsoTilt += snap * 0.018 * commitment.snap + pulse * 0.004;
     base.frontArm.shoulder.y += absorb * 2.2 * commitment.shoulder - snap * 0.9 + shoulderClamp * 1.1;
     base.backArm.shoulder.y += absorb * 2.6 * commitment.shoulder - snap * 0.7 + shoulderClamp * 1.3;
     base.frontArm.shoulder.x -= (absorb * 1.8 - snap * 0.8 + shoulderClamp * 0.8) * spec.stance * commitment.shoulder;
     base.backArm.shoulder.x += (absorb * 1.5 - snap * 0.6 + shoulderClamp * 0.7) * spec.stance * commitment.shoulder;
-    base.frontArm.elbow.x -= (handGuard * 4.2 - snap * 4.8 + pulse * 0.8 + elbowSeal * 1.6) * spec.stance;
-    base.frontArm.elbow.y += absorb * 3.2 - coil * 1.2 - snap * 2.4 + wristLock * 0.8;
-    base.frontArm.hand.x -= (handGuard * 7.8 - snap * 9.4 + pulse * 1.2 + wristLock * 2.2) * spec.stance;
-    base.frontArm.hand.y += absorb * 4.4 - coil * 2.2 - snap * 5.6 + wristLock * 1.1;
-    base.backArm.elbow.x += (handGuard * 3.6 + snap * 3.8 - pulse * 0.6 + elbowSeal * 1.2) * spec.stance;
-    base.backArm.elbow.y += absorb * 2.8 - coil * 0.8 - snap * 1.8 + wristLock * 0.65;
-    base.backArm.hand.x += (handGuard * 6.4 + snap * 7.2 - pulse * 0.9 + wristLock * 1.8) * spec.stance;
-    base.backArm.hand.y += absorb * 3.6 - coil * 1.8 - snap * 4.2 + wristLock * 0.9;
-    base.frontLeg.hip.y += absorb * 1.4 + footBrace * 0.7;
-    base.backLeg.hip.y += absorb * 2.1 + footBrace * 0.9;
-    base.frontLeg.knee.x += (footBrace * 3.8 + snap * 2.4) * spec.stance;
-    base.frontLeg.knee.y += footBrace * 4.8 + absorb * 2.2 - snap * 1.4;
-    base.frontLeg.foot.x += (footBrace * 5.8 + snap * 4.2) * spec.stance;
+    base.frontArm.elbow.x -= (handGuard * 4.2 - snap * 4.8 + pulse * 0.8 + elbowSeal * 1.6 + forearmCompression * 1.9) * spec.stance;
+    base.frontArm.elbow.y += absorb * 3.2 - coil * 1.2 - snap * 2.4 + wristLock * 0.8 + forearmCompression * 0.75;
+    base.frontArm.hand.x -= (handGuard * 7.8 - snap * 9.4 + pulse * 1.2 + wristLock * 2.2 + forearmCompression * 2.7) * spec.stance;
+    base.frontArm.hand.y += absorb * 4.4 - coil * 2.2 - snap * 5.6 + wristLock * 1.1 + forearmCompression;
+    base.backArm.elbow.x += (handGuard * 3.6 + snap * 3.8 - pulse * 0.6 + elbowSeal * 1.2 + forearmCompression * 1.6) * spec.stance;
+    base.backArm.elbow.y += absorb * 2.8 - coil * 0.8 - snap * 1.8 + wristLock * 0.65 + forearmCompression * 0.65;
+    base.backArm.hand.x += (handGuard * 6.4 + snap * 7.2 - pulse * 0.9 + wristLock * 1.8 + forearmCompression * 2.2) * spec.stance;
+    base.backArm.hand.y += absorb * 3.6 - coil * 1.8 - snap * 4.2 + wristLock * 0.9 + forearmCompression * 0.82;
+    base.frontLeg.hip.y += absorb * 1.4 + footBrace * 0.7 + hipCounterSet * 0.58;
+    base.backLeg.hip.y += absorb * 2.1 + footBrace * 0.9 + hipCounterSet * 0.74;
+    base.frontLeg.knee.x += (footBrace * 3.8 + snap * 2.4 + guardAnatomy.frontFootCheck * 1.5) * spec.stance;
+    base.frontLeg.knee.y += footBrace * 4.8 + absorb * 2.2 - snap * 1.4 + kneeSink * 1.8;
+    base.frontLeg.foot.x += (footBrace * 5.8 + snap * 4.2 + guardAnatomy.frontFootCheck * 2.6) * spec.stance;
     base.frontLeg.foot.y += absorb * 0.8;
-    base.backLeg.knee.x -= (footBrace * 5.2 + absorb * 3.4) * spec.stance;
-    base.backLeg.knee.y += footBrace * 6.2 + absorb * 3.2 - snap * 0.8;
-    base.backLeg.foot.x -= (footBrace * 10.6 + absorb * 4.8 - snap * 1.6 + backFootDig * 2.8) * spec.stance;
+    base.backLeg.knee.x -= (footBrace * 5.2 + absorb * 3.4 + guardAnatomy.backFootDig * 1.9) * spec.stance;
+    base.backLeg.knee.y += footBrace * 6.2 + absorb * 3.2 - snap * 0.8 + kneeSink * 2.2;
+    base.backLeg.foot.x -= (footBrace * 10.6 + absorb * 4.8 - snap * 1.6 + backFootDig * 2.8 + guardAnatomy.backFootDig * 3.4) * spec.stance;
     base.backLeg.foot.y += absorb * 1.1 + backFootDig * 0.55;
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.62 + footBrace * 0.32 + snap * 0.12, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.78 + footBrace * 0.22 + absorb * 0.16, 0, 1));
     base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + (absorb * 0.024 + snap * 0.018) * commitment.foot;
     base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - (absorb * 0.038 + footBrace * 0.012) * commitment.foot;
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, guardAnatomy.toeFlex * 0.58);
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, guardAnatomy.toeFlex * 0.82 + guardAnatomy.backFootDig * 0.12);
   }
 
   if (attackType === "punch" || attackType === "airPunch") {
@@ -21154,6 +21257,7 @@ function getPose(f, stride) {
     airborne,
     walkingPose,
     guardPresent,
+    guardAnatomy,
   });
   return humanizePose(base, spec);
 }
@@ -21229,24 +21333,39 @@ function applyKineticAnatomyPose(base, f, spec, context = {}) {
   if (guard > 0.025) {
     const brace = smoothStep01(guard) * style.guard;
     const guardPresent = context.guardPresent ?? guardPresentationMotion(f);
+    const guardAnatomy = context.guardAnatomy ?? defensiveGuardAnatomyProfile(f, guardPresent);
     const elbowSeal = clamp(guardPresent.elbowSeal ?? 0, 0, 1.4);
     const wristLock = clamp(guardPresent.wristLock ?? 0, 0, 1.35);
     const backFootDig = clamp(guardPresent.backFootDig ?? 0, 0, 1.45);
     const frontFootCheck = clamp(guardPresent.frontFootCheck ?? 0, 0, 1.2);
     const shoulderClamp = clamp(guardPresent.shoulderClamp ?? 0, 0, 1.45);
-    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + brace * 0.08 + wristLock * 0.045, 0, 1);
-    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + brace * 0.1 + wristLock * 0.052, 0, 1);
-    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, brace * 0.2 + wristLock * 0.18);
-    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, brace * 0.24 + wristLock * 0.2);
-    base.frontArm.shoulder.y += shoulderClamp * 0.9;
-    base.backArm.shoulder.y += shoulderClamp * 1.15;
-    base.frontArm.elbow.x -= dir * elbowSeal * 1.2 * spec.stance;
-    base.backArm.elbow.x += dir * elbowSeal * 1.05 * spec.stance;
+    const forearmCompression = clamp(guardAnatomy.forearmCompression ?? 0, 0, 1.55);
+    const torsoBrace = clamp(guardAnatomy.torsoBrace ?? 0, 0, 1.7);
+    const hipCounterSet = clamp(guardAnatomy.hipCounterSet ?? 0, 0, 1.55);
+    const kneeSink = clamp(guardAnatomy.kneeSink ?? 0, 0, 1.55);
+    const toeFlex = clamp(guardAnatomy.toeFlex ?? 0, 0, 1.12);
+    base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + brace * 0.08 + wristLock * 0.045 + forearmCompression * 0.026, 0, 1);
+    base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + brace * 0.1 + wristLock * 0.052 + forearmCompression * 0.03, 0, 1);
+    base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, brace * 0.2 + wristLock * 0.18 + forearmCompression * 0.12);
+    base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, brace * 0.24 + wristLock * 0.2 + forearmCompression * 0.14);
+    base.torsoTilt -= torsoBrace * 0.006;
+    base.frontArm.shoulder.y += shoulderClamp * 0.9 + guardAnatomy.shoulderClamp * 0.38;
+    base.backArm.shoulder.y += shoulderClamp * 1.15 + guardAnatomy.shoulderClamp * 0.48;
+    base.frontArm.elbow.x -= dir * (elbowSeal * 1.2 + forearmCompression * 0.95) * spec.stance;
+    base.backArm.elbow.x += dir * (elbowSeal * 1.05 + forearmCompression * 0.82) * spec.stance;
+    base.frontArm.hand.x -= dir * forearmCompression * 1.35 * spec.stance;
+    base.backArm.hand.x += dir * forearmCompression * 1.18 * spec.stance;
+    base.frontLeg.hip.y += hipCounterSet * 0.32;
+    base.backLeg.hip.y += hipCounterSet * 0.46;
+    base.frontLeg.knee.y += kneeSink * 0.9;
+    base.backLeg.knee.y += kneeSink * 1.15;
     base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.62 + brace * 0.2 + frontFootCheck * 0.08, 0, 1));
     base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.72 + brace * 0.22 + backFootDig * 0.1, 0, 1));
-    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, brace * 0.2 + frontFootCheck * 0.18);
-    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, brace * 0.26 + backFootDig * 0.22);
-    base.backLeg.foot.y += backFootDig * 0.35;
+    base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, brace * 0.2 + frontFootCheck * 0.18 + toeFlex * 0.38);
+    base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, brace * 0.26 + backFootDig * 0.22 + toeFlex * 0.5);
+    base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + guardAnatomy.footAngle * 0.42;
+    base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - guardAnatomy.footAngle * 0.58;
+    base.backLeg.foot.y += backFootDig * 0.35 + guardAnatomy.backFootDig * 0.18;
   }
 
   if (hurt > 0.025) {
@@ -22985,6 +23104,7 @@ function drawGuard(color, crouch, f) {
   const guardProfile = characterGuard(f);
   const absorption = guardAbsorptionProfile(f);
   const defense = guardPresentationMotion(f);
+  const anatomy = defensiveGuardAnatomyProfile(f, defense);
   const guard = defense.guard;
   const impact = defense.impact;
   const counter = defense.counter;
@@ -22994,11 +23114,12 @@ function drawGuard(color, crouch, f) {
   const backFootDig = clamp(defense.backFootDig ?? 0, 0, 1.45);
   const shoulderClamp = clamp(defense.shoulderClamp ?? 0, 0, 1.45);
   const shieldLean = clamp(defense.shieldLean ?? 0, -0.35, 1.25);
-  const centerX = 22 + impact * 5 * guardProfile.recoil + defense.counterSnap * 2.5 + elbowSeal * 1.3 + wristLock * 1.8 + (f?.profileId === "p2" ? 4 : f?.profileId === "p1" ? -2 : 0);
-  const centerY = -106 + crouch + impact * 2 * guardProfile.recoil + defense.crouchSettle * 2.4 - defense.counterSnap * 2 + shoulderClamp * 1.15 + (f?.profileId === "p2" ? -4 : f?.profileId === "p1" ? 1 : 0);
-  const radius = (30 + guard * 5 * guardProfile.brace + impact * 12 * guardProfile.recoil + defense.shield * 3.2 + wristLock * 1.6 + backFootDig * 0.8) * guardProfile.shieldScale;
-  const arcStart = (-1.35 - shieldLean * 0.045) * guardProfile.arc;
-  const arcEnd = (1.38 + elbowSeal * 0.025) * guardProfile.arc;
+  const shieldCompress = clamp(anatomy.shieldCompress ?? 0, 0, 1.45);
+  const centerX = 22 + impact * 5 * guardProfile.recoil + defense.counterSnap * 2.5 + elbowSeal * 1.3 + wristLock * 1.8 + anatomy.shieldAlignX + (f?.profileId === "p2" ? 4 : f?.profileId === "p1" ? -2 : 0);
+  const centerY = -106 + crouch + impact * 2 * guardProfile.recoil + defense.crouchSettle * 2.4 - defense.counterSnap * 2 + shoulderClamp * 1.15 + anatomy.shieldAlignY + (f?.profileId === "p2" ? -4 : f?.profileId === "p1" ? 1 : 0);
+  const radius = (30 + guard * 5 * guardProfile.brace + impact * 12 * guardProfile.recoil + defense.shield * 3.2 + wristLock * 1.6 + backFootDig * 0.8 - shieldCompress * 1.6) * guardProfile.shieldScale;
+  const arcStart = (-1.35 - shieldLean * 0.045 - shieldCompress * 0.016) * guardProfile.arc;
+  const arcEnd = (1.38 + elbowSeal * 0.025 + anatomy.bodyAlign * 0.018) * guardProfile.arc;
   const guardColor = guardProfile.color ?? color;
 
   ctx.save();
@@ -23010,20 +23131,20 @@ function drawGuard(color, crouch, f) {
   glow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(centerX, centerY, radius + 24 * guardProfile.shieldWidth, radius + 38, -0.08, 0, Math.PI * 2);
+  ctx.ellipse(centerX, centerY, radius + 24 * guardProfile.shieldWidth - shieldCompress * 2.2, radius + 38 + shieldCompress * 5.4, -0.08 - anatomy.bodyAlign * 0.018, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = colorWithAlpha(color, (0.5 + guard * 0.22 + impact * 0.3 + counter * 0.08 + defense.brace * 0.035 + backFootDig * 0.015) * guardProfile.shieldAlpha);
-  ctx.lineWidth = (4.4 + impact * 3.8 * guardProfile.recoil + counter * 0.7 + defense.brace * 0.45 + shoulderClamp * 0.35) * guardProfile.shieldWidth;
+  ctx.strokeStyle = colorWithAlpha(color, (0.5 + guard * 0.22 + impact * 0.3 + counter * 0.08 + defense.brace * 0.035 + backFootDig * 0.015 + shieldCompress * 0.018) * guardProfile.shieldAlpha);
+  ctx.lineWidth = (4.4 + impact * 3.8 * guardProfile.recoil + counter * 0.7 + defense.brace * 0.45 + shoulderClamp * 0.35 + shieldCompress * 0.42) * guardProfile.shieldWidth;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.arc(centerX, centerY, radius, arcStart, arcEnd);
   ctx.stroke();
 
   ctx.strokeStyle = `rgba(255,255,255,${(0.38 + impact * 0.36 + counter * 0.26) * guardProfile.shieldAlpha})`;
-  ctx.lineWidth = 1.9 + impact * 2.2 * guardProfile.recoil + counter * 0.6 + wristLock * 0.25;
+  ctx.lineWidth = 1.9 + impact * 2.2 * guardProfile.recoil + counter * 0.6 + wristLock * 0.25 + anatomy.forearmCompression * 0.2;
   ctx.beginPath();
-  ctx.arc(centerX + 2, centerY, radius + 9 + impact * 3, -1.12 * guardProfile.arc, 1.13 * guardProfile.arc);
+  ctx.arc(centerX + 2 + anatomy.bodyAlign * 0.8, centerY, radius + 9 + impact * 3 - shieldCompress * 0.8, -1.12 * guardProfile.arc, 1.13 * guardProfile.arc);
   ctx.stroke();
 
   if (impact > 0.05 || counter > 0.05) {
