@@ -18349,6 +18349,119 @@ function drawDamageReactionFX(f, crouch) {
   ctx.restore();
 }
 
+function drawLocalizedReactionReadability(f, crouch, reaction = reactionPresentationProfile(f), localized = localizedImpactProfile(f), flavor = null) {
+  const damageRead = clamp((winner ? Math.max(0, (f.damagePulse ?? 0) - resultFrame * 0.78) : (f.damagePulse ?? 0)) / 34, 0, 1);
+  const contact = clamp((f.contactFlash ?? 0) / 14, 0, 1);
+  const force = clamp(Math.max(reaction.force ?? 0, localized.snap ?? 0, contact * 0.72, damageRead * 0.55), 0, 1.75);
+  if (force <= 0.035 || reaction.kind === "guard" || f.hitZone === "guard") return;
+
+  const motion = characterMotion(f);
+  const zone = reaction.zone === "head" || reaction.zone === "legs" ? reaction.zone : localized.zone === "head" || localized.zone === "legs" ? localized.zone : "torso";
+  const localDir = reaction.localDir || localized.localDir || ((f.impactDir ?? f.dir) === f.dir ? 1 : -1);
+  const strength = clamp(f.impactStrength ?? reaction.strength ?? localized.strength ?? 0.8, 0.45, 1.75) * motion.damageFx;
+  const follow = clamp(reaction.follow ?? localized.rebound ?? 0, 0, 1.45);
+  const compress = clamp((reaction.torsoCompress ?? 0) + force * 0.26 + damageRead * 0.16, 0, 1.5);
+  const brace = clamp((reaction.bracePress ?? 0) + (zone === "legs" ? force * 0.22 : 0), 0, 1.4);
+  const trim = f.trim ?? "#fff1bd";
+  const highlight = flavor?.highlight ?? impactFlavorWarp(f.impactFlavor).highlight ?? trim;
+  const contactX = reaction.contactX ?? -localDir * (zone === "head" ? 18 : zone === "legs" ? 12 : 15);
+  const contactY = (reaction.contactY ?? (zone === "head" ? -142 : zone === "legs" ? -47 : -101)) + crouch;
+  const zoneRx = zone === "head" ? 32 : zone === "legs" ? 43 : 39;
+  const zoneRy = zone === "head" ? 17 : zone === "legs" ? 12 : 24;
+  const pulse = Math.sin((roundFrame + resultFrame) * 0.42 + force * 1.7) * 0.5 + 0.5;
+  const ringAlpha = clamp((0.035 + force * 0.075 + contact * 0.05 + damageRead * 0.035) * (0.9 + strength * 0.06), 0.025, 0.2);
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(24, 12, 8, ${clamp(0.035 + force * 0.055 + compress * 0.024, 0.02, 0.14)})`;
+  ctx.beginPath();
+  ctx.ellipse(
+    contactX - localDir * (force * 4.5 + follow * 2.2),
+    contactY + (zone === "legs" ? brace * 2.4 : compress * 1.2),
+    zoneRx + force * 7.5 + (zone === "legs" ? brace * 6 : 0),
+    zoneRy + compress * 3 + follow * 1.8,
+    -localDir * (0.16 + force * 0.035),
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  if (f.grounded && zone === "legs") {
+    ctx.fillStyle = `rgba(19, 10, 7, ${clamp(0.03 + brace * 0.06 + force * 0.025, 0.018, 0.12)})`;
+    ctx.beginPath();
+    ctx.ellipse(-localDir * (26 + brace * 8), -3 + crouch + brace * 1.1, 46 + brace * 18, 5.2 + brace * 2.2, -localDir * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = colorWithAlpha(highlight, ringAlpha * 1.18);
+  ctx.lineWidth = 1.05 + force * 0.92;
+  for (let i = 0; i < 2; i += 1) {
+    const ring = i + 1;
+    const travel = force * (5 + i * 4) + pulse * 2;
+    ctx.beginPath();
+    ctx.ellipse(
+      contactX + localDir * (i * 4 - travel * 0.24),
+      contactY + follow * (zone === "head" ? -1.8 : 1.2),
+      zoneRx * (0.52 + ring * 0.2) + travel,
+      zoneRy * (0.58 + ring * 0.16) + compress * 2.5,
+      -localDir * (0.2 + i * 0.035),
+      0,
+      Math.PI * 2
+    );
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = colorWithAlpha("#ffffff", clamp(0.04 + force * 0.08 + contact * 0.06, 0.03, 0.18));
+  ctx.lineWidth = 0.85 + force * 0.55;
+  ctx.beginPath();
+  ctx.moveTo(contactX - localDir * (zoneRx * 0.76 + force * 7), contactY - zoneRy * 0.54);
+  ctx.quadraticCurveTo(
+    contactX - localDir * (zoneRx * 0.12 - follow * 2),
+    contactY - zoneRy * (1.08 + compress * 0.08) - force * 3.5,
+    contactX + localDir * (zoneRx * 0.66 + force * 4),
+    contactY - zoneRy * 0.16 + follow * 1.4
+  );
+  ctx.moveTo(contactX - localDir * (zoneRx * 0.52 + force * 4), contactY + zoneRy * 0.48);
+  ctx.quadraticCurveTo(
+    contactX - localDir * 1.5,
+    contactY + zoneRy * (0.82 + compress * 0.08) + follow * 2.4,
+    contactX + localDir * (zoneRx * 0.48 + force * 3),
+    contactY + zoneRy * 0.22
+  );
+  ctx.stroke();
+
+  if (zone === "head") {
+    ctx.strokeStyle = colorWithAlpha(highlight, clamp(0.035 + force * 0.075, 0.025, 0.14));
+    ctx.lineWidth = 0.9 + force * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(contactX - localDir * 21, contactY - 21 - follow * 2);
+    ctx.quadraticCurveTo(contactX - localDir * 6, contactY - 32 - force * 6, contactX + localDir * 24, contactY - 19 + follow * 2);
+    ctx.stroke();
+  } else if (zone === "torso") {
+    ctx.strokeStyle = colorWithAlpha(trim, clamp(0.035 + compress * 0.075, 0.025, 0.14));
+    ctx.lineWidth = 1 + compress * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(contactX - localDir * 29, contactY + 20 + compress * 2);
+    ctx.quadraticCurveTo(contactX - localDir * 2, contactY + 30 + follow * 3, contactX + localDir * 31, contactY + 19);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = colorWithAlpha("#fff1bd", clamp(0.03 + brace * 0.08 + force * 0.04, 0.02, 0.15));
+    ctx.lineWidth = 0.9 + brace * 0.55;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * (22 + brace * 4), -34 + crouch + force * 1.2);
+      ctx.quadraticCurveTo(side * (35 + brace * 7), -24 + crouch + brace * 4, side * (50 + brace * 8), -18 + crouch + follow * 2);
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
 function drawLowHealthStagger(f, crouch) {
   const danger = clamp((30 - f.health) / 30, 0, 1);
   const stagger = clamp((f.staggerPulse ?? 0) / 18, 0, 1);
@@ -18442,6 +18555,8 @@ function drawHitFlash(f, crouch) {
     ctx.stroke();
   }
   ctx.restore();
+
+  drawLocalizedReactionReadability(f, crouch, reactionPresentationProfile(f), localizedImpactProfile(f), flavor);
 }
 
 function drawResultActingOverlay(f, crouch, resultPresent, clock) {
