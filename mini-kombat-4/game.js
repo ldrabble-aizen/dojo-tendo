@@ -727,6 +727,29 @@ function movementPivotProfile(f) {
   }[f?.profileId] ?? { brake: 1, snap: 1, shoulder: 1, hip: 1, foot: 1, sway: 1 };
 }
 
+function pivotVisualMotion(f) {
+  const style = movementPivotProfile(f);
+  const active = f?.grounded && (f?.hurt ?? 0) <= 0 && !f?.attack && !winner ? 1 : 0;
+  const stopRaw = active ? clamp((f?.walkStopPulse ?? 0) / 16, 0, 1) : 0;
+  const moveRaw = active ? clamp((f?.moveTurnPulse ?? 0) / 10, 0, 1) : 0;
+  const faceRaw = active ? clamp((f?.facingTurnPulse ?? 0) / 14, 0, 1) : 0;
+  const stopSpeed = clamp(f?.walkStopSpeed ?? 0.45, 0, 1.55);
+  const stop = smoothStep01(stopRaw) * stopSpeed * style.brake;
+  const stopRebound = Math.sin((1 - stopRaw) * Math.PI) * stopSpeed * style.snap;
+  const moveTurn = smoothStep01(moveRaw) * style.brake;
+  const moveSnap = Math.sin((1 - moveRaw) * Math.PI) * style.snap;
+  const faceTurn = smoothStep01(faceRaw) * style.brake;
+  const faceSnap = Math.sin((1 - faceRaw) * Math.PI) * style.snap;
+  const stopDir = f?.walkStopDir || Math.sign(f?.vx ?? 0) || f?.dir || 1;
+  const moveDir = f?.moveIntent || Math.sign(f?.vx ?? 0) || f?.dir || 1;
+  const faceDir = f?.facingTurnTo || f?.dir || 1;
+  const pivotSide = (f?.walkAnchorSide || f?.footPlantSide || 1) * (f?.dir || 1);
+  const press = clamp(Math.max(stop * 0.82, moveTurn * 0.72, faceTurn * 0.92), 0, 1.7);
+  const snap = clamp(Math.max(stopRebound * 0.52, moveSnap * 0.48, faceSnap * 0.62), 0, 1.55);
+  const activeAmount = Math.max(press, snap);
+  return { active, style, stopRaw, moveRaw, faceRaw, stopSpeed, stop, stopRebound, moveTurn, moveSnap, faceTurn, faceSnap, stopDir, moveDir, faceDir, pivotSide, press, snap, activeAmount };
+}
+
 function grabTechniqueProfile(f) {
   return {
     p1: { clasp: 0.82, shoulder: 0.9, hip: 1.18, pull: 1.12, foot: 1.16, aura: 0.86 },
@@ -9856,6 +9879,7 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const landingWeight = landing * clamp(f.landingStrength ?? 1, 0.42, 1.65);
   const aerial = aerialVisualMotion(f);
   const preLandShadow = aerial.preLand * aerial.style.shadow;
+  const pivot = pivotVisualMotion(f);
   const facingTurn = f.grounded ? clamp((f.facingTurnPulse ?? 0) / 14, 0, 1) : 0;
   const facingStyle = {
     p1: { weight: 1.18, snap: 0.78 },
@@ -9886,13 +9910,14 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const stopOffset = -(f.walkStopDir || 0) * stopStrength * 7 * FIGHTER_SCALE;
   const facingOffset = -(f.facingTurnTo || f.dir || 1) * (facingPress * 5 - facingSnap * 2.5) * FIGHTER_SCALE;
   const aerialOffset = (f.landingDir || f.jumpDir || Math.sign(f.vx) || f.dir || 1) * preLandShadow * 6 * FIGHTER_SCALE;
-  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + preLandShadow * 18 + facingPress * 34 + facingSnap * 16 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
-  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + preLandShadow * 2.2 + facingPress * 4.8 + facingSnap * 1.7 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
-  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + preLandShadow * 0.035 + facingPress * 0.085 + facingSnap * 0.035 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.58);
+  const pivotOffset = -pivot.stopDir * pivot.stop * 4.2 * FIGHTER_SCALE - pivot.faceDir * pivot.faceTurn * 2.6 * FIGHTER_SCALE;
+  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + preLandShadow * 18 + facingPress * 34 + facingSnap * 16 + pivot.press * 18 + pivot.snap * 9 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18) * FIGHTER_SCALE * (1 - air * 0.38);
+  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + preLandShadow * 2.2 + facingPress * 4.8 + facingSnap * 1.7 + pivot.press * 2.2 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7) * FIGHTER_SCALE * (1 - air * 0.48);
+  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + preLandShadow * 0.035 + facingPress * 0.085 + facingSnap * 0.035 + pivot.press * 0.042 + pivot.snap * 0.02 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052, 0.08, 0.58);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
-  ctx.translate(baseX + attackOffset + reactionOffset + stopOffset + facingOffset + aerialOffset, FLOOR + 5);
+  ctx.translate(baseX + attackOffset + reactionOffset + stopOffset + facingOffset + aerialOffset + pivotOffset, FLOOR + 5);
   ctx.scale(width, height);
   const shadow = ctx.createRadialGradient(0, 0, 0.12, 0, 0, 1);
   shadow.addColorStop(0, `rgba(22, 12, 8, ${alpha})`);
@@ -9952,6 +9977,52 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     ctx.restore();
   }
 
+  if (pivot.activeAmount > 0.045) {
+    const pivotDir = pivot.faceRaw > 0.03 ? pivot.faceDir : pivot.stopRaw > 0.03 ? pivot.stopDir : pivot.moveDir;
+    const pivotSide = pivot.pivotSide || 1;
+    const releaseSide = -pivotSide;
+    const press = clamp(pivot.press, 0, 1.55);
+    const snap = clamp(pivot.snap, 0, 1.35);
+    const pivotX = baseX + pivotSide * (21 + press * 9) * FIGHTER_SCALE;
+    const releaseX = baseX + releaseSide * (18 + snap * 8) * FIGHTER_SCALE;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = `rgba(45, 27, 14, ${0.052 + press * 0.052})`;
+    ctx.beginPath();
+    ctx.ellipse(pivotX, FLOOR + 8, 18 + press * 15, 4 + press * 2.1, -pivotDir * 0.045, 0, Math.PI * 2);
+    ctx.fill();
+    if (snap > 0.04) {
+      ctx.fillStyle = `rgba(53, 32, 17, ${0.025 + snap * 0.042})`;
+      ctx.beginPath();
+      ctx.ellipse(releaseX, FLOOR + 7, 14 + snap * 10, 3.5 + snap * 1.5, pivotDir * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.strokeStyle = colorWithAlpha(f.trim ?? "#fff1bd", 0.045 + press * 0.055 + snap * 0.035);
+    ctx.lineWidth = 1 + press * 0.9 + snap * 0.45;
+    ctx.beginPath();
+    ctx.ellipse(pivotX, FLOOR + 6, 14 + press * 9, 3 + press * 1.2, -pivotDir * 0.055, Math.PI * 0.05, Math.PI * 1.8);
+    ctx.stroke();
+    if (pivot.stopRaw > 0.03 || pivot.moveRaw > 0.03) {
+      ctx.strokeStyle = `rgba(255, 238, 184, ${0.035 + pivot.activeAmount * 0.05})`;
+      ctx.lineWidth = 0.9 + pivot.activeAmount * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(pivotX - pivotDir * 4, FLOOR + 6);
+      ctx.quadraticCurveTo(
+        pivotX - pivotDir * (18 + press * 10),
+        FLOOR + 11,
+        pivotX - pivotDir * (34 + press * 16 + snap * 8),
+        FLOOR + 7
+      );
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   if (f.grounded && Math.abs(f.vx) > 1.4) {
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
@@ -9986,7 +10057,7 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     ctx.restore();
   }
 
-  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.75, stop * 0.68, landingWeight * 0.72, facingPress * 0.78, attackPlant * 0.46, attackCompression * 0.36, reactionFloor * 0.34);
+  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.75, stop * 0.68, landingWeight * 0.72, facingPress * 0.78, pivot.press * 0.7, pivot.snap * 0.36, attackPlant * 0.46, attackCompression * 0.36, reactionFloor * 0.34);
   if (f.grounded && footPlant > 0.04) {
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
@@ -10030,6 +10101,7 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   }[f.profileId] ?? { weight: 1, snap: 1 };
   const facingPress = smoothStep01(facingTurn) * facingStyle.weight;
   const facingSnap = Math.sin((1 - facingTurn) * Math.PI) * facingStyle.snap;
+  const pivot = pivotVisualMotion(f);
   const air = !f.grounded ? clamp((FLOOR - f.y) / 155, 0, 1) : 0;
   const plant = walking ? clamp(f.walkPlant ?? 0, 0, 1) : 0;
   const anchor = walking ? clamp((f.walkAnchorPulse ?? 0) / 12, 0, 1) : 0;
@@ -10044,8 +10116,8 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
   const hitMass = f.hurt > 0 || (f.reactionPulse ?? 0) > 0 ? hitReactionMassProfile(f) : null;
   const reactionFloor = hitMass ? clamp(hitMass.floor, 0, 1.7) : 0;
   const reactionSkid = hitMass ? clamp(hitMass.skid, 0, 1.85) : 0;
-  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.78, stop * 0.65, landingWeight * 0.7, facingPress * 0.78, attackPlant * 0.45, attackCompression * 0.34, reactionFloor * 0.34);
-  if (jump <= 0.03 && aerialTuck <= 0.03 && preLand <= 0.03 && landing <= 0.03 && facingTurn <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && stopStrength <= 0.03 && attackPlant <= 0.03 && attackCompression <= 0.03 && reactionSkid <= 0.03) return;
+  const footPlant = Math.max(clamp((f.footPlantPulse ?? 0) / 10, 0, 1), anchor * 0.78, stop * 0.65, landingWeight * 0.7, facingPress * 0.78, pivot.press * 0.68, pivot.snap * 0.35, attackPlant * 0.45, attackCompression * 0.34, reactionFloor * 0.34);
+  if (jump <= 0.03 && aerialTuck <= 0.03 && preLand <= 0.03 && landing <= 0.03 && facingTurn <= 0.03 && pivot.activeAmount <= 0.03 && air <= 0.03 && plant <= 0.08 && footPlant <= 0.03 && push <= 0.03 && stopStrength <= 0.03 && attackPlant <= 0.03 && attackCompression <= 0.03 && reactionSkid <= 0.03) return;
 
   const localCrouch = crouch * 0.18;
   const trim = f.trim ?? "#fff1bd";
@@ -10148,6 +10220,36 @@ function drawMovementPoseFX(f, crouch, walking, stride) {
     ctx.beginPath();
     ctx.ellipse(pivotSide * 30, 3 + localCrouch, 18 + facingPress * 8, 4.2 + facingPress * 1.4, -turnDir * 0.06, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  if (pivot.activeAmount > 0.04) {
+    const pivotDir = pivot.faceRaw > 0.03 ? pivot.faceDir : pivot.stopRaw > 0.03 ? pivot.stopDir : pivot.moveDir;
+    const support = (pivot.pivotSide || 1) * (f.dir || 1) * 30;
+    const release = -support;
+    const drag = clamp(pivot.press + pivot.snap * 0.5, 0, 1.75);
+    ctx.strokeStyle = `rgba(255, 236, 184, ${0.055 + drag * 0.055})`;
+    ctx.lineWidth = 1.05 + drag * 0.85;
+    ctx.beginPath();
+    ctx.ellipse(support, 5 + localCrouch, 17 + pivot.press * 9, 3.7 + pivot.press * 1.6, -pivotDir * 0.06, Math.PI * 0.05, Math.PI * 1.82);
+    ctx.stroke();
+
+    if (pivot.stopRaw > 0.03 || pivot.moveRaw > 0.03) {
+      ctx.strokeStyle = colorWithAlpha(trim, 0.045 + drag * 0.055);
+      ctx.lineWidth = 0.95 + drag * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(support - pivotDir * 4, 5 + localCrouch);
+      ctx.quadraticCurveTo(support - pivotDir * (17 + drag * 8), 9 + localCrouch, support - pivotDir * (33 + drag * 15), 6 + localCrouch);
+      ctx.stroke();
+    }
+
+    if (pivot.snap > 0.05) {
+      ctx.strokeStyle = `rgba(255, 247, 214, ${0.038 + pivot.snap * 0.045})`;
+      ctx.lineWidth = 0.8 + pivot.snap * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(release + pivotDir * 3, 1 + localCrouch);
+      ctx.quadraticCurveTo(release + pivotDir * (9 + pivot.snap * 8), -1 + localCrouch, release + pivotDir * (18 + pivot.snap * 10), 4 + localCrouch);
+      ctx.stroke();
+    }
   }
 
   if (footPlant > 0.03) {
@@ -11261,11 +11363,112 @@ function drawUnifiedSpriteAnatomyPolish(f, crouch, frameName, frameIndex, walkin
   drawUnifiedImpactRecoveryPolish(f, localCrouch, motion, acting);
   drawUnifiedKickSupportPolish(f, localCrouch, frameName, frameIndex, kick, landing, phase);
   drawUnifiedAerialBodyPolish(f, localCrouch, frameName);
+  drawUnifiedPivotMotionPolish(f, localCrouch, walking, stride);
   drawUnifiedIdleLifePolish(f, localCrouch, walking, stride);
   drawUnifiedFatiguePolish(f, localCrouch);
   drawUnifiedGuardCommitmentPolish(f, localCrouch);
   drawUnifiedWhiffRecoveryPolish(f, localCrouch);
   drawUnifiedHeadAccessoryPolish(f, localCrouch, motion, acting);
+}
+
+function drawUnifiedPivotMotionPolish(f, localCrouch, walking, stride) {
+  const pivot = pivotVisualMotion(f);
+  if (pivot.activeAmount <= 0.035) return;
+
+  const heavy = f.profileId === "p1";
+  const agile = f.profileId === "p2";
+  const trim = f.trim ?? "#fff1bd";
+  const footY = -2 + localCrouch;
+  const shoulderY = heavy ? -145 : -150;
+  const chestY = heavy ? -120 : -122;
+  const hipY = heavy ? -62 : -59;
+  const pivotSide = (pivot.pivotSide || 1) * (f.dir || 1);
+  const releaseSide = -pivotSide;
+  const pivotDir = pivot.faceRaw > 0.03 ? pivot.faceDir : pivot.stopRaw > 0.03 ? pivot.stopDir : pivot.moveDir;
+  const press = clamp(pivot.press * (heavy ? 1.08 : 0.82), 0, 1.5);
+  const snap = clamp(pivot.snap * (agile ? 1.1 : 0.84), 0, 1.35);
+  const load = clamp(press + snap * 0.42 + (walking ? Math.abs(stride ?? 0) * 0.08 : 0), 0, 1.6);
+  const counter = pivotDir * (press * (heavy ? 3.6 : 2.7) - snap * (agile ? 2.4 : 1.7));
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(18, 9, 7, ${0.032 + load * 0.062})`;
+  ctx.beginPath();
+  ctx.ellipse(
+    counter * 0.28,
+    hipY + localCrouch + press * 1.2,
+    (heavy ? 45 : 36) + press * 9,
+    (heavy ? 10.5 : 8.8) + press * 2.2,
+    -pivotDir * 0.018,
+    0,
+    Math.PI * 2
+  );
+  ctx.ellipse(
+    -counter * 0.2,
+    shoulderY + localCrouch + snap * 0.8,
+    (heavy ? 31 : 25) + snap * 4,
+    (heavy ? 8.4 : 7.2) + press * 0.9,
+    pivotDir * 0.014,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(23, 12, 8, ${0.045 + press * 0.07})`;
+  ctx.beginPath();
+  ctx.ellipse(
+    pivotSide * (heavy ? 35 : 30) - pivotDir * press * 2.2,
+    footY + 5 + press * 0.8,
+    (heavy ? 23 : 19) + press * 10,
+    4.3 + press * 1.4,
+    -pivotDir * 0.04,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+  if (snap > 0.04) {
+    ctx.fillStyle = `rgba(28, 15, 9, ${0.025 + snap * 0.045})`;
+    ctx.beginPath();
+    ctx.ellipse(
+      releaseSide * (heavy ? 31 : 27) + pivotDir * snap * 2.6,
+      footY + 3 - snap * 0.7,
+      (heavy ? 18 : 15) + snap * 8,
+      3.3 + snap * 0.8,
+      pivotDir * 0.055,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = colorWithAlpha(trim, 0.042 + load * 0.065);
+  ctx.lineWidth = 0.85 + load * 0.55;
+  ctx.beginPath();
+  ctx.moveTo(-28 - counter * 0.35, chestY + localCrouch + press * 0.6);
+  ctx.quadraticCurveTo(-11 - counter * 0.56, -96 + localCrouch - snap * 1.4, -4 + counter * 0.2, hipY + localCrouch + press * 1.2);
+  ctx.moveTo(28 - counter * 0.35, chestY + localCrouch + snap * 0.5);
+  ctx.quadraticCurveTo(11 - counter * 0.48, -96 + localCrouch + press * 0.8, 4 + counter * 0.16, hipY + localCrouch + press * 0.8);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(255, 231, 158, ${0.038 + press * 0.055 + snap * 0.025})`;
+  ctx.lineWidth = 0.85 + press * 0.5;
+  ctx.beginPath();
+  ctx.ellipse(pivotSide * (heavy ? 35 : 30) - pivotDir * press * 1.5, footY + 2, 15 + press * 6, 3 + press * 0.7, -pivotDir * 0.04, 0, Math.PI * 1.82);
+  ctx.stroke();
+  if (snap > 0.05) {
+    ctx.strokeStyle = colorWithAlpha(trim, 0.032 + snap * 0.052);
+    ctx.lineWidth = 0.72 + snap * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(releaseSide * (heavy ? 31 : 27), footY - snap * 0.5);
+    ctx.quadraticCurveTo(releaseSide * (heavy ? 26 : 23) + pivotDir * snap * 8, footY - 4 - snap, releaseSide * (heavy ? 20 : 18) + pivotDir * snap * 14, footY + 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawUnifiedWhiffRecoveryPolish(f, localCrouch) {
@@ -12992,6 +13195,7 @@ function drawSpriteExtremityDetails(f, crouch, frameName, stride, options = {}) 
   const feet = spriteFootDetailPose(frameName, action, walk, localCrouch, f);
   applyIdleFootPressure(feet, f, frameName);
   applyAttackFootPressure(feet, f);
+  applyPivotFootPressure(feet, f);
   applyFacingTurnFootPressure(feet, f);
   applyReactionFootPressure(feet, f);
   if (!options.unified) applyWhiffFootPressure(feet, f);
@@ -13161,6 +13365,38 @@ function applyAttackFootPressure(feet, f) {
     free.y -= drive * 1.8 + bodyWeight.lift * 1.2 - bodyWeight.low * 0.4;
     free.x += (f.dir || 1) * (drive * 2.8 + bodyWeight.follow * 0.9);
     free.press = Math.max(free.press ?? 0, drive * 0.12);
+  }
+}
+
+function applyPivotFootPressure(feet, f) {
+  if (!f?.grounded || f.hurt > 0 || f.attack || !Array.isArray(feet) || feet.length < 2) return;
+  const pivot = pivotVisualMotion(f);
+  const active = clamp(Math.max(pivot.stop, pivot.moveTurn, pivot.stopRebound * 0.42, pivot.moveSnap * 0.42), 0, 1.45);
+  if (active <= 0.035) return;
+
+  const side = f.walkAnchorSide || f.footPlantSide || (pivot.stopDir === (f.dir || 1) ? 1 : -1);
+  const supportIndex = side < 0 ? 0 : 1;
+  const releaseIndex = supportIndex === 0 ? 1 : 0;
+  const support = feet[supportIndex];
+  const release = feet[releaseIndex];
+  const press = clamp(active * 0.82, 0, 1.08);
+  const snap = clamp(Math.max(pivot.stopRebound, pivot.moveSnap) * 0.55, 0, 1.1);
+  const localDir = (pivot.stopRaw > 0.03 ? pivot.stopDir : pivot.moveDir) === (f.dir || 1) ? 1 : -1;
+
+  support.press = Math.max(support.press ?? 0, press);
+  support.plant = Math.max(support.plant ?? 0, 0.68 + press * 0.26);
+  support.w += press * 5.4 + snap * 1.6;
+  support.h = Math.max(7.1, support.h - press * 1.05);
+  support.y += press * 1.2;
+  support.x -= localDir * (press * 2.1 + snap * 0.8);
+  support.angle += supportIndex === 0 ? -press * 0.042 + snap * 0.012 : press * 0.042 - snap * 0.012;
+
+  if (release) {
+    release.plant = Math.max(0.16, (release.plant ?? 0.72) - snap * 0.16 - press * 0.06);
+    release.press = Math.max(release.press ?? 0, snap * 0.11);
+    release.y -= snap * 1.25;
+    release.x += localDir * (snap * 2.6 + press * 0.7);
+    release.angle += releaseIndex === 0 ? snap * 0.035 : -snap * 0.035;
   }
 }
 
