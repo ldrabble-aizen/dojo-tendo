@@ -21751,6 +21751,15 @@ function getPose(f, stride) {
     }
   }
 
+  applyLimbMicroActingPose(base, f, spec, {
+    movePresent,
+    guardPresent,
+    guardAnatomy,
+    idlePose,
+    walkingPose,
+    airborne,
+  });
+
   applyKineticAnatomyPose(base, f, spec, {
     attackType,
     phase,
@@ -21760,6 +21769,116 @@ function getPose(f, stride) {
     guardAnatomy,
   });
   return humanizePose(base, spec);
+}
+
+function limbMicroActingProfile(f, movePresent = null, context = {}) {
+  const style = {
+    p1: { hand: 0.82, foot: 1.16, shoulder: 0.84, hip: 1.14, idle: 0.76, walk: 0.88, crouch: 1.12, guard: 0.92, hurt: 0.82, tempo: 0.9 },
+    p2: { hand: 1.18, foot: 0.86, shoulder: 1.18, hip: 0.86, idle: 1.12, walk: 1.18, crouch: 0.86, guard: 1.16, hurt: 1.18, tempo: 1.18 },
+    p3: { hand: 0.72, foot: 1.3, shoulder: 0.74, hip: 1.28, idle: 0.64, walk: 0.78, crouch: 1.24, guard: 0.78, hurt: 0.72, tempo: 0.78 },
+    p4: { hand: 1.2, foot: 0.88, shoulder: 1.16, hip: 0.88, idle: 1.18, walk: 1.22, crouch: 0.9, guard: 1.2, hurt: 1.12, tempo: 1.22 },
+    p5: { hand: 1.28, foot: 0.78, shoulder: 1.24, hip: 0.8, idle: 1.2, walk: 1.28, crouch: 0.82, guard: 1.22, hurt: 1.16, tempo: 1.2 },
+    p6: { hand: 0.94, foot: 1.04, shoulder: 0.96, hip: 1.04, idle: 0.92, walk: 0.96, crouch: 1.02, guard: 0.96, hurt: 0.88, tempo: 0.96 },
+  }[f?.profileId] ?? { hand: 1, foot: 1, shoulder: 1, hip: 1, idle: 1, walk: 1, crouch: 1, guard: 1, hurt: 1, tempo: 1 };
+
+  const clock = roundFrame + (f?.profileId?.charCodeAt(1) ?? 0) * 19 + (f?.x ?? 0) * 0.026;
+  const wave = Math.sin(clock * 0.091 * style.tempo);
+  const quick = Math.sin(clock * 0.187 * style.tempo + 0.7);
+  const slow = Math.sin(clock * 0.046 * style.tempo - 0.45);
+  const idle = context.idlePose ? style.idle : 0;
+  const walk = context.walkingPose ? clamp((movePresent?.walkWeight ?? 0) * 0.72 + Math.abs(f?.vx ?? 0) / 5.6 + (movePresent?.walkSwing ?? 0) * 0.24, 0, 1.35) * style.walk : 0;
+  const landing = clamp((movePresent?.landingPress ?? 0) * 0.54 + (movePresent?.landingSquash ?? 0) * 0.42 + (movePresent?.landingHeelBite ?? 0) * 0.28, 0, 1.55) * style.foot;
+  const crouch = clamp((movePresent?.crouchSettle ?? 0) + (f?.crouch ?? 0) * 0.18, 0, 1.25) * style.crouch;
+  const guard = f?.blocking ? clamp((context.guardPresent?.guard ?? 0.42) + (context.guardPresent?.impact ?? 0) * 0.46 + (context.guardAnatomy?.wristLock ?? 0) * 0.18, 0, 1.45) * style.guard : 0;
+  const hurt = !winner ? clamp((f?.reactionPulse ?? 0) / Math.max(1, f?.reactionMax ?? 16), 0, 1.18) * style.hurt : 0;
+  const active = clamp(idle * 0.62 + walk * 0.78 + landing * 0.86 + crouch * 0.56 + guard * 0.72 + hurt * 0.68, 0, 1.9);
+  const side = ((movePresent?.pivotSide ?? f?.footPlantSide ?? 1) >= 0 ? 1 : -1);
+  const moveLocal = movePresent?.moveLocal ?? (Math.sign(f?.vx || f?.dir || 1) === (f?.dir || 1) ? 1 : -1);
+  const pressure = clamp((movePresent?.walkLoad ?? 0) * 0.36 + (movePresent?.pivotLoad ?? 0) * 0.28 + landing * 0.34 + crouch * 0.22 + guard * 0.28, 0, 1.65);
+  const release = clamp((movePresent?.walkLift ?? 0) * 0.42 + (movePresent?.walkToePush ?? 0) * 0.48 + (movePresent?.landingRebound ?? 0) * 0.34 + Math.max(0, quick) * idle * 0.08, 0, 1.4);
+  const handLife = clamp(idle * (0.2 + Math.max(0, quick) * 0.18) + walk * 0.2 + guard * 0.28 + hurt * 0.34 + landing * 0.16, 0, 1.45) * style.hand;
+  const footGrip = clamp(idle * (0.18 + Math.max(0, -slow) * 0.12) + pressure * 0.48 + landing * 0.52 + crouch * 0.34 + hurt * 0.18, 0, 1.55) * style.foot;
+
+  return {
+    style,
+    active,
+    idle,
+    walk,
+    landing,
+    crouch,
+    guard,
+    hurt,
+    side,
+    moveLocal,
+    wave,
+    quick,
+    slow,
+    pressure,
+    release,
+    handLife,
+    footGrip,
+    shoulderOpp: clamp((walk * moveLocal * 0.72 + guard * 0.18 - hurt * 0.3 + wave * idle * 0.16) * style.shoulder, -1.35, 1.35),
+    hipOpp: clamp((-walk * moveLocal * 0.54 + crouch * 0.16 + landing * 0.22 - slow * idle * 0.12) * style.hip, -1.25, 1.25),
+  };
+}
+
+function applyLimbMicroActingPose(base, f, spec, context = {}) {
+  if (!base || !f || !spec || f.attack || winner) return;
+
+  const micro = limbMicroActingProfile(f, context.movePresent, context);
+  if (micro.active <= 0.025) return;
+
+  const stance = spec.stance ?? 1;
+  const dirScale = (f.dir || 1) * stance;
+  const frontSupport = micro.side >= 0;
+  const supportLeg = frontSupport ? base.frontLeg : base.backLeg;
+  const freeLeg = frontSupport ? base.backLeg : base.frontLeg;
+  const supportSign = frontSupport ? 1 : -1;
+  const handGuardLift = micro.guard * 3.8 + micro.idle * Math.max(0, micro.quick) * 1.4 - micro.hurt * 1.8;
+  const handDrop = micro.landing * 2.4 + micro.crouch * 1.3 + micro.hurt * 2.2;
+  const shoulderRoll = micro.shoulderOpp;
+  const hipRoll = micro.hipOpp;
+  const planted = clamp(micro.footGrip, 0, 1.45);
+  const release = clamp(micro.release, 0, 1.25);
+
+  base.torsoTilt += dirScale * (shoulderRoll * 0.006 - hipRoll * 0.004 + micro.hurt * 0.01) - micro.crouch * 0.004 - micro.landing * 0.006;
+  base.frontArm.shoulder.x += dirScale * shoulderRoll * 0.82;
+  base.backArm.shoulder.x -= dirScale * shoulderRoll * 0.68;
+  base.frontLeg.hip.x -= dirScale * hipRoll * 0.72;
+  base.backLeg.hip.x += dirScale * hipRoll * 0.84;
+  base.frontLeg.hip.y += micro.crouch * 0.62 + micro.landing * 0.36;
+  base.backLeg.hip.y += micro.crouch * 0.78 + micro.landing * 0.46;
+
+  base.frontArm.elbow.x += dirScale * (shoulderRoll * 1.4 + micro.walk * -micro.moveLocal * 1.1 + micro.guard * 1.2 - micro.hurt * 1.4);
+  base.frontArm.elbow.y += handDrop * 0.54 - handGuardLift * 0.72 + micro.walk * Math.max(0, -micro.wave) * 1.2;
+  base.frontArm.hand.x += dirScale * (shoulderRoll * 2.4 + micro.walk * -micro.moveLocal * 2.2 + micro.guard * 2.6 - micro.hurt * 2.1 + micro.quick * micro.idle * 0.8);
+  base.frontArm.hand.y += handDrop - handGuardLift + micro.walk * Math.max(0, -micro.wave) * 1.7;
+  base.backArm.elbow.x -= dirScale * (shoulderRoll * 1.05 + micro.walk * -micro.moveLocal * 0.84 + micro.guard * 0.8 - micro.hurt * 0.9);
+  base.backArm.elbow.y += handDrop * 0.42 - handGuardLift * 0.48 + micro.walk * Math.max(0, micro.wave) * 0.9;
+  base.backArm.hand.x -= dirScale * (shoulderRoll * 1.85 + micro.walk * -micro.moveLocal * 1.65 + micro.guard * 1.7 - micro.hurt * 1.4 - micro.quick * micro.idle * 0.55);
+  base.backArm.hand.y += handDrop * 0.82 - handGuardLift * 0.72 + micro.walk * Math.max(0, micro.wave) * 1.25;
+
+  const curlPulse = micro.handLife * (0.08 + micro.guard * 0.035) - micro.hurt * 0.05;
+  base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + curlPulse + micro.crouch * 0.025, 0.04, 1);
+  base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.48) + curlPulse * 0.82 + micro.guard * 0.028, 0.04, 1);
+  base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, micro.handLife * 0.42 + micro.hurt * 0.34 + Math.max(0, micro.quick) * micro.idle * 0.16);
+  base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, micro.handLife * 0.34 + micro.hurt * 0.28 + Math.max(0, -micro.quick) * micro.idle * 0.14);
+
+  supportLeg.knee.x += supportSign * dirScale * (planted * 1.8 + micro.crouch * 1.4 + micro.landing * 1.6);
+  supportLeg.knee.y += planted * 2.2 + micro.crouch * 2.6 + micro.landing * 3.1;
+  supportLeg.foot.x += supportSign * dirScale * (planted * 2.6 + micro.crouch * 2.2 + micro.landing * 2.8);
+  supportLeg.foot.y += micro.landing * 0.72 + micro.crouch * 0.46;
+  supportLeg.plant = Math.max(supportLeg.plant ?? 0, clamp(0.54 + planted * 0.32 + micro.landing * 0.12 + micro.guard * 0.08, 0, 1));
+  supportLeg.toeFlex = Math.max(supportLeg.toeFlex ?? 0, clamp(planted * 0.46 + micro.landing * 0.2 + micro.guard * 0.14, 0, 0.86));
+  supportLeg.footAngle = (supportLeg.footAngle ?? 0) + supportSign * (planted * 0.013 + micro.crouch * 0.012 + micro.landing * 0.014);
+
+  freeLeg.knee.x -= supportSign * dirScale * (release * 1.2 + micro.walk * 0.8);
+  freeLeg.knee.y -= release * 1.2 - micro.crouch * 1.4;
+  freeLeg.foot.x -= supportSign * dirScale * (release * 2.6 + micro.walk * 1.35);
+  freeLeg.foot.y -= release * 1.45;
+  freeLeg.lift = Math.max(freeLeg.lift ?? 0, clamp(release * 0.56 + micro.walk * 0.08, 0, 1));
+  freeLeg.toeFlex = Math.max(freeLeg.toeFlex ?? 0, clamp(release * 0.36 + micro.walk * 0.14 + micro.hurt * 0.12, 0, 0.72));
+  freeLeg.footAngle = (freeLeg.footAngle ?? 0) - supportSign * (release * 0.016 + micro.walk * 0.006);
 }
 
 function kineticAnatomyProfile(f) {
@@ -23297,16 +23416,44 @@ function drawVectorFootAnatomy(spec, outfit, plant, lift, extension = 0, toeFlex
     ctx.quadraticCurveTo(x + 1.2 + toeFlex * 0.5, -0.4 + toeFlex * 0.8, x + 2.4 + toeFlex * 0.9, 4.6 - toeFlex * 0.4);
     ctx.stroke();
   }
+
+  const soleBite = clamp(plant * 0.62 + toeFlex * 0.46 - lift * 0.22, 0, 1.2);
+  if (soleBite > 0.04) {
+    ctx.strokeStyle = `rgba(18, 10, 8, ${0.18 + soleBite * 0.16})`;
+    ctx.lineWidth = 1.25 + soleBite * 0.36;
+    ctx.beginPath();
+    ctx.moveTo(-10, 6.2 + soleBite * 0.4);
+    ctx.quadraticCurveTo(5 * spec.foot + extension * 1.4, 9.2 + soleBite * 1.4, 28 * spec.foot + extension * 5.4, 4.6 - toeFlex * 1.2);
+    ctx.stroke();
+
+    ctx.lineWidth = 0.9 + soleBite * 0.18;
+    for (let i = 0; i < 3; i += 1) {
+      const x = 10 + i * 5.6 * spec.foot + extension * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(x, 5.6 - toeFlex * 0.4);
+      ctx.lineTo(x + 2.6 + toeFlex * 0.7, 2.4 - toeFlex * 0.8);
+      ctx.stroke();
+    }
+  }
   ctx.restore();
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  ctx.strokeStyle = colorWithAlpha(lighten(outfit.shoe, 28), 0.16);
-  ctx.lineWidth = 1.25;
+  ctx.strokeStyle = colorWithAlpha(lighten(outfit.shoe, 28), 0.16 + clamp(toeFlex + plant * 0.5, 0, 1.2) * 0.045);
+  ctx.lineWidth = 1.25 + toeFlex * 0.18;
   ctx.beginPath();
   ctx.moveTo(-9, -7.2);
   ctx.quadraticCurveTo(4 * spec.foot + extension * 2, -11 - extension * 0.8 - toeFlex * 0.8, 23 * spec.foot + extension * 5, -5.5 - toeFlex * 0.35);
   ctx.stroke();
+
+  if (toeFlex > 0.08 || plant > 0.35) {
+    ctx.strokeStyle = colorWithAlpha(lighten(outfit.shoe, 42), 0.08 + clamp(toeFlex * 0.1 + plant * 0.045, 0, 0.16));
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(12 * spec.foot + extension * 2.2, -4.8 - toeFlex * 0.9);
+    ctx.quadraticCurveTo(18 * spec.foot + extension * 3.6, -7.2 - toeFlex * 1.2, 29 * spec.foot + extension * 5.8, -3.8 - toeFlex * 0.6);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -23329,6 +23476,7 @@ function drawVectorHandAnatomy(f, arm, spec, front) {
   for (let i = -1; i <= 1; i += 1) {
     const fingerWave = Math.sin(roundFrame * 0.13 + i * 1.7 + (front ? 0.4 : 1.2)) * fingerFidget;
     const x = arm.hand.x + i * 4.5 * spec.hand + tremor * (0.45 + Math.abs(i) * 0.28) + fingerWave * 0.8;
+    const knuckleLift = curl * 1.6 + fingerFidget * (0.8 + Math.abs(i) * 0.18);
     ctx.beginPath();
     ctx.moveTo(x - 1.2 * spec.hand, arm.hand.y - 6.2 * spec.hand - fingerFidget * 0.45);
     ctx.quadraticCurveTo(
@@ -23338,6 +23486,11 @@ function drawVectorHandAnatomy(f, arm, spec, front) {
       arm.hand.y + 4.4 * spec.hand + fatigue * 1.8 - fingerFidget * 0.35
     );
     ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x - 2.1 * spec.hand, arm.hand.y - 5.4 * spec.hand + knuckleLift * 0.2);
+    ctx.quadraticCurveTo(x + fingerWave * 0.25, arm.hand.y - 7.4 * spec.hand - knuckleLift * 0.28, x + 2.3 * spec.hand, arm.hand.y - 5.2 * spec.hand + knuckleLift * 0.18);
+    ctx.stroke();
   }
 
   ctx.strokeStyle = "rgba(34, 17, 12, 0.38)";
@@ -23346,16 +23499,38 @@ function drawVectorHandAnatomy(f, arm, spec, front) {
   ctx.moveTo(arm.hand.x - 8 * spec.hand, arm.hand.y - 2.4 * spec.hand);
   ctx.quadraticCurveTo(arm.hand.x, arm.hand.y - 8.8 * spec.hand, arm.hand.x + 8.5 * spec.hand, arm.hand.y - 2.5 * spec.hand);
   ctx.stroke();
+
+  ctx.strokeStyle = `rgba(34, 17, 12, ${0.2 + curl * 0.08 + fingerFidget * 0.08})`;
+  ctx.lineWidth = 1.15;
+  const thumbSide = front ? -1 : 1;
+  ctx.beginPath();
+  ctx.moveTo(arm.hand.x + thumbSide * 7.4 * spec.hand, arm.hand.y - 2.1 * spec.hand);
+  ctx.quadraticCurveTo(
+    arm.hand.x + thumbSide * (11.5 + curl * 1.4) * spec.hand,
+    arm.hand.y + (0.8 + fingerFidget * 0.9) * spec.hand,
+    arm.hand.x + thumbSide * (6.2 + curl * 0.8) * spec.hand,
+    arm.hand.y + 4.9 * spec.hand
+  );
+  ctx.stroke();
   ctx.restore();
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  ctx.strokeStyle = colorWithAlpha(lighten(skin, 28), punch ? 0.22 : 0.15 + fatigue * 0.04);
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = colorWithAlpha(lighten(skin, 28), punch ? 0.24 : 0.15 + fatigue * 0.04 + fingerFidget * 0.035);
+  ctx.lineWidth = 1.2 + fingerFidget * 0.16;
   ctx.beginPath();
   ctx.moveTo(arm.hand.x - 7 * spec.hand + tremor * 0.5, arm.hand.y - 5.5 * spec.hand + fatigue * 0.8);
   ctx.quadraticCurveTo(arm.hand.x - 1 * spec.hand + tremor * 0.35, arm.hand.y - 10 * spec.hand + fatigue * 0.6, arm.hand.x + 8 * spec.hand + tremor * 0.2, arm.hand.y - 4.8 * spec.hand + fatigue * 0.9);
   ctx.stroke();
+
+  if (fingerFidget > 0.08 || idleCurl > 0.35 || punch) {
+    ctx.strokeStyle = colorWithAlpha(lighten(skin, 38), 0.08 + fingerFidget * 0.08 + (punch ? 0.04 : 0));
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(arm.hand.x - 4.8 * spec.hand + tremor * 0.3, arm.hand.y - 1.2 * spec.hand);
+    ctx.quadraticCurveTo(arm.hand.x + 0.4 * spec.hand, arm.hand.y - 3.4 * spec.hand - fingerFidget * 0.8, arm.hand.x + 6.8 * spec.hand, arm.hand.y - 0.6 * spec.hand);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
