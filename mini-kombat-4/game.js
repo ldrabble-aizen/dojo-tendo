@@ -23252,6 +23252,7 @@ function drawHead(f, crouch, stride, headScaleMultiplier = 1, options = {}) {
     ctx.fillRect(clipX, clipY, clipW, clipH);
     drawFacePaintPass(f, clipX, clipY, clipW, clipH, options.faceMask);
     drawFaceActingPass(f, clipX, clipY, clipW, clipH, acting, options.faceMask);
+    drawFaceMicroExpressionPass(f, clipX, clipY, clipW, clipH, acting, options.faceMask);
     drawFaceWearPass(f, clipX, clipY, clipW, clipH, options.faceMask);
     ctx.restore();
 
@@ -23475,6 +23476,117 @@ function drawFaceActingPass(f, clipX, clipY, clipW, clipH, acting, maskMode) {
     ctx.lineTo(clipX + clipW * 0.66 + snapDir * shock * 1.2, mouthY + clipH * (0.012 + grimace * 0.018 + shock * 0.01));
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+function faceMicroExpressionProfile(f, acting = {}) {
+  const frame = roundFrame || 0;
+  const profileSeed =
+    f.profileId === "p2" ? 67 :
+    f.profileId === "p6" ? 113 :
+    f.profileId === "p1" ? 31 :
+    43;
+  const cadence = f.profileId === "p2" ? 188 : f.profileId === "p1" ? 214 : 201;
+  const blinkClock = (frame + profileSeed + Math.floor((f.x ?? 0) * 0.09)) % cadence;
+  const blinkBase = blinkClock < 5 ? Math.sin((blinkClock / 5) * Math.PI) : 0;
+  const impactMax = Math.max(1, f.faceImpactMax ?? 1);
+  const impact = smoothStep01(clamp((f.faceImpactPulse ?? 0) / impactMax, 0, 1)) * clamp(f.faceImpactStrength ?? 0, 0, 1.35);
+  const speed = clamp(Math.abs(f.vx ?? 0) / 4.2, 0, 1);
+  const attackPhaseState = attackPhase(f.attack);
+  const attackIntent = f.attack ? Math.max(attackPhaseState.anticipation * 0.7, attackPhaseState.strike, attackPhaseState.snap) : 0;
+  const guard = f.blocking ? clamp((f.guardPulse ?? 0) / 18, 0, 1) : 0;
+  const hurt = clamp((f.hurt ?? 0) / 26, 0, 1);
+  const danger = clamp((100 - (f.health ?? 100)) / 100, 0, 1);
+  const breathGate = f.attack || f.hurt > 0 ? 0.28 : f.blocking ? 0.62 : 1;
+  const breath = Math.sin(frame * 0.052 + profileSeed * 0.31 + (f.x ?? 0) * 0.007) * breathGate;
+  const eyeDrift = Math.sin(frame * 0.027 + profileSeed * 0.19) * 0.38 + Math.sin(frame * 0.011 + profileSeed) * 0.22;
+  const dir = f.dir || 1;
+  const effort = clamp((acting.focus ?? 0) * 0.45 + attackIntent * 0.72 + guard * 0.42 + hurt * 0.62 + impact * 0.86, 0, 1.85);
+  const shock = clamp((acting.shock ?? 0) + impact * 0.7 + hurt * 0.18, 0, 1.55);
+  const blink = clamp(blinkBase * (1 - shock * 0.32) + hurt * 0.28 + guard * 0.12, 0, 1);
+  return {
+    blink,
+    gazeX: clamp(eyeDrift + speed * dir * 0.44 + attackIntent * dir * 0.52 - impact * dir * 0.28, -1.15, 1.15),
+    gazeY: clamp(-effort * 0.2 + breath * 0.15 + shock * 0.32, -0.55, 0.7),
+    brow: clamp(effort * 0.72 + guard * 0.36 + danger * 0.18, 0, 1.45),
+    browLift: clamp(shock * 0.62 - attackIntent * 0.18 + breath * 0.06, -0.25, 0.95),
+    jaw: clamp((acting.grimace ?? 0) * 0.58 + attackIntent * 0.42 + hurt * 0.5 + danger * 0.24 + impact * 0.44, 0, 1.55),
+    cheek: clamp((acting.cheek ?? 0) * 0.5 + breath * 0.12 + effort * 0.34 + impact * 0.28, 0, 1.35),
+    nostril: clamp(effort * 0.45 + breath * 0.12 + danger * 0.2, 0, 1.15),
+    asym: clamp(Math.sin(frame * 0.021 + profileSeed * 0.7) * 0.48 + impact * dir * 0.48 + attackIntent * dir * 0.32, -1, 1),
+  };
+}
+
+function drawFaceMicroExpressionPass(f, clipX, clipY, clipW, clipH, acting, maskMode) {
+  if (maskMode !== "sprite") return;
+  const face = faceMicroExpressionProfile(f, acting);
+  const intensity = Math.max(face.blink, face.brow * 0.55, face.jaw * 0.52, face.cheek * 0.45, Math.abs(face.gazeX) * 0.22);
+  if (intensity <= 0.025) return;
+
+  const eyeY = clipY + clipH * 0.38;
+  const leftEyeX = clipX + clipW * 0.35;
+  const rightEyeX = clipX + clipW * 0.66;
+  const mouthY = clipY + clipH * 0.76;
+  const blinkPress = face.blink * clipH * 0.036;
+  const gazeX = face.gazeX * clipW * 0.018;
+  const gazeY = face.gazeY * clipH * 0.014;
+  const browLift = face.browLift * clipH * 0.025;
+  const browPinch = face.brow * clipW * 0.018;
+  const asym = face.asym * clipW * 0.012;
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.globalCompositeOperation = "multiply";
+  ctx.strokeStyle = `rgba(24, 12, 11, ${0.035 + face.brow * 0.065 + face.blink * 0.09})`;
+  ctx.lineWidth = 0.85 + face.brow * 0.65 + face.blink * 0.35;
+  ctx.beginPath();
+  ctx.moveTo(leftEyeX - clipW * 0.13 + asym, eyeY - clipH * 0.13 - browLift);
+  ctx.quadraticCurveTo(leftEyeX - browPinch + asym, eyeY - clipH * (0.17 + face.brow * 0.025) - browLift, leftEyeX + clipW * 0.12, eyeY - clipH * 0.115 + face.brow * clipH * 0.012 - browLift * 0.45);
+  ctx.moveTo(rightEyeX - clipW * 0.12, eyeY - clipH * 0.115 + face.brow * clipH * 0.012 - browLift * 0.45);
+  ctx.quadraticCurveTo(rightEyeX + browPinch + asym, eyeY - clipH * (0.17 + face.brow * 0.025) - browLift, rightEyeX + clipW * 0.13 + asym, eyeY - clipH * 0.13 - browLift);
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(25, 13, 12, ${0.028 + face.blink * 0.14 + face.brow * 0.032})`;
+  ctx.beginPath();
+  ctx.ellipse(leftEyeX + gazeX, eyeY + gazeY + blinkPress * 0.34, clipW * 0.105, clipH * (0.018 + face.blink * 0.028), -0.08, 0, Math.PI * 2);
+  ctx.ellipse(rightEyeX + gazeX, eyeY + gazeY + blinkPress * 0.34, clipW * 0.105, clipH * (0.018 + face.blink * 0.028), 0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (face.blink < 0.72) {
+    ctx.globalCompositeOperation = "screen";
+    ctx.fillStyle = `rgba(255, 246, 220, ${0.025 + (1 - face.blink) * 0.04})`;
+    ctx.beginPath();
+    ctx.ellipse(leftEyeX + gazeX * 1.2, eyeY + gazeY - clipH * 0.002, clipW * 0.026, clipH * 0.012, -0.12, 0, Math.PI * 2);
+    ctx.ellipse(rightEyeX + gazeX * 1.2, eyeY + gazeY - clipH * 0.002, clipW * 0.026, clipH * 0.012, 0.12, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.globalCompositeOperation = "multiply";
+  ctx.strokeStyle = `rgba(34, 15, 12, ${0.035 + face.jaw * 0.075})`;
+  ctx.lineWidth = 0.8 + face.jaw * 0.5;
+  ctx.beginPath();
+  ctx.moveTo(clipX + clipW * 0.36 + asym * 0.55, mouthY + clipH * (0.018 + face.jaw * 0.006));
+  ctx.quadraticCurveTo(clipX + clipW * 0.5 + asym * 0.25, mouthY + clipH * (0.045 + face.jaw * 0.026), clipX + clipW * 0.66 - asym * 0.4, mouthY + clipH * (0.018 - face.jaw * 0.004));
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(39, 18, 14, ${0.025 + face.nostril * 0.06})`;
+  ctx.lineWidth = 0.7 + face.nostril * 0.35;
+  ctx.beginPath();
+  ctx.moveTo(clipX + clipW * 0.45 + asym * 0.25, clipY + clipH * 0.59);
+  ctx.quadraticCurveTo(clipX + clipW * 0.5 + asym * 0.22, clipY + clipH * (0.61 + face.nostril * 0.01), clipX + clipW * 0.55 + asym * 0.18, clipY + clipH * 0.59);
+  ctx.stroke();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.strokeStyle = `rgba(255, 238, 205, ${0.03 + face.cheek * 0.05})`;
+  ctx.lineWidth = 0.8 + face.cheek * 0.35;
+  ctx.beginPath();
+  ctx.moveTo(clipX + clipW * 0.24, clipY + clipH * (0.61 - face.cheek * 0.006));
+  ctx.quadraticCurveTo(clipX + clipW * 0.34 + asym * 0.2, clipY + clipH * (0.57 - face.cheek * 0.012), clipX + clipW * 0.43, clipY + clipH * 0.61);
+  ctx.moveTo(clipX + clipW * 0.57, clipY + clipH * 0.61);
+  ctx.quadraticCurveTo(clipX + clipW * 0.68 + asym * 0.2, clipY + clipH * (0.57 - face.cheek * 0.012), clipX + clipW * 0.78, clipY + clipH * (0.61 - face.cheek * 0.006));
+  ctx.stroke();
   ctx.restore();
 }
 
