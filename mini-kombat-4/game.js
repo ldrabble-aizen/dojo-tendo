@@ -9692,6 +9692,12 @@ function reactionPresentationProfile(f) {
       toeShock: 0,
       creaseAlpha: 0,
       shadowWeight: 0,
+      headWhip: 0,
+      torsoCompress: 0,
+      hipCounter: 0,
+      handLag: 0,
+      footRelease: 0,
+      bracePress: 0,
     };
   }
 
@@ -9711,6 +9717,7 @@ function reactionPresentationProfile(f) {
   );
   const contactY = zone === "head" ? -142 : zone === "legs" ? -47 : -101;
   const contactX = -localDir * (zone === "head" ? 18 : zone === "legs" ? 12 : 15);
+  const secondary = force * 0.48 + follow * 0.38 + localized.t * 0.2;
   return {
     active,
     zone,
@@ -9725,6 +9732,12 @@ function reactionPresentationProfile(f) {
     toeShock: clamp((mass.floor * 0.5 + mass.skid * 0.24 + follow * 0.2 + (zone === "legs" ? force * 0.28 : 0)) * anatomy.toeClaw, 0, 1.22),
     creaseAlpha: clamp((active * 0.34 + force * 0.2 + localized.t * 0.18) * anatomy.crease, 0, 0.92),
     shadowWeight: clamp((mass.floor * 0.54 + force * 0.18 + active * 0.12) * anatomy.shadowWeight, 0, 1.25),
+    headWhip: clamp(secondary * (zone === "head" ? 0.78 : zone === "torso" ? 0.2 : 0.12) * anatomy.spine, 0, 1.05),
+    torsoCompress: clamp(secondary * (zone === "torso" ? 0.72 : zone === "legs" ? 0.34 : 0.22) * anatomy.crease, 0, 1.08),
+    hipCounter: clamp((mass.floor * 0.28 + follow * 0.28 + force * 0.18) * (zone === "legs" ? 1.15 : zone === "torso" ? 0.9 : 0.55) * anatomy.hip, 0, 1.08),
+    handLag: clamp((follow * 0.52 + force * 0.24 + localized.t * 0.12) * (zone === "head" ? 1.1 : zone === "torso" ? 0.88 : 0.56) * anatomy.armLag, 0, 1.18),
+    footRelease: clamp((mass.skid * 0.34 + follow * 0.24 + force * 0.16) * (zone === "legs" ? 1.15 : 0.55) * anatomy.footLag, 0, 1.18),
+    bracePress: clamp((mass.floor * 0.46 + force * 0.24 + mass.skid * 0.16) * (zone === "legs" ? 1.22 : zone === "torso" ? 0.95 : 0.78) * anatomy.settle, 0, 1.18),
   };
 }
 
@@ -12994,20 +13007,23 @@ function drawReactionCompressionEcho(f, localCrouch, reaction = reactionPresenta
   const contactX = reaction.contactX;
   const contactY = reaction.contactY + localCrouch;
   const trim = accent ?? f.trim ?? "#fff1bd";
-  const rx = zone === "head" ? 26 : zone === "legs" ? 34 : 31;
-  const ry = zone === "head" ? 10 : zone === "legs" ? 8 : 12;
+  const headWhip = clamp(reaction.headWhip ?? 0, 0, 1.05);
+  const torsoCompress = clamp(reaction.torsoCompress ?? 0, 0, 1.08);
+  const bracePress = clamp(reaction.bracePress ?? 0, 0, 1.18);
+  const rx = (zone === "head" ? 26 : zone === "legs" ? 34 : 31) + torsoCompress * 4.2 + bracePress * 2.4;
+  const ry = (zone === "head" ? 10 : zone === "legs" ? 8 : 12) + torsoCompress * 2.2;
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
-  ctx.fillStyle = `rgba(24, 12, 9, ${clamp(0.032 + shadow * 0.064 + force * 0.018, 0.025, 0.12)})`;
+  ctx.fillStyle = `rgba(24, 12, 9, ${clamp(0.032 + shadow * 0.064 + force * 0.018 + torsoCompress * 0.012, 0.025, 0.13)})`;
   ctx.beginPath();
-  ctx.ellipse(contactX - dir * force * 4, contactY + force * (zone === "head" ? 0.5 : 1.4), rx + force * 8, ry + force * 2.2, -dir * 0.13, 0, Math.PI * 2);
+  ctx.ellipse(contactX - dir * (force * 4 + headWhip * 2.8), contactY + force * (zone === "head" ? 0.5 : 1.4) + torsoCompress * 0.8, rx + force * 8, ry + force * 2.2, -dir * (0.13 + headWhip * 0.045), 0, Math.PI * 2);
   ctx.fill();
 
   if (f.grounded && shadow > 0.04) {
-    ctx.fillStyle = `rgba(18, 10, 7, ${clamp(0.03 + shadow * 0.05, 0.02, 0.095)})`;
+    ctx.fillStyle = `rgba(18, 10, 7, ${clamp(0.03 + shadow * 0.05 + bracePress * 0.022, 0.02, 0.112)})`;
     ctx.beginPath();
-    ctx.ellipse(-dir * (22 + force * 4), -3 + localCrouch + shadow * 0.8, 34 + shadow * 12, 4.6 + shadow * 1.8, -dir * 0.04, 0, Math.PI * 2);
+    ctx.ellipse(-dir * (22 + force * 4 + bracePress * 2.5), -3 + localCrouch + shadow * 0.8 + bracePress * 0.5, 34 + shadow * 12 + bracePress * 8, 4.6 + shadow * 1.8 + bracePress * 0.7, -dir * 0.04, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -13021,10 +13037,10 @@ function drawReactionCompressionEcho(f, localCrouch, reaction = reactionPresenta
   ctx.strokeStyle = colorWithAlpha(trim, clamp(0.045 + crease * 0.11, 0.04, 0.145));
   ctx.lineWidth = 0.9 + force * 0.55;
   ctx.beginPath();
-  ctx.moveTo(contactX - dir * (rx * 0.75 + force * 3), contactY - ry * 0.65);
-  ctx.quadraticCurveTo(contactX - dir * 3, contactY - ry * 1.05 - reaction.follow * 2.2, contactX + dir * (rx * 0.62 + force * 3), contactY - ry * 0.25);
+  ctx.moveTo(contactX - dir * (rx * 0.75 + force * 3 + headWhip * 2), contactY - ry * 0.65 - headWhip * 0.9);
+  ctx.quadraticCurveTo(contactX - dir * (3 + headWhip * 4), contactY - ry * 1.05 - reaction.follow * 2.2 - headWhip * 3.4, contactX + dir * (rx * 0.62 + force * 3), contactY - ry * 0.25 + torsoCompress * 1.2);
   ctx.moveTo(contactX - dir * (rx * 0.55 + force * 2), contactY + ry * 0.52);
-  ctx.quadraticCurveTo(contactX - dir * 1.5, contactY + ry * 0.78 + reaction.follow * 1.6, contactX + dir * (rx * 0.48 + force * 2), contactY + ry * 0.28);
+  ctx.quadraticCurveTo(contactX - dir * 1.5, contactY + ry * 0.78 + reaction.follow * 1.6 + torsoCompress * 1.5, contactX + dir * (rx * 0.48 + force * 2 + bracePress * 1.4), contactY + ry * 0.28);
   ctx.stroke();
   ctx.restore();
 }
@@ -14846,45 +14862,50 @@ function applyReactionExtremityPresence(hands, feet, f, frameName) {
   const lowHit = reaction.zone === "legs";
   const handShock = clamp(reaction.handShock, 0, 1.12);
   const toeShock = clamp(reaction.toeShock, 0, 1.15);
+  const headWhip = clamp(reaction.headWhip ?? 0, 0, 1.05);
+  const torsoCompress = clamp(reaction.torsoCompress ?? 0, 0, 1.08);
+  const handLag = clamp(reaction.handLag ?? 0, 0, 1.18);
+  const footRelease = clamp(reaction.footRelease ?? 0, 0, 1.18);
+  const bracePress = clamp(reaction.bracePress ?? 0, 0, 1.18);
   const recoilSide = headHit ? reaction.localDir : -reaction.localDir;
   const lift = headHit ? -1 : lowHit ? 1 : 0.45;
 
-  hands[0].x += recoilSide * handShock * (headHit ? 5.2 : lowHit ? 2.6 : 4.1);
-  hands[0].y += lift * handShock * (headHit ? 5.4 : lowHit ? 4.2 : 3.1);
-  hands[0].sx += handShock * 0.045;
-  hands[0].sy -= handShock * 0.028;
-  hands[0].angle += recoilSide * handShock * (headHit ? 0.08 : 0.052);
+  hands[0].x += recoilSide * (handShock * (headHit ? 5.2 : lowHit ? 2.6 : 4.1) + handLag * (headHit ? 4.4 : lowHit ? 1.9 : 3.2));
+  hands[0].y += lift * handShock * (headHit ? 5.4 : lowHit ? 4.2 : 3.1) + handLag * (headHit ? -2.6 : lowHit ? 3.6 : 2.4) + torsoCompress * 1.4;
+  hands[0].sx += handShock * 0.045 + handLag * 0.018;
+  hands[0].sy -= handShock * 0.028 + headWhip * 0.008;
+  hands[0].angle += recoilSide * (handShock * (headHit ? 0.08 : 0.052) + handLag * 0.035);
   hands[0].curl = clamp((hands[0].curl ?? 0.68) + handShock * (headHit ? 0.18 : 0.12), 0, 1.12);
-  hands[0].shock = Math.max(hands[0].shock ?? 0, handShock);
+  hands[0].shock = Math.max(hands[0].shock ?? 0, handShock + handLag * 0.32);
 
-  hands[1].x += recoilSide * handShock * (headHit ? 4.2 : lowHit ? 2.1 : 3.3);
-  hands[1].y += lift * handShock * (headHit ? 4.5 : lowHit ? 3.5 : 2.5);
-  hands[1].sx += handShock * 0.036;
-  hands[1].sy -= handShock * 0.022;
-  hands[1].angle += recoilSide * handShock * (headHit ? 0.066 : 0.044);
+  hands[1].x += recoilSide * (handShock * (headHit ? 4.2 : lowHit ? 2.1 : 3.3) + handLag * (headHit ? 3.2 : lowHit ? 1.5 : 2.6));
+  hands[1].y += lift * handShock * (headHit ? 4.5 : lowHit ? 3.5 : 2.5) + handLag * (headHit ? -2.1 : lowHit ? 2.8 : 1.9) + torsoCompress * 1.1;
+  hands[1].sx += handShock * 0.036 + handLag * 0.014;
+  hands[1].sy -= handShock * 0.022 + headWhip * 0.006;
+  hands[1].angle += recoilSide * (handShock * (headHit ? 0.066 : 0.044) + handLag * 0.027);
   hands[1].curl = clamp((hands[1].curl ?? 0.68) + handShock * (headHit ? 0.15 : 0.1), 0, 1.1);
-  hands[1].shock = Math.max(hands[1].shock ?? 0, handShock * 0.86);
+  hands[1].shock = Math.max(hands[1].shock ?? 0, handShock * 0.86 + handLag * 0.25);
 
   const supportIndex = reaction.localDir > 0 ? 0 : 1;
   const freeIndex = supportIndex === 0 ? 1 : 0;
   const support = feet[supportIndex];
   const free = feet[freeIndex];
-  const press = clamp(reaction.shadowWeight * 0.64 + toeShock * 0.28, 0, 1.08);
+  const press = clamp(reaction.shadowWeight * 0.64 + toeShock * 0.28 + bracePress * 0.46, 0, 1.18);
 
   support.press = Math.max(support.press ?? 0, press);
-  support.plant = Math.max(support.plant ?? 0, 0.68 + press * 0.25);
-  support.w += press * 3.8 + toeShock * (lowHit ? 2.2 : 1.2);
-  support.h = Math.max(7.1, support.h - press * 0.85);
-  support.y += press * 0.95;
-  support.x -= reaction.localDir * (press * 1.5 + toeShock * 1.8);
-  support.angle += supportIndex === 0 ? -press * 0.03 : press * 0.03;
+  support.plant = Math.max(support.plant ?? 0, 0.68 + press * 0.25 + bracePress * 0.08);
+  support.w += press * 3.8 + toeShock * (lowHit ? 2.2 : 1.2) + bracePress * 2.1;
+  support.h = Math.max(7.1, support.h - press * 0.85 - bracePress * 0.35);
+  support.y += press * 0.95 + bracePress * 0.42;
+  support.x -= reaction.localDir * (press * 1.5 + toeShock * 1.8 + bracePress * 1.2);
+  support.angle += supportIndex === 0 ? -(press * 0.03 + bracePress * 0.012) : press * 0.03 + bracePress * 0.012;
   support.toeFlex = Math.max(support.toeFlex ?? 0, toeShock);
 
-  free.plant = Math.max(0.14, (free.plant ?? 0.7) - toeShock * 0.08);
-  free.y += lowHit ? toeShock * 0.5 : -toeShock * 0.45;
-  free.x += reaction.localDir * toeShock * (lowHit ? 3.2 : 1.8);
-  free.angle += freeIndex === 0 ? toeShock * 0.026 : -toeShock * 0.026;
-  free.toeFlex = Math.max(free.toeFlex ?? 0, toeShock * (lowHit ? 0.78 : 0.55));
+  free.plant = Math.max(0.14, (free.plant ?? 0.7) - toeShock * 0.08 - footRelease * 0.055);
+  free.y += (lowHit ? toeShock * 0.5 : -toeShock * 0.45) + footRelease * (lowHit ? 0.75 : -0.42);
+  free.x += reaction.localDir * (toeShock * (lowHit ? 3.2 : 1.8) + footRelease * (lowHit ? 2.8 : 1.2));
+  free.angle += freeIndex === 0 ? toeShock * 0.026 + footRelease * 0.014 : -(toeShock * 0.026 + footRelease * 0.014);
+  free.toeFlex = Math.max(free.toeFlex ?? 0, toeShock * (lowHit ? 0.78 : 0.55) + footRelease * 0.22);
 }
 
 function applyReactionFootPressure(feet, f) {
@@ -14897,21 +14918,24 @@ function applyReactionFootPressure(feet, f) {
   const freeIndex = supportIndex === 0 ? 1 : 0;
   const support = feet[supportIndex];
   const free = feet[freeIndex];
-  const press = clamp(mass.floor * 0.72 + mass.skid * 0.16, 0, 1);
+  const reaction = reactionPresentationProfile(f);
+  const bracePress = clamp(reaction.bracePress ?? 0, 0, 1.18);
+  const footRelease = clamp(reaction.footRelease ?? 0, 0, 1.18);
+  const press = Math.max(clamp(mass.floor * 0.72 + mass.skid * 0.16, 0, 1), clamp(bracePress * 0.55, 0, 0.72));
   const skid = clamp(mass.skid, 0, 1.5);
 
   support.press = Math.max(support.press ?? 0, press);
-  support.plant = Math.max(support.plant ?? 0, 0.66 + press * 0.3);
-  support.w += press * 4.8 + skid * 1.8;
-  support.h = Math.max(7.2, support.h - press * 1.2);
-  support.y += press * 1.3;
-  support.x -= localImpactDir * (press * 2.6 + skid * 2.2);
-  support.angle += supportIndex === 0 ? -press * 0.04 : press * 0.04;
+  support.plant = Math.max(support.plant ?? 0, 0.66 + press * 0.3 + bracePress * 0.05);
+  support.w += press * 4.8 + skid * 1.8 + bracePress * 1.4;
+  support.h = Math.max(7.2, support.h - press * 1.2 - bracePress * 0.25);
+  support.y += press * 1.3 + bracePress * 0.34;
+  support.x -= localImpactDir * (press * 2.6 + skid * 2.2 + bracePress * 1.1);
+  support.angle += supportIndex === 0 ? -(press * 0.04 + bracePress * 0.01) : press * 0.04 + bracePress * 0.01;
 
   if (free) {
-    free.plant = Math.max(0.14, (free.plant ?? 0.7) - skid * 0.12);
-    free.y -= mass.zone === "head" ? skid * 0.9 : 0;
-    free.x += localImpactDir * skid * 2.6;
+    free.plant = Math.max(0.14, (free.plant ?? 0.7) - skid * 0.12 - footRelease * 0.05);
+    free.y += mass.zone === "head" ? -skid * 0.9 - footRelease * 0.42 : mass.zone === "legs" ? footRelease * 0.72 : -footRelease * 0.16;
+    free.x += localImpactDir * (skid * 2.6 + footRelease * (mass.zone === "legs" ? 2.2 : 1.1));
   }
 }
 
@@ -20075,21 +20099,41 @@ function getPose(f, stride) {
       const toeShock = clamp(present.toeShock * (lowHit ? 1.14 : 0.9), 0, lowHit ? 0.55 : 0.42);
       const wristCurl = clamp(0.1 + present.force * 0.08 + present.follow * 0.06, 0, 0.24);
       const palmSide = hitMass.zone === "head" ? localDir : -localDir;
+      const headWhip = clamp(present.headWhip ?? 0, 0, 1.05);
+      const torsoCompress = clamp(present.torsoCompress ?? 0, 0, 1.08);
+      const hipCounter = clamp(present.hipCounter ?? 0, 0, 1.08);
+      const handLag = clamp(present.handLag ?? 0, 0, 1.18);
+      const footRelease = clamp(present.footRelease ?? 0, 0, 1.18);
+      const bracePress = clamp(present.bracePress ?? 0, 0, 1.18);
 
       base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) + wristCurl + (headHit ? 0.04 : 0), 0, 1);
       base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) + wristCurl * 0.86 + (lowHit ? 0.03 : 0), 0, 1);
       base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, fingerShock);
       base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, fingerShock * 0.82);
-      base.frontArm.hand.x += palmSide * present.handShock * 2.2 * spec.stance;
-      base.backArm.hand.x += palmSide * present.handShock * 1.7 * spec.stance;
-      base.frontArm.hand.y += present.handShock * (headHit ? -1.8 : lowHit ? 2.2 : 1.4);
-      base.backArm.hand.y += present.handShock * (headHit ? -1.3 : lowHit ? 1.8 : 1.1);
+      base.torsoTilt += localDir * (headWhip * -0.014 + torsoCompress * 0.012 + hipCounter * (lowHit ? 0.014 : 0.006));
+      base.frontArm.shoulder.x += localDir * (headWhip * 1.9 - torsoCompress * 1.1) * spec.stance;
+      base.frontArm.shoulder.y += torsoCompress * 1.6 - headWhip * 1.1;
+      base.backArm.shoulder.x += localDir * (headWhip * 1.35 - torsoCompress * 1.45) * spec.stance;
+      base.backArm.shoulder.y += torsoCompress * 2.1 - headWhip * 0.8;
+      base.frontLeg.hip.x -= localDir * hipCounter * (lowHit ? 2.2 : 1.2) * spec.stance;
+      base.backLeg.hip.x += localDir * hipCounter * (lowHit ? 1.7 : 1.0) * spec.stance;
+      base.frontLeg.hip.y += hipCounter * (lowHit ? 1.6 : 0.8);
+      base.backLeg.hip.y += hipCounter * (lowHit ? 1.9 : 0.9);
+      base.frontArm.hand.x += (palmSide * present.handShock * 2.2 + palmSide * handLag * 2.4 + localDir * headWhip * 2.2) * spec.stance;
+      base.backArm.hand.x += (palmSide * present.handShock * 1.7 + palmSide * handLag * 1.8 + localDir * headWhip * 1.7) * spec.stance;
+      base.frontArm.hand.y += present.handShock * (headHit ? -1.8 : lowHit ? 2.2 : 1.4) + handLag * (headHit ? -2.2 : lowHit ? 2.5 : 1.8) + torsoCompress * 1.6;
+      base.backArm.hand.y += present.handShock * (headHit ? -1.3 : lowHit ? 1.8 : 1.1) + handLag * (headHit ? -1.7 : lowHit ? 1.9 : 1.4) + torsoCompress * 1.3;
 
       base[braceFoot].toeFlex = Math.max(base[braceFoot].toeFlex ?? 0, toeShock);
       base[freeFoot].toeFlex = Math.max(base[freeFoot].toeFlex ?? 0, toeShock * (lowHit ? 0.86 : 0.64));
-      base[braceFoot].plant = Math.max(base[braceFoot].plant ?? 0, clamp(0.58 + present.shadowWeight * 0.26, 0, 1));
-      base[braceFoot].footAngle = (base[braceFoot].footAngle ?? 0) - worldLocal * toeShock * 0.028;
-      base[freeFoot].footAngle = (base[freeFoot].footAngle ?? 0) + worldLocal * toeShock * 0.018;
+      base[braceFoot].plant = Math.max(base[braceFoot].plant ?? 0, clamp(0.58 + present.shadowWeight * 0.26 + bracePress * 0.12, 0, 1));
+      base[braceFoot].knee.y += bracePress * 1.7;
+      base[braceFoot].foot.y += bracePress * 0.55;
+      base[braceFoot].foot.x -= worldLocal * bracePress * 1.9 * spec.stance;
+      base[braceFoot].footAngle = (base[braceFoot].footAngle ?? 0) - worldLocal * (toeShock * 0.028 + bracePress * 0.014);
+      base[freeFoot].foot.x += worldLocal * footRelease * (lowHit ? 2.8 : 1.4) * spec.stance;
+      base[freeFoot].foot.y += footRelease * (lowHit ? 1.4 : -0.55);
+      base[freeFoot].footAngle = (base[freeFoot].footAngle ?? 0) + worldLocal * (toeShock * 0.018 + footRelease * 0.018);
     }
   }
 
