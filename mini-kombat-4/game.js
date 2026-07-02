@@ -6970,6 +6970,10 @@ function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
   ctx.lineWidth = 2;
   ctx.stroke();
 
+  const stanceX = reverse ? x + 56 : x + width - 56;
+  const stanceFeetY = y + height - 15;
+  drawRoundIntroStanceGlyph(fighter, stanceX, stanceFeetY, reverse, pulse, fontScale);
+
   ctx.globalCompositeOperation = "screen";
   const glow = ctx.createRadialGradient(portraitX + portraitSize / 2, portraitY + portraitSize / 2, 8, portraitX + portraitSize / 2, portraitY + portraitSize / 2, portraitSize * 1.12);
   glow.addColorStop(0, colorWithAlpha(trim, 0.22 + pulse * 0.08));
@@ -7022,6 +7026,120 @@ function drawRoundIntroCard(fighter, side, x, y, width, height, pulse) {
   ctx.fillText(compactIntroText(presentation.signature, 30).toUpperCase(), textAnchor, y + 86);
   drawRoundIntroStats(fighter, textX, y + height - 13, textW, reverse, pulse);
 
+  ctx.restore();
+}
+
+function drawRoundIntroStanceGlyph(fighter, cx, feetY, reverse, pulse, scale = 1) {
+  const profileId = fighter?.profileId ?? fighter?.id ?? "";
+  const trim = fighter?.trim || "#fff1bd";
+  const base = fighter?.color || trim;
+  const ready = roundStartReadinessProfile(fighter);
+  const heavy = profileId === "p1" || profileId === "p3" || profileId === "p6";
+  const agile = profileId === "p2" || profileId === "p4" || profileId === "p5";
+  const facing = reverse ? -1 : 1;
+  const bodyScale = scale * (heavy ? 1.04 : agile ? 0.94 : 1);
+  const breath = Math.sin((180 - countdownFrames) * 0.11 + (profileId.charCodeAt(1) || 0)) * ready.breath;
+  const guard = 0.66 + pulse * 0.22;
+  const shoulderW = (heavy ? 24 : 20) * bodyScale * ready.shoulder;
+  const hipW = (heavy ? 19 : 15) * bodyScale * ready.hip;
+  const headR = (heavy ? 8.2 : 7.2) * bodyScale;
+  const headY = feetY - (heavy ? 74 : 78) * bodyScale + breath * 0.6;
+  const chestY = feetY - (heavy ? 55 : 58) * bodyScale + breath * 0.9;
+  const hipY = feetY - (heavy ? 31 : 30) * bodyScale;
+  const frontFoot = {
+    x: cx + facing * (20 + ready.stanceWide * 3.2) * bodyScale,
+    y: feetY,
+  };
+  const backFoot = {
+    x: cx - facing * (18 + ready.stanceWide * 2.6) * bodyScale,
+    y: feetY - 1.5 * bodyScale,
+  };
+  const frontKnee = {
+    x: cx + facing * (12 + guard * 2.5) * bodyScale,
+    y: feetY - (19 + ready.kneeSink * 2.8) * bodyScale,
+  };
+  const backKnee = {
+    x: cx - facing * 10 * bodyScale,
+    y: feetY - (20 + ready.kneeSink * 2.2) * bodyScale,
+  };
+  const frontHand = {
+    x: cx + facing * (29 + ready.snapReach * 2.6) * bodyScale,
+    y: chestY - (11 + ready.handLift * 2.4) * bodyScale,
+  };
+  const backHand = {
+    x: cx - facing * (18 - guard * 2) * bodyScale,
+    y: chestY - (7 + ready.handLift * 1.6) * bodyScale,
+  };
+  const frontElbow = {
+    x: cx + facing * 18 * bodyScale,
+    y: chestY - 3 * bodyScale,
+  };
+  const backElbow = {
+    x: cx - facing * 14 * bodyScale,
+    y: chestY + 1 * bodyScale,
+  };
+
+  ctx.save();
+  ctx.globalAlpha *= 0.74;
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = "rgba(16, 8, 6, 0.18)";
+  ctx.beginPath();
+  ctx.ellipse(cx + facing * 1.5, feetY + 2.5, 43 * bodyScale, 5.8 * bodyScale, -facing * 0.03, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = colorWithAlpha(trim, 0.2 + pulse * 0.08);
+  ctx.lineWidth = 1.2 * bodyScale;
+  ctx.beginPath();
+  ctx.ellipse(cx + facing * 2, feetY + 1.5, 33 * bodyScale, 4.2 * bodyScale, 0, 0.05, Math.PI * 1.9);
+  ctx.stroke();
+
+  const bodyGrad = ctx.createLinearGradient(cx - shoulderW, headY, cx + shoulderW, feetY);
+  bodyGrad.addColorStop(0, colorWithAlpha(trim, 0.34 + pulse * 0.07));
+  bodyGrad.addColorStop(0.48, colorWithAlpha(base, 0.2 + pulse * 0.06));
+  bodyGrad.addColorStop(1, colorWithAlpha(trim, 0.16));
+  ctx.strokeStyle = bodyGrad;
+  ctx.lineWidth = 4.6 * bodyScale;
+  ctx.beginPath();
+  ctx.moveTo(cx - shoulderW * 0.72, chestY - 1);
+  ctx.quadraticCurveTo(cx + facing * ready.torso * 2.4, chestY + 8 * bodyScale, cx - hipW * 0.42, hipY);
+  ctx.moveTo(cx + shoulderW * 0.72, chestY - 1);
+  ctx.quadraticCurveTo(cx + facing * ready.torso * 4.2, chestY + 9 * bodyScale, cx + hipW * 0.42, hipY);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorWithAlpha(trim, 0.24 + guard * 0.09);
+  ctx.lineWidth = 3.1 * bodyScale;
+  ctx.beginPath();
+  ctx.moveTo(cx + shoulderW * 0.74, chestY - 1);
+  ctx.quadraticCurveTo(frontElbow.x, frontElbow.y, frontHand.x, frontHand.y);
+  ctx.moveTo(cx - shoulderW * 0.72, chestY);
+  ctx.quadraticCurveTo(backElbow.x, backElbow.y, backHand.x, backHand.y);
+  ctx.moveTo(cx + hipW * 0.48, hipY);
+  ctx.quadraticCurveTo(frontKnee.x, frontKnee.y, frontFoot.x, frontFoot.y);
+  ctx.moveTo(cx - hipW * 0.48, hipY);
+  ctx.quadraticCurveTo(backKnee.x, backKnee.y, backFoot.x, backFoot.y);
+  ctx.stroke();
+
+  ctx.fillStyle = colorWithAlpha("#fff7d6", 0.2 + pulse * 0.08);
+  for (const point of [frontHand, backHand, frontFoot, backFoot]) {
+    ctx.beginPath();
+    ctx.ellipse(point.x, point.y, 3.6 * bodyScale, 2.5 * bodyScale, facing * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = colorWithAlpha(trim, 0.23 + pulse * 0.08);
+  ctx.beginPath();
+  ctx.ellipse(cx + facing * (1.8 + breath * 0.5), headY, headR * 0.88, headR * 1.08, facing * 0.05, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = colorWithAlpha("#ffffff", 0.09 + pulse * 0.035);
+  ctx.lineWidth = 0.8 * bodyScale;
+  ctx.beginPath();
+  ctx.moveTo(backHand.x - facing * 8 * bodyScale, backHand.y - 3 * bodyScale);
+  ctx.quadraticCurveTo(cx + facing * 2 * bodyScale, chestY - 17 * bodyScale, frontHand.x + facing * 6 * bodyScale, frontHand.y - 4 * bodyScale);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -9707,6 +9825,9 @@ function roundStartBodyPresence(f) {
       footPress: 0,
       floorWeight: 0,
       snapReach: 0,
+      guardLock: 0,
+      chestSet: 0,
+      heelDig: 0,
       pulse: 0,
       side: f?.id === "left" ? -1 : 1,
     };
@@ -9725,6 +9846,9 @@ function roundStartBodyPresence(f) {
   const handPresence = clamp((guard * 0.48 + beat * 0.18 + fightSnap * 0.44) * readiness.handSize, 0, 1.55);
   const floorWeight = clamp((footPress * 0.72 + kneeLoad * 0.28) * readiness.brace, 0, 1.75);
   const snapReach = clamp(fightSnap * readiness.snapReach * readiness.snap, 0, 1.5);
+  const guardLock = clamp(fightSnap * readiness.guard, 0, 1.35);
+  const chestSet = clamp((guard * 0.35 + fightSnap * 0.65) * readiness.torso, 0, 1.35);
+  const heelDig = clamp((footPress * 0.55 + fightSnap * 0.45) * readiness.footWeight, 0, 1.55);
 
   return {
     active: Math.max(guard, footPress, fightSnap),
@@ -9740,6 +9864,9 @@ function roundStartBodyPresence(f) {
     footPress,
     floorWeight,
     snapReach,
+    guardLock,
+    chestSet,
+    heelDig,
     pulse,
     side: entrance.side,
   };
@@ -11301,6 +11428,25 @@ function drawFighterIdentityAura(f, crouch, walking = false, stride = 0) {
     ctx.beginPath();
     ctx.ellipse(0, 2 + localCrouch, prepWidth, (7 + startBeat * 2.4 + startSnap * 1.8) * scale, 0, 0, Math.PI * 2);
     ctx.stroke();
+
+    if (startPresence.heelDig > 0.04) {
+      const dig = clamp(startPresence.heelDig, 0, 1.35);
+      ctx.strokeStyle = colorWithAlpha(trim, 0.035 + dig * 0.055 + startSnap * 0.025);
+      ctx.lineWidth = 0.8 + dig * 0.72;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(
+          side * (29 + dig * 4 + (startReady.stanceWide - 1) * 6) * scale,
+          4.4 + localCrouch + dig * 0.45,
+          (15 + dig * 7) * scale,
+          (2.6 + dig * 1.1) * scale,
+          side * 0.04,
+          0,
+          Math.PI * 2
+        );
+        ctx.stroke();
+      }
+    }
 
     ctx.strokeStyle = colorWithAlpha("#ffffff", prepAlpha * 0.55);
     ctx.lineWidth = 0.75 + startSnap * 0.85;
@@ -19860,30 +20006,39 @@ function getPose(f, stride) {
       const load = start.kneeLoad;
       const press = start.footPress;
       const snapReach = start.snapReach;
+      const guardLock = start.guardLock;
+      const chestSet = start.chestSet;
+      const heelDig = start.heelDig;
       const presenceSide = entrance.side;
-      base.torsoTilt += presenceSide * (snapReach * 0.009 + start.pulse * 0.003) - load * 0.002;
+      base.torsoTilt += presenceSide * (snapReach * 0.009 + start.pulse * 0.003 + guardLock * 0.004) - load * 0.002 - chestSet * 0.003;
       base.frontArm.shoulder.x += presenceSide * start.shoulderMass * 1.7 * spec.stance;
+      base.frontArm.shoulder.y += chestSet * 1.2;
       base.backArm.shoulder.x -= presenceSide * start.shoulderMass * 1.3 * spec.stance;
+      base.backArm.shoulder.y += chestSet * 0.9;
       base.frontArm.elbow.x += presenceSide * (arms * 3.6 + snapReach * 4.2) * spec.stance;
-      base.frontArm.elbow.y -= hands * 2.8 + snapReach * 2.2;
+      base.frontArm.elbow.y -= hands * 2.8 + snapReach * 2.2 + guardLock * 2.4;
       base.frontArm.hand.x += presenceSide * (hands * 4.5 + snapReach * 6.4) * spec.stance;
-      base.frontArm.hand.y -= hands * 4.2 + snapReach * 3.8;
+      base.frontArm.hand.y -= hands * 4.2 + snapReach * 3.8 + guardLock * 5.2;
       base.backArm.elbow.x -= presenceSide * (arms * 2.8 + snapReach * 2.4) * spec.stance;
-      base.backArm.elbow.y -= hands * 1.7 + start.beat * 1.2;
+      base.backArm.elbow.y -= hands * 1.7 + start.beat * 1.2 + guardLock * 1.8;
       base.backArm.hand.x -= presenceSide * (hands * 3.5 + snapReach * 3.8) * spec.stance;
-      base.backArm.hand.y -= hands * 2.6 + start.beat * 1.8;
+      base.backArm.hand.y -= hands * 2.6 + start.beat * 1.8 + guardLock * 3.7;
+      base.frontLeg.hip.y += chestSet * 1.1;
+      base.backLeg.hip.y += chestSet * 0.9;
       base.frontLeg.knee.x += presenceSide * load * 2.2 * spec.stance;
       base.frontLeg.knee.y += load * 3.8 + press * 1.4;
-      base.frontLeg.foot.x += (ready.stanceWide - 1) * 3.4 * spec.stance - presenceSide * snapReach * 1.6;
-      base.frontLeg.foot.y += press * 1.1;
+      base.frontLeg.foot.x += (ready.stanceWide - 1) * 3.4 * spec.stance - presenceSide * snapReach * 1.6 + presenceSide * heelDig * 1.2;
+      base.frontLeg.foot.y += press * 1.1 + heelDig * 0.4;
       base.backLeg.knee.x -= presenceSide * load * 2.9 * spec.stance;
       base.backLeg.knee.y += load * 4.6 + press * 1.6;
-      base.backLeg.foot.x -= (ready.stanceWide - 1) * 4.2 * spec.stance + presenceSide * snapReach * 1.8;
-      base.backLeg.foot.y += press * 1.35;
-      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.66 + press * 0.24 + snapReach * 0.08, 0, 1));
-      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.72 + press * 0.24 + snapReach * 0.1, 0, 1));
-      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + presenceSide * (press * 0.014 + snapReach * 0.01);
-      base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - presenceSide * (press * 0.018 + snapReach * 0.012);
+      base.backLeg.foot.x -= (ready.stanceWide - 1) * 4.2 * spec.stance + presenceSide * snapReach * 1.8 + presenceSide * heelDig * 1.4;
+      base.backLeg.foot.y += press * 1.35 + heelDig * 0.5;
+      base.frontLeg.plant = Math.max(base.frontLeg.plant ?? 0, clamp(0.66 + press * 0.24 + snapReach * 0.08 + heelDig * 0.08, 0, 1));
+      base.backLeg.plant = Math.max(base.backLeg.plant ?? 0, clamp(0.72 + press * 0.24 + snapReach * 0.1 + heelDig * 0.1, 0, 1));
+      base.frontLeg.toeFlex = Math.max(base.frontLeg.toeFlex ?? 0, heelDig * 0.22 + guardLock * 0.08);
+      base.backLeg.toeFlex = Math.max(base.backLeg.toeFlex ?? 0, heelDig * 0.26 + guardLock * 0.06);
+      base.frontLeg.footAngle = (base.frontLeg.footAngle ?? 0) + presenceSide * (press * 0.014 + snapReach * 0.01 + heelDig * 0.006);
+      base.backLeg.footAngle = (base.backLeg.footAngle ?? 0) - presenceSide * (press * 0.018 + snapReach * 0.012 + heelDig * 0.008);
     }
   }
 
