@@ -1129,6 +1129,99 @@ function hitReactionAnatomyProfile(f) {
   }[f?.profileId] ?? { shoulder: 1, hip: 1, armLag: 1, footLag: 1, settle: 1, twist: 1, handWhip: 1, kneeWhip: 1, spine: 1, fingerShock: 1, toeClaw: 1, crease: 1, shadowWeight: 1 };
 }
 
+function localizedHitReactionAnatomyProfile(f, mass = hitReactionMassProfile(f), localized = localizedImpactProfile(f)) {
+  const anatomy = hitReactionAnatomyProfile(f);
+  const zone = mass?.zone === "head" || mass?.zone === "legs" ? mass.zone : localized?.zone === "head" || localized?.zone === "legs" ? localized.zone : "torso";
+  const kind = mass?.kind || f?.reactionKind || "light";
+  const grounded = !!f?.grounded;
+  const worldDir = mass?.worldDir || f?.reactionDir || f?.impactDir || f?.dir || 1;
+  const localDir = worldDir === (f?.dir || 1) ? 1 : -1;
+  const reactionMax = Math.max(1, f?.reactionMax ?? 1);
+  const reactionRaw = winner ? Math.max(0, (f?.reactionPulse ?? 0) - resultFrame * 0.82) : (f?.reactionPulse ?? 0);
+  const reactionT = clamp(reactionRaw / reactionMax, 0, 1);
+  const zonePulseMax = zone === "head" ? 30 : zone === "legs" ? 28 : 26;
+  const zoneT = clamp((f?.hitZonePulse ?? 0) / zonePulseMax, 0, 1);
+  const hurtT = clamp((f?.hurt ?? 0) / 24, 0, 1);
+  const strength = clamp(Math.max(f?.reactionStrength ?? 0, f?.impactStrength ?? 0, mass?.strength ?? 0, localized?.strength ?? 0.72), 0.32, 2.05);
+  const kindWeight =
+    kind === "finish" ? 1.38 :
+    kind === "counter" || kind === "blast" ? 1.22 :
+    kind === "heavy" || kind === "low" ? 1.1 :
+    kind === "guard" ? 0.34 :
+    0.88;
+  const active = kind === "guard" || (f?.hurt ?? 0) <= 0
+    ? 0
+    : clamp(Math.max(mass?.active ?? 0, (localized?.t ?? 0) * 0.92, reactionT * 0.86, zoneT * 0.72) * kindWeight, 0, 1.95);
+
+  if (active <= 0.012) {
+    return {
+      active: 0,
+      localDir,
+      zone,
+      headSnap: 0,
+      torsoCrumple: 0,
+      lowBuckle: 0,
+      shoulderLag: 0,
+      spineRipple: 0,
+      hipCounter: 0,
+      openPalm: 0,
+      fingerSplay: 0,
+      ankleDrag: 0,
+      toeClaw: 0,
+      bracePlant: 0,
+      skidWeight: 0,
+      shadowWeight: 0,
+      recoveryEcho: 0,
+    };
+  }
+
+  const snap = clamp(((mass?.snap ?? 0) * 0.48 + (localized?.snap ?? 0) * 0.46 + zoneT * 0.24) * strength, 0, 2.05);
+  const rebound = clamp(((mass?.rebound ?? 0) * 0.48 + (localized?.rebound ?? 0) * 0.34 + reactionT * 0.2) * strength, 0, 1.95);
+  const floor = grounded ? clamp((mass?.floor ?? 0) * 0.82 + Math.abs(f?.vx ?? 0) / 12, 0, 1.85) : 0;
+  const skid = grounded ? clamp((mass?.skid ?? 0) * 0.84 + Math.abs(f?.vx ?? 0) / 9.2, 0, 1.95) : 0;
+  const echo = Math.sin((1 - clamp(Math.max(mass?.active ?? 0, reactionT, localized?.t ?? 0), 0, 1)) * Math.PI) * strength * kindWeight;
+  const recoveryEcho = clamp(echo * (kind === "finish" ? 1.16 : kind === "counter" || kind === "blast" ? 1.08 : 0.9), 0, 1.55);
+  const head = zone === "head";
+  const low = zone === "legs";
+  const torso = !head && !low;
+
+  const headSnap = head ? clamp((snap * 0.66 + rebound * 0.34 + recoveryEcho * 0.2) * anatomy.spine, 0, 1.7) : 0;
+  const torsoCrumple = torso
+    ? clamp((snap * 0.54 + floor * 0.24 + recoveryEcho * 0.22) * anatomy.crease, 0, 1.55)
+    : clamp((head ? rebound * 0.18 : snap * 0.22 + floor * 0.18) * anatomy.crease, 0, 0.72);
+  const lowBuckle = low ? clamp((snap * 0.52 + floor * 0.56 + recoveryEcho * 0.22) * anatomy.kneeWhip, 0, 1.7) : 0;
+  const shoulderLag = clamp((headSnap * 0.62 + torsoCrumple * 0.46 + rebound * 0.26 + recoveryEcho * 0.24) * anatomy.shoulder, 0, 1.65);
+  const spineRipple = clamp((headSnap * 0.38 + torsoCrumple * 0.62 + lowBuckle * 0.22 + recoveryEcho * 0.28) * anatomy.spine, 0, 1.62);
+  const hipCounter = clamp((torsoCrumple * 0.36 + lowBuckle * 0.64 + floor * 0.24) * anatomy.hip, 0, 1.6);
+  const openPalm = clamp((headSnap * 0.42 + torsoCrumple * 0.34 + lowBuckle * 0.28 + recoveryEcho * 0.34) * anatomy.handWhip, 0, 1.35);
+  const fingerSplay = clamp((openPalm * 0.58 + snap * 0.18 + recoveryEcho * 0.2) * anatomy.fingerShock, 0, 1.15);
+  const ankleDrag = grounded ? clamp((lowBuckle * 0.62 + skid * 0.3 + recoveryEcho * 0.14) * anatomy.footLag, 0, 1.55) : 0;
+  const toeClaw = grounded ? clamp((lowBuckle * 0.36 + floor * 0.38 + skid * 0.18 + torsoCrumple * 0.12) * anatomy.toeClaw, 0, 1.38) : 0;
+  const bracePlant = grounded ? clamp((floor * 0.52 + skid * 0.22 + lowBuckle * 0.42 + torsoCrumple * 0.18) * anatomy.settle, 0, 1.45) : 0;
+  const skidWeight = grounded ? clamp((skid * 0.58 + ankleDrag * 0.36 + bracePlant * 0.22) * anatomy.shadowWeight, 0, 1.75) : 0;
+  const shadowWeight = grounded ? clamp((bracePlant * 0.44 + skidWeight * 0.38 + lowBuckle * 0.28 + torsoCrumple * 0.2 + hurtT * 0.08) * anatomy.shadowWeight, 0, 1.75) : 0;
+
+  return {
+    active,
+    localDir,
+    zone,
+    headSnap,
+    torsoCrumple,
+    lowBuckle,
+    shoulderLag,
+    spineRipple,
+    hipCounter,
+    openPalm,
+    fingerSplay,
+    ankleDrag,
+    toeClaw,
+    bracePlant,
+    skidWeight,
+    shadowWeight,
+    recoveryEcho,
+  };
+}
+
 function entrancePoseProfile(f) {
   return {
     p1: { slide: 1.12, lift: 0.82, weight: 1.18, flourish: 0.86, lean: 0.025, guard: 0.74, settle: 1.16, foot: 1.16, front: [[45, -112], [48, -92]], back: [[-42, -118], [-35, -98]], aura: 0.82 },
@@ -10970,13 +11063,16 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
   const attackAnatomy = attackPresent ? attackAnatomyPolishProfile(f, attackPresent) : null;
   const attackContact = attackAnatomy ? clamp(attackAnatomy.contact * 0.68 + attackAnatomy.supportPlant * 0.28, 0, 1.25) : 0;
   const hitMass = f.hurt > 0 || (f.reactionPulse ?? 0) > 0 ? hitReactionMassProfile(f) : null;
+  const reactionAnatomy = hitMass ? localizedHitReactionAnatomyProfile(f, hitMass) : null;
   const reactionFloor = hitMass ? clamp(hitMass.floor, 0, 1.7) : 0;
   const reactionSkid = hitMass ? clamp(hitMass.skid, 0, 1.85) : 0;
+  const reactionAnatomyWeight = reactionAnatomy ? clamp(reactionAnatomy.shadowWeight, 0, 1.75) : 0;
+  const reactionAnatomySkid = reactionAnatomy ? clamp(reactionAnatomy.skidWeight, 0, 1.75) : 0;
   const recoveryPolish = hurtRecoveryPolishProfile(f);
   const recoveryShadowWeight = f.grounded ? recoveryPolish.shadowWeight : 0;
   const recoveryToeDrag = f.grounded ? recoveryPolish.toeDrag : 0;
   const attackOffset = (attackDrive * 8 - attackLoad * 5 - (attackWeight?.recoil ?? 0) * 2.4) * (f.dir || 1) * FIGHTER_SCALE;
-  const reactionOffset = hitMass ? hitMass.worldDir * reactionSkid * 7 * FIGHTER_SCALE : 0;
+  const reactionOffset = hitMass ? hitMass.worldDir * (reactionSkid * 7 + reactionAnatomySkid * 3.2) * FIGHTER_SCALE : 0;
   const recoveryOffset = recoveryPolish.impactDir * (recoveryPolish.shadowShift * 4.8 - recoveryToeDrag * 2.4) * FIGHTER_SCALE;
   const defeatOffset = defeatContact.fallDir * (defeatContact.shadowAlign * 5.8 + defeatContact.footDrag * 2.6) * FIGHTER_SCALE;
   const stopOffset = -(f.walkStopDir || 0) * stopStrength * 7 * FIGHTER_SCALE;
@@ -10992,9 +11088,9 @@ function drawWorldContactShadow(f, baseX, walking, stride, impactEase) {
     movePresent.airLocal * movePresent.preLand * 3.2
   ) * FIGHTER_SCALE;
   const idleOffset = (f.dir || 1) * (idlePresence.hipOpp * 1.2 + (idlePresence.frontPress - idlePresence.backPress) * 1.8) * idleGround * FIGHTER_SCALE;
-  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + landingDustBloom * 18 + preLandShadow * 18 + airToeShadow * 12 + aerialContactWeight * 14 + facingPress * 34 + facingSnap * 16 + pivot.press * 18 + pivot.snap * 9 + startPresence.floorWeight * 30 + startPresence.snapReach * 10 + idleWeightShift * 13 + idleToeGrip * 8 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + movePresent.walkLoad * 14 + movePresent.walkReach * 8 + movePresent.walkHeelRoll * 10 + movePresent.walkToePush * 9 + movePresent.pivotFootPress * 13 + movePresent.stopHeelCatch * 12 + movePresent.pivotHipTwist * 8 + movePresent.turnShoulderWhip * 7 + movePresent.landingSquash * 16 + movePresent.landingHeelBite * 8 + movePresent.crouchFootPress * 14 + guardPresent.footPress * 23 + guardPresent.footSpread * 16 + guardPresent.impact * 12 + resultPresent.victoryLift * 12 + resultPresent.cheerLift * 9 + resultPresent.heroFootDig * 13 + resultPresent.sprawl * 36 + resultPresent.dust * 22 + resultPresent.koFloorContact * 22 + resultPresent.koSlamEcho * 14 + defeatContact.shadowAlign * 26 + defeatContact.floorCompression * 18 + defeatContact.footDrag * 16 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18 + recoveryShadowWeight * 18 + recoveryToeDrag * 12) * FIGHTER_SCALE * (1 - air * 0.38);
-  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + landingDustBloom * 2.4 + preLandShadow * 2.2 + airToeShadow * 1.2 + aerialContactWeight * 1.6 + facingPress * 4.8 + facingSnap * 1.7 + pivot.press * 2.2 + startPresence.floorWeight * 3.4 + startPresence.footPress * 1.2 + idleWeightShift * 1.3 + idleToeGrip * 0.8 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + movePresent.walkLoad * 1.4 + movePresent.walkHeelRoll * 1.3 + movePresent.walkToePush * 0.8 + movePresent.pivotFootPress * 1.6 + movePresent.stopHeelCatch * 1.5 + movePresent.pivotHipTwist * 1.1 + movePresent.landingPress * 2.2 + movePresent.landingKneeAbsorb * 1.4 + movePresent.crouchFootPress * 1.9 + guardPresent.footPress * 2.7 + guardPresent.brace * 1.1 + resultPresent.victory * 0.8 + resultPresent.heroFootDig * 1.5 + resultPresent.collapse * 3.2 + resultPresent.slam * 2.4 + resultPresent.koFloorContact * 1.6 + resultPresent.koSlamEcho * 2.2 + defeatContact.shadowWeight * 2.4 + defeatContact.floorCompression * 1.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7 + recoveryShadowWeight * 1.8 + recoveryToeDrag * 0.9) * FIGHTER_SCALE * (1 - air * 0.48);
-  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + landingDustBloom * 0.04 + preLandShadow * 0.035 + airToeShadow * 0.018 + aerialContactWeight * 0.026 + facingPress * 0.085 + facingSnap * 0.035 + pivot.press * 0.042 + pivot.snap * 0.02 + startPresence.floorWeight * 0.065 + startPresence.fightSnap * 0.035 + idleWeightShift * 0.026 + idleToeGrip * 0.014 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + movePresent.walkLoad * 0.032 + movePresent.walkHeelRoll * 0.024 + movePresent.walkToePush * 0.018 + movePresent.pivotFootPress * 0.03 + movePresent.stopHeelCatch * 0.032 + movePresent.pivotHipTwist * 0.02 + movePresent.landingSquash * 0.04 + movePresent.landingHeelBite * 0.026 + movePresent.crouchFootPress * 0.026 + guardPresent.footPress * 0.048 + guardPresent.impact * 0.055 + guardPresent.counter * 0.032 + resultPresent.glow * 0.032 + resultPresent.heroPlant * 0.024 + resultPresent.dust * 0.06 + resultPresent.collapse * 0.042 + resultPresent.koFloorContact * 0.045 + resultPresent.koSlamEcho * 0.035 + defeatContact.shadowWeight * 0.054 + defeatContact.finalSettle * 0.024 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052 + recoveryShadowWeight * 0.04, 0.08, 0.64);
+  const width = (62 + spec.stance * 18 + walkSpread + crouchSpread + impactEase * 16 + landing * 18 + landingWeight * 28 + landingDustBloom * 18 + preLandShadow * 18 + airToeShadow * 12 + aerialContactWeight * 14 + facingPress * 34 + facingSnap * 16 + pivot.press * 18 + pivot.snap * 9 + startPresence.floorWeight * 30 + startPresence.snapReach * 10 + idleWeightShift * 13 + idleToeGrip * 8 + step * 8 + plant * 10 + anchor * 12 + push * 7 + stopStrength * 22 + movePresent.walkLoad * 14 + movePresent.walkReach * 8 + movePresent.walkHeelRoll * 10 + movePresent.walkToePush * 9 + movePresent.pivotFootPress * 13 + movePresent.stopHeelCatch * 12 + movePresent.pivotHipTwist * 8 + movePresent.turnShoulderWhip * 7 + movePresent.landingSquash * 16 + movePresent.landingHeelBite * 8 + movePresent.crouchFootPress * 14 + guardPresent.footPress * 23 + guardPresent.footSpread * 16 + guardPresent.impact * 12 + resultPresent.victoryLift * 12 + resultPresent.cheerLift * 9 + resultPresent.heroFootDig * 13 + resultPresent.sprawl * 36 + resultPresent.dust * 22 + resultPresent.koFloorContact * 22 + resultPresent.koSlamEcho * 14 + defeatContact.shadowAlign * 26 + defeatContact.floorCompression * 18 + defeatContact.footDrag * 16 + attackPlant * 25 + attackDrive * 19 + attackCompression * 10 + reactionFloor * 24 + reactionSkid * 18 + reactionAnatomyWeight * 18 + reactionAnatomySkid * 10 + recoveryShadowWeight * 18 + recoveryToeDrag * 12) * FIGHTER_SCALE * (1 - air * 0.38);
+  const height = (8.5 + spec.stance * 2.4 + impactEase * 2 + landing * 2.6 + landingWeight * 4.4 + landingDustBloom * 2.4 + preLandShadow * 2.2 + airToeShadow * 1.2 + aerialContactWeight * 1.6 + facingPress * 4.8 + facingSnap * 1.7 + pivot.press * 2.2 + startPresence.floorWeight * 3.4 + startPresence.footPress * 1.2 + idleWeightShift * 1.3 + idleToeGrip * 0.8 + step * 1.4 + plant * 0.8 + anchor * 1.8 + stopStrength * 3.6 + movePresent.walkLoad * 1.4 + movePresent.walkHeelRoll * 1.3 + movePresent.walkToePush * 0.8 + movePresent.pivotFootPress * 1.6 + movePresent.stopHeelCatch * 1.5 + movePresent.pivotHipTwist * 1.1 + movePresent.landingPress * 2.2 + movePresent.landingKneeAbsorb * 1.4 + movePresent.crouchFootPress * 1.9 + guardPresent.footPress * 2.7 + guardPresent.brace * 1.1 + resultPresent.victory * 0.8 + resultPresent.heroFootDig * 1.5 + resultPresent.collapse * 3.2 + resultPresent.slam * 2.4 + resultPresent.koFloorContact * 1.6 + resultPresent.koSlamEcho * 2.2 + defeatContact.shadowWeight * 2.4 + defeatContact.floorCompression * 1.6 + attackPlant * 3.4 + attackCompression * 1.2 + reactionFloor * 2.7 + reactionAnatomyWeight * 1.8 + recoveryShadowWeight * 1.8 + recoveryToeDrag * 0.9) * FIGHTER_SCALE * (1 - air * 0.48);
+  const alpha = clamp(0.3 - air * 0.18 + impactEase * 0.06 + landing * 0.045 + landingWeight * 0.075 + landingDustBloom * 0.04 + preLandShadow * 0.035 + airToeShadow * 0.018 + aerialContactWeight * 0.026 + facingPress * 0.085 + facingSnap * 0.035 + pivot.press * 0.042 + pivot.snap * 0.02 + startPresence.floorWeight * 0.065 + startPresence.fightSnap * 0.035 + idleWeightShift * 0.026 + idleToeGrip * 0.014 + step * 0.025 + plant * 0.018 + anchor * 0.04 + stopStrength * 0.055 + movePresent.walkLoad * 0.032 + movePresent.walkHeelRoll * 0.024 + movePresent.walkToePush * 0.018 + movePresent.pivotFootPress * 0.03 + movePresent.stopHeelCatch * 0.032 + movePresent.pivotHipTwist * 0.02 + movePresent.landingSquash * 0.04 + movePresent.landingHeelBite * 0.026 + movePresent.crouchFootPress * 0.026 + guardPresent.footPress * 0.048 + guardPresent.impact * 0.055 + guardPresent.counter * 0.032 + resultPresent.glow * 0.032 + resultPresent.heroPlant * 0.024 + resultPresent.dust * 0.06 + resultPresent.collapse * 0.042 + resultPresent.koFloorContact * 0.045 + resultPresent.koSlamEcho * 0.035 + defeatContact.shadowWeight * 0.054 + defeatContact.finalSettle * 0.024 + attackPlant * 0.058 + attackCompression * 0.025 + reactionFloor * 0.052 + reactionAnatomyWeight * 0.035 + recoveryShadowWeight * 0.04, 0.08, 0.64);
 
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
@@ -20873,6 +20969,7 @@ function getPose(f, stride) {
     const absorbStyle = f.profileId === "p1" ? 0.82 : f.profileId === "p2" ? 1.12 : f.profileId === "p3" ? 0.68 : 1;
     const liftStyle = f.profileId === "p1" ? 0.74 : f.profileId === "p2" ? 1.18 : f.profileId === "p3" ? 0.58 : 1;
     const anatomy = hitReactionAnatomyProfile(f);
+    const localizedAnatomy = localizedHitReactionAnatomyProfile(f, hitMass, localizedImpact);
     const braceFoot = worldLocal > 0 ? "backLeg" : "frontLeg";
     const freeFoot = braceFoot === "backLeg" ? "frontLeg" : "backLeg";
     const headHit = hitMass.zone === "head";
@@ -21048,6 +21145,60 @@ function getPose(f, stride) {
       base[freeFoot].foot.x += worldLocal * footRelease * (lowHit ? 2.8 : 1.4) * spec.stance;
       base[freeFoot].foot.y += footRelease * (lowHit ? 1.4 : -0.55);
       base[freeFoot].footAngle = (base[freeFoot].footAngle ?? 0) + worldLocal * (toeShock * 0.018 + footRelease * 0.018);
+    }
+
+    if (localizedAnatomy.active > 0.025) {
+      const headSnap = clamp(localizedAnatomy.headSnap, 0, 1.7);
+      const torsoCrumple = clamp(localizedAnatomy.torsoCrumple, 0, 1.55);
+      const lowBuckle = clamp(localizedAnatomy.lowBuckle, 0, 1.7);
+      const shoulderLag = clamp(localizedAnatomy.shoulderLag, 0, 1.65);
+      const spineRipple = clamp(localizedAnatomy.spineRipple, 0, 1.62);
+      const hipCounter = clamp(localizedAnatomy.hipCounter, 0, 1.6);
+      const openPalm = clamp(localizedAnatomy.openPalm, 0, 1.35);
+      const fingerSplay = clamp(localizedAnatomy.fingerSplay, 0, 1.15);
+      const ankleDrag = clamp(localizedAnatomy.ankleDrag, 0, 1.55);
+      const toeClaw = clamp(localizedAnatomy.toeClaw, 0, 1.38);
+      const bracePlant = clamp(localizedAnatomy.bracePlant, 0, 1.45);
+      const skidWeight = clamp(localizedAnatomy.skidWeight, 0, 1.75);
+      const recoveryEcho = clamp(localizedAnatomy.recoveryEcho, 0, 1.55);
+      const palmDir = headHit ? localDir : -localDir;
+
+      base.torsoTilt += localDir * (-headSnap * 0.024 + torsoCrumple * 0.018 + lowBuckle * 0.022 + spineRipple * (headHit ? -0.012 : 0.01));
+      base.frontArm.shoulder.x += localDir * (headSnap * 3.1 - torsoCrumple * 1.7 - lowBuckle * 0.8 + shoulderLag * 1.2) * spec.stance;
+      base.frontArm.shoulder.y += -headSnap * 2.2 + torsoCrumple * 2.5 + lowBuckle * 1.1 + spineRipple * 0.7;
+      base.backArm.shoulder.x += localDir * (headSnap * 2.2 - torsoCrumple * 2.2 - lowBuckle * 0.7 + shoulderLag * 0.9) * spec.stance;
+      base.backArm.shoulder.y += -headSnap * 1.4 + torsoCrumple * 3.1 + lowBuckle * 1.4 + spineRipple * 0.55;
+      base.frontLeg.hip.x -= localDir * (hipCounter * 2.6 + lowBuckle * 1.4) * spec.stance;
+      base.frontLeg.hip.y += torsoCrumple * 1.2 + lowBuckle * 3.4 + hipCounter * 1.3;
+      base.backLeg.hip.x += localDir * (hipCounter * 2.1 + lowBuckle * 1.1) * spec.stance;
+      base.backLeg.hip.y += torsoCrumple * 1.5 + lowBuckle * 3.9 + hipCounter * 1.5;
+
+      base.frontArm.elbow.x += palmDir * (openPalm * 4.5 + fingerSplay * 2.2 + headSnap * 2.7 - torsoCrumple * 1.4) * spec.stance;
+      base.frontArm.elbow.y += -headSnap * 3.8 + torsoCrumple * 4.8 + lowBuckle * 4.2 + recoveryEcho * 2.2;
+      base.frontArm.hand.x += palmDir * (openPalm * 9.8 + fingerSplay * 3.8 + headSnap * 4.8 - torsoCrumple * 2.2) * spec.stance;
+      base.frontArm.hand.y += -headSnap * 8.4 + torsoCrumple * 7.8 + lowBuckle * 8.2 + recoveryEcho * 3.4;
+      base.backArm.elbow.x += palmDir * (openPalm * 3.8 + fingerSplay * 1.8 + headSnap * 2.1 - torsoCrumple * 1.2) * spec.stance;
+      base.backArm.elbow.y += -headSnap * 3.1 + torsoCrumple * 4.1 + lowBuckle * 3.4 + recoveryEcho * 1.8;
+      base.backArm.hand.x += palmDir * (openPalm * 8.1 + fingerSplay * 3.2 + headSnap * 4.1 - torsoCrumple * 1.8) * spec.stance;
+      base.backArm.hand.y += -headSnap * 7.2 + torsoCrumple * 6.4 + lowBuckle * 6.8 + recoveryEcho * 2.9;
+
+      base[braceFoot].knee.x -= worldLocal * (lowBuckle * 5.6 + bracePlant * 2.8 + skidWeight * 1.9) * spec.stance;
+      base[braceFoot].knee.y += lowBuckle * 7.8 + bracePlant * 4.1 + torsoCrumple * 1.4;
+      base[braceFoot].foot.x -= worldLocal * (ankleDrag * 7.8 + skidWeight * 4.2 + bracePlant * 2.4) * spec.stance;
+      base[braceFoot].foot.y += bracePlant * 0.9 + ankleDrag * 1.2;
+      base[braceFoot].plant = Math.max(base[braceFoot].plant ?? 0, clamp(0.52 + bracePlant * 0.32 + skidWeight * 0.12, 0, 1));
+      base[braceFoot].toeFlex = Math.max(base[braceFoot].toeFlex ?? 0, clamp(toeClaw * 0.82 + bracePlant * 0.14, 0, 1));
+      base[braceFoot].footAngle = (base[braceFoot].footAngle ?? 0) - worldLocal * (ankleDrag * 0.034 + toeClaw * 0.026 + bracePlant * 0.016);
+      base[freeFoot].knee.x += worldLocal * (lowBuckle * 4.2 + ankleDrag * 2.6 + recoveryEcho * 1.4) * spec.stance;
+      base[freeFoot].knee.y += lowBuckle * 6.6 + ankleDrag * 3.8 + torsoCrumple * 1.1;
+      base[freeFoot].foot.x += worldLocal * (lowBuckle * 7.4 + ankleDrag * 6.2 + recoveryEcho * 2.4) * spec.stance;
+      base[freeFoot].foot.y += lowBuckle * 3.4 + ankleDrag * 2.6;
+      base[freeFoot].toeFlex = Math.max(base[freeFoot].toeFlex ?? 0, clamp(toeClaw * (lowHit ? 0.72 : 0.38), 0, 0.82));
+      base[freeFoot].footAngle = (base[freeFoot].footAngle ?? 0) + worldLocal * (ankleDrag * 0.04 + toeClaw * 0.018 + recoveryEcho * 0.012);
+      base.frontArm.handCurl = clamp((base.frontArm.handCurl ?? 0.5) - openPalm * 0.12 + bracePlant * 0.035, 0.04, 1);
+      base.backArm.handCurl = clamp((base.backArm.handCurl ?? 0.5) - openPalm * 0.1 + bracePlant * 0.028, 0.04, 1);
+      base.frontArm.fingerFidget = Math.max(base.frontArm.fingerFidget ?? 0, fingerSplay);
+      base.backArm.fingerFidget = Math.max(base.backArm.fingerFidget ?? 0, fingerSplay * 0.86);
     }
   }
 
